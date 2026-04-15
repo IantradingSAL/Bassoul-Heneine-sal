@@ -1,0 +1,2258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Renault Warranty — Bassoul Heneine</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+// ══ LANGUAGE ═════════════════════════════════════════════════
+let _lang = 'en';
+function setLang(l){
+  _lang = l;
+  document.body.classList.toggle('lang-fr', l==='fr');
+  document.getElementById('LANG_EN').classList.toggle('active', l==='en');
+  document.getElementById('LANG_FR').classList.toggle('active', l==='fr');
+  // update placeholders
+  const placeholders = {
+    'GSEARCH':     {en:'Search VIN, invoice, RO, NITG…',     fr:'Rechercher VIN, facture, OR, NITG…'},
+    'F_GQ':        {en:'VIN, invoice, RO, NITG…',            fr:'VIN, facture, OR, NITG…'},
+    'F_EQ':        {en:'Code or description…',               fr:'Code ou description…'},
+    'F_CQ':        {en:'Search VIN…',                        fr:'Rechercher VIN…'},
+    'F_IQ':        {en:'VIN, invoice, order, customer…',     fr:'VIN, facture, ordre, client…'},
+  };
+  for(const [id,v] of Object.entries(placeholders)){
+    const el=document.getElementById(id); if(el) el.placeholder = v[l]||v.en;
+  }
+  // sidebar labels
+  const siLabels = {
+    'upload':    {en:'Upload Files',    fr:'Télécharger'},
+    'gcm':       {en:'GCM Claims',      fr:'Dossiers GCM'},
+    'overview':  {en:'General View',    fr:'Vue Générale'},
+    'expense':   {en:'Expense Codes',   fr:'Codes Dépense'},
+    'comparison':{en:'Incadea vs GCM',  fr:'Incadea vs GCM'},
+    'askedpaid': {en:'Asked vs Paid',   fr:'Demandé vs Payé'},
+    'rejections':{en:'Rejections',      fr:'Rejets'},
+    'incadea':   {en:'Incadea Data',    fr:'Données Incadea'},
+    'bonus':     {en:'Bonus 1%',        fr:'Bonus 1%'},
+  };
+  document.querySelectorAll('.si[data-page]').forEach(el=>{
+    const pg = el.dataset.page;
+    if(!siLabels[pg]) return;
+    const badge = el.querySelector('.sbadge');
+    const emoji = el.querySelector('.si-emoji');
+    el.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=''; });
+    // rebuild text
+    const txt = document.createTextNode(siLabels[pg][l]||siLabels[pg].en);
+    if(emoji) el.insertBefore(txt, badge||null);
+    else el.appendChild(txt);
+  });
+  // re-render current page if data loaded
+  const active = document.querySelector('.si.active');
+  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus})[active.dataset.page]?.();
+}
+
+// ══ HELP CONTENT ══════════════════════════════════════════════
+const HELP = {
+  upload:{
+    icon:'⬆️', bg:'var(--sky3)',
+    en:{title:'Upload Files',sub:'How to import your monthly data',
+      rules:[
+        {icon:'📋',title:'GCM Claims File',desc:'Export from the GCM portal every month. File name: Claims_detail_MM_YYYY_LB.xlsx. Drop it on the left dropzone or click "Choose File".'},
+        {icon:'🔧',title:'INCADEA File',desc:'Export from your INCADEA DMS. The system reads the "INCADEA" sheet automatically. Drop on the right dropzone.'},
+        {icon:'🔑',title:'Duplicate Detection',desc:'Claims with the same VIN + Invoice # combination are automatically flagged as duplicates and excluded from all calculations.'},
+        {icon:'🕐',title:'Last Update',desc:'The header shows how many claims were imported and the exact time of the last upload. Upload new files each month to accumulate history.'},
+      ],
+      buttons:[{icon:'📂',label:'Choose File — opens file browser'},{icon:'🗂️',label:'Drag & Drop — drop file directly on the zone'}]
+    },
+    fr:{title:'Télécharger les Fichiers',sub:'Comment importer vos données mensuelles',
+      rules:[
+        {icon:'📋',title:'Fichier GCM',desc:'Exportez depuis le portail GCM chaque mois. Nom: Claims_detail_MM_YYYY_LB.xlsx. Déposez-le dans la zone gauche.'},
+        {icon:'🔧',title:'Fichier INCADEA',desc:'Export depuis votre DMS INCADEA. Le système lit automatiquement l'onglet "INCADEA".'},
+        {icon:'🔑',title:'Détection des Doublons',desc:'Les dossiers avec le même VIN + N° Facture sont automatiquement signalés comme doublons et exclus de tous les calculs.'},
+        {icon:'🕐',title:'Dernière Mise à Jour',desc:'L'en-tête affiche le nombre de dossiers importés et l'heure exacte du dernier import. Importez de nouveaux fichiers chaque mois.'},
+      ],
+      buttons:[{icon:'📂',label:'Choisir Fichier — ouvre l'explorateur'},{icon:'🗂️',label:'Glisser-Déposer — déposez le fichier directement'}]
+    }
+  },
+  gcm:{
+    icon:'📋', bg:'var(--sun3)',
+    en:{title:'GCM Claims',sub:'All warranty claims from the GCM portal',
+      rules:[
+        {icon:'✅',title:'Paid Claims (Status 0)',desc:'Claims where invoice_flag_state = 0. Renault has accepted and paid these. Shown with a green "Paid" badge.'},
+        {icon:'❌',title:'Rejected Claims (Status 4)',desc:'Claims where invoice_flag_state = 4. Renault has rejected these. Use the "+ Track" button to record the reason and resubmission details.'},
+        {icon:'🔑',title:'Deduplication Key',desc:'VIN + Invoice # is used as the unique key. Duplicates are highlighted in yellow and excluded from all totals.'},
+        {icon:'💰',title:'Amount Fields',desc:'Parts Asked/Paid = part amounts. Labour Asked/Paid = labour amounts. Total = sum of all. "Asked" = submitted to Renault. "Paid" = approved by Renault.'},
+        {icon:'🔍',title:'Filters & Search',desc:'Filter by Month, Expense Code, or Status. Use the search box to find any VIN, Invoice #, RO number, or NITG code instantly.'},
+      ],
+      buttons:[{icon:'+ Track',label:'Opens the rejection tracking modal for a rejected claim'},{icon:'✏️ Edit',label:'Re-open the tracking modal to update rejection details'}]
+    },
+    fr:{title:'Dossiers GCM',sub:'Tous les dossiers de garantie du portail GCM',
+      rules:[
+        {icon:'✅',title:'Dossiers Payés (Statut 0)',desc:'Dossiers où invoice_flag_state = 0. Renault a accepté et payé ces dossiers. Badge vert "Payé".'},
+        {icon:'❌',title:'Dossiers Rejetés (Statut 4)',desc:'Dossiers où invoice_flag_state = 4. Renault a rejeté ces dossiers. Utilisez le bouton "+ Suivre" pour enregistrer la raison et les détails de re-soumission.'},
+        {icon:'🔑',title:'Clé de Dédoublonnage',desc:'VIN + N° Facture est utilisé comme clé unique. Les doublons sont surlignés en jaune et exclus de tous les totaux.'},
+        {icon:'💰',title:'Champs Montants',desc:'PR Demandé/Payé = montants pièces. MO Demandé/Payé = montants main-d'œuvre. Total Demandé = soumis à Renault. Total Payé = approuvé par Renault.'},
+        {icon:'🔍',title:'Filtres & Recherche',desc:'Filtrez par Mois, Code Dépense, ou Statut. Utilisez la recherche pour trouver VIN, N° Facture, N° OR, ou code NITG.'},
+      ],
+      buttons:[{icon:'+ Suivre',label:'Ouvre le modal de suivi de rejet'},{icon:'✏️ Modifier',label:'Rouvrir le modal pour mettre à jour les détails'}]
+    }
+  },
+  overview:{
+    icon:'📊', bg:'var(--sky3)',
+    en:{title:'General View',sub:'Monthly summary and trends',
+      rules:[
+        {icon:'📅',title:'Monthly Subtotals',desc:'Each row represents one month of data. Columns show Parts Asked, Parts Paid, Labour Asked, Labour Paid, Total Asked, Total Paid, and Deducted (difference).'},
+        {icon:'📈',title:'Chart',desc:'Bar chart shows Parts Paid (orange) and Labour Paid (blue) per month. The purple line shows Total Paid trend across months.'},
+        {icon:'📉',title:'Deducted Amount',desc:'The "Deducted" column = Total Asked − Total Paid. This is the amount Renault did not reimburse. Red values mean deductions occurred.'},
+        {icon:'🚗',title:'Unique VINs',desc:'Number of distinct vehicles (VINs) in the loaded data — each VIN is one vehicle.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Vue Générale',sub:'Résumé mensuel et tendances',
+      rules:[
+        {icon:'📅',title:'Sous-totaux Mensuels',desc:'Chaque ligne représente un mois de données. Colonnes: PR Demandé, PR Payé, MO Demandé, MO Payé, Total Demandé, Total Payé, Déduit.'},
+        {icon:'📈',title:'Graphique',desc:'Barres: PR Payé (orange) et MO Payé (bleu) par mois. La ligne violette montre la tendance du Total Payé.'},
+        {icon:'📉',title:'Montant Déduit',desc:'Colonne "Déduit" = Total Demandé − Total Payé. C'est le montant que Renault n'a pas remboursé. Valeurs en rouge = déductions.'},
+        {icon:'🚗',title:'VINs Uniques',desc:'Nombre de véhicules distincts (VINs) dans les données chargées — chaque VIN = un véhicule.'},
+      ],
+      buttons:[]
+    }
+  },
+  expense:{
+    icon:'🏷️', bg:'var(--lemon3)',
+    en:{title:'By Expense Code',sub:'Claims grouped by warranty expense type',
+      rules:[
+        {icon:'🏷️',title:'Expense Code',desc:'Each code (e.g. G36) represents a type of warranty expense defined by Renault. "G36" = Warranty group first year, etc.'},
+        {icon:'📊',title:'% Share',desc:'The percentage column shows what proportion of total paid amount each expense code represents.'},
+        {icon:'🔢',title:'Sorting',desc:'Table is sorted by Total Paid descending — the most expensive expense type appears first.'},
+        {icon:'🗓️',title:'Month Filter',desc:'Use the Month filter to see the expense breakdown for a specific month only.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Par Code Dépense',sub:'Dossiers regroupés par type de dépense garantie',
+      rules:[
+        {icon:'🏷️',title:'Code Dépense',desc:'Chaque code (ex: G36) représente un type de dépense garantie défini par Renault. "G36" = Garantie groupe première année, etc.'},
+        {icon:'📊',title:'% Part',desc:'La colonne pourcentage montre la proportion du montant total payé que représente chaque code dépense.'},
+        {icon:'🔢',title:'Tri',desc:'Table triée par Total Payé décroissant — le type de dépense le plus coûteux apparaît en premier.'},
+        {icon:'🗓️',title:'Filtre Mois',desc:'Utilisez le filtre Mois pour voir la répartition par code dépense pour un mois spécifique.'},
+      ],
+      buttons:[]
+    }
+  },
+  comparison:{
+    icon:'⚖️', bg:'var(--pur3)',
+    en:{title:'Incadea vs GCM',sub:'Reconciliation between your DMS and Renault portal',
+      rules:[
+        {icon:'⚖️',title:'Purpose',desc:'Compares the amounts recorded in your INCADEA DMS against what GCM (Renault portal) shows. Differences reveal data entry gaps or timing issues.'},
+        {icon:'🔴',title:'Positive Δ (red)',desc:'GCM total is HIGHER than Incadea. Renault paid more than what INCADEA recorded — check if all invoices were entered in INCADEA.'},
+        {icon:'🟢',title:'Negative Δ (green)',desc:'GCM total is LOWER than Incadea. INCADEA has more than Renault paid — check for rejected claims or missing GCM submissions.'},
+        {icon:'✅',title:'Perfect Match',desc:'Δ Total = 0.00. GCM and Incadea are in perfect agreement for this VIN. Aim to maximise this count.'},
+        {icon:'🔍',title:'Differences Only filter',desc:'Select "Differences Only" in the filter to focus on VINs that need investigation.'},
+      ],
+      buttons:[{icon:'⚠️ Differences Only',label:'Filter to show only VINs with a discrepancy'},{icon:'✅ Matches Only',label:'Filter to show only perfectly reconciled VINs'}]
+    },
+    fr:{title:'Incadea vs GCM',sub:'Rapprochement entre votre DMS et le portail Renault',
+      rules:[
+        {icon:'⚖️',title:'Objectif',desc:'Compare les montants enregistrés dans votre DMS INCADEA avec ce que GCM (portail Renault) affiche. Les écarts révèlent des oublis de saisie ou des décalages.'},
+        {icon:'🔴',title:'Δ Positif (rouge)',desc:'Total GCM SUPÉRIEUR à Incadea. Renault a payé plus que ce qu'INCADEA a enregistré — vérifiez si toutes les factures sont saisies dans INCADEA.'},
+        {icon:'🟢',title:'Δ Négatif (vert)',desc:'Total GCM INFÉRIEUR à Incadea. INCADEA a plus que ce que Renault a payé — vérifiez les dossiers rejetés ou les soumissions GCM manquantes.'},
+        {icon:'✅',title:'Correspondance Parfaite',desc:'Δ Total = 0,00. GCM et Incadea sont en parfait accord pour ce VIN.'},
+        {icon:'🔍',title:'Filtre Écarts Seulement',desc:'Sélectionnez "Écarts Seulement" pour vous concentrer sur les VINs à investiguer.'},
+      ],
+      buttons:[{icon:'⚠️ Écarts Seulement',label:'Filtrer pour afficher uniquement les VINs avec écart'},{icon:'✅ Correspondances',label:'Filtrer pour afficher les VINs parfaitement réconciliés'}]
+    }
+  },
+  askedpaid:{
+    icon:'📈', bg:'var(--mint3)',
+    en:{title:'Asked vs Paid',sub:'Gap analysis between submitted and approved amounts',
+      rules:[
+        {icon:'📤',title:'Total Asked',desc:'The total amount submitted to Renault (received_amount_eur). This is what you claim should be reimbursed.'},
+        {icon:'💵',title:'Total Paid',desc:'The definitive amount Renault approved (definitive_amount_without_pco_eur). This is what was actually reimbursed.'},
+        {icon:'📉',title:'Deduction Rate',desc:'(Asked − Paid) / Asked × 100. A high deduction rate means Renault is regularly paying less than requested. Investigate expense codes with high gaps.'},
+        {icon:'📅',title:'Subtotals',desc:'Monthly subtotal rows (yellow) aggregate all expense codes for each month. Grand Total row (dark) shows the overall position.'},
+        {icon:'🏷️',title:'By Expense Code',desc:'Each row is one month + one expense code combination. This helps identify which expense types have the highest deduction rates.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Demandé vs Payé',sub:'Analyse de l'écart entre soumis et approuvé',
+      rules:[
+        {icon:'📤',title:'Total Demandé',desc:'Montant total soumis à Renault (received_amount_eur). C'est ce que vous réclamez comme remboursement.'},
+        {icon:'💵',title:'Total Payé',desc:'Montant définitif approuvé par Renault (definitive_amount_without_pco_eur). C'est ce qui a réellement été remboursé.'},
+        {icon:'📉',title:'Taux de Déduction',desc:'(Demandé − Payé) / Demandé × 100. Un taux élevé signifie que Renault paie régulièrement moins que demandé.'},
+        {icon:'📅',title:'Sous-totaux',desc:'Lignes de sous-total mensuels (jaune) agrègent tous les codes dépense pour chaque mois. Ligne Total Général (sombre) = position globale.'},
+        {icon:'🏷️',title:'Par Code Dépense',desc:'Chaque ligne = un mois + un code dépense. Identifie quels types de dépenses ont les taux de déduction les plus élevés.'},
+      ],
+      buttons:[]
+    }
+  },
+  rejections:{
+    icon:'❌', bg:'var(--rose3)',
+    en:{title:'Rejections',sub:'Track, annotate and resubmit rejected claims',
+      rules:[
+        {icon:'❌',title:'What is a Rejection?',desc:'A claim where invoice_flag_state = 4 in GCM. Renault has refused to reimburse this claim. It must be corrected and resubmitted.'},
+        {icon:'📝',title:'Recording the Rejection',desc:'Click "+ Track" to open the rejection modal. Fill in: Reason (dropdown), New Claim #, Resubmission Invoice #, Category, and free-text Notes.'},
+        {icon:'🔄',title:'Resubmission Workflow',desc:'Once corrected, enter the new claim number in the "Correct Claim #" field and the new invoice number. This tracks your resubmission history.'},
+        {icon:'🔴',title:'"No Action Yet" filter',desc:'Shows only rejected claims that have not yet been annotated — your to-do list of rejections.'},
+        {icon:'✅',title:'"Has New Claim #" filter',desc:'Shows claims that have been corrected and resubmitted with a new claim number.'},
+      ],
+      buttons:[{icon:'+ Track',label:'Open rejection modal — record reason, new claim #, notes'},{icon:'✏️ Edit',label:'Update existing rejection details'}]
+    },
+    fr:{title:'Rejets',sub:'Suivre, annoter et re-soumettre les dossiers rejetés',
+      rules:[
+        {icon:'❌',title:'Qu'est-ce qu'un Rejet?',desc:'Un dossier où invoice_flag_state = 4 dans GCM. Renault a refusé de rembourser ce dossier. Il doit être corrigé et re-soumis.'},
+        {icon:'📝',title:'Enregistrer le Rejet',desc:'Cliquez sur "+ Suivre" pour ouvrir le modal. Remplissez: Raison (liste), N° Nouveau Dossier, N° Facture Re-soumission, Catégorie, et Notes.'},
+        {icon:'🔄',title:'Processus de Re-soumission',desc:'Une fois corrigé, entrez le nouveau numéro de dossier dans le champ "N° Dossier Correct" et le nouveau numéro de facture.'},
+        {icon:'🔴',title:'Filtre "Aucune Action"',desc:'Affiche uniquement les dossiers rejetés qui n'ont pas encore été annotés — votre liste de tâches de rejets.'},
+        {icon:'✅',title:'Filtre "A un N° de Dossier"',desc:'Affiche les dossiers corrigés et re-soumis avec un nouveau numéro de dossier.'},
+      ],
+      buttons:[{icon:'+ Suivre',label:'Ouvrir le modal de rejet — enregistrer raison, N° nouveau dossier'},{icon:'✏️ Modifier',label:'Mettre à jour les détails du rejet existant'}]
+    }
+  },
+  incadea:{
+    icon:'🔧', bg:'var(--sky3)',
+    en:{title:'Incadea Data',sub:'All records from your INCADEA DMS export',
+      rules:[
+        {icon:'📄',title:'Source',desc:'Data comes from your INCADEA DMS warranty invoice export. The system reads the "INCADEA" sheet from the uploaded file.'},
+        {icon:'🔍',title:'Search',desc:'Search across Invoice No., VIN, Service Order No., Customer name, and External Document No. simultaneously.'},
+        {icon:'🚗',title:'Make Filter',desc:'Filter by vehicle make (RENAULT, DACIA, etc.) to see only one brand's warranty invoices.'},
+        {icon:'⚖️',title:'Use with Comparison',desc:'These records are used in the "Incadea vs GCM" page to reconcile amounts by VIN. Upload both files to see the reconciliation.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Données Incadea',sub:'Tous les enregistrements de votre export DMS INCADEA',
+      rules:[
+        {icon:'📄',title:'Source',desc:'Les données proviennent de votre export de factures garantie DMS INCADEA. Le système lit l'onglet "INCADEA".'},
+        {icon:'🔍',title:'Recherche',desc:'Recherche simultanée sur N° Facture, VIN, N° Ordre de Service, Nom Client, et N° Document Externe.'},
+        {icon:'🚗',title:'Filtre Marque',desc:'Filtrez par marque (RENAULT, DACIA, etc.) pour voir uniquement les factures garantie d'une marque.'},
+        {icon:'⚖️',title:'Utilisation avec Comparaison',desc:'Ces données sont utilisées dans la page "Incadea vs GCM" pour rapprocher les montants par VIN.'},
+      ],
+      buttons:[]
+    }
+  },
+  bonus:{
+    icon:'⭐', bg:'var(--lemon3)',
+    en:{title:'Bonus — 1% Labour',sub:'Monthly bonus based on paid labour amounts',
+      rules:[
+        {icon:'⭐',title:'Bonus Formula',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculated only on PAID claims (invoice_flag_state = 0). Rejected and duplicate claims are excluded.'},
+        {icon:'📅',title:'Per Month',desc:'The bonus is calculated independently for each month. The bar chart shows the relative labour amounts visually.'},
+        {icon:'❌',title:'What is Excluded',desc:'Rejected claims (status ≠ 0) and duplicate rows are excluded from the bonus calculation to avoid double-counting.'},
+        {icon:'💡',title:'How to Read',desc:'The "Your Bonus" column shows the 1% of paid labour for that month. The grand total row shows the cumulative bonus across all loaded months.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Bonus — 1% Main-d'Œuvre',sub:'Bonus mensuel basé sur les montants MO payés',
+      rules:[
+        {icon:'⭐',title:'Formule Bonus',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculé uniquement sur les dossiers PAYÉS (invoice_flag_state = 0). Rejets et doublons exclus.'},
+        {icon:'📅',title:'Par Mois',desc:'Le bonus est calculé indépendamment pour chaque mois. Le graphique barres montre visuellement les montants MO relatifs.'},
+        {icon:'❌',title:'Ce qui est Exclu',desc:'Dossiers rejetés (statut ≠ 0) et doublons exclus du calcul du bonus pour éviter les doubles comptages.'},
+        {icon:'💡',title:'Comment Lire',desc:'La colonne "Votre Bonus" affiche 1% de la MO payée pour ce mois. La ligne total affiche le bonus cumulé sur tous les mois chargés.'},
+      ],
+      buttons:[]
+    }
+  },
+};
+
+// ══ HELP OPEN/CLOSE ══════════════════════════════════════════
+let _helpPage = 'upload';
+function openHelp(){
+  const active = document.querySelector('.si.active');
+  _helpPage = active ? active.dataset.page : 'upload';
+  renderHelp();
+  document.getElementById('HELP_BG').classList.add('open');
+}
+function closeHelp(){ document.getElementById('HELP_BG').classList.remove('open'); }
+
+function renderHelp(){
+  const d = HELP[_helpPage] || HELP['upload'];
+  const lang = _lang;
+  const t = d[lang] || d['en'];
+
+  document.getElementById('HP_ICON').textContent = d.icon;
+  document.getElementById('HP_ICON').style.background = d.bg;
+  document.getElementById('HP_TITLE_EN').textContent = HELP[_helpPage]?.en?.title || t.title;
+  document.getElementById('HP_TITLE_FR').textContent = HELP[_helpPage]?.fr?.title || t.title;
+  document.getElementById('HP_SUB_EN').textContent = HELP[_helpPage]?.en?.sub || t.sub;
+  document.getElementById('HP_SUB_FR').textContent = HELP[_helpPage]?.fr?.sub || t.sub;
+
+  let html = '';
+  // Business Rules
+  html += `<div class="hp-section"><div class="hp-section-title">📋 <span>${lang==='fr'?'Règles Métier':'Business Rules'}</span></div>`;
+  t.rules.forEach(r => {
+    html += `<div class="hp-rule"><div class="hp-rule-icon">${r.icon}</div><div class="hp-rule-content"><div class="hp-rule-title">${r.title}</div><div class="hp-rule-desc">${r.desc}</div></div></div>`;
+  });
+  html += '</div>';
+
+  // Buttons
+  if(t.buttons && t.buttons.length){
+    html += `<div class="hp-section"><div class="hp-section-title">🖱️ <span>${lang==='fr'?'Boutons de cette page':'Buttons on this page'}</span></div><div class="hp-btn-row">`;
+    t.buttons.forEach(b => {
+      html += `<div class="hp-btag"><span>${b.icon}</span><span>${b.label}</span></div>`;
+    });
+    html += '</div></div>';
+  }
+
+  document.getElementById('HP_BODY').innerHTML = html;
+}
+
+// ══ FEEDBACK / IDEA ════════════════════════════════════════════
+let _fbType = 'idea';
+function openFeedback(type){
+  _fbType = type;
+  const isIdea = type === 'idea';
+  document.getElementById('FB_EMOJI').textContent = isIdea ? '💡' : '🔧';
+  document.getElementById('FB_TITLE').textContent = _lang==='fr'
+    ? (isIdea ? 'Nouvelle Idée' : 'Correction Système')
+    : (isIdea ? 'New Idea' : 'System Correction');
+  document.getElementById('FB_SUBJECT').value = '';
+  document.getElementById('FB_SUBJECT_EN').value = '';
+  document.getElementById('FB_BODY').value = '';
+  document.getElementById('FB_BG').classList.add('open');
+}
+function closeFeedback(){ document.getElementById('FB_BG').classList.remove('open'); }
+
+function sendFeedback(){
+  const subjectEl = _lang==='fr' ? document.getElementById('FB_SUBJECT') : document.getElementById('FB_SUBJECT_EN');
+  const subject = (subjectEl?.value || '').trim();
+  const body = (document.getElementById('FB_BODY').value || '').trim();
+  const isIdea = _fbType === 'idea';
+  const prefix = _lang==='fr' ? (isIdea?'[IDÉE] ':'[CORRECTION] ') : (isIdea?'[IDEA] ':'[CORRECTION] ');
+  const pageLabel = (_helpPage||'').toUpperCase();
+  const fullSubject = prefix + (subject || (isIdea ? 'Renault Warranty System — New Idea' : 'Renault Warranty System — Correction Needed')) + ' [' + pageLabel + ']';
+  const greeting = _lang==='fr'
+    ? 'Bonjour,\n\nVoici ma suggestion / correction pour le système de garantie Renault:\n\n'
+    : 'Hello,\n\nHere is my suggestion / correction for the Renault Warranty System:\n\n';
+  const fullBody = greeting + (body || (isIdea ? 'Please describe your idea here.' : 'Please describe the correction needed here.'));
+  const mailto = 'mailto:managment@iantradingsal.com?subject=' + encodeURIComponent(fullSubject) + '&body=' + encodeURIComponent(fullBody.replace(/\\n/g,'\n'));
+  window.location.href = mailto;
+  closeFeedback();
+  closeHelp();
+  showToast('📧 ' + (_lang==='fr' ? 'Outlook ouvert !' : 'Opening Outlook!'));
+}
+
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
+// ══ LANGUAGE ═════════════════════════════════════════════════
+let _lang = 'en';
+function setLang(l){
+  _lang = l;
+  document.body.classList.toggle('lang-fr', l==='fr');
+  document.getElementById('LANG_EN').classList.toggle('active', l==='en');
+  document.getElementById('LANG_FR').classList.toggle('active', l==='fr');
+  // update placeholders
+  const placeholders = {
+    'GSEARCH':     {en:'Search VIN, invoice, RO, NITG…',     fr:'Rechercher VIN, facture, OR, NITG…'},
+    'F_GQ':        {en:'VIN, invoice, RO, NITG…',            fr:'VIN, facture, OR, NITG…'},
+    'F_EQ':        {en:'Code or description…',               fr:'Code ou description…'},
+    'F_CQ':        {en:'Search VIN…',                        fr:'Rechercher VIN…'},
+    'F_IQ':        {en:'VIN, invoice, order, customer…',     fr:'VIN, facture, ordre, client…'},
+  };
+  for(const [id,v] of Object.entries(placeholders)){
+    const el=document.getElementById(id); if(el) el.placeholder = v[l]||v.en;
+  }
+  // sidebar labels
+  const siLabels = {
+    'upload':    {en:'Upload Files',    fr:'Télécharger'},
+    'gcm':       {en:'GCM Claims',      fr:'Dossiers GCM'},
+    'overview':  {en:'General View',    fr:'Vue Générale'},
+    'expense':   {en:'Expense Codes',   fr:'Codes Dépense'},
+    'comparison':{en:'Incadea vs GCM',  fr:'Incadea vs GCM'},
+    'askedpaid': {en:'Asked vs Paid',   fr:'Demandé vs Payé'},
+    'rejections':{en:'Rejections',      fr:'Rejets'},
+    'incadea':   {en:'Incadea Data',    fr:'Données Incadea'},
+    'bonus':     {en:'Bonus 1%',        fr:'Bonus 1%'},
+  };
+  document.querySelectorAll('.si[data-page]').forEach(el=>{
+    const pg = el.dataset.page;
+    if(!siLabels[pg]) return;
+    const badge = el.querySelector('.sbadge');
+    const emoji = el.querySelector('.si-emoji');
+    el.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=''; });
+    // rebuild text
+    const txt = document.createTextNode(siLabels[pg][l]||siLabels[pg].en);
+    if(emoji) el.insertBefore(txt, badge||null);
+    else el.appendChild(txt);
+  });
+  // re-render current page if data loaded
+  const active = document.querySelector('.si.active');
+  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus})[active.dataset.page]?.();
+}
+
+// ══ HELP CONTENT ══════════════════════════════════════════════
+const HELP = {
+  upload:{
+    icon:'⬆️', bg:'var(--sky3)',
+    en:{title:'Upload Files',sub:'How to import your monthly data',
+      rules:[
+        {icon:'📋',title:'GCM Claims File',desc:'Export from the GCM portal every month. File name: Claims_detail_MM_YYYY_LB.xlsx. Drop it on the left dropzone or click "Choose File".'},
+        {icon:'🔧',title:'INCADEA File',desc:'Export from your INCADEA DMS. The system reads the "INCADEA" sheet automatically. Drop on the right dropzone.'},
+        {icon:'🔑',title:'Duplicate Detection',desc:'Claims with the same VIN + Invoice # combination are automatically flagged as duplicates and excluded from all calculations.'},
+        {icon:'🕐',title:'Last Update',desc:'The header shows how many claims were imported and the exact time of the last upload. Upload new files each month to accumulate history.'},
+      ],
+      buttons:[{icon:'📂',label:'Choose File — opens file browser'},{icon:'🗂️',label:'Drag & Drop — drop file directly on the zone'}]
+    },
+    fr:{title:'Télécharger les Fichiers',sub:'Comment importer vos données mensuelles',
+      rules:[
+        {icon:'📋',title:'Fichier GCM',desc:'Exportez depuis le portail GCM chaque mois. Nom: Claims_detail_MM_YYYY_LB.xlsx. Déposez-le dans la zone gauche.'},
+        {icon:'🔧',title:'Fichier INCADEA',desc:'Export depuis votre DMS INCADEA. Le système lit automatiquement l'onglet "INCADEA".'},
+        {icon:'🔑',title:'Détection des Doublons',desc:'Les dossiers avec le même VIN + N° Facture sont automatiquement signalés comme doublons et exclus de tous les calculs.'},
+        {icon:'🕐',title:'Dernière Mise à Jour',desc:'L'en-tête affiche le nombre de dossiers importés et l'heure exacte du dernier import. Importez de nouveaux fichiers chaque mois.'},
+      ],
+      buttons:[{icon:'📂',label:'Choisir Fichier — ouvre l'explorateur'},{icon:'🗂️',label:'Glisser-Déposer — déposez le fichier directement'}]
+    }
+  },
+  gcm:{
+    icon:'📋', bg:'var(--sun3)',
+    en:{title:'GCM Claims',sub:'All warranty claims from the GCM portal',
+      rules:[
+        {icon:'✅',title:'Paid Claims (Status 0)',desc:'Claims where invoice_flag_state = 0. Renault has accepted and paid these. Shown with a green "Paid" badge.'},
+        {icon:'❌',title:'Rejected Claims (Status 4)',desc:'Claims where invoice_flag_state = 4. Renault has rejected these. Use the "+ Track" button to record the reason and resubmission details.'},
+        {icon:'🔑',title:'Deduplication Key',desc:'VIN + Invoice # is used as the unique key. Duplicates are highlighted in yellow and excluded from all totals.'},
+        {icon:'💰',title:'Amount Fields',desc:'Parts Asked/Paid = part amounts. Labour Asked/Paid = labour amounts. Total = sum of all. "Asked" = submitted to Renault. "Paid" = approved by Renault.'},
+        {icon:'🔍',title:'Filters & Search',desc:'Filter by Month, Expense Code, or Status. Use the search box to find any VIN, Invoice #, RO number, or NITG code instantly.'},
+      ],
+      buttons:[{icon:'+ Track',label:'Opens the rejection tracking modal for a rejected claim'},{icon:'✏️ Edit',label:'Re-open the tracking modal to update rejection details'}]
+    },
+    fr:{title:'Dossiers GCM',sub:'Tous les dossiers de garantie du portail GCM',
+      rules:[
+        {icon:'✅',title:'Dossiers Payés (Statut 0)',desc:'Dossiers où invoice_flag_state = 0. Renault a accepté et payé ces dossiers. Badge vert "Payé".'},
+        {icon:'❌',title:'Dossiers Rejetés (Statut 4)',desc:'Dossiers où invoice_flag_state = 4. Renault a rejeté ces dossiers. Utilisez le bouton "+ Suivre" pour enregistrer la raison et les détails de re-soumission.'},
+        {icon:'🔑',title:'Clé de Dédoublonnage',desc:'VIN + N° Facture est utilisé comme clé unique. Les doublons sont surlignés en jaune et exclus de tous les totaux.'},
+        {icon:'💰',title:'Champs Montants',desc:'PR Demandé/Payé = montants pièces. MO Demandé/Payé = montants main-d'œuvre. Total Demandé = soumis à Renault. Total Payé = approuvé par Renault.'},
+        {icon:'🔍',title:'Filtres & Recherche',desc:'Filtrez par Mois, Code Dépense, ou Statut. Utilisez la recherche pour trouver VIN, N° Facture, N° OR, ou code NITG.'},
+      ],
+      buttons:[{icon:'+ Suivre',label:'Ouvre le modal de suivi de rejet'},{icon:'✏️ Modifier',label:'Rouvrir le modal pour mettre à jour les détails'}]
+    }
+  },
+  overview:{
+    icon:'📊', bg:'var(--sky3)',
+    en:{title:'General View',sub:'Monthly summary and trends',
+      rules:[
+        {icon:'📅',title:'Monthly Subtotals',desc:'Each row represents one month of data. Columns show Parts Asked, Parts Paid, Labour Asked, Labour Paid, Total Asked, Total Paid, and Deducted (difference).'},
+        {icon:'📈',title:'Chart',desc:'Bar chart shows Parts Paid (orange) and Labour Paid (blue) per month. The purple line shows Total Paid trend across months.'},
+        {icon:'📉',title:'Deducted Amount',desc:'The "Deducted" column = Total Asked − Total Paid. This is the amount Renault did not reimburse. Red values mean deductions occurred.'},
+        {icon:'🚗',title:'Unique VINs',desc:'Number of distinct vehicles (VINs) in the loaded data — each VIN is one vehicle.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Vue Générale',sub:'Résumé mensuel et tendances',
+      rules:[
+        {icon:'📅',title:'Sous-totaux Mensuels',desc:'Chaque ligne représente un mois de données. Colonnes: PR Demandé, PR Payé, MO Demandé, MO Payé, Total Demandé, Total Payé, Déduit.'},
+        {icon:'📈',title:'Graphique',desc:'Barres: PR Payé (orange) et MO Payé (bleu) par mois. La ligne violette montre la tendance du Total Payé.'},
+        {icon:'📉',title:'Montant Déduit',desc:'Colonne "Déduit" = Total Demandé − Total Payé. C'est le montant que Renault n'a pas remboursé. Valeurs en rouge = déductions.'},
+        {icon:'🚗',title:'VINs Uniques',desc:'Nombre de véhicules distincts (VINs) dans les données chargées — chaque VIN = un véhicule.'},
+      ],
+      buttons:[]
+    }
+  },
+  expense:{
+    icon:'🏷️', bg:'var(--lemon3)',
+    en:{title:'By Expense Code',sub:'Claims grouped by warranty expense type',
+      rules:[
+        {icon:'🏷️',title:'Expense Code',desc:'Each code (e.g. G36) represents a type of warranty expense defined by Renault. "G36" = Warranty group first year, etc.'},
+        {icon:'📊',title:'% Share',desc:'The percentage column shows what proportion of total paid amount each expense code represents.'},
+        {icon:'🔢',title:'Sorting',desc:'Table is sorted by Total Paid descending — the most expensive expense type appears first.'},
+        {icon:'🗓️',title:'Month Filter',desc:'Use the Month filter to see the expense breakdown for a specific month only.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Par Code Dépense',sub:'Dossiers regroupés par type de dépense garantie',
+      rules:[
+        {icon:'🏷️',title:'Code Dépense',desc:'Chaque code (ex: G36) représente un type de dépense garantie défini par Renault. "G36" = Garantie groupe première année, etc.'},
+        {icon:'📊',title:'% Part',desc:'La colonne pourcentage montre la proportion du montant total payé que représente chaque code dépense.'},
+        {icon:'🔢',title:'Tri',desc:'Table triée par Total Payé décroissant — le type de dépense le plus coûteux apparaît en premier.'},
+        {icon:'🗓️',title:'Filtre Mois',desc:'Utilisez le filtre Mois pour voir la répartition par code dépense pour un mois spécifique.'},
+      ],
+      buttons:[]
+    }
+  },
+  comparison:{
+    icon:'⚖️', bg:'var(--pur3)',
+    en:{title:'Incadea vs GCM',sub:'Reconciliation between your DMS and Renault portal',
+      rules:[
+        {icon:'⚖️',title:'Purpose',desc:'Compares the amounts recorded in your INCADEA DMS against what GCM (Renault portal) shows. Differences reveal data entry gaps or timing issues.'},
+        {icon:'🔴',title:'Positive Δ (red)',desc:'GCM total is HIGHER than Incadea. Renault paid more than what INCADEA recorded — check if all invoices were entered in INCADEA.'},
+        {icon:'🟢',title:'Negative Δ (green)',desc:'GCM total is LOWER than Incadea. INCADEA has more than Renault paid — check for rejected claims or missing GCM submissions.'},
+        {icon:'✅',title:'Perfect Match',desc:'Δ Total = 0.00. GCM and Incadea are in perfect agreement for this VIN. Aim to maximise this count.'},
+        {icon:'🔍',title:'Differences Only filter',desc:'Select "Differences Only" in the filter to focus on VINs that need investigation.'},
+      ],
+      buttons:[{icon:'⚠️ Differences Only',label:'Filter to show only VINs with a discrepancy'},{icon:'✅ Matches Only',label:'Filter to show only perfectly reconciled VINs'}]
+    },
+    fr:{title:'Incadea vs GCM',sub:'Rapprochement entre votre DMS et le portail Renault',
+      rules:[
+        {icon:'⚖️',title:'Objectif',desc:'Compare les montants enregistrés dans votre DMS INCADEA avec ce que GCM (portail Renault) affiche. Les écarts révèlent des oublis de saisie ou des décalages.'},
+        {icon:'🔴',title:'Δ Positif (rouge)',desc:'Total GCM SUPÉRIEUR à Incadea. Renault a payé plus que ce qu'INCADEA a enregistré — vérifiez si toutes les factures sont saisies dans INCADEA.'},
+        {icon:'🟢',title:'Δ Négatif (vert)',desc:'Total GCM INFÉRIEUR à Incadea. INCADEA a plus que ce que Renault a payé — vérifiez les dossiers rejetés ou les soumissions GCM manquantes.'},
+        {icon:'✅',title:'Correspondance Parfaite',desc:'Δ Total = 0,00. GCM et Incadea sont en parfait accord pour ce VIN.'},
+        {icon:'🔍',title:'Filtre Écarts Seulement',desc:'Sélectionnez "Écarts Seulement" pour vous concentrer sur les VINs à investiguer.'},
+      ],
+      buttons:[{icon:'⚠️ Écarts Seulement',label:'Filtrer pour afficher uniquement les VINs avec écart'},{icon:'✅ Correspondances',label:'Filtrer pour afficher les VINs parfaitement réconciliés'}]
+    }
+  },
+  askedpaid:{
+    icon:'📈', bg:'var(--mint3)',
+    en:{title:'Asked vs Paid',sub:'Gap analysis between submitted and approved amounts',
+      rules:[
+        {icon:'📤',title:'Total Asked',desc:'The total amount submitted to Renault (received_amount_eur). This is what you claim should be reimbursed.'},
+        {icon:'💵',title:'Total Paid',desc:'The definitive amount Renault approved (definitive_amount_without_pco_eur). This is what was actually reimbursed.'},
+        {icon:'📉',title:'Deduction Rate',desc:'(Asked − Paid) / Asked × 100. A high deduction rate means Renault is regularly paying less than requested. Investigate expense codes with high gaps.'},
+        {icon:'📅',title:'Subtotals',desc:'Monthly subtotal rows (yellow) aggregate all expense codes for each month. Grand Total row (dark) shows the overall position.'},
+        {icon:'🏷️',title:'By Expense Code',desc:'Each row is one month + one expense code combination. This helps identify which expense types have the highest deduction rates.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Demandé vs Payé',sub:'Analyse de l'écart entre soumis et approuvé',
+      rules:[
+        {icon:'📤',title:'Total Demandé',desc:'Montant total soumis à Renault (received_amount_eur). C'est ce que vous réclamez comme remboursement.'},
+        {icon:'💵',title:'Total Payé',desc:'Montant définitif approuvé par Renault (definitive_amount_without_pco_eur). C'est ce qui a réellement été remboursé.'},
+        {icon:'📉',title:'Taux de Déduction',desc:'(Demandé − Payé) / Demandé × 100. Un taux élevé signifie que Renault paie régulièrement moins que demandé.'},
+        {icon:'📅',title:'Sous-totaux',desc:'Lignes de sous-total mensuels (jaune) agrègent tous les codes dépense pour chaque mois. Ligne Total Général (sombre) = position globale.'},
+        {icon:'🏷️',title:'Par Code Dépense',desc:'Chaque ligne = un mois + un code dépense. Identifie quels types de dépenses ont les taux de déduction les plus élevés.'},
+      ],
+      buttons:[]
+    }
+  },
+  rejections:{
+    icon:'❌', bg:'var(--rose3)',
+    en:{title:'Rejections',sub:'Track, annotate and resubmit rejected claims',
+      rules:[
+        {icon:'❌',title:'What is a Rejection?',desc:'A claim where invoice_flag_state = 4 in GCM. Renault has refused to reimburse this claim. It must be corrected and resubmitted.'},
+        {icon:'📝',title:'Recording the Rejection',desc:'Click "+ Track" to open the rejection modal. Fill in: Reason (dropdown), New Claim #, Resubmission Invoice #, Category, and free-text Notes.'},
+        {icon:'🔄',title:'Resubmission Workflow',desc:'Once corrected, enter the new claim number in the "Correct Claim #" field and the new invoice number. This tracks your resubmission history.'},
+        {icon:'🔴',title:'"No Action Yet" filter',desc:'Shows only rejected claims that have not yet been annotated — your to-do list of rejections.'},
+        {icon:'✅',title:'"Has New Claim #" filter',desc:'Shows claims that have been corrected and resubmitted with a new claim number.'},
+      ],
+      buttons:[{icon:'+ Track',label:'Open rejection modal — record reason, new claim #, notes'},{icon:'✏️ Edit',label:'Update existing rejection details'}]
+    },
+    fr:{title:'Rejets',sub:'Suivre, annoter et re-soumettre les dossiers rejetés',
+      rules:[
+        {icon:'❌',title:'Qu'est-ce qu'un Rejet?',desc:'Un dossier où invoice_flag_state = 4 dans GCM. Renault a refusé de rembourser ce dossier. Il doit être corrigé et re-soumis.'},
+        {icon:'📝',title:'Enregistrer le Rejet',desc:'Cliquez sur "+ Suivre" pour ouvrir le modal. Remplissez: Raison (liste), N° Nouveau Dossier, N° Facture Re-soumission, Catégorie, et Notes.'},
+        {icon:'🔄',title:'Processus de Re-soumission',desc:'Une fois corrigé, entrez le nouveau numéro de dossier dans le champ "N° Dossier Correct" et le nouveau numéro de facture.'},
+        {icon:'🔴',title:'Filtre "Aucune Action"',desc:'Affiche uniquement les dossiers rejetés qui n'ont pas encore été annotés — votre liste de tâches de rejets.'},
+        {icon:'✅',title:'Filtre "A un N° de Dossier"',desc:'Affiche les dossiers corrigés et re-soumis avec un nouveau numéro de dossier.'},
+      ],
+      buttons:[{icon:'+ Suivre',label:'Ouvrir le modal de rejet — enregistrer raison, N° nouveau dossier'},{icon:'✏️ Modifier',label:'Mettre à jour les détails du rejet existant'}]
+    }
+  },
+  incadea:{
+    icon:'🔧', bg:'var(--sky3)',
+    en:{title:'Incadea Data',sub:'All records from your INCADEA DMS export',
+      rules:[
+        {icon:'📄',title:'Source',desc:'Data comes from your INCADEA DMS warranty invoice export. The system reads the "INCADEA" sheet from the uploaded file.'},
+        {icon:'🔍',title:'Search',desc:'Search across Invoice No., VIN, Service Order No., Customer name, and External Document No. simultaneously.'},
+        {icon:'🚗',title:'Make Filter',desc:'Filter by vehicle make (RENAULT, DACIA, etc.) to see only one brand's warranty invoices.'},
+        {icon:'⚖️',title:'Use with Comparison',desc:'These records are used in the "Incadea vs GCM" page to reconcile amounts by VIN. Upload both files to see the reconciliation.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Données Incadea',sub:'Tous les enregistrements de votre export DMS INCADEA',
+      rules:[
+        {icon:'📄',title:'Source',desc:'Les données proviennent de votre export de factures garantie DMS INCADEA. Le système lit l'onglet "INCADEA".'},
+        {icon:'🔍',title:'Recherche',desc:'Recherche simultanée sur N° Facture, VIN, N° Ordre de Service, Nom Client, et N° Document Externe.'},
+        {icon:'🚗',title:'Filtre Marque',desc:'Filtrez par marque (RENAULT, DACIA, etc.) pour voir uniquement les factures garantie d'une marque.'},
+        {icon:'⚖️',title:'Utilisation avec Comparaison',desc:'Ces données sont utilisées dans la page "Incadea vs GCM" pour rapprocher les montants par VIN.'},
+      ],
+      buttons:[]
+    }
+  },
+  bonus:{
+    icon:'⭐', bg:'var(--lemon3)',
+    en:{title:'Bonus — 1% Labour',sub:'Monthly bonus based on paid labour amounts',
+      rules:[
+        {icon:'⭐',title:'Bonus Formula',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculated only on PAID claims (invoice_flag_state = 0). Rejected and duplicate claims are excluded.'},
+        {icon:'📅',title:'Per Month',desc:'The bonus is calculated independently for each month. The bar chart shows the relative labour amounts visually.'},
+        {icon:'❌',title:'What is Excluded',desc:'Rejected claims (status ≠ 0) and duplicate rows are excluded from the bonus calculation to avoid double-counting.'},
+        {icon:'💡',title:'How to Read',desc:'The "Your Bonus" column shows the 1% of paid labour for that month. The grand total row shows the cumulative bonus across all loaded months.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Bonus — 1% Main-d'Œuvre',sub:'Bonus mensuel basé sur les montants MO payés',
+      rules:[
+        {icon:'⭐',title:'Formule Bonus',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculé uniquement sur les dossiers PAYÉS (invoice_flag_state = 0). Rejets et doublons exclus.'},
+        {icon:'📅',title:'Par Mois',desc:'Le bonus est calculé indépendamment pour chaque mois. Le graphique barres montre visuellement les montants MO relatifs.'},
+        {icon:'❌',title:'Ce qui est Exclu',desc:'Dossiers rejetés (statut ≠ 0) et doublons exclus du calcul du bonus pour éviter les doubles comptages.'},
+        {icon:'💡',title:'Comment Lire',desc:'La colonne "Votre Bonus" affiche 1% de la MO payée pour ce mois. La ligne total affiche le bonus cumulé sur tous les mois chargés.'},
+      ],
+      buttons:[]
+    }
+  },
+};
+
+// ══ HELP OPEN/CLOSE ══════════════════════════════════════════
+let _helpPage = 'upload';
+function openHelp(){
+  const active = document.querySelector('.si.active');
+  _helpPage = active ? active.dataset.page : 'upload';
+  renderHelp();
+  document.getElementById('HELP_BG').classList.add('open');
+}
+function closeHelp(){ document.getElementById('HELP_BG').classList.remove('open'); }
+
+function renderHelp(){
+  const d = HELP[_helpPage] || HELP['upload'];
+  const lang = _lang;
+  const t = d[lang] || d['en'];
+
+  document.getElementById('HP_ICON').textContent = d.icon;
+  document.getElementById('HP_ICON').style.background = d.bg;
+  document.getElementById('HP_TITLE_EN').textContent = HELP[_helpPage]?.en?.title || t.title;
+  document.getElementById('HP_TITLE_FR').textContent = HELP[_helpPage]?.fr?.title || t.title;
+  document.getElementById('HP_SUB_EN').textContent = HELP[_helpPage]?.en?.sub || t.sub;
+  document.getElementById('HP_SUB_FR').textContent = HELP[_helpPage]?.fr?.sub || t.sub;
+
+  let html = '';
+  // Business Rules
+  html += `<div class="hp-section"><div class="hp-section-title">📋 <span>${lang==='fr'?'Règles Métier':'Business Rules'}</span></div>`;
+  t.rules.forEach(r => {
+    html += `<div class="hp-rule"><div class="hp-rule-icon">${r.icon}</div><div class="hp-rule-content"><div class="hp-rule-title">${r.title}</div><div class="hp-rule-desc">${r.desc}</div></div></div>`;
+  });
+  html += '</div>';
+
+  // Buttons
+  if(t.buttons && t.buttons.length){
+    html += `<div class="hp-section"><div class="hp-section-title">🖱️ <span>${lang==='fr'?'Boutons de cette page':'Buttons on this page'}</span></div><div class="hp-btn-row">`;
+    t.buttons.forEach(b => {
+      html += `<div class="hp-btag"><span>${b.icon}</span><span>${b.label}</span></div>`;
+    });
+    html += '</div></div>';
+  }
+
+  document.getElementById('HP_BODY').innerHTML = html;
+}
+
+// ══ FEEDBACK / IDEA ════════════════════════════════════════════
+let _fbType = 'idea';
+function openFeedback(type){
+  _fbType = type;
+  const isIdea = type === 'idea';
+  document.getElementById('FB_EMOJI').textContent = isIdea ? '💡' : '🔧';
+  document.getElementById('FB_TITLE').textContent = _lang==='fr'
+    ? (isIdea ? 'Nouvelle Idée' : 'Correction Système')
+    : (isIdea ? 'New Idea' : 'System Correction');
+  document.getElementById('FB_SUBJECT').value = '';
+  document.getElementById('FB_SUBJECT_EN').value = '';
+  document.getElementById('FB_BODY').value = '';
+  document.getElementById('FB_BG').classList.add('open');
+}
+function closeFeedback(){ document.getElementById('FB_BG').classList.remove('open'); }
+
+function sendFeedback(){
+  const subjectEl = _lang==='fr' ? document.getElementById('FB_SUBJECT') : document.getElementById('FB_SUBJECT_EN');
+  const subject = (subjectEl?.value || '').trim();
+  const body = (document.getElementById('FB_BODY').value || '').trim();
+  const isIdea = _fbType === 'idea';
+  const prefix = _lang==='fr' ? (isIdea?'[IDÉE] ':'[CORRECTION] ') : (isIdea?'[IDEA] ':'[CORRECTION] ');
+  const pageLabel = (_helpPage||'').toUpperCase();
+  const fullSubject = prefix + (subject || (isIdea ? 'Renault Warranty System — New Idea' : 'Renault Warranty System — Correction Needed')) + ' [' + pageLabel + ']';
+  const greeting = _lang==='fr'
+    ? 'Bonjour,\n\nVoici ma suggestion / correction pour le système de garantie Renault:\n\n'
+    : 'Hello,\n\nHere is my suggestion / correction for the Renault Warranty System:\n\n';
+  const fullBody = greeting + (body || (isIdea ? 'Please describe your idea here.' : 'Please describe the correction needed here.'));
+  const mailto = 'mailto:managment@iantradingsal.com?subject=' + encodeURIComponent(fullSubject) + '&body=' + encodeURIComponent(fullBody.replace(/\\n/g,'\n'));
+  window.location.href = mailto;
+  closeFeedback();
+  closeHelp();
+  showToast('📧 ' + (_lang==='fr' ? 'Outlook ouvert !' : 'Opening Outlook!'));
+}
+
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --sun:#FF6B35; --sun2:#FF8C5A; --sun3:#FFE8DF;
+  --sky:#0EA5E9; --sky2:#38BDF8; --sky3:#E0F2FE;
+  --mint:#10B981; --mint2:#34D399; --mint3:#D1FAE5;
+  --lemon:#F59E0B; --lemon2:#FCD34D; --lemon3:#FEF3C7;
+  --rose:#F43F5E; --rose2:#FB7185; --rose3:#FFE4E6;
+  --pur:#8B5CF6; --pur2:#A78BFA; --pur3:#EDE9FE;
+  --ink:#1E1B2E; --ink2:#3D3A52; --muted:#8B8BA8; --faint:#C4C4D4;
+  --bg:#F8F7FF; --surf:#FFFFFF; --surf2:#F3F2FB;
+  --border:#E8E6F4; --border2:#D4D0EC;
+  --r: var(--sun); --r2: var(--sun2); --r3: var(--sun3);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--ink);font-size:13px;line-height:1.5}
+
+/* ── TOPBAR ── */
+.topbar{height:56px;background:linear-gradient(135deg,#1E1B2E 0%,#2D2A45 100%);display:flex;align-items:center;gap:14px;padding:0 22px;flex-shrink:0;z-index:30;box-shadow:0 2px 20px rgba(30,27,46,.3)}
+.t-logo{width:38px;height:38px;background:linear-gradient(135deg,#F5C500,#FFDE00);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;box-shadow:0 4px 14px rgba(245,197,0,.5)}
+.t-brand{display:flex;flex-direction:column}
+.t-name{font-size:13px;font-weight:800;color:#fff;letter-spacing:-.3px;line-height:1}
+.t-sub{font-size:9px;color:#9896B5;font-weight:500;margin-top:2px;letter-spacing:.05em}
+.t-pills{display:flex;gap:6px;margin-left:16px}
+.t-pill{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:4px 10px;font-size:10px;color:#C4C2D9;display:flex;align-items:center;gap:5px;white-space:nowrap;transition:all .2s}
+.t-pill.ok{background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.3);color:#6EE7B7}
+.t-pill.warn{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:#FCD34D}
+.t-pill .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dot-ok{background:var(--mint2)}.dot-warn{background:var(--lemon2)}.dot-off{background:#555}
+.t-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.gsw{position:relative}
+.gsw-ic{position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:12px}
+.gsearch{background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;padding:7px 14px 7px 32px;font-size:11px;color:#fff;outline:none;width:220px;font-family:inherit;transition:all .2s}
+.gsearch:focus{background:rgba(255,255,255,.13);border-color:rgba(255,107,53,.5);width:260px}
+.gsearch::placeholder{color:#7070A0}
+.sdrop{position:absolute;top:calc(100%+8px);right:0;width:440px;background:var(--surf);border:1.5px solid var(--border);border-radius:16px;box-shadow:0 20px 60px rgba(30,27,46,.15);z-index:200;max-height:420px;overflow-y:auto;display:none}
+.sdrop.open{display:block;animation:fadeUp .15s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.sd-sec{padding:8px 14px 4px;font-size:9px;color:var(--faint);text-transform:uppercase;letter-spacing:.1em;font-weight:700;background:var(--surf2);border-bottom:1px solid var(--border)}
+.sd-item{padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;display:flex;gap:10px;align-items:flex-start}
+.sd-item:hover{background:var(--surf2)}.sd-item:last-child{border-bottom:none}
+.sd-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:1px}
+.sd-main{flex:1}
+.sd-title{font-size:12px;font-weight:600;color:var(--ink);margin-bottom:2px}
+.sd-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)}
+.sd-empty{padding:28px;text-align:center;color:var(--muted);font-size:12px}
+
+/* ── SHELL ── */
+.shell{display:flex;height:calc(100vh - 56px);overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{width:216px;flex-shrink:0;background:var(--surf);border-right:1.5px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.s-header{padding:16px 16px 8px;border-bottom:1px solid var(--border)}
+.s-header-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+.ss{padding:14px 14px 4px;font-size:9px;color:var(--faint);text-transform:uppercase;letter-spacing:.12em;font-weight:700}
+.si{display:flex;align-items:center;gap:10px;padding:8px 14px 8px 16px;cursor:pointer;font-size:12px;font-weight:500;color:var(--muted);border-left:3px solid transparent;transition:all .15s;user-select:none;border-radius:0 8px 8px 0;margin:1px 8px 1px 0}
+.si:hover{background:var(--surf2);color:var(--ink)}
+.si.active{color:var(--ink);border-left-color:var(--sun);font-weight:700}
+.si-emoji{font-size:15px;flex-shrink:0;width:22px;text-align:center}
+.sbadge{margin-left:auto;font-size:8px;font-weight:700;padding:2px 7px;border-radius:20px;flex-shrink:0}
+.sb-sun{background:var(--sun3);color:var(--sun)}.sb-mint{background:var(--mint3);color:var(--mint)}.sb-sky{background:var(--sky3);color:var(--sky)}.sb-lem{background:var(--lemon3);color:var(--lemon)}.sb-rose{background:var(--rose3);color:var(--rose)}.sb-pur{background:var(--pur3);color:var(--pur)}
+.s-foot{margin-top:auto;padding:12px 14px;border-top:1px solid var(--border)}
+.s-foot-text{font-size:9px;color:var(--faint);line-height:1.9}
+
+/* ── CONTENT ── */
+.content{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.filterbar{background:var(--surf);border-bottom:1.5px solid var(--border);padding:0 20px;display:flex;align-items:center;height:46px;flex-shrink:0;overflow-x:auto;gap:0}
+.fg{display:flex;align-items:center;gap:6px;padding:0 14px;border-right:1px solid var(--border);flex-shrink:0;height:100%}
+.fg:first-child{padding-left:0}.fg.nobr{border-right:none}
+.fl{font-size:9px;color:var(--faint);text-transform:uppercase;letter-spacing:.1em;font-weight:700;white-space:nowrap}
+.fsel{border:1.5px solid var(--border);background:var(--surf2);border-radius:8px;padding:5px 24px 5px 8px;font-size:11px;color:var(--ink);cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238B8BA8' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center;font-family:inherit;font-weight:500;transition:border-color .15s}
+.fsel:focus{border-color:var(--sun);outline:none}
+.finput{border:1.5px solid var(--border);background:var(--surf2);border-radius:8px;padding:5px 10px;font-size:11px;color:var(--ink);outline:none;font-family:inherit;min-width:160px;font-weight:500;transition:border-color .15s}
+.finput:focus{border-color:var(--sun)}
+.page-area{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.scroll{flex:1;overflow-y:auto;padding:20px 22px;background:var(--bg)}
+.page{max-width:1600px}
+
+/* ── PAGE HEADER ── */
+.ph{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.ph-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.ph-title{font-size:18px;font-weight:800;color:var(--ink);letter-spacing:-.3px}
+.ph-sub{font-size:11px;color:var(--muted);margin-top:2px;font-weight:500}
+
+/* ── KPIs ── */
+.krow{display:grid;gap:10px;margin-bottom:14px}
+.k4{grid-template-columns:repeat(4,1fr)}.k3{grid-template-columns:repeat(3,1fr)}.k5{grid-template-columns:repeat(5,1fr)}.k2{grid-template-columns:repeat(2,1fr)}
+.kpi{background:var(--surf);border-radius:14px;padding:16px 18px;border:1.5px solid var(--border);position:relative;overflow:hidden;transition:transform .15s,box-shadow .15s}
+.kpi:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(30,27,46,.08)}
+.kpi-accent{position:absolute;top:0;right:0;width:70px;height:70px;border-radius:50%;opacity:.08;transform:translate(20px,-20px)}
+.kl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;font-weight:700;display:flex;align-items:center;gap:4px}
+.kv{font-size:26px;font-weight:800;color:var(--ink);line-height:1;letter-spacing:-.5px}
+.ks{font-size:10px;color:var(--muted);margin-top:5px;font-weight:500}
+.kv.sun{color:var(--sun)}.kv.mint{color:var(--mint)}.kv.sky{color:var(--sky)}.kv.rose{color:var(--rose)}.kv.lem{color:var(--lemon)}.kv.pur{color:var(--pur)}
+
+/* ── CARDS ── */
+.card{background:var(--surf);border-radius:16px;border:1.5px solid var(--border);padding:16px 18px;margin-bottom:12px;box-shadow:0 2px 8px rgba(30,27,46,.04)}
+.ct{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.g2l{display:grid;grid-template-columns:1.6fr 1fr;gap:12px;margin-bottom:12px}
+
+/* ── TABLES ── */
+.tw{overflow-x:auto;max-height:500px;overflow-y:auto;border-radius:10px;border:1.5px solid var(--border)}
+table.t{width:100%;border-collapse:collapse;font-size:11px}
+table.t thead th{text-align:left;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:10px 12px;border-bottom:1.5px solid var(--border);background:var(--surf2);position:sticky;top:0;z-index:2;white-space:nowrap}
+table.t tbody td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+table.t tbody tr:last-child td{border-bottom:none}
+table.t tbody tr:hover td{background:var(--surf2)}
+.num{text-align:right;font-family:'JetBrains Mono',monospace;font-size:10px}
+.mono{font-family:'JetBrains Mono',monospace;font-size:10px}
+.tr-sub td{background:linear-gradient(90deg,var(--lemon3),transparent)!important;font-weight:700;border-top:2px solid var(--lemon2)!important}
+.tr-grand td{background:linear-gradient(135deg,var(--ink),var(--ink2))!important;color:#fff!important;font-weight:700}
+.tr-dup td{background:var(--lemon3)!important}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;font-size:8px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.05em;text-transform:uppercase;gap:3px}
+.b-sun{background:var(--sun3);color:var(--sun)}.b-mint{background:var(--mint3);color:var(--mint)}.b-rose{background:var(--rose3);color:var(--rose)}.b-sky{background:var(--sky3);color:var(--sky)}.b-lem{background:var(--lemon3);color:var(--lemon)}.b-pur{background:var(--pur3);color:var(--pur)}.b-n{background:var(--surf2);color:var(--muted)}.b-dup{background:#FEF9C3;color:#92400E}
+.dp{color:var(--rose);font-weight:700}.dn{color:var(--mint);font-weight:700}.dz{color:var(--faint)}
+
+/* ── DROPZONES ── */
+.dzb{border:2.5px dashed var(--border2);border-radius:16px;background:linear-gradient(135deg,var(--surf),var(--surf2));cursor:pointer;transition:all .2s;text-align:center;padding:32px 24px;position:relative;overflow:hidden}
+.dzb:hover,.dzb.over{border-color:var(--sun);background:var(--sun3);transform:scale(1.01)}
+.dz-emoji{font-size:36px;margin-bottom:10px;display:block;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.dz-title{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px}
+.dz-sub{font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6;font-weight:500}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:6px;border:none;border-radius:10px;padding:9px 18px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;letter-spacing:-.1px}
+.btn-sun{background:linear-gradient(135deg,var(--sun),var(--sun2));color:#fff;box-shadow:0 4px 12px rgba(255,107,53,.3)}.btn-sun:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(255,107,53,.4)}
+.btn-sky{background:linear-gradient(135deg,var(--sky),var(--sky2));color:#fff;box-shadow:0 4px 12px rgba(14,165,233,.3)}.btn-sky:hover{transform:translateY(-1px)}
+.btn-mint{background:linear-gradient(135deg,var(--mint),var(--mint2));color:#fff}.btn-mint:hover{transform:translateY(-1px)}
+.btn-ghost{background:var(--surf2);color:var(--ink);border:1.5px solid var(--border);box-shadow:none}.btn-ghost:hover{background:var(--border);border-color:var(--border2)}
+.btn-sm{padding:6px 14px;font-size:10px;border-radius:8px}
+.btn-xs{padding:4px 10px;font-size:9px;border-radius:6px}
+
+/* ── STATUS CARDS (upload page) ── */
+.upload-stat{background:var(--surf2);border-radius:12px;padding:14px 16px;border:1.5px solid var(--border);display:flex;align-items:center;gap:12px}
+.us-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.us-info{flex:1;min-width:0}
+.us-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.us-val{font-size:18px;font-weight:800;color:var(--ink);letter-spacing:-.3px;line-height:1}
+.us-meta{font-size:10px;color:var(--muted);margin-top:3px;font-weight:500}
+
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(30,27,46,.5);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-bg.open{opacity:1;pointer-events:all}
+.modal{background:var(--surf);border-radius:20px;padding:28px;width:540px;max-width:95vw;max-height:90vh;overflow-y:auto;transform:translateY(16px) scale(.98);transition:transform .2s;box-shadow:0 30px 80px rgba(30,27,46,.25)}
+.modal-bg.open .modal{transform:translateY(0) scale(1)}
+.modal-emoji{font-size:32px;margin-bottom:8px}
+.mt{font-size:16px;font-weight:800;margin-bottom:4px;color:var(--ink);letter-spacing:-.2px}
+.ms{font-size:11px;color:var(--muted);margin-bottom:20px;font-family:'JetBrains Mono',monospace}
+.fr{margin-bottom:14px}
+.flb{font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;display:block}
+.fi{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s;background:var(--surf2);font-weight:500}
+.fi:focus{border-color:var(--sun);box-shadow:0 0 0 3px rgba(255,107,53,.1)}
+textarea.fi{resize:vertical;min-height:80px}
+.fac{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:18px;border-top:1.5px solid var(--border)}
+
+/* ── LOADING ── */
+.loading{position:fixed;inset:0;background:rgba(248,247,255,.92);backdrop-filter:blur(4px);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.spin-wrap{position:relative;width:52px;height:52px}
+.spin-ring{width:52px;height:52px;border:3px solid var(--border);border-top-color:var(--sun);border-radius:50%;animation:spin .7s linear infinite;position:absolute}
+.spin-emoji{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;animation:pulse 1s ease-in-out infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+
+/* ── ALERTS ── */
+.al{padding:12px 16px;border-radius:12px;font-size:11px;margin-bottom:12px;line-height:1.7;display:flex;align-items:flex-start;gap:10px;font-weight:500}
+.al-i{background:var(--sky3);color:var(--sky);border:1px solid rgba(14,165,233,.2)}.al-w{background:var(--lemon3);color:var(--lemon);border:1px solid rgba(245,158,11,.2)}.al-g{background:var(--mint3);color:var(--mint);border:1px solid rgba(16,185,129,.2)}.al-r{background:var(--rose3);color:var(--rose);border:1px solid rgba(244,63,94,.2)}
+
+/* ── CHIP ── */
+.chip{display:flex;align-items:center;gap:8px;border-radius:10px;padding:10px 14px;margin-top:10px;font-size:11px;font-weight:600}
+.chip-ok{background:var(--mint3);color:var(--mint);border:1.5px solid rgba(16,185,129,.25)}
+.chip-err{background:var(--rose3);color:var(--rose);border:1.5px solid rgba(244,63,94,.25)}
+.cdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+
+/* ── BONUS BARS ── */
+.bb{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bbl{font-size:10px;color:var(--muted);width:72px;flex-shrink:0;font-weight:600}
+.bbt{flex:1;height:12px;background:var(--surf2);border-radius:6px;overflow:hidden;border:1px solid var(--border)}
+.bbf{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--lemon),var(--sun));transition:width .6s cubic-bezier(.34,1.56,.64,1)}
+.bbv{font-size:10px;font-weight:700;width:86px;flex-shrink:0;text-align:right;font-family:'JetBrains Mono',monospace;color:var(--lemon)}
+
+/* ── FEATURE LIST ── */
+.feat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.feat-item{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surf);border-radius:10px;border:1.5px solid var(--border);font-size:11px;font-weight:600;color:var(--ink2)}
+.feat-item span:first-child{font-size:14px}
+
+/* ── UPLOAD STATUS GRID ── */
+.up-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+
+/* ── SECTION DIVIDER ── */
+.sdiv{font-size:11px;font-weight:700;color:var(--ink2);margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+.sdiv::after{content:'';flex:1;height:1.5px;background:var(--border)}
+
+
+/* ── LANGUAGE TOGGLE ── */
+.lang-toggle{display:flex;align-items:center;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.14);border-radius:20px;padding:2px;gap:2px;flex-shrink:0}
+.lang-btn{padding:4px 10px;border-radius:16px;font-size:10px;font-weight:700;cursor:pointer;color:rgba(255,255,255,.55);border:none;background:transparent;font-family:inherit;transition:all .18s;letter-spacing:.04em}
+.lang-btn.active{background:rgba(255,255,255,.18);color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+
+/* ── HELP PANEL ── */
+.help-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:10px;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.14);color:rgba(255,255,255,.75);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .18s;flex-shrink:0}
+.help-btn:hover{background:rgba(255,255,255,.16);color:#fff}
+.help-btn-icon{font-size:13px}
+.help-panel-bg{position:fixed;inset:0;background:rgba(30,27,46,.5);backdrop-filter:blur(4px);z-index:90;display:flex;align-items:flex-end;justify-content:flex-end;padding:20px;opacity:0;pointer-events:none;transition:opacity .22s}
+.help-panel-bg.open{opacity:1;pointer-events:all}
+.help-panel{background:var(--surf);border-radius:20px;width:420px;max-height:calc(100vh - 80px);overflow-y:auto;transform:translateX(30px);transition:transform .22s;box-shadow:0 24px 70px rgba(30,27,46,.22);display:flex;flex-direction:column}
+.help-panel-bg.open .help-panel{transform:translateX(0)}
+.hp-header{padding:20px 20px 14px;border-bottom:1.5px solid var(--border);display:flex;align-items:flex-start;gap:12px;position:sticky;top:0;background:var(--surf);z-index:2;border-radius:20px 20px 0 0}
+.hp-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.hp-title{font-size:15px;font-weight:800;color:var(--ink);letter-spacing:-.2px}
+.hp-sub{font-size:11px;color:var(--muted);margin-top:2px;font-weight:500}
+.hp-close{margin-left:auto;background:var(--surf2);border:1.5px solid var(--border);border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;flex-shrink:0;transition:background .15s}
+.hp-close:hover{background:var(--border)}
+.hp-body{padding:16px 20px}
+.hp-section{margin-bottom:16px}
+.hp-section-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.hp-rule{display:flex;gap:10px;margin-bottom:8px;padding:10px 12px;background:var(--surf2);border-radius:10px;border:1.5px solid var(--border)}
+.hp-rule-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.hp-rule-content{}
+.hp-rule-title{font-size:11px;font-weight:700;color:var(--ink);margin-bottom:2px}
+.hp-rule-desc{font-size:10px;color:var(--muted);line-height:1.6;font-weight:500}
+.hp-btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.hp-btag{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;background:var(--surf2);border:1.5px solid var(--border);border-radius:8px;font-size:10px;font-weight:600;color:var(--ink2)}
+
+/* ── FEEDBACK MODAL ── */
+.fb-modal-bg{position:fixed;inset:0;background:rgba(30,27,46,.5);backdrop-filter:blur(4px);z-index:110;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.fb-modal-bg.open{opacity:1;pointer-events:all}
+.fb-modal{background:var(--surf);border-radius:20px;padding:28px;width:500px;max-width:95vw;transform:translateY(14px) scale(.98);transition:transform .2s;box-shadow:0 30px 80px rgba(30,27,46,.25)}
+.fb-modal-bg.open .fb-modal{transform:translateY(0) scale(1)}
+.hp-footer{padding:14px 20px;border-top:1.5px solid var(--border);display:flex;gap:8px}
+.hp-feedback-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;background:linear-gradient(135deg,var(--pur3),#EDE9FE);border:1.5px solid var(--pur2);border-radius:12px;cursor:pointer;font-size:12px;font-weight:700;color:var(--pur);font-family:inherit;transition:all .15s}
+.hp-feedback-btn:hover{background:var(--pur);color:#fff;border-color:var(--pur)}
+.hp-idea-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;background:linear-gradient(135deg,var(--lemon3),#FEF9C3);border:1.5px solid var(--lemon2);border-radius:12px;cursor:pointer;font-size:12px;font-weight:700;color:var(--lemon);font-family:inherit;transition:all .15s}
+.hp-idea-btn:hover{background:var(--lemon);color:var(--ink);border-color:var(--lemon)}
+
+/* ── LANG HIDE/SHOW ── */
+.fr{display:none}.en{display:inline}
+body.lang-fr .fr{display:inline}body.lang-fr .en{display:none}
+.fr-b{display:none}.en-b{display:block}
+body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;border-radius:12px;padding:12px 18px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px;z-index:999;transform:translateY(80px);transition:transform .3s cubic-bezier(.34,1.56,.64,1);box-shadow:0 12px 30px rgba(30,27,46,.3)}
+.toast.show{transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading" id="LOADING" style="display:none">
+  <div class="spin-wrap"><div class="spin-ring"></div><div class="spin-emoji">📊</div></div>
+  <div id="LMSG" style="font-size:13px;color:var(--muted);font-weight:600">Processing…</div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="TOAST">✅ Saved!</div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="MBGR" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-emoji">🔧</div>
+    <div class="mt" id="MTITLE">Rejected Claim</div>
+    <div class="ms" id="MSUB"></div>
+    <div class="fr">
+      <label class="flb">🚫 Rejection Reason</label>
+      <select class="fi" id="M_REASON">
+        <option value="">— Select reason —</option>
+        <option>Test not supported</option>
+        <option>Claim out of warranty period</option>
+        <option>Wrong repair order number</option>
+        <option>Duplicate claim</option>
+        <option>Missing documentation</option>
+        <option>Part not covered</option>
+        <option>Labour rate incorrect</option>
+        <option>VIN mismatch</option>
+        <option>Already paid under different invoice</option>
+        <option>Other (see notes)</option>
+      </select>
+    </div>
+    <div class="fr">
+      <label class="flb">✅ Correct / Replacement Claim Number</label>
+      <input class="fi" id="M_NEWCLAIM" placeholder="New or corrected claim number"/>
+    </div>
+    <div class="fr">
+      <label class="flb">📋 Resubmission Invoice Number</label>
+      <input class="fi" id="M_REINV" placeholder="Invoice number after resubmission"/>
+    </div>
+    <div class="fr">
+      <label class="flb">🏷️ Category of Issue</label>
+      <select class="fi" id="M_CAT">
+        <option value="">— Select category —</option>
+        <option>Technical</option><option>Administrative</option>
+        <option>Financial</option><option>Data / Typing Error</option><option>System Issue</option>
+      </select>
+    </div>
+    <div class="fr">
+      <label class="flb">📝 Notes / Free Text</label>
+      <textarea class="fi" id="M_NOTES" placeholder="Corrective action, context, or any remarks…"></textarea>
+    </div>
+    <div class="fac">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-sun btn-sm" onclick="saveRej()">💾 Save Details</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="t-logo"><svg viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg" width="21" height="26">
+    <!-- Renault 2021 logo: two interlocking diamond outlines -->
+    <!-- Outer hexagonal diamond - draw BEHIND first -->
+    <polygon points="18,1 33,12 33,32 18,43 3,32 3,12" fill="none" stroke="#1a1400" stroke-width="2.4" stroke-linejoin="round"/>
+    <!-- Inner classic diamond - draw on top of outer -->
+    <!-- But ONLY draw the left and right halves (the parts that go OVER the outer) -->
+    <!-- Top half of inner: from top point down to left and right mid-sides -->
+    <polyline points="8,22 18,7 28,22" fill="none" stroke="#1a1400" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+    <!-- Bottom half of inner -->
+    <polyline points="8,22 18,37 28,22" fill="none" stroke="#1a1400" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+    <!-- Cover outer sides at inner's left/right intersection points with yellow -->
+    <line x1="5.5" y1="20" x2="5.5" y2="24" stroke="#FFDE00" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="30.5" y1="20" x2="30.5" y2="24" stroke="#FFDE00" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- Redraw outer sides from intersection back — inner goes OVER these sections -->
+    <!-- Left outer side segments (outer left side passes BEHIND inner left point) -->
+    <!-- Redraw outer top half lines OVER inner top to complete interlocking -->
+    <line x1="18" y1="1" x2="3" y2="12" stroke="#1a1400" stroke-width="2.4" stroke-linecap="round"/>
+    <line x1="18" y1="1" x2="33" y2="12" stroke="#1a1400" stroke-width="2.4" stroke-linecap="round"/>
+    <!-- Cover inner top/bottom at where outer's angled lines cross them -->
+    <line x1="12.5" y1="14.5" x2="16.5" y2="10.5" stroke="#FFDE00" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="19.5" y1="10.5" x2="23.5" y2="14.5" stroke="#FFDE00" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="12.5" y1="29.5" x2="16.5" y2="33.5" stroke="#FFDE00" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="19.5" y1="33.5" x2="23.5" y2="29.5" stroke="#FFDE00" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- Redraw inner TOP and BOTTOM tips to go over outer -->
+    <polyline points="18,7 14,12" fill="none" stroke="#1a1400" stroke-width="2.4" stroke-linecap="round"/>
+    <polyline points="22,12 18,7" fill="none" stroke="#1a1400" stroke-width="2.4" stroke-linecap="round"/>
+    <polyline points="18,37 14,32" fill="none" stroke="#1a1400" stroke-width="2.4" stroke-linecap="round"/>
+    <polyline points="22,32 18,37" fill="none" stroke="#1a1400" stroke-width="2.4" stroke-linecap="round"/>
+  </svg></div>
+  <div class="t-brand">
+    <div class="t-name">Renault Warranty</div>
+    <div class="t-sub">Bassoul Heneine SAL</div>
+  </div>
+  <div class="t-pills">
+    <div class="t-pill" id="PILL_GCM"><span class="dot dot-off" id="PILL_GCM_DOT"></span><span id="PILL_GCM_TXT">GCM: no data</span></div>
+    <div class="t-pill" id="PILL_INC"><span class="dot dot-off" id="PILL_INC_DOT"></span><span id="PILL_INC_TXT">INC: no data</span></div>
+    <div class="t-pill" id="PILL_TS" style="display:none"><span>🕐</span><span id="PILL_TS_TXT"></span></div>
+  </div>
+  <div class="t-right">
+    <div class="gsw">
+      <span class="gsw-ic">🔍</span>
+      <input class="gsearch" id="GSEARCH" placeholder="Search VIN, invoice, RO, NITG…" oninput="gSearch(this.value)" onblur="setTimeout(closeSearch,200)" autocomplete="off"/>
+      <div class="sdrop" id="SDROP"></div>
+    </div>
+  </div>
+  <!-- Language Toggle -->
+  <div class="lang-toggle" style="margin-left:10px">
+    <button class="lang-btn active" id="LANG_EN" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" id="LANG_FR" onclick="setLang('fr')">FR</button>
+  </div>
+  <!-- Help Button -->
+  <button class="help-btn" style="margin-left:8px" onclick="openHelp()" id="HELP_BTN">
+    <span class="help-btn-icon">❓</span>
+    <span class="en">Help</span><span class="fr">Aide</span>
+  </button>
+</div>
+
+<div class="shell">
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="ss">📂 Main</div>
+  <div class="si active" data-page="upload" onclick="go(this)"><span class="si-emoji">⬆️</span>Upload Files</div>
+  <div class="si" data-page="gcm" onclick="go(this)"><span class="si-emoji">📋</span>GCM Claims<span class="sbadge sb-sun" id="B_GCM">–</span></div>
+  <div class="si" data-page="overview" onclick="go(this)"><span class="si-emoji">📊</span>General View</div>
+  <div class="si" data-page="expense" onclick="go(this)"><span class="si-emoji">🏷️</span>Expense Codes</div>
+  <div class="si" data-page="comparison" onclick="go(this)"><span class="si-emoji">⚖️</span>Incadea vs GCM</div>
+  <div class="si" data-page="askedpaid" onclick="go(this)"><span class="si-emoji">📈</span>Asked vs Paid</div>
+  <div class="si" data-page="rejections" onclick="go(this)"><span class="si-emoji">❌</span>Rejections<span class="sbadge sb-rose" id="B_REJ">–</span></div>
+  <div class="ss">🔢 Data</div>
+  <div class="si" data-page="incadea" onclick="go(this)"><span class="si-emoji">🔧</span>Incadea Data<span class="sbadge sb-sky" id="B_INC">–</span></div>
+  <div class="si" data-page="bonus" onclick="go(this)"><span class="si-emoji">⭐</span>Bonus 1%</div>
+  <div class="s-foot">
+    <div class="s-foot-text">📁 GCM + INCADEA monthly<br/>🔑 Dedup: VIN + Invoice #</div>
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:9px;color:var(--faint);line-height:1.8">
+      <div id="LS_STATUS" style="margin-bottom:4px"></div>
+      © 2025 IanTradingSAL<br/>All rights reserved
+    </div>
+
+  </div>
+</div>
+
+<div class="content">
+
+<!-- ══ UPLOAD PAGE ══════════════════════════════════════ -->
+<div class="page-area" id="P_upload">
+<div class="scroll"><div class="page">
+
+  <!-- Upload header stats -->
+  <div class="up-stats" id="UP_STATS">
+    <div class="upload-stat">
+      <div class="us-icon" style="background:var(--sun3)">📋</div>
+      <div class="us-info">
+        <div class="us-label">GCM Claims</div>
+        <div class="us-val" id="US_GCM_COUNT">—</div>
+        <div class="us-meta" id="US_GCM_META">No file loaded</div>
+      </div>
+    </div>
+    <div class="upload-stat">
+      <div class="us-icon" style="background:var(--sky3)">🔧</div>
+      <div class="us-info">
+        <div class="us-label">INCADEA Records</div>
+        <div class="us-val" id="US_INC_COUNT">—</div>
+        <div class="us-meta" id="US_INC_META">No file loaded</div>
+      </div>
+    </div>
+    <div class="upload-stat">
+      <div class="us-icon" style="background:var(--rose3)">❌</div>
+      <div class="us-info">
+        <div class="us-label">Rejections</div>
+        <div class="us-val" id="US_REJ_COUNT" class="rose">—</div>
+        <div class="us-meta" id="US_REJ_META">From GCM data</div>
+      </div>
+    </div>
+    <div class="upload-stat">
+      <div class="us-icon" style="background:var(--pur3)">🕐</div>
+      <div class="us-info">
+        <div class="us-label">Last Update</div>
+        <div class="us-val" id="US_TIME" style="font-size:14px">—</div>
+        <div class="us-meta" id="US_DATE">Never updated</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clear Data Button -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
+    <button class="btn btn-ghost btn-sm" onclick="if(confirm(_lang==='fr'?'Effacer toutes les données et recommencer?':'Clear all data and start fresh?'))lsClear()" style="font-size:10px;color:var(--muted);border-color:var(--border)">
+      🗑️ <span class="en">Clear All Data</span><span class="fr">Effacer les Données</span>
+    </button>
+  </div>
+
+  <!-- Drop zones -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:2px">
+    <button class="btn btn-ghost btn-sm" style="font-size:10px;color:var(--muted)" onclick="if(confirm(_lang==='fr'?'Effacer toutes les données?':'Clear all saved data and start fresh?'))lsClear()">🗑️ <span class="en">Clear All Data</span><span class="fr">Effacer Données</span></button>
+  </div>
+  <div class="sdiv">📁 Monthly File Upload</div>
+  <div class="g2" style="margin-bottom:16px">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:14px 16px 0;border-bottom:none">
+        <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px">📋 GCM Claims Detail</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:12px;font-weight:500">Claims_detail_MM_YYYY_LB.xlsx · from GCM portal</div>
+      </div>
+      <div style="padding:0 16px 16px">
+        <div class="dzb" id="DZ_GCM" onclick="document.getElementById('FI_GCM').click()" ondragover="dzO(event,'DZ_GCM')" ondragleave="dzL('DZ_GCM')" ondrop="dzD(event,'gcm')">
+          <span class="dz-emoji">📂</span>
+          <div class="dz-title">Drop your GCM file here</div>
+          <div class="dz-sub">Supports .xlsx · Duplicates auto-detected<br/>by VIN + Invoice # combination</div>
+          <button class="btn btn-sun btn-sm">Choose File</button>
+        </div>
+        <input type="file" id="FI_GCM" accept=".xlsx,.xls" style="display:none" onchange="loadF(event,'gcm')"/>
+        <div id="ST_GCM"></div>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:14px 16px 0">
+        <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:4px">🔧 INCADEA Export</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:12px;font-weight:500">Warranty invoice export from INCADEA DMS · sheet: INCADEA</div>
+      </div>
+      <div style="padding:0 16px 16px">
+        <div class="dzb" id="DZ_INC" onclick="document.getElementById('FI_INC').click()" ondragover="dzO(event,'DZ_INC')" ondragleave="dzL('DZ_INC')" ondrop="dzD(event,'inc')">
+          <span class="dz-emoji" style="animation-delay:.4s">🗂️</span>
+          <div class="dz-title">Drop your INCADEA file here</div>
+          <div class="dz-sub">Supports .xlsx · Matched to GCM by VIN<br/>for reconciliation and comparison</div>
+          <button class="btn btn-sky btn-sm">Choose File</button>
+        </div>
+        <input type="file" id="FI_INC" accept=".xlsx,.xls" style="display:none" onchange="loadF(event,'inc')"/>
+        <div id="ST_INC"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature list -->
+  <div class="sdiv">✨ What this system does</div>
+  <div class="feat-grid">
+    <div class="feat-item"><span>🔍</span>Duplicate detection (VIN + Invoice #)</div>
+    <div class="feat-item"><span>📊</span>Monthly summary + subtotals</div>
+    <div class="feat-item"><span>🏷️</span>Expense code breakdown with % share</div>
+    <div class="feat-item"><span>⚖️</span>Incadea ↔ GCM reconciliation per VIN</div>
+    <div class="feat-item"><span>📈</span>Asked vs Paid gap + deduction rate</div>
+    <div class="feat-item"><span>❌</span>Rejection reason + category + notes</div>
+    <div class="feat-item"><span>✅</span>New claim # + resubmission invoice</div>
+    <div class="feat-item"><span>🔎</span>Search by VIN, invoice, RO, NITG</div>
+    <div class="feat-item"><span>⭐</span>Bonus: 1% of paid labour per month</div>
+    <div class="feat-item"><span>🇱🇧</span>Replaces the Renault Excel report</div>
+  </div>
+</div></div>
+</div>
+
+<!-- ══ GCM PAGE ═════════════════════════════════════════ -->
+<div class="page-area" id="P_gcm" style="display:none">
+  <div class="filterbar">
+    <div class="fg"><span class="fl">Month</span><select class="fsel" id="F_GM" onchange="rGCM()"><option value="">All</option></select></div>
+    <div class="fg"><span class="fl">Expense Code</span><select class="fsel" id="F_GE" onchange="rGCM()"><option value="">All</option></select></div>
+    <div class="fg"><span class="fl">Status</span><select class="fsel" id="F_GS" onchange="rGCM()"><option value="">All</option><option value="0">✅ Paid</option><option value="4">❌ Rejected</option><option value="other">Other</option></select></div>
+    <div class="fg nobr"><span class="fl">Search</span><input class="finput" id="F_GQ" placeholder="VIN, invoice, RO, NITG…" oninput="rGCM()"/></div>
+  </div>
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--sun3)">📋</div><div><div class="ph-title">GCM Claims</div><div class="ph-sub">All warranty claims from the GCM portal</div></div></div>
+    <div id="GCM_E" class="al al-i" style="display:none">⬆️ Upload a GCM file to view claims.</div>
+    <div id="GCM_K" class="krow k5" style="display:none"></div>
+    <div id="GCM_T"></div>
+  </div></div>
+</div>
+
+<!-- ══ OVERVIEW PAGE ════════════════════════════════════ -->
+<div class="page-area" id="P_overview" style="display:none">
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--sky3)">📊</div><div><div class="ph-title">General View</div><div class="ph-sub">Monthly summary, totals and trends</div></div></div>
+    <div id="OV_E" class="al al-i" style="display:none">⬆️ Upload GCM data to generate the overview.</div>
+    <div id="OV_K" class="krow k4" style="display:none"></div>
+    <div id="OV_C" class="card" style="display:none"><div class="ct">📈 Monthly Paid — Parts + Labour + Total (€)</div><canvas id="OV_CANVAS" height="72"></canvas></div>
+    <div id="OV_T"></div>
+  </div></div>
+</div>
+
+<!-- ══ EXPENSE PAGE ══════════════════════════════════════ -->
+<div class="page-area" id="P_expense" style="display:none">
+  <div class="filterbar">
+    <div class="fg"><span class="fl">Month</span><select class="fsel" id="F_EM" onchange="rExp()"><option value="">All</option></select></div>
+    <div class="fg nobr"><span class="fl">Search</span><input class="finput" id="F_EQ" placeholder="Code or description…" oninput="rExp()"/></div>
+  </div>
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--lemon3)">🏷️</div><div><div class="ph-title">By Expense Code</div><div class="ph-sub">Claims grouped and ranked by expense type</div></div></div>
+    <div id="EXP_E" class="al al-i" style="display:none">⬆️ Upload GCM to view expense breakdown.</div>
+    <div id="EXP_T"></div>
+  </div></div>
+</div>
+
+<!-- ══ COMPARISON PAGE ══════════════════════════════════ -->
+<div class="page-area" id="P_comparison" style="display:none">
+  <div class="filterbar">
+    <div class="fg"><span class="fl">Show</span><select class="fsel" id="F_CD" onchange="rComp()"><option value="">All VINs</option><option value="diff">⚠️ Differences Only</option><option value="match">✅ Matches Only</option></select></div>
+    <div class="fg nobr"><span class="fl">Search VIN</span><input class="finput" id="F_CQ" placeholder="Search VIN…" oninput="rComp()"/></div>
+  </div>
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--pur3)">⚖️</div><div><div class="ph-title">Incadea vs GCM</div><div class="ph-sub">Reconciliation per VIN — spot every difference</div></div></div>
+    <div id="CMP_E" class="al al-i" style="display:none">⬆️ Upload both GCM and Incadea files to reconcile.</div>
+    <div id="CMP_K" class="krow k4" style="display:none"></div>
+    <div id="CMP_T"></div>
+  </div></div>
+</div>
+
+<!-- ══ ASKED vs PAID PAGE ════════════════════════════════ -->
+<div class="page-area" id="P_askedpaid" style="display:none">
+  <div class="filterbar">
+    <div class="fg"><span class="fl">Month</span><select class="fsel" id="F_AM" onchange="rAP()"><option value="">All</option></select></div>
+    <div class="fg nobr"><span class="fl">Expense Code</span><select class="fsel" id="F_AE" onchange="rAP()"><option value="">All</option></select></div>
+  </div>
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--mint3)">📈</div><div><div class="ph-title">Asked vs Paid</div><div class="ph-sub">Gap analysis — what you asked vs what Renault paid</div></div></div>
+    <div id="AP_E" class="al al-i" style="display:none">⬆️ Upload GCM to view this analysis.</div>
+    <div id="AP_K" class="krow k4" style="display:none"></div>
+    <div id="AP_T"></div>
+  </div></div>
+</div>
+
+<!-- ══ REJECTIONS PAGE ═══════════════════════════════════ -->
+<div class="page-area" id="P_rejections" style="display:none">
+  <div class="filterbar">
+    <div class="fg"><span class="fl">Month</span><select class="fsel" id="F_RM" onchange="rRej()"><option value="">All</option></select></div>
+    <div class="fg nobr"><span class="fl">Filter</span><select class="fsel" id="F_RF" onchange="rRej()"><option value="">All Rejected</option><option value="no_action">🔴 No Action Yet</option><option value="resubmitted">✅ Has New Claim #</option></select></div>
+  </div>
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--rose3)">❌</div><div><div class="ph-title">Rejections</div><div class="ph-sub">Track, annotate and resubmit rejected claims</div></div></div>
+    <div id="REJ_E" class="al al-i" style="display:none">✅ No rejected claims found. GCM rejections = invoice_flag_state = 4.</div>
+    <div id="REJ_K" class="krow k4" style="display:none"></div>
+    <div id="REJ_T"></div>
+  </div></div>
+</div>
+
+<!-- ══ INCADEA PAGE ══════════════════════════════════════ -->
+<div class="page-area" id="P_incadea" style="display:none">
+  <div class="filterbar">
+    <div class="fg"><span class="fl">Make</span><select class="fsel" id="F_IMK" onchange="rInc()"><option value="">All Makes</option></select></div>
+    <div class="fg nobr"><span class="fl">Search</span><input class="finput" id="F_IQ" placeholder="VIN, invoice, order, customer…" oninput="rInc()"/></div>
+  </div>
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--sky3)">🔧</div><div><div class="ph-title">Incadea Data</div><div class="ph-sub">All records from your INCADEA DMS export</div></div></div>
+    <div id="INC_E" class="al al-i" style="display:none">⬆️ Upload INCADEA file to view data.</div>
+    <div id="INC_K" class="krow k4" style="display:none"></div>
+    <div id="INC_T"></div>
+  </div></div>
+</div>
+
+<!-- ══ BONUS PAGE ════════════════════════════════════════ -->
+<div class="page-area" id="P_bonus" style="display:none">
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--lemon3)">⭐</div><div><div class="ph-title">Bonus — 1% Labour</div><div class="ph-sub">1% of definitive paid labour per month (paid claims only)</div></div></div>
+    <div id="BON_E" class="al al-i" style="display:none">⬆️ Upload GCM file to calculate bonus.</div>
+    <div id="BON_K" class="krow k3" style="display:none"></div>
+    <div id="BON_C"></div>
+  </div></div>
+</div>
+
+</div></div>
+
+<script>
+// ══ STATE ═══════════════════════════════════════════════════
+const S = { gcm:[], inc:[], rej:{}, lastUpdate:null };
+let _mk=null, _ovc=null;
+
+// ══ LOCALSTORAGE KEYS ════════════════════════════════════════
+const LS_GCM='rw_gcm_v1',LS_INC='rw_inc_v1',LS_REJ='rw_rej_v1',LS_META='rw_meta_v1';
+function lsSave(k,d){try{localStorage.setItem(k,JSON.stringify(d));}catch(e){console.warn('LS save fail',e);}}
+function lsLoad(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
+
+function lsClear(){
+  [LS_GCM,LS_INC,LS_REJ,LS_META].forEach(k=>localStorage.removeItem(k));
+  S.gcm=[];S.inc=[];S.rej={};S.lastUpdate=null;
+  ['B_GCM','B_REJ','B_INC'].forEach(id=>document.getElementById(id).textContent='–');
+  document.getElementById('US_GCM_COUNT').textContent='—';
+  document.getElementById('US_GCM_META').textContent='No file loaded';
+  document.getElementById('US_INC_COUNT').textContent='—';
+  document.getElementById('US_INC_META').textContent='No file loaded';
+  document.getElementById('US_REJ_COUNT').textContent='—';
+  document.getElementById('US_TIME').textContent='—';
+  document.getElementById('US_DATE').textContent='Never updated';
+  document.getElementById('PILL_TS').style.display='none';
+  ['PILL_GCM','PILL_INC'].forEach(id=>document.getElementById(id).className='t-pill');
+  document.getElementById('PILL_GCM_DOT').className='dot dot-off';
+  document.getElementById('PILL_GCM_TXT').textContent='GCM: no data';
+  document.getElementById('PILL_INC_DOT').className='dot dot-off';
+  document.getElementById('PILL_INC_TXT').textContent='INC: no data';
+  const lsEl=document.getElementById('LS_STATUS');if(lsEl)lsEl.textContent='';
+  showToast(_lang==='fr'?'🗑️ Données effacées':'🗑️ All data cleared');
+}
+
+function lsRestore(){
+  const gcm=lsLoad(LS_GCM),inc=lsLoad(LS_INC),rej=lsLoad(LS_REJ),meta=lsLoad(LS_META);
+  let restored=false;
+  if(gcm&&gcm.length){
+    S.gcm=gcm;
+    const valid=S.gcm.filter(r=>!r._d),rejCount=valid.filter(r=>r.st===4).length;
+    document.getElementById('B_GCM').textContent=valid.length;
+    document.getElementById('B_REJ').textContent=rejCount;
+    document.getElementById('US_GCM_COUNT').textContent=valid.length.toLocaleString();
+    document.getElementById('US_GCM_META').textContent=S.gcm.filter(r=>r._d).length+' dups excluded · from cache';
+    document.getElementById('US_REJ_COUNT').textContent=rejCount;
+    document.getElementById('US_REJ_META').textContent=valid.length?((rejCount/valid.length)*100).toFixed(1)+'% rejection rate':'';
+    fillGF();restored=true;
+  }
+  if(inc&&inc.length){
+    S.inc=inc;
+    document.getElementById('B_INC').textContent=S.inc.length;
+    document.getElementById('US_INC_COUNT').textContent=S.inc.length.toLocaleString();
+    document.getElementById('US_INC_META').textContent=new Set(S.inc.map(r=>r.make)).size+' makes · from cache';
+    fillIF();restored=true;
+  }
+  if(rej)S.rej=rej;
+  if(meta){
+    S.lastUpdate=new Date(meta.ts);updTime();updPills();
+    if(meta.gcmFile)document.getElementById('US_GCM_META').textContent=S.gcm.filter(r=>r._d).length+' dups excluded · '+meta.gcmFile;
+    if(meta.incFile)document.getElementById('US_INC_META').textContent=new Set(S.inc.map(r=>r.make)).size+' makes · '+meta.incFile;
+  }
+  if(restored){
+    updLsStatus();
+    setTimeout(()=>showToast(_lang==='fr'?'✅ Données restaurées':'✅ Data restored from last session'),600);
+  }
+}
+document.addEventListener('DOMContentLoaded',lsRestore);
+
+// ══ LOCALSTORAGE PERSISTENCE ══════════════════════════════════
+const LS_GCM = 'rw_gcm_v1';
+const LS_INC = 'rw_inc_v1';
+const LS_REJ = 'rw_rej_v1';
+const LS_META = 'rw_meta_v1';
+
+function lsSave(key, data){
+  try{ localStorage.setItem(key, JSON.stringify(data)); return true; }
+  catch(e){ console.warn('localStorage save failed:', e); return false; }
+}
+function lsLoad(key){ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):null; } catch(e){ return null; } }
+function lsClear(){
+  [LS_GCM,LS_INC,LS_REJ,LS_META].forEach(k=>localStorage.removeItem(k));
+  S.gcm=[]; S.inc=[]; S.rej={}; S.lastUpdate=null;
+  document.getElementById('B_GCM').textContent='–';
+  document.getElementById('B_REJ').textContent='–';
+  document.getElementById('B_INC').textContent='–';
+  document.getElementById('US_GCM_COUNT').textContent='—';
+  document.getElementById('US_GCM_META').textContent='No file loaded';
+  document.getElementById('US_INC_COUNT').textContent='—';
+  document.getElementById('US_INC_META').textContent='No file loaded';
+  document.getElementById('US_REJ_COUNT').textContent='—';
+  document.getElementById('US_TIME').textContent='—';
+  document.getElementById('US_DATE').textContent='Never updated';
+  document.getElementById('PILL_TS').style.display='none';
+  document.getElementById('PILL_GCM').className='t-pill';
+  document.getElementById('PILL_GCM_DOT').className='dot dot-off';
+  document.getElementById('PILL_GCM_TXT').textContent='GCM: no data';
+  document.getElementById('PILL_INC').className='t-pill';
+  document.getElementById('PILL_INC_DOT').className='dot dot-off';
+  document.getElementById('PILL_INC_TXT').textContent='INC: no data';
+  showToast(_lang==='fr'?'🗑️ Données effacées':'🗑️ All data cleared');
+}
+
+function lsRestore(){
+  const gcm = lsLoad(LS_GCM);
+  const inc = lsLoad(LS_INC);
+  const rej = lsLoad(LS_REJ);
+  const meta = lsLoad(LS_META);
+  let restored = false;
+  if(gcm && gcm.length){
+    S.gcm = gcm;
+    const valid = S.gcm.filter(r=>!r._d);
+    const rejCount = valid.filter(r=>r.st===4).length;
+    document.getElementById('B_GCM').textContent = valid.length;
+    document.getElementById('B_REJ').textContent = rejCount;
+    document.getElementById('US_GCM_COUNT').textContent = valid.length.toLocaleString();
+    document.getElementById('US_GCM_META').textContent = S.gcm.filter(r=>r._d).length + ' duplicates excluded · restored from cache';
+    document.getElementById('US_REJ_COUNT').textContent = rejCount;
+    document.getElementById('US_REJ_META').textContent = valid.length ? ((rejCount/valid.length)*100).toFixed(1)+'% rejection rate' : '';
+    fillGF();
+    restored = true;
+  }
+  if(inc && inc.length){
+    S.inc = inc;
+    document.getElementById('B_INC').textContent = S.inc.length;
+    document.getElementById('US_INC_COUNT').textContent = S.inc.length.toLocaleString();
+    document.getElementById('US_INC_META').textContent = new Set(S.inc.map(r=>r.make)).size + ' makes · restored from cache';
+    fillIF();
+    restored = true;
+  }
+  if(rej){ S.rej = rej; }
+  if(meta){
+    S.lastUpdate = new Date(meta.ts);
+    updTime(); updPills();
+    if(meta.gcmFile) document.getElementById('US_GCM_META').textContent = S.gcm.filter(r=>r._d).length + ' duplicates excluded · ' + meta.gcmFile;
+    if(meta.incFile) document.getElementById('US_INC_META').textContent = new Set(S.inc.map(r=>r.make)).size + ' makes · ' + meta.incFile;
+  }
+  if(restored){
+    updLsStatus();
+    const msg = _lang==='fr' ? '✅ Données restaurées depuis le cache' : '✅ Data restored from last session';
+    setTimeout(()=>showToast(msg), 600);
+  }
+}
+
+// Restore on page load
+document.addEventListener('DOMContentLoaded', lsRestore);
+
+// ══ NAV ═════════════════════════════════════════════════════
+function go(el){
+  document.querySelectorAll('.si').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.page-area').forEach(p=>p.style.display='none');
+  const pg = el.dataset.page;
+  document.getElementById('P_'+pg).style.display = 'flex';
+  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus})[pg]?.();
+}
+
+// ══ DRAG & DROP ══════════════════════════════════════════════
+function dzO(e,id){e.preventDefault();document.getElementById(id).classList.add('over')}
+function dzL(id){document.getElementById(id).classList.remove('over')}
+function dzD(e,t){e.preventDefault();dzL('DZ_'+t.toUpperCase());const f=e.dataTransfer.files[0];if(f)procF(f,t)}
+function loadF(e,t){const f=e.target.files[0];if(f)procF(f,t)}
+
+// ══ FILE PROCESSING ══════════════════════════════════════════
+function procF(file, type){
+  showLoad('Reading ' + file.name + ' …');
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      if(type==='gcm'){
+        const sn = wb.SheetNames.find(s=>/sheet1/i.test(s)) || wb.SheetNames[0];
+        S.gcm = parseGCM(XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:''}));
+        S.lastUpdate = new Date();
+        const valid = S.gcm.filter(r=>!r._d);
+        const rejCount = valid.filter(r=>r.st===4).length;
+        document.getElementById('B_GCM').textContent = valid.length;
+        document.getElementById('B_REJ').textContent = rejCount;
+        fillGF();
+        // Update upload stats
+        document.getElementById('US_GCM_COUNT').textContent = valid.length.toLocaleString();
+        document.getElementById('US_GCM_META').textContent = S.gcm.filter(r=>r._d).length + ' duplicates excluded · ' + file.name;
+        document.getElementById('US_REJ_COUNT').textContent = rejCount;
+        document.getElementById('US_REJ_META').textContent = valid.length ? ((rejCount/valid.length)*100).toFixed(1)+'% rejection rate' : '';
+        updTime(); updPills();
+        stat('ST_GCM', '✅ ' + valid.length + ' claims loaded · ' + S.gcm.filter(r=>r._d).length + ' duplicates flagged', true);
+      } else if(type==='inc'){
+        const sn = wb.SheetNames.find(s=>/incadea/i.test(s)) || wb.SheetNames[0];
+        S.inc = parseINC(XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:''}));
+        S.lastUpdate = new Date();
+        document.getElementById('B_INC').textContent = S.inc.length;
+        fillIF();
+        document.getElementById('US_INC_COUNT').textContent = S.inc.length.toLocaleString();
+        document.getElementById('US_INC_META').textContent = new Set(S.inc.map(r=>r.make)).size + ' makes · ' + file.name;
+        updTime(); updPills();
+        stat('ST_INC', '✅ ' + S.inc.length + ' INCADEA records loaded', true);
+      }
+      // Save to localStorage
+      lsSave(LS_GCM, S.gcm);
+      lsSave(LS_INC, S.inc);
+      const meta = lsLoad(LS_META)||{};
+      if(type==='gcm') meta.gcmFile = file.name;
+      if(type==='inc') meta.incFile = file.name;
+      meta.ts = S.lastUpdate ? S.lastUpdate.toISOString() : new Date().toISOString();
+      lsSave(LS_META, meta);
+      updLsStatus();
+      // Persist to localStorage
+      lsSave(LS_GCM,S.gcm); lsSave(LS_INC,S.inc);
+      const _meta=lsLoad(LS_META)||{};
+      if(type==='gcm')_meta.gcmFile=file.name;
+      if(type==='inc')_meta.incFile=file.name;
+      _meta.ts=S.lastUpdate?S.lastUpdate.toISOString():new Date().toISOString();
+      lsSave(LS_META,_meta); updLsStatus();
+      hideLoad(); showToast('🎉 File loaded successfully!');
+    } catch(err){ hideLoad(); stat('ST_'+type.toUpperCase(), '❌ Error: ' + err.message, false); }
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function updTime(){
+  if(!S.lastUpdate) return;
+  const ts = S.lastUpdate;
+  const timeStr = ts.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const dateStr = ts.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  document.getElementById('US_TIME').textContent = timeStr;
+  document.getElementById('US_DATE').textContent = dateStr;
+  document.getElementById('PILL_TS_TXT').textContent = 'Updated ' + timeStr;
+  document.getElementById('PILL_TS').style.display = 'flex';
+}
+function updLsStatus(){
+  try{
+    const gcmSize = (localStorage.getItem(LS_GCM)||'').length;
+    const incSize = (localStorage.getItem(LS_INC)||'').length;
+    const rejSize = (localStorage.getItem(LS_REJ)||'').length;
+    const total = gcmSize + incSize + rejSize;
+    const kb = (total/1024).toFixed(0);
+    const el = document.getElementById('LS_STATUS');
+    if(el && total > 0){
+      el.innerHTML = '💾 ' + kb + ' KB ' + (_lang==='fr'?'sauvegardé':'saved locally');
+      el.style.color = 'var(--mint)';
+    }
+  }catch(e){}
+}
+
+function updPills(){
+  const gEl = document.getElementById('PILL_GCM');
+  const iEl = document.getElementById('PILL_INC');
+  const gDot = document.getElementById('PILL_GCM_DOT');
+  const iDot = document.getElementById('PILL_INC_DOT');
+  if(S.gcm.length){ document.getElementById('PILL_GCM_TXT').textContent = 'GCM: '+S.gcm.filter(r=>!r._d).length+' claims'; gEl.className='t-pill ok'; gDot.className='dot dot-ok'; }
+  if(S.inc.length){ document.getElementById('PILL_INC_TXT').textContent = 'INC: '+S.inc.length+' records'; iEl.className='t-pill ok'; iDot.className='dot dot-ok'; }
+}
+
+// ══ PARSERS ══════════════════════════════════════════════════
+function parseGCM(raw){
+  const seen = new Map();
+  return raw.map(r=>{
+    const vin = String(r.vin||'').trim().toUpperCase();
+    const inv = String(r.dealer_invoice_number||'').trim();
+    const key = vin+'||'+inv;
+    const isDup = seen.has(key);
+    if(!isDup&&(vin||inv)) seen.set(key,true);
+    return{_d:isDup,vin,inv,
+      ro:String(r.DEALER_REPAIT_ORDER_NUMBER||'').trim(),
+      month:String(r.yearmonth_topage||'').trim(),
+      date:String(r.date_ouv_or||'').substr(0,10),
+      exp:String(r.expense_nature_code||'').trim(),
+      expD:String(r.expense_nature_level_2_description_en||'').trim(),
+      st:parseInt(r.invoice_flag_state??-1),
+      nitg:String(r.nitg||'').trim(),
+      pa:n(r.part_received_amount_local_eur),
+      pp:n(r.part_definitive_amount_without_pco_eur),
+      la:n(r.labour_received_amount_eur),
+      lp:n(r.labour_definitive_amount_without_pco_eur),
+      ta:n(r.received_amount_eur),
+      tp:n(r.definitive_amount_without_pco_eur),
+    };
+  }).filter(r=>r.vin||r.inv);
+}
+function parseINC(raw){
+  return raw.filter(r=>r['No.']||r['VIN']).map(r=>({
+    no:String(r['No.']||'').trim(),vin:String(r['VIN']||'').trim().toUpperCase(),
+    model:String(r['Model']||'').trim(),make:String(r['Make Code']||'').trim(),
+    cust:String(r['Sell-to Customer Name']||'').trim(),
+    svcOrd:String(r['Service Order No.']||'').trim(),
+    extDoc:String(r['External Document No.']||'').trim(),
+    date:String(r['Posting Date']||'').substr(0,10),
+    month:mKey(String(r['Posting Date']||'')),
+    lab:n(r['Total Labors']),parts:n(r['Total Parts']),amt:n(r['Amount']),
+  }));
+}
+
+// ══ HELPERS ══════════════════════════════════════════════════
+function n(v){const f=parseFloat(v);return isNaN(f)?0:f;}
+function f(v){if(v===null||v===undefined||v==='')return '–';const x=parseFloat(v);if(isNaN(x))return '–';return x.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function mKey(d){if(!d)return '';const s=String(d).replace(/\D/g,'').substr(0,6);return s.length===6?s:'';}
+function fmM(m){if(!m)return '–';const s=String(m);if(s.length===6){const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return (mn[parseInt(s.substr(4,2))-1]||'?')+' '+s.substr(0,4);}return s;}
+function showLoad(m){document.getElementById('LOADING').style.display='flex';document.getElementById('LMSG').textContent=m||'…';}
+function hideLoad(){document.getElementById('LOADING').style.display='none';}
+function stat(id,msg,ok){const el=document.getElementById(id);if(el)el.innerHTML=`<div class="chip ${ok?'chip-ok':'chip-err'}">${msg}</div>`;}
+function gv(id){const e=document.getElementById(id);return e?e.value:'';}
+function sm(arr,k){return arr.reduce((s,r)=>s+(r[k]||0),0);}
+function esc(s){return String(s).replace(/'/g,"\\'");}
+let _toastTimer;
+function showToast(msg){const t=document.getElementById('TOAST');t.innerHTML=msg;t.classList.add('show');clearTimeout(_toastTimer);_toastTimer=setTimeout(()=>t.classList.remove('show'),3000);}
+
+function fillGF(){
+  const months=[...new Set(S.gcm.map(r=>r.month))].filter(Boolean).sort();
+  const exps=[...new Set(S.gcm.map(r=>r.exp))].filter(Boolean).sort();
+  ['F_GM','F_EM','F_AM','F_RM'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.innerHTML='<option value="">All</option>';months.forEach(m=>el.innerHTML+=`<option value="${m}">${fmM(m)}</option>`);});
+  ['F_GE','F_AE'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.innerHTML='<option value="">All</option>';exps.forEach(e=>el.innerHTML+=`<option value="${e}">${e}</option>`);});
+}
+function fillIF(){
+  const makes=[...new Set(S.inc.map(r=>r.make))].filter(Boolean).sort();
+  const mk=document.getElementById('F_IMK');if(mk){mk.innerHTML='<option value="">All Makes</option>';makes.forEach(m=>mk.innerHTML+=`<option value="${m}">${m}</option>`);}
+}
+
+// ══ MODAL ════════════════════════════════════════════════════
+function openModal(inv,vin){
+  _mk=inv;
+  document.getElementById('MTITLE').textContent = 'Claim — '+inv;
+  document.getElementById('MSUB').textContent = 'VIN: '+vin;
+  const d=S.rej[inv]||{};
+  document.getElementById('M_REASON').value=d.reason||'';
+  document.getElementById('M_NEWCLAIM').value=d.newClaim||'';
+  document.getElementById('M_REINV').value=d.reInv||'';
+  document.getElementById('M_CAT').value=d.cat||'';
+  document.getElementById('M_NOTES').value=d.notes||'';
+  document.getElementById('MBGR').classList.add('open');
+}
+function closeModal(){document.getElementById('MBGR').classList.remove('open');_mk=null;}
+function saveRej(){
+  if(!_mk)return;
+  S.rej[_mk]={reason:gv('M_REASON'),newClaim:gv('M_NEWCLAIM'),reInv:gv('M_REINV'),cat:gv('M_CAT'),notes:gv('M_NOTES'),ts:new Date().toISOString()};
+  closeModal(); rRej(); rGCM();
+  document.getElementById('B_REJ').textContent=S.gcm.filter(r=>r.st===4&&!r._d).length;
+  lsSave(LS_REJ, S.rej);
+  updLsStatus();
+  lsSave(LS_REJ,S.rej); updLsStatus();
+  showToast('✅ Rejection details saved!');
+}
+
+// ══ GLOBAL SEARCH ═════════════════════════════════════════════
+function gSearch(q){
+  const drop=document.getElementById('SDROP');
+  if(!q||q.length<2){drop.classList.remove('open');return;}
+  const ql=q.toLowerCase();
+  const gh=S.gcm.filter(r=>[r.vin,r.inv,r.ro,r.nitg].join('|').toLowerCase().includes(ql)).slice(0,6);
+  const ih=S.inc.filter(r=>[r.vin,r.no,r.svcOrd,r.cust].join('|').toLowerCase().includes(ql)).slice(0,4);
+  if(!gh.length&&!ih.length){drop.innerHTML='<div class="sd-empty">🔍 No results for "'+q+'"</div>';drop.classList.add('open');return;}
+  let h='';
+  if(gh.length){
+    h+='<div class="sd-sec">📋 GCM Claims</div>';
+    gh.forEach(r=>{h+=`<div class="sd-item" onclick="jumpTo('gcm','${esc(r.inv)}')"><div class="sd-icon" style="background:${r.st===4?'var(--rose3)':'var(--mint3)'}">${r.st===4?'❌':'✅'}</div><div class="sd-main"><div class="sd-title">${r.inv} <span class="badge ${r.st===4?'b-rose':'b-mint'}">${r.st===4?'Rejected':'Paid'}</span></div><div class="sd-meta">VIN ${r.vin} · RO ${r.ro||'–'} · ${fmM(r.month)} · €${f(r.tp)}</div></div></div>`;});
+  }
+  if(ih.length){
+    h+='<div class="sd-sec">🔧 INCADEA</div>';
+    ih.forEach(r=>{h+=`<div class="sd-item" onclick="jumpTo('incadea','${esc(r.no)}')"><div class="sd-icon" style="background:var(--sky3)">🔧</div><div class="sd-main"><div class="sd-title">${r.no} — ${r.cust}</div><div class="sd-meta">VIN ${r.vin} · Order ${r.svcOrd||'–'} · €${f(r.amt)}</div></div></div>`;});
+  }
+  drop.innerHTML=h; drop.classList.add('open');
+}
+function closeSearch(){document.getElementById('SDROP').classList.remove('open');}
+function jumpTo(page,q){
+  closeSearch(); document.getElementById('GSEARCH').value='';
+  const item=document.querySelector(`.si[data-page="${page}"]`); if(item)go(item);
+  if(page==='gcm'){document.getElementById('F_GQ').value=q;rGCM();}
+  else if(page==='incadea'){document.getElementById('F_IQ').value=q;rInc();}
+}
+
+// ══ RENDER GCM ════════════════════════════════════════════════
+function rGCM(){
+  const E=document.getElementById('GCM_E'),K=document.getElementById('GCM_K'),T=document.getElementById('GCM_T');
+  if(!S.gcm.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}E.style.display='none';
+  const mf=gv('F_GM'),ef=gv('F_GE'),sf=gv('F_GS'),qf=gv('F_GQ').toLowerCase();
+  let rows=S.gcm.filter(r=>{
+    if(mf&&r.month!==mf)return false;if(ef&&r.exp!==ef)return false;
+    if(sf==='0'&&r.st!==0)return false;if(sf==='4'&&r.st!==4)return false;if(sf==='other'&&(r.st===0||r.st===4))return false;
+    if(qf&&![r.vin,r.inv,r.ro,r.nitg].join('|').toLowerCase().includes(qf))return false;
+    return true;
+  });
+  const vld=rows.filter(r=>!r._d),dups=rows.filter(r=>r._d).length,rej=vld.filter(r=>r.st===4).length;
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📋 Claims</div><div class="kv sky">${vld.length.toLocaleString()}</div><div class="ks">${dups} duplicates excluded</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Total Paid (€)</div><div class="kv mint">${f(vld.reduce((s,r)=>s+r.tp,0))}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Rejected</div><div class="kv rose">${rej}</div><div class="ks">${vld.length?((rej/vld.length)*100).toFixed(1)+'% of claims':''}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">✅ Action Taken</div><div class="kv lem">${vld.filter(r=>r.st===4&&S.rej[r.inv]).length}</div><div class="ks">of ${rej} rejected</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">🚗 Unique VINs</div><div class="kv pur">${new Set(vld.map(r=>r.vin)).size.toLocaleString()}</div></div>`;
+  let h=dups?`<div class="al al-w">⚠️ ${dups} duplicate rows detected (same VIN + Invoice #) — highlighted, excluded from all calculations.</div>`:'';
+  h+=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
+    <th>VIN</th><th>Invoice #</th><th>RO / Order</th><th>Month</th><th>Date</th>
+    <th>Exp Code</th><th>NITG</th>
+    <th class="num">Parts Asked</th><th class="num">Parts Paid</th>
+    <th class="num">Labour Asked</th><th class="num">Labour Paid</th>
+    <th class="num">Total Asked</th><th class="num">Total Paid</th>
+    <th>Status</th><th>Action</th>
+  </tr></thead><tbody>`;
+  rows.slice(0,600).forEach(r=>{
+    const rd=S.rej[r.inv];
+    const isP=r.st===0,isR=r.st===4;
+    h+=`<tr class="${r._d?'tr-dup':''}">
+      <td class="mono">${r.vin}${r._d?' <span class="badge b-dup">DUP</span>':''}</td>
+      <td class="mono">${r.inv}</td>
+      <td class="mono" style="color:var(--muted);font-size:9px">${r.ro||'–'}</td>
+      <td style="white-space:nowrap;font-size:11px;font-weight:600">${fmM(r.month)}</td>
+      <td style="font-size:9px;color:var(--muted)">${r.date||'–'}</td>
+      <td><span class="badge b-sun">${r.exp||'–'}</span></td>
+      <td class="mono" style="font-size:9px;color:var(--muted)">${r.nitg||'–'}</td>
+      <td class="num">${f(r.pa)}</td><td class="num">${f(r.pp)}</td>
+      <td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td>
+      <td class="num">${f(r.ta)}</td>
+      <td class="num" style="font-weight:700">${f(r.tp)}</td>
+      <td><span class="badge ${isP?'b-mint':isR?'b-rose':'b-n'}">${isP?'✅ Paid':isR?'❌ Rejected':'Stat '+r.st}</span></td>
+      <td>${isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="openModal('${esc(r.inv)}','${r.vin}')">${rd?'✏️ Edit':'+ Track'}</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'}</td>
+    </tr>`;
+  });
+  if(rows.length>600)h+=`<tr><td colspan="15" style="text-align:center;padding:14px;color:var(--muted);font-size:11px;font-weight:500">… ${rows.length-600} more rows — use filters to narrow down 🔍</td></tr>`;
+  h+=`</tbody></table></div></div>`;
+  T.innerHTML=h;
+}
+
+// ══ RENDER OVERVIEW ═══════════════════════════════════════════
+function rOV(){
+  const E=document.getElementById('OV_E'),K=document.getElementById('OV_K'),C=document.getElementById('OV_C'),T=document.getElementById('OV_T');
+  if(!S.gcm.length){E.style.display='flex';K.style.display='none';C.style.display='none';T.innerHTML='';return;}E.style.display='none';
+  const vld=S.gcm.filter(r=>!r._d);
+  const byM={};vld.forEach(r=>{const k=r.month||'?';if(!byM[k])byM[k]={m:k,cnt:0,pa:0,pp:0,la:0,lp:0,ta:0,tp:0};byM[k].cnt++;byM[k].pa+=r.pa;byM[k].pp+=r.pp;byM[k].la+=r.la;byM[k].lp+=r.lp;byM[k].ta+=r.ta;byM[k].tp+=r.tp;});
+  const mks=Object.keys(byM).sort(),mr=mks.map(k=>byM[k]);
+  const tot={cnt:sm(mr,'cnt'),pp:sm(mr,'pp'),lp:sm(mr,'lp'),tp:sm(mr,'tp'),pa:sm(mr,'pa'),la:sm(mr,'la'),ta:sm(mr,'ta')};
+  const rr=vld.length?vld.filter(r=>r.st===4).length/vld.length*100:0;
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📋 Total Claims</div><div class="kv sky">${tot.cnt.toLocaleString()}</div><div class="ks">${new Set(vld.map(r=>r.vin)).size} unique VINs</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">🔩 Parts Paid (€)</div><div class="kv sun">${f(tot.pp)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">🔧 Labour Paid (€)</div><div class="kv mint">${f(tot.lp)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💰 Grand Total Paid (€)</div><div class="kv pur" style="font-size:22px">${f(tot.tp)}</div><div class="ks">Rejection rate ${rr.toFixed(1)}%</div></div>`;
+  C.style.display='block';if(_ovc)_ovc.destroy();
+  _ovc=new Chart(document.getElementById('OV_CANVAS').getContext('2d'),{
+    type:'bar',
+    data:{labels:mks.map(fmM),datasets:[
+      {label:'Parts Paid',data:mr.map(r=>r.pp),backgroundColor:'rgba(255,107,53,.7)',borderRadius:6},
+      {label:'Labour Paid',data:mr.map(r=>r.lp),backgroundColor:'rgba(14,165,233,.7)',borderRadius:6},
+      {label:'Total Paid',data:mr.map(r=>r.tp),type:'line',borderColor:'#8B5CF6',backgroundColor:'transparent',pointBackgroundColor:'#8B5CF6',pointRadius:5,tension:.4,borderWidth:2.5},
+    ]},
+    options:{responsive:true,plugins:{legend:{position:'top',labels:{font:{size:11,family:'Plus Jakarta Sans',weight:'600'},boxWidth:12,borderRadius:4}}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(0,0,0,.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v,font:{size:10}}}}}
+  });
+  let h=`<div class="card"><div class="ct">📅 Monthly Subtotals</div><div class="tw"><table class="t">
+  <thead><tr><th>Month</th><th class="num">Claims</th><th class="num">Parts Asked</th><th class="num">Parts Paid</th><th class="num">Labour Asked</th><th class="num">Labour Paid</th><th class="num">Total Asked</th><th class="num">Total Paid</th><th class="num">Deducted</th></tr></thead><tbody>`;
+  mr.forEach(r=>{const ded=r.ta-r.tp;h+=`<tr><td style="font-weight:700">${fmM(r.m)}</td><td class="num">${r.cnt}</td><td class="num">${f(r.pa)}</td><td class="num">${f(r.pp)}</td><td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td><td class="num">${f(r.ta)}</td><td class="num" style="font-weight:700">${f(r.tp)}</td><td class="num ${ded>0.01?'dp':'dz'}">${f(ded)}</td></tr>`;});
+  h+=`</tbody><tfoot><tr class="tr-grand"><td>TOTAL</td><td class="num">${tot.cnt}</td><td class="num">${f(tot.pa)}</td><td class="num">${f(tot.pp)}</td><td class="num">${f(tot.la)}</td><td class="num">${f(tot.lp)}</td><td class="num">${f(tot.ta)}</td><td class="num">${f(tot.tp)}</td><td class="num">${f(tot.ta-tot.tp)}</td></tr></tfoot></table></div></div>`;
+  T.innerHTML=h;
+}
+
+// ══ RENDER EXPENSE ════════════════════════════════════════════
+function rExp(){
+  const E=document.getElementById('EXP_E'),T=document.getElementById('EXP_T');
+  if(!S.gcm.length){E.style.display='flex';T.innerHTML='';return;}E.style.display='none';
+  const mf=gv('F_EM'),qf=gv('F_EQ').toLowerCase();
+  const rows=S.gcm.filter(r=>!r._d&&(!mf||r.month===mf));
+  const byE={};rows.forEach(r=>{const k=r.exp||'?';if(!byE[k])byE[k]={code:k,desc:r.expD,cnt:0,pa:0,pp:0,la:0,lp:0,tp:0};byE[k].cnt++;byE[k].pa+=r.pa;byE[k].pp+=r.pp;byE[k].la+=r.la;byE[k].lp+=r.lp;byE[k].tp+=r.tp;byE[k].desc=r.expD||byE[k].desc;});
+  let er=Object.values(byE).sort((a,b)=>b.tp-a.tp);
+  if(qf)er=er.filter(r=>r.code.toLowerCase().includes(qf)||r.desc.toLowerCase().includes(qf));
+  const gt=er.reduce((s,r)=>s+r.tp,0);
+  let h=`<div class="card"><div class="ct">🏷️ By Expense Code${mf?' — '+fmM(mf):''}</div><div class="tw"><table class="t">
+  <thead><tr><th>Code</th><th>Description</th><th class="num">Claims</th><th class="num">Parts Asked</th><th class="num">Parts Paid</th><th class="num">Labour Asked</th><th class="num">Labour Paid</th><th class="num">Total Paid</th><th class="num">% Share</th></tr></thead><tbody>`;
+  er.forEach(r=>{const pct=gt>0?r.tp/gt*100:0;h+=`<tr><td><span class="badge b-sun">${r.code}</span></td><td style="font-size:10px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500" title="${r.desc||''}">${r.desc||'–'}</td><td class="num">${r.cnt}</td><td class="num">${f(r.pa)}</td><td class="num">${f(r.pp)}</td><td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td><td class="num" style="font-weight:700">${f(r.tp)}</td><td class="num"><span class="badge b-pur">${pct.toFixed(1)}%</span></td></tr>`;});
+  h+=`</tbody><tfoot><tr class="tr-grand"><td colspan="2">TOTAL</td><td class="num">${er.reduce((s,r)=>s+r.cnt,0)}</td><td class="num">${f(er.reduce((s,r)=>s+r.pa,0))}</td><td class="num">${f(er.reduce((s,r)=>s+r.pp,0))}</td><td class="num">${f(er.reduce((s,r)=>s+r.la,0))}</td><td class="num">${f(er.reduce((s,r)=>s+r.lp,0))}</td><td class="num">${f(gt)}</td><td class="num">100%</td></tr></tfoot></table></div></div>`;
+  T.innerHTML=h;
+}
+
+// ══ RENDER COMPARISON ═════════════════════════════════════════
+function rComp(){
+  const E=document.getElementById('CMP_E'),K=document.getElementById('CMP_K'),T=document.getElementById('CMP_T');
+  if(!S.gcm.length||!S.inc.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}E.style.display='none';
+  const df=gv('F_CD'),qf=gv('F_CQ').toLowerCase();
+  const gcmV={};S.gcm.filter(r=>!r._d).forEach(r=>{if(!gcmV[r.vin])gcmV[r.vin]={pp:0,lp:0,tp:0};gcmV[r.vin].pp+=r.pp;gcmV[r.vin].lp+=r.lp;gcmV[r.vin].tp+=r.tp;});
+  const incV={};S.inc.forEach(r=>{if(!incV[r.vin])incV[r.vin]={pp:0,lp:0,tp:0,make:r.make,model:r.model};incV[r.vin].pp+=r.parts;incV[r.vin].lp+=r.lab;incV[r.vin].tp+=r.amt;});
+  let mg=[...new Set([...Object.keys(gcmV),...Object.keys(incV)])].filter(Boolean).map(vin=>{
+    const g=gcmV[vin]||{pp:0,lp:0,tp:0};const i=incV[vin]||{pp:0,lp:0,tp:0};
+    return{vin,make:incV[vin]?.make||'',model:incV[vin]?.model||'',gpp:g.pp,glp:g.lp,gtp:g.tp,ipp:i.pp,ilp:i.lp,itp:i.tp,dpp:g.pp-i.pp,dlp:g.lp-i.lp,dtp:g.tp-i.tp};
+  });
+  if(df==='diff')mg=mg.filter(r=>Math.abs(r.dtp)>0.01);else if(df==='match')mg=mg.filter(r=>Math.abs(r.dtp)<=0.01);
+  if(qf)mg=mg.filter(r=>r.vin.toLowerCase().includes(qf));
+  mg.sort((a,b)=>Math.abs(b.dtp)-Math.abs(a.dtp));
+  const tG=mg.reduce((s,r)=>s+r.gtp,0),tI=mg.reduce((s,r)=>s+r.itp,0),tD=tG-tI;
+  const mtch=mg.filter(r=>Math.abs(r.dtp)<=0.01).length;
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">📋 GCM Total (€)</div><div class="kv sun">${f(tG)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">🔧 Incadea Total (€)</div><div class="kv sky">${f(tI)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚖️ Difference (€)</div><div class="kv ${Math.abs(tD)>0.01?'lem':'mint'}">${f(tD)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">✅ Perfect Matches</div><div class="kv mint">${mtch}</div><div class="ks">of ${mg.length} VINs</div></div>`;
+  const dc=v=>Math.abs(v)<=0.01?'dz':v>0?'dp':'dn';
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">⚖️ Incadea ↔ GCM by VIN — ${mg.length} records</div><div class="tw"><table class="t">
+  <thead><tr><th>VIN</th><th>Make / Model</th><th class="num">GCM Parts</th><th class="num">INC Parts</th><th class="num">Δ Parts</th><th class="num">GCM Labour</th><th class="num">INC Labour</th><th class="num">Δ Labour</th><th class="num">GCM Total</th><th class="num">INC Total</th><th class="num">Δ Total</th></tr></thead><tbody>`;
+  mg.slice(0,400).forEach(r=>{h+=`<tr><td class="mono">${r.vin}</td><td style="font-size:10px;font-weight:600">${r.make} ${r.model}</td><td class="num">${f(r.gpp)}</td><td class="num">${f(r.ipp)}</td><td class="num ${dc(r.dpp)}">${f(r.dpp)}</td><td class="num">${f(r.glp)}</td><td class="num">${f(r.ilp)}</td><td class="num ${dc(r.dlp)}">${f(r.dlp)}</td><td class="num">${f(r.gtp)}</td><td class="num">${f(r.itp)}</td><td class="num ${dc(r.dtp)}" style="font-weight:700">${f(r.dtp)}</td></tr>`;});
+  if(mg.length>400)h+=`<tr><td colspan="11" style="text-align:center;padding:12px;color:var(--muted);font-size:11px">… ${mg.length-400} more</td></tr>`;
+  h+=`</tbody><tfoot><tr class="tr-grand"><td colspan="2">TOTAL</td><td class="num">${f(mg.reduce((s,r)=>s+r.gpp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.ipp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.dpp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.glp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.ilp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.dlp,0))}</td><td class="num">${f(tG)}</td><td class="num">${f(tI)}</td><td class="num">${f(tD)}</td></tr></tfoot></table></div></div>`;
+  T.innerHTML=h;
+}
+
+// ══ RENDER ASKED vs PAID ══════════════════════════════════════
+function rAP(){
+  const E=document.getElementById('AP_E'),K=document.getElementById('AP_K'),T=document.getElementById('AP_T');
+  if(!S.gcm.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}E.style.display='none';
+  const mf=gv('F_AM'),ef=gv('F_AE');
+  const rows=S.gcm.filter(r=>!r._d&&(!mf||r.month===mf)&&(!ef||r.exp===ef));
+  const byME={};rows.forEach(r=>{const k=r.month+'||'+r.exp;if(!byME[k])byME[k]={m:r.month,exp:r.exp,expD:r.expD,cnt:0,pa:0,pp:0,la:0,lp:0,ta:0,tp:0};byME[k].cnt++;byME[k].pa+=r.pa;byME[k].pp+=r.pp;byME[k].la+=r.la;byME[k].lp+=r.lp;byME[k].ta+=r.ta;byME[k].tp+=r.tp;});
+  const items=Object.values(byME).sort((a,b)=>a.m.localeCompare(b.m)||a.exp.localeCompare(b.exp));
+  const tTA=sm(items,'ta'),tTP=sm(items,'tp');
+  const rr=tTA>0?(1-tTP/tTA)*100:0;
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📤 Total Asked (€)</div><div class="kv sky">${f(tTA)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💵 Total Paid (€)</div><div class="kv mint">${f(tTP)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">📉 Total Deducted (€)</div><div class="kv rose">${f(tTA-tTP)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">📊 Deduction Rate</div><div class="kv ${rr>5?'rose':rr>2?'lem':'mint'}">${rr.toFixed(1)}%</div></div>`;
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">📈 Asked vs Paid — by Month & Expense Code</div><div class="tw"><table class="t">
+  <thead><tr><th>Month</th><th>Exp Code</th><th>Description</th><th class="num">Claims</th><th class="num">Parts Asked</th><th class="num">Parts Paid</th><th class="num">Δ Parts</th><th class="num">Labour Asked</th><th class="num">Labour Paid</th><th class="num">Δ Labour</th><th class="num">Total Asked</th><th class="num">Total Paid</th><th class="num">Deducted</th></tr></thead><tbody>`;
+  let pm='',ms={cnt:0,pa:0,pp:0,la:0,lp:0,ta:0,tp:0};
+  items.forEach(r=>{
+    if(pm&&r.m!==pm){h+=`<tr class="tr-sub"><td colspan="3">📅 Subtotal ${fmM(pm)}</td><td class="num">${ms.cnt}</td><td class="num">${f(ms.pa)}</td><td class="num">${f(ms.pp)}</td><td class="num dp">${f(ms.pa-ms.pp)}</td><td class="num">${f(ms.la)}</td><td class="num">${f(ms.lp)}</td><td class="num dp">${f(ms.la-ms.lp)}</td><td class="num">${f(ms.ta)}</td><td class="num">${f(ms.tp)}</td><td class="num dp">${f(ms.ta-ms.tp)}</td></tr>`;ms={cnt:0,pa:0,pp:0,la:0,lp:0,ta:0,tp:0};}
+    ms.cnt+=r.cnt;ms.pa+=r.pa;ms.pp+=r.pp;ms.la+=r.la;ms.lp+=r.lp;ms.ta+=r.ta;ms.tp+=r.tp;pm=r.m;
+    const pd=r.pa-r.pp,ld=r.la-r.lp,td=r.ta-r.tp;
+    h+=`<tr><td style="font-weight:600">${fmM(r.m)}</td><td><span class="badge b-sun">${r.exp}</span></td><td style="font-size:10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${r.expD||'–'}</td><td class="num">${r.cnt}</td><td class="num">${f(r.pa)}</td><td class="num">${f(r.pp)}</td><td class="num ${pd>0.01?'dp':'dz'}">${f(pd)}</td><td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td><td class="num ${ld>0.01?'dp':'dz'}">${f(ld)}</td><td class="num">${f(r.ta)}</td><td class="num">${f(r.tp)}</td><td class="num ${td>0.01?'dp':'dz'}">${f(td)}</td></tr>`;
+  });
+  if(pm)h+=`<tr class="tr-sub"><td colspan="3">📅 Subtotal ${fmM(pm)}</td><td class="num">${ms.cnt}</td><td class="num">${f(ms.pa)}</td><td class="num">${f(ms.pp)}</td><td class="num dp">${f(ms.pa-ms.pp)}</td><td class="num">${f(ms.la)}</td><td class="num">${f(ms.lp)}</td><td class="num dp">${f(ms.la-ms.lp)}</td><td class="num">${f(ms.ta)}</td><td class="num">${f(ms.tp)}</td><td class="num dp">${f(ms.ta-ms.tp)}</td></tr>`;
+  h+=`</tbody><tfoot><tr class="tr-grand"><td colspan="3">GRAND TOTAL</td><td class="num">${sm(items,'cnt')}</td><td class="num">${f(sm(items,'pa'))}</td><td class="num">${f(sm(items,'pp'))}</td><td class="num">${f(sm(items,'pa')-sm(items,'pp'))}</td><td class="num">${f(sm(items,'la'))}</td><td class="num">${f(sm(items,'lp'))}</td><td class="num">${f(sm(items,'la')-sm(items,'lp'))}</td><td class="num">${f(tTA)}</td><td class="num">${f(tTP)}</td><td class="num">${f(tTA-tTP)}</td></tr></tfoot></table></div></div>`;
+  T.innerHTML=h;
+}
+
+// ══ RENDER REJECTIONS ══════════════════════════════════════════
+function rRej(){
+  const E=document.getElementById('REJ_E'),K=document.getElementById('REJ_K'),T=document.getElementById('REJ_T');
+  const allRej=S.gcm.filter(r=>r.st===4&&!r._d);
+  if(!allRej.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}E.style.display='none';
+  const mf=gv('F_RM'),ff=gv('F_RF');
+  let rows=allRej.filter(r=>{
+    if(mf&&r.month!==mf)return false;
+    if(ff==='no_action'&&S.rej[r.inv])return false;
+    if(ff==='resubmitted'&&(!S.rej[r.inv]||!S.rej[r.inv].newClaim))return false;
+    return true;
+  });
+  const wA=allRej.filter(r=>S.rej[r.inv]).length,reSub=allRej.filter(r=>S.rej[r.inv]?.newClaim).length;
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Total Rejected</div><div class="kv rose">${allRej.length}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💸 Amount Rejected (€)</div><div class="kv sun">${f(allRej.reduce((s,r)=>s+r.ta,0))}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">✏️ Action Recorded</div><div class="kv lem">${wA}</div><div class="ks">of ${allRej.length} claims</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">🔄 Resubmitted</div><div class="kv mint">${reSub}</div><div class="ks">with new claim #</div></div>`;
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">❌ Rejected Claims — Full Tracking</div><div class="tw"><table class="t">
+  <thead><tr><th>VIN</th><th>Invoice #</th><th>RO / Order</th><th>Month</th><th>Exp Code</th><th class="num">Asked (€)</th><th>Reason</th><th>New Claim #</th><th>Resubmission Inv.</th><th>Category</th><th>Notes</th><th>Action</th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    const d=S.rej[r.inv]||{};
+    h+=`<tr>
+      <td class="mono">${r.vin}</td>
+      <td class="mono">${r.inv}</td>
+      <td class="mono" style="font-size:9px;color:var(--muted)">${r.ro||'–'}</td>
+      <td style="font-size:11px;font-weight:600;white-space:nowrap">${fmM(r.month)}</td>
+      <td><span class="badge b-sun">${r.exp||'–'}</span></td>
+      <td class="num" style="font-weight:700">${f(r.ta)}</td>
+      <td>${d.reason?`<span class="badge b-rose">${d.reason}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="mono">${d.newClaim?`<span class="badge b-mint">✅ ${d.newClaim}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="mono" style="font-size:10px">${d.reInv||'<span style="color:var(--faint)">—</span>'}</td>
+      <td style="font-size:10px;font-weight:500">${d.cat||'—'}</td>
+      <td style="font-size:10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)" title="${d.notes||''}">${d.notes||'—'}</td>
+      <td><button class="btn btn-sm ${d.reason?'btn-ghost':'btn-sun'}" onclick="openModal('${esc(r.inv)}','${r.vin}')">${d.reason?'✏️ Edit':'+ Track'}</button></td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div></div>`;T.innerHTML=h;
+}
+
+// ══ RENDER INCADEA ════════════════════════════════════════════
+function rInc(){
+  const E=document.getElementById('INC_E'),K=document.getElementById('INC_K'),T=document.getElementById('INC_T');
+  if(!S.inc.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}E.style.display='none';
+  const mkf=gv('F_IMK'),qf=gv('F_IQ').toLowerCase();
+  let rows=S.inc.filter(r=>{
+    if(mkf&&r.make!==mkf)return false;
+    if(qf&&![r.vin,r.no,r.svcOrd,r.cust,r.extDoc].join('|').toLowerCase().includes(qf))return false;
+    return true;
+  });
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📄 Invoices</div><div class="kv sky">${rows.length.toLocaleString()}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">🔩 Parts (€)</div><div class="kv sun">${f(rows.reduce((s,r)=>s+r.parts,0))}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">🔧 Labour (€)</div><div class="kv mint">${f(rows.reduce((s,r)=>s+r.lab,0))}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💰 Total Amount (€)</div><div class="kv pur">${f(rows.reduce((s,r)=>s+r.amt,0))}</div></div>`;
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>Invoice No.</th><th>VIN</th><th>Make / Model</th><th>Customer</th><th>Service Order</th><th>Posting Date</th><th>Ext. Doc</th><th class="num">Parts (€)</th><th class="num">Labour (€)</th><th class="num">Amount (€)</th></tr></thead><tbody>`;
+  rows.slice(0,500).forEach(r=>{h+=`<tr><td class="mono" style="font-weight:600">${r.no}</td><td class="mono" style="font-size:9px">${r.vin||'–'}</td><td style="font-size:10px;font-weight:600">${r.make} ${r.model}</td><td style="font-size:10px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500" title="${r.cust}">${r.cust}</td><td class="mono" style="color:var(--muted)">${r.svcOrd||'–'}</td><td style="font-size:10px;white-space:nowrap;font-weight:500">${r.date}</td><td class="mono" style="font-size:9px;color:var(--muted)">${r.extDoc||'–'}</td><td class="num">${f(r.parts)}</td><td class="num">${f(r.lab)}</td><td class="num" style="font-weight:700">${f(r.amt)}</td></tr>`;});
+  if(rows.length>500)h+=`<tr><td colspan="10" style="text-align:center;padding:14px;color:var(--muted);font-size:11px;font-weight:500">… ${rows.length-500} more records — use filters to narrow 🔍</td></tr>`;
+  h+=`</tbody></table></div></div>`;T.innerHTML=h;
+}
+
+// ══ RENDER BONUS ══════════════════════════════════════════════
+function rBonus(){
+  const E=document.getElementById('BON_E'),K=document.getElementById('BON_K'),C=document.getElementById('BON_C');
+  if(!S.gcm.length){E.style.display='flex';K.style.display='none';C.innerHTML='';return;}E.style.display='none';
+  const vld=S.gcm.filter(r=>!r._d&&r.st===0);
+  const byM={};vld.forEach(r=>{const k=r.month||'?';if(!byM[k])byM[k]={m:k,cnt:0,lp:0};byM[k].cnt++;byM[k].lp+=r.lp;});
+  const mr=Object.keys(byM).sort().map(k=>({...byM[k],bonus:byM[k].lp*0.01}));
+  const tL=mr.reduce((s,r)=>s+r.lp,0),tB=mr.reduce((s,r)=>s+r.bonus,0);
+  const maxL=Math.max(...mr.map(r=>r.lp),1);
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔧 Paid Labour Total (€)</div><div class="kv lem">${f(tL)}</div><div class="ks">Paid claims only (status = 0)</div></div>
+    <div class="kpi" style="background:linear-gradient(135deg,var(--lemon3),#FFF8E7);border-color:var(--lemon2)"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⭐ Your Bonus 1% (€)</div><div class="kv" style="font-size:30px;color:var(--sun)">${f(tB)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📅 Months</div><div class="kv sky">${mr.length}</div></div>`;
+  let h=`<div class="g2l"><div class="card"><div class="ct">📊 Labour Paid by Month</div>`;
+  mr.forEach(r=>{h+=`<div class="bb"><div class="bbl">${fmM(r.m)}</div><div class="bbt"><div class="bbf" style="width:${(r.lp/maxL*100).toFixed(1)}%"></div></div><div class="bbv">€${f(r.lp)}</div></div>`;});
+  h+=`</div><div class="card"><div class="ct">⭐ 1% Bonus per Month</div><table class="t">
+  <thead><tr><th>Month</th><th class="num">Paid Claims</th><th class="num">Labour Paid (€)</th><th class="num">Your Bonus (€)</th></tr></thead><tbody>`;
+  mr.forEach(r=>{h+=`<tr><td style="font-weight:700">${fmM(r.m)}</td><td class="num">${r.cnt}</td><td class="num">${f(r.lp)}</td><td class="num" style="font-weight:700;color:var(--sun)">⭐ ${f(r.bonus)}</td></tr>`;});
+  h+=`</tbody><tfoot><tr class="tr-grand"><td>TOTAL</td><td class="num">${mr.reduce((s,r)=>s+r.cnt,0)}</td><td class="num">${f(tL)}</td><td class="num">⭐ ${f(tB)}</td></tr></tfoot></table></div></div>
+  <div class="al al-g">⭐ <strong>Bonus = 1% × labour_definitive_amount_without_pco_eur</strong> — paid claims only (invoice_flag_state = 0), duplicates excluded. This period your bonus is <strong>€${f(tB)}</strong> on <strong>€${f(tL)}</strong> paid labour.</div>`;
+  C.innerHTML=h;
+}
+
+// ══ LANGUAGE ═════════════════════════════════════════════════
+let _lang = 'en';
+function setLang(l){
+  _lang = l;
+  document.body.classList.toggle('lang-fr', l==='fr');
+  document.getElementById('LANG_EN').classList.toggle('active', l==='en');
+  document.getElementById('LANG_FR').classList.toggle('active', l==='fr');
+  // update placeholders
+  const placeholders = {
+    'GSEARCH':     {en:'Search VIN, invoice, RO, NITG…',     fr:'Rechercher VIN, facture, OR, NITG…'},
+    'F_GQ':        {en:'VIN, invoice, RO, NITG…',            fr:'VIN, facture, OR, NITG…'},
+    'F_EQ':        {en:'Code or description…',               fr:'Code ou description…'},
+    'F_CQ':        {en:'Search VIN…',                        fr:'Rechercher VIN…'},
+    'F_IQ':        {en:'VIN, invoice, order, customer…',     fr:'VIN, facture, ordre, client…'},
+  };
+  for(const [id,v] of Object.entries(placeholders)){
+    const el=document.getElementById(id); if(el) el.placeholder = v[l]||v.en;
+  }
+  // sidebar labels
+  const siLabels = {
+    'upload':    {en:'Upload Files',    fr:'Télécharger'},
+    'gcm':       {en:'GCM Claims',      fr:'Dossiers GCM'},
+    'overview':  {en:'General View',    fr:'Vue Générale'},
+    'expense':   {en:'Expense Codes',   fr:'Codes Dépense'},
+    'comparison':{en:'Incadea vs GCM',  fr:'Incadea vs GCM'},
+    'askedpaid': {en:'Asked vs Paid',   fr:'Demandé vs Payé'},
+    'rejections':{en:'Rejections',      fr:'Rejets'},
+    'incadea':   {en:'Incadea Data',    fr:'Données Incadea'},
+    'bonus':     {en:'Bonus 1%',        fr:'Bonus 1%'},
+  };
+  document.querySelectorAll('.si[data-page]').forEach(el=>{
+    const pg = el.dataset.page;
+    if(!siLabels[pg]) return;
+    const badge = el.querySelector('.sbadge');
+    const emoji = el.querySelector('.si-emoji');
+    el.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=''; });
+    // rebuild text
+    const txt = document.createTextNode(siLabels[pg][l]||siLabels[pg].en);
+    if(emoji) el.insertBefore(txt, badge||null);
+    else el.appendChild(txt);
+  });
+  // re-render current page if data loaded
+  const active = document.querySelector('.si.active');
+  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus})[active.dataset.page]?.();
+}
+
+// ══ HELP CONTENT ══════════════════════════════════════════════
+const HELP = {
+  upload:{
+    icon:'⬆️', bg:'var(--sky3)',
+    en:{title:'Upload Files',sub:'How to import your monthly data',
+      rules:[
+        {icon:'📋',title:'GCM Claims File',desc:'Export from the GCM portal every month. File name: Claims_detail_MM_YYYY_LB.xlsx. Drop it on the left dropzone or click "Choose File".'},
+        {icon:'🔧',title:'INCADEA File',desc:'Export from your INCADEA DMS. The system reads the "INCADEA" sheet automatically. Drop on the right dropzone.'},
+        {icon:'🔑',title:'Duplicate Detection',desc:'Claims with the same VIN + Invoice # combination are automatically flagged as duplicates and excluded from all calculations.'},
+        {icon:'🕐',title:'Last Update',desc:'The header shows how many claims were imported and the exact time of the last upload. Upload new files each month to accumulate history.'},
+      ],
+      buttons:[{icon:'📂',label:'Choose File — opens file browser'},{icon:'🗂️',label:'Drag & Drop — drop file directly on the zone'}]
+    },
+    fr:{title:'Télécharger les Fichiers',sub:'Comment importer vos données mensuelles',
+      rules:[
+        {icon:'📋',title:'Fichier GCM',desc:'Exportez depuis le portail GCM chaque mois. Nom: Claims_detail_MM_YYYY_LB.xlsx. Déposez-le dans la zone gauche.'},
+        {icon:'🔧',title:'Fichier INCADEA',desc:'Export depuis votre DMS INCADEA. Le système lit automatiquement l'onglet "INCADEA".'},
+        {icon:'🔑',title:'Détection des Doublons',desc:'Les dossiers avec le même VIN + N° Facture sont automatiquement signalés comme doublons et exclus de tous les calculs.'},
+        {icon:'🕐',title:'Dernière Mise à Jour',desc:'L'en-tête affiche le nombre de dossiers importés et l'heure exacte du dernier import. Importez de nouveaux fichiers chaque mois.'},
+      ],
+      buttons:[{icon:'📂',label:'Choisir Fichier — ouvre l'explorateur'},{icon:'🗂️',label:'Glisser-Déposer — déposez le fichier directement'}]
+    }
+  },
+  gcm:{
+    icon:'📋', bg:'var(--sun3)',
+    en:{title:'GCM Claims',sub:'All warranty claims from the GCM portal',
+      rules:[
+        {icon:'✅',title:'Paid Claims (Status 0)',desc:'Claims where invoice_flag_state = 0. Renault has accepted and paid these. Shown with a green "Paid" badge.'},
+        {icon:'❌',title:'Rejected Claims (Status 4)',desc:'Claims where invoice_flag_state = 4. Renault has rejected these. Use the "+ Track" button to record the reason and resubmission details.'},
+        {icon:'🔑',title:'Deduplication Key',desc:'VIN + Invoice # is used as the unique key. Duplicates are highlighted in yellow and excluded from all totals.'},
+        {icon:'💰',title:'Amount Fields',desc:'Parts Asked/Paid = part amounts. Labour Asked/Paid = labour amounts. Total = sum of all. "Asked" = submitted to Renault. "Paid" = approved by Renault.'},
+        {icon:'🔍',title:'Filters & Search',desc:'Filter by Month, Expense Code, or Status. Use the search box to find any VIN, Invoice #, RO number, or NITG code instantly.'},
+      ],
+      buttons:[{icon:'+ Track',label:'Opens the rejection tracking modal for a rejected claim'},{icon:'✏️ Edit',label:'Re-open the tracking modal to update rejection details'}]
+    },
+    fr:{title:'Dossiers GCM',sub:'Tous les dossiers de garantie du portail GCM',
+      rules:[
+        {icon:'✅',title:'Dossiers Payés (Statut 0)',desc:'Dossiers où invoice_flag_state = 0. Renault a accepté et payé ces dossiers. Badge vert "Payé".'},
+        {icon:'❌',title:'Dossiers Rejetés (Statut 4)',desc:'Dossiers où invoice_flag_state = 4. Renault a rejeté ces dossiers. Utilisez le bouton "+ Suivre" pour enregistrer la raison et les détails de re-soumission.'},
+        {icon:'🔑',title:'Clé de Dédoublonnage',desc:'VIN + N° Facture est utilisé comme clé unique. Les doublons sont surlignés en jaune et exclus de tous les totaux.'},
+        {icon:'💰',title:'Champs Montants',desc:'PR Demandé/Payé = montants pièces. MO Demandé/Payé = montants main-d'œuvre. Total Demandé = soumis à Renault. Total Payé = approuvé par Renault.'},
+        {icon:'🔍',title:'Filtres & Recherche',desc:'Filtrez par Mois, Code Dépense, ou Statut. Utilisez la recherche pour trouver VIN, N° Facture, N° OR, ou code NITG.'},
+      ],
+      buttons:[{icon:'+ Suivre',label:'Ouvre le modal de suivi de rejet'},{icon:'✏️ Modifier',label:'Rouvrir le modal pour mettre à jour les détails'}]
+    }
+  },
+  overview:{
+    icon:'📊', bg:'var(--sky3)',
+    en:{title:'General View',sub:'Monthly summary and trends',
+      rules:[
+        {icon:'📅',title:'Monthly Subtotals',desc:'Each row represents one month of data. Columns show Parts Asked, Parts Paid, Labour Asked, Labour Paid, Total Asked, Total Paid, and Deducted (difference).'},
+        {icon:'📈',title:'Chart',desc:'Bar chart shows Parts Paid (orange) and Labour Paid (blue) per month. The purple line shows Total Paid trend across months.'},
+        {icon:'📉',title:'Deducted Amount',desc:'The "Deducted" column = Total Asked − Total Paid. This is the amount Renault did not reimburse. Red values mean deductions occurred.'},
+        {icon:'🚗',title:'Unique VINs',desc:'Number of distinct vehicles (VINs) in the loaded data — each VIN is one vehicle.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Vue Générale',sub:'Résumé mensuel et tendances',
+      rules:[
+        {icon:'📅',title:'Sous-totaux Mensuels',desc:'Chaque ligne représente un mois de données. Colonnes: PR Demandé, PR Payé, MO Demandé, MO Payé, Total Demandé, Total Payé, Déduit.'},
+        {icon:'📈',title:'Graphique',desc:'Barres: PR Payé (orange) et MO Payé (bleu) par mois. La ligne violette montre la tendance du Total Payé.'},
+        {icon:'📉',title:'Montant Déduit',desc:'Colonne "Déduit" = Total Demandé − Total Payé. C'est le montant que Renault n'a pas remboursé. Valeurs en rouge = déductions.'},
+        {icon:'🚗',title:'VINs Uniques',desc:'Nombre de véhicules distincts (VINs) dans les données chargées — chaque VIN = un véhicule.'},
+      ],
+      buttons:[]
+    }
+  },
+  expense:{
+    icon:'🏷️', bg:'var(--lemon3)',
+    en:{title:'By Expense Code',sub:'Claims grouped by warranty expense type',
+      rules:[
+        {icon:'🏷️',title:'Expense Code',desc:'Each code (e.g. G36) represents a type of warranty expense defined by Renault. "G36" = Warranty group first year, etc.'},
+        {icon:'📊',title:'% Share',desc:'The percentage column shows what proportion of total paid amount each expense code represents.'},
+        {icon:'🔢',title:'Sorting',desc:'Table is sorted by Total Paid descending — the most expensive expense type appears first.'},
+        {icon:'🗓️',title:'Month Filter',desc:'Use the Month filter to see the expense breakdown for a specific month only.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Par Code Dépense',sub:'Dossiers regroupés par type de dépense garantie',
+      rules:[
+        {icon:'🏷️',title:'Code Dépense',desc:'Chaque code (ex: G36) représente un type de dépense garantie défini par Renault. "G36" = Garantie groupe première année, etc.'},
+        {icon:'📊',title:'% Part',desc:'La colonne pourcentage montre la proportion du montant total payé que représente chaque code dépense.'},
+        {icon:'🔢',title:'Tri',desc:'Table triée par Total Payé décroissant — le type de dépense le plus coûteux apparaît en premier.'},
+        {icon:'🗓️',title:'Filtre Mois',desc:'Utilisez le filtre Mois pour voir la répartition par code dépense pour un mois spécifique.'},
+      ],
+      buttons:[]
+    }
+  },
+  comparison:{
+    icon:'⚖️', bg:'var(--pur3)',
+    en:{title:'Incadea vs GCM',sub:'Reconciliation between your DMS and Renault portal',
+      rules:[
+        {icon:'⚖️',title:'Purpose',desc:'Compares the amounts recorded in your INCADEA DMS against what GCM (Renault portal) shows. Differences reveal data entry gaps or timing issues.'},
+        {icon:'🔴',title:'Positive Δ (red)',desc:'GCM total is HIGHER than Incadea. Renault paid more than what INCADEA recorded — check if all invoices were entered in INCADEA.'},
+        {icon:'🟢',title:'Negative Δ (green)',desc:'GCM total is LOWER than Incadea. INCADEA has more than Renault paid — check for rejected claims or missing GCM submissions.'},
+        {icon:'✅',title:'Perfect Match',desc:'Δ Total = 0.00. GCM and Incadea are in perfect agreement for this VIN. Aim to maximise this count.'},
+        {icon:'🔍',title:'Differences Only filter',desc:'Select "Differences Only" in the filter to focus on VINs that need investigation.'},
+      ],
+      buttons:[{icon:'⚠️ Differences Only',label:'Filter to show only VINs with a discrepancy'},{icon:'✅ Matches Only',label:'Filter to show only perfectly reconciled VINs'}]
+    },
+    fr:{title:'Incadea vs GCM',sub:'Rapprochement entre votre DMS et le portail Renault',
+      rules:[
+        {icon:'⚖️',title:'Objectif',desc:'Compare les montants enregistrés dans votre DMS INCADEA avec ce que GCM (portail Renault) affiche. Les écarts révèlent des oublis de saisie ou des décalages.'},
+        {icon:'🔴',title:'Δ Positif (rouge)',desc:'Total GCM SUPÉRIEUR à Incadea. Renault a payé plus que ce qu'INCADEA a enregistré — vérifiez si toutes les factures sont saisies dans INCADEA.'},
+        {icon:'🟢',title:'Δ Négatif (vert)',desc:'Total GCM INFÉRIEUR à Incadea. INCADEA a plus que ce que Renault a payé — vérifiez les dossiers rejetés ou les soumissions GCM manquantes.'},
+        {icon:'✅',title:'Correspondance Parfaite',desc:'Δ Total = 0,00. GCM et Incadea sont en parfait accord pour ce VIN.'},
+        {icon:'🔍',title:'Filtre Écarts Seulement',desc:'Sélectionnez "Écarts Seulement" pour vous concentrer sur les VINs à investiguer.'},
+      ],
+      buttons:[{icon:'⚠️ Écarts Seulement',label:'Filtrer pour afficher uniquement les VINs avec écart'},{icon:'✅ Correspondances',label:'Filtrer pour afficher les VINs parfaitement réconciliés'}]
+    }
+  },
+  askedpaid:{
+    icon:'📈', bg:'var(--mint3)',
+    en:{title:'Asked vs Paid',sub:'Gap analysis between submitted and approved amounts',
+      rules:[
+        {icon:'📤',title:'Total Asked',desc:'The total amount submitted to Renault (received_amount_eur). This is what you claim should be reimbursed.'},
+        {icon:'💵',title:'Total Paid',desc:'The definitive amount Renault approved (definitive_amount_without_pco_eur). This is what was actually reimbursed.'},
+        {icon:'📉',title:'Deduction Rate',desc:'(Asked − Paid) / Asked × 100. A high deduction rate means Renault is regularly paying less than requested. Investigate expense codes with high gaps.'},
+        {icon:'📅',title:'Subtotals',desc:'Monthly subtotal rows (yellow) aggregate all expense codes for each month. Grand Total row (dark) shows the overall position.'},
+        {icon:'🏷️',title:'By Expense Code',desc:'Each row is one month + one expense code combination. This helps identify which expense types have the highest deduction rates.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Demandé vs Payé',sub:'Analyse de l'écart entre soumis et approuvé',
+      rules:[
+        {icon:'📤',title:'Total Demandé',desc:'Montant total soumis à Renault (received_amount_eur). C'est ce que vous réclamez comme remboursement.'},
+        {icon:'💵',title:'Total Payé',desc:'Montant définitif approuvé par Renault (definitive_amount_without_pco_eur). C'est ce qui a réellement été remboursé.'},
+        {icon:'📉',title:'Taux de Déduction',desc:'(Demandé − Payé) / Demandé × 100. Un taux élevé signifie que Renault paie régulièrement moins que demandé.'},
+        {icon:'📅',title:'Sous-totaux',desc:'Lignes de sous-total mensuels (jaune) agrègent tous les codes dépense pour chaque mois. Ligne Total Général (sombre) = position globale.'},
+        {icon:'🏷️',title:'Par Code Dépense',desc:'Chaque ligne = un mois + un code dépense. Identifie quels types de dépenses ont les taux de déduction les plus élevés.'},
+      ],
+      buttons:[]
+    }
+  },
+  rejections:{
+    icon:'❌', bg:'var(--rose3)',
+    en:{title:'Rejections',sub:'Track, annotate and resubmit rejected claims',
+      rules:[
+        {icon:'❌',title:'What is a Rejection?',desc:'A claim where invoice_flag_state = 4 in GCM. Renault has refused to reimburse this claim. It must be corrected and resubmitted.'},
+        {icon:'📝',title:'Recording the Rejection',desc:'Click "+ Track" to open the rejection modal. Fill in: Reason (dropdown), New Claim #, Resubmission Invoice #, Category, and free-text Notes.'},
+        {icon:'🔄',title:'Resubmission Workflow',desc:'Once corrected, enter the new claim number in the "Correct Claim #" field and the new invoice number. This tracks your resubmission history.'},
+        {icon:'🔴',title:'"No Action Yet" filter',desc:'Shows only rejected claims that have not yet been annotated — your to-do list of rejections.'},
+        {icon:'✅',title:'"Has New Claim #" filter',desc:'Shows claims that have been corrected and resubmitted with a new claim number.'},
+      ],
+      buttons:[{icon:'+ Track',label:'Open rejection modal — record reason, new claim #, notes'},{icon:'✏️ Edit',label:'Update existing rejection details'}]
+    },
+    fr:{title:'Rejets',sub:'Suivre, annoter et re-soumettre les dossiers rejetés',
+      rules:[
+        {icon:'❌',title:'Qu'est-ce qu'un Rejet?',desc:'Un dossier où invoice_flag_state = 4 dans GCM. Renault a refusé de rembourser ce dossier. Il doit être corrigé et re-soumis.'},
+        {icon:'📝',title:'Enregistrer le Rejet',desc:'Cliquez sur "+ Suivre" pour ouvrir le modal. Remplissez: Raison (liste), N° Nouveau Dossier, N° Facture Re-soumission, Catégorie, et Notes.'},
+        {icon:'🔄',title:'Processus de Re-soumission',desc:'Une fois corrigé, entrez le nouveau numéro de dossier dans le champ "N° Dossier Correct" et le nouveau numéro de facture.'},
+        {icon:'🔴',title:'Filtre "Aucune Action"',desc:'Affiche uniquement les dossiers rejetés qui n'ont pas encore été annotés — votre liste de tâches de rejets.'},
+        {icon:'✅',title:'Filtre "A un N° de Dossier"',desc:'Affiche les dossiers corrigés et re-soumis avec un nouveau numéro de dossier.'},
+      ],
+      buttons:[{icon:'+ Suivre',label:'Ouvrir le modal de rejet — enregistrer raison, N° nouveau dossier'},{icon:'✏️ Modifier',label:'Mettre à jour les détails du rejet existant'}]
+    }
+  },
+  incadea:{
+    icon:'🔧', bg:'var(--sky3)',
+    en:{title:'Incadea Data',sub:'All records from your INCADEA DMS export',
+      rules:[
+        {icon:'📄',title:'Source',desc:'Data comes from your INCADEA DMS warranty invoice export. The system reads the "INCADEA" sheet from the uploaded file.'},
+        {icon:'🔍',title:'Search',desc:'Search across Invoice No., VIN, Service Order No., Customer name, and External Document No. simultaneously.'},
+        {icon:'🚗',title:'Make Filter',desc:'Filter by vehicle make (RENAULT, DACIA, etc.) to see only one brand's warranty invoices.'},
+        {icon:'⚖️',title:'Use with Comparison',desc:'These records are used in the "Incadea vs GCM" page to reconcile amounts by VIN. Upload both files to see the reconciliation.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Données Incadea',sub:'Tous les enregistrements de votre export DMS INCADEA',
+      rules:[
+        {icon:'📄',title:'Source',desc:'Les données proviennent de votre export de factures garantie DMS INCADEA. Le système lit l'onglet "INCADEA".'},
+        {icon:'🔍',title:'Recherche',desc:'Recherche simultanée sur N° Facture, VIN, N° Ordre de Service, Nom Client, et N° Document Externe.'},
+        {icon:'🚗',title:'Filtre Marque',desc:'Filtrez par marque (RENAULT, DACIA, etc.) pour voir uniquement les factures garantie d'une marque.'},
+        {icon:'⚖️',title:'Utilisation avec Comparaison',desc:'Ces données sont utilisées dans la page "Incadea vs GCM" pour rapprocher les montants par VIN.'},
+      ],
+      buttons:[]
+    }
+  },
+  bonus:{
+    icon:'⭐', bg:'var(--lemon3)',
+    en:{title:'Bonus — 1% Labour',sub:'Monthly bonus based on paid labour amounts',
+      rules:[
+        {icon:'⭐',title:'Bonus Formula',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculated only on PAID claims (invoice_flag_state = 0). Rejected and duplicate claims are excluded.'},
+        {icon:'📅',title:'Per Month',desc:'The bonus is calculated independently for each month. The bar chart shows the relative labour amounts visually.'},
+        {icon:'❌',title:'What is Excluded',desc:'Rejected claims (status ≠ 0) and duplicate rows are excluded from the bonus calculation to avoid double-counting.'},
+        {icon:'💡',title:'How to Read',desc:'The "Your Bonus" column shows the 1% of paid labour for that month. The grand total row shows the cumulative bonus across all loaded months.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Bonus — 1% Main-d'Œuvre',sub:'Bonus mensuel basé sur les montants MO payés',
+      rules:[
+        {icon:'⭐',title:'Formule Bonus',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculé uniquement sur les dossiers PAYÉS (invoice_flag_state = 0). Rejets et doublons exclus.'},
+        {icon:'📅',title:'Par Mois',desc:'Le bonus est calculé indépendamment pour chaque mois. Le graphique barres montre visuellement les montants MO relatifs.'},
+        {icon:'❌',title:'Ce qui est Exclu',desc:'Dossiers rejetés (statut ≠ 0) et doublons exclus du calcul du bonus pour éviter les doubles comptages.'},
+        {icon:'💡',title:'Comment Lire',desc:'La colonne "Votre Bonus" affiche 1% de la MO payée pour ce mois. La ligne total affiche le bonus cumulé sur tous les mois chargés.'},
+      ],
+      buttons:[]
+    }
+  },
+};
+
+// ══ HELP OPEN/CLOSE ══════════════════════════════════════════
+let _helpPage = 'upload';
+function openHelp(){
+  const active = document.querySelector('.si.active');
+  _helpPage = active ? active.dataset.page : 'upload';
+  renderHelp();
+  document.getElementById('HELP_BG').classList.add('open');
+}
+function closeHelp(){ document.getElementById('HELP_BG').classList.remove('open'); }
+
+function renderHelp(){
+  const d = HELP[_helpPage] || HELP['upload'];
+  const lang = _lang;
+  const t = d[lang] || d['en'];
+
+  document.getElementById('HP_ICON').textContent = d.icon;
+  document.getElementById('HP_ICON').style.background = d.bg;
+  document.getElementById('HP_TITLE_EN').textContent = HELP[_helpPage]?.en?.title || t.title;
+  document.getElementById('HP_TITLE_FR').textContent = HELP[_helpPage]?.fr?.title || t.title;
+  document.getElementById('HP_SUB_EN').textContent = HELP[_helpPage]?.en?.sub || t.sub;
+  document.getElementById('HP_SUB_FR').textContent = HELP[_helpPage]?.fr?.sub || t.sub;
+
+  let html = '';
+  // Business Rules
+  html += `<div class="hp-section"><div class="hp-section-title">📋 <span>${lang==='fr'?'Règles Métier':'Business Rules'}</span></div>`;
+  t.rules.forEach(r => {
+    html += `<div class="hp-rule"><div class="hp-rule-icon">${r.icon}</div><div class="hp-rule-content"><div class="hp-rule-title">${r.title}</div><div class="hp-rule-desc">${r.desc}</div></div></div>`;
+  });
+  html += '</div>';
+
+  // Buttons
+  if(t.buttons && t.buttons.length){
+    html += `<div class="hp-section"><div class="hp-section-title">🖱️ <span>${lang==='fr'?'Boutons de cette page':'Buttons on this page'}</span></div><div class="hp-btn-row">`;
+    t.buttons.forEach(b => {
+      html += `<div class="hp-btag"><span>${b.icon}</span><span>${b.label}</span></div>`;
+    });
+    html += '</div></div>';
+  }
+
+  document.getElementById('HP_BODY').innerHTML = html;
+}
+
+// ══ FEEDBACK / IDEA ════════════════════════════════════════════
+let _fbType = 'idea';
+function openFeedback(type){
+  _fbType = type;
+  const isIdea = type === 'idea';
+  document.getElementById('FB_EMOJI').textContent = isIdea ? '💡' : '🔧';
+  document.getElementById('FB_TITLE').textContent = _lang==='fr'
+    ? (isIdea ? 'Nouvelle Idée' : 'Correction Système')
+    : (isIdea ? 'New Idea' : 'System Correction');
+  document.getElementById('FB_SUBJECT').value = '';
+  document.getElementById('FB_SUBJECT_EN').value = '';
+  document.getElementById('FB_BODY').value = '';
+  document.getElementById('FB_BG').classList.add('open');
+}
+function closeFeedback(){ document.getElementById('FB_BG').classList.remove('open'); }
+
+function sendFeedback(){
+  const subjectEl = _lang==='fr' ? document.getElementById('FB_SUBJECT') : document.getElementById('FB_SUBJECT_EN');
+  const subject = (subjectEl?.value || '').trim();
+  const body = (document.getElementById('FB_BODY').value || '').trim();
+  const isIdea = _fbType === 'idea';
+  const prefix = _lang==='fr' ? (isIdea?'[IDÉE] ':'[CORRECTION] ') : (isIdea?'[IDEA] ':'[CORRECTION] ');
+  const pageLabel = (_helpPage||'').toUpperCase();
+  const fullSubject = prefix + (subject || (isIdea ? 'Renault Warranty System — New Idea' : 'Renault Warranty System — Correction Needed')) + ' [' + pageLabel + ']';
+  const greeting = _lang==='fr'
+    ? 'Bonjour,\n\nVoici ma suggestion / correction pour le système de garantie Renault:\n\n'
+    : 'Hello,\n\nHere is my suggestion / correction for the Renault Warranty System:\n\n';
+  const fullBody = greeting + (body || (isIdea ? 'Please describe your idea here.' : 'Please describe the correction needed here.'));
+  const mailto = 'mailto:managment@iantradingsal.com?subject=' + encodeURIComponent(fullSubject) + '&body=' + encodeURIComponent(fullBody.replace(/\\n/g,'\n'));
+  window.location.href = mailto;
+  closeFeedback();
+  closeHelp();
+  showToast('📧 ' + (_lang==='fr' ? 'Outlook ouvert !' : 'Opening Outlook!'));
+}
+
+</script>
+
+<!-- ══ HELP PANEL ══════════════════════════════════════════ -->
+<div class="help-panel-bg" id="HELP_BG" onclick="if(event.target===this)closeHelp()">
+  <div class="help-panel">
+    <div class="hp-header">
+      <div class="hp-icon" id="HP_ICON" style="background:var(--sky3)">❓</div>
+      <div>
+        <div class="hp-title en" id="HP_TITLE_EN">Help & Business Rules</div>
+        <div class="hp-title fr" id="HP_TITLE_FR">Aide & Règles Métier</div>
+        <div class="hp-sub en" id="HP_SUB_EN">How this page works</div>
+        <div class="hp-sub fr" id="HP_SUB_FR">Comment fonctionne cette page</div>
+      </div>
+      <div class="hp-close" onclick="closeHelp()">✕</div>
+    </div>
+    <div class="hp-body" id="HP_BODY"></div>
+    <div class="hp-footer">
+      <button class="hp-idea-btn" onclick="openFeedback('idea')">💡 <span class="en">New Idea</span><span class="fr">Nouvelle Idée</span></button>
+      <button class="hp-feedback-btn" onclick="openFeedback('correction')">🔧 <span class="en">System Correction</span><span class="fr">Correction Système</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ FEEDBACK MODAL ══════════════════════════════════════ -->
+<div class="fb-modal-bg" id="FB_BG" onclick="if(event.target===this)closeFeedback()">
+  <div class="fb-modal">
+    <div style="font-size:28px;margin-bottom:8px" id="FB_EMOJI">💡</div>
+    <div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:4px" id="FB_TITLE">New Idea</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:20px;font-weight:500">
+      <span class="en">This will open Outlook with a pre-filled email to the management team.</span>
+      <span class="fr">Cela ouvrira Outlook avec un e-mail pré-rempli pour l'équipe de direction.</span>
+    </div>
+    <div class="fr" style="margin-bottom:14px">
+      <label class="flb" style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block">Titre / Subject</label>
+      <input class="fi" id="FB_SUBJECT" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);font-family:inherit;outline:none;background:var(--surf2)" placeholder="Short title of your idea or correction…"/>
+    </div>
+    <div class="en-b" style="margin-bottom:14px">
+      <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block">Subject</label>
+      <input class="fi" id="FB_SUBJECT_EN" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);font-family:inherit;outline:none;background:var(--surf2)" placeholder="Short title of your idea or correction…"/>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block">
+        <span class="en">Description</span><span class="fr">Description</span>
+      </label>
+      <textarea class="fi" id="FB_BODY" rows="5" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);font-family:inherit;outline:none;background:var(--surf2);resize:vertical" placeholder="Describe your idea or the correction needed…"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:16px;border-top:1.5px solid var(--border)">
+      <button class="btn btn-ghost btn-sm" onclick="closeFeedback()"><span class="en">Cancel</span><span class="fr">Annuler</span></button>
+      <button class="btn btn-sun btn-sm" onclick="sendFeedback()">📧 <span class="en">Open in Outlook</span><span class="fr">Ouvrir dans Outlook</span></button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
