@@ -6,203 +6,6 @@
 <title>Renault Warranty — Bassoul Heneine</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
 
-// ══ SHORTFALL REPORT ══════════════════════════════════════════
-function rShf(){
-  const E=document.getElementById('SHF_E'),K=document.getElementById('SHF_K'),T=document.getElementById('SHF_T');
-  const allRej=S.gcm.filter(r=>r.st===4&&!r._d);
-  const credited=allRej.filter(r=>S.rej[r.inv]?.status==='credited'&&S.rej[r.inv]?.creditedAmt!=null);
-
-  // Update sidebar badge — number of claims with shortfall > 0
-  const withShortfall=credited.filter(r=>(S.rej[r.inv]?.shortfall||0)>0.01);
-  const el=document.getElementById('B_SHF');
-  if(el) el.textContent=withShortfall.length||'–';
-
-  if(!credited.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}
-  E.style.display='none';
-
-  const ff=gv('F_SHFF');
-  let rows=credited.map(r=>({...r,d:S.rej[r.inv]}));
-  if(ff==='shortfall') rows=rows.filter(r=>(r.d.shortfall||0)>0.01);
-  else if(ff==='full_recovery') rows=rows.filter(r=>Math.abs(r.d.shortfall||0)<=0.01);
-  else if(ff==='overpaid') rows=rows.filter(r=>(r.d.shortfall||0)<-0.01);
-  rows.sort((a,b)=>(b.d.shortfall||0)-(a.d.shortfall||0));
-
-  const totRejAmt=credited.reduce((s,r)=>s+(r.d.rejectedAmt||r.ta),0);
-  const totCredited=credited.reduce((s,r)=>s+(r.d.creditedAmt||0),0);
-  const totShortfall=credited.reduce((s,r)=>s+(r.d.shortfall||0),0);
-  const totOverpaid=credited.filter(r=>(r.d.shortfall||0)<-0.01).reduce((s,r)=>s+Math.abs(r.d.shortfall||0),0);
-  const avgRate=totRejAmt>0?(totCredited/totRejAmt*100):0;
-
-  K.style.display='grid';
-  K.innerHTML=`
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💚 Total Credited (€)</div><div class="kv mint">${f(totCredited)}</div><div class="ks">${credited.length} claims credited by Renault</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">⚠️ Total Shortfall (€)</div><div class="kv rose">${f(Math.max(totShortfall,0))}</div><div class="ks">${withShortfall.length} claims paid less than rejected</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">💙 Overpaid by Renault (€)</div><div class="kv sky">${f(totOverpaid)}</div><div class="ks">${credited.filter(r=>(r.d.shortfall||0)<-0.01).length} claims Renault paid more</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">📊 Avg Recovery Rate</div><div class="kv ${avgRate>=100?'mint':avgRate>=70?'lem':'rose'}">${avgRate.toFixed(1)}%</div><div class="ks">Across all credited claims</div></div>
-    <div class="kpi" style="background:linear-gradient(135deg,var(--rose3),#FFE4E6);border-color:var(--rose2)"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">💸 Still Outstanding (€)</div><div class="kv rose" style="font-size:20px">${f(Math.max(totShortfall,0))}</div><div class="ks">Shortfall still owed by Renault</div></div>`;
-
-  if(!rows.length){T.innerHTML=`<div class="al al-g">✅ No claims match this filter.</div>`;return;}
-
-  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">📋 Shortfall Detail — ${rows.length} credited claims</div>
-  <div class="tw"><table class="t">
-  <thead><tr>
-    <th>VIN</th><th>Orig Invoice #</th><th>New Claim #</th><th>Month</th><th>Exp Code</th>
-    <th class="num">Orig Asked (€)</th><th class="num">Rejected (€)</th>
-    <th class="num">Credited (€)</th><th class="num">Shortfall (€)</th><th class="num">Recovery %</th>
-    <th>Credit Date</th><th>Auto?</th><th>Reason</th><th>Action</th>
-  </tr></thead><tbody>`;
-
-  rows.forEach(r=>{
-    const d=r.d;
-    const sf=d.shortfall||0;
-    const sfColor=sf>0.01?'var(--rose)':sf<-0.01?'var(--sky)':'var(--mint)';
-    const rate=d.recoveryRate||0;
-    const rateColor=rate>=100?'var(--mint)':rate>=70?'var(--lemon)':'var(--rose)';
-    h+=`<tr>
-      <td class="mono" style="font-size:10px">${r.vin}</td>
-      <td class="mono">${r.inv}</td>
-      <td class="mono">${d.newClaim?`<span class="badge b-mint" style="font-size:8px">✅ ${d.newClaim}</span>`:'—'}</td>
-      <td style="font-size:11px;font-weight:600">${fmM(r.month)}</td>
-      <td><span class="badge b-sun">${r.exp||'–'}</span></td>
-      <td class="num">${f(r.ta)}</td>
-      <td class="num" style="color:var(--rose)">${f(d.rejectedAmt||r.ta)}</td>
-      <td class="num" style="font-weight:700;color:var(--mint)">${f(d.creditedAmt)}</td>
-      <td class="num" style="font-weight:700;color:${sfColor}">${sf>=0?'':'+'} ${f(Math.abs(sf))}</td>
-      <td class="num"><span class="badge" style="background:${rate>=100?'var(--mint3)':rate>=70?'var(--lemon3)':'var(--rose3)'};color:${rateColor};border:1.5px solid currentColor">${rate.toFixed(1)}%</span></td>
-      <td style="font-size:10px;color:var(--mint)">${d.creditDate||'—'}</td>
-      <td>${d.autoMatched?'<span class="badge b-sky" style="font-size:8px">🤖 Auto</span>':'<span class="badge b-n" style="font-size:8px">Manual</span>'}</td>
-      <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)" title="${d.reason||''}">${d.reason||'—'}</td>
-      <td><button class="btn btn-ghost btn-xs" onclick="openModal('${esc(r.inv)}','${r.vin}')">✏️ Edit</button></td>
-    </tr>`;
-  });
-  h+=`</tbody><tfoot><tr class="tr-grand">
-    <td colspan="5">TOTAL (${rows.length} claims)</td>
-    <td class="num">${f(rows.reduce((s,r)=>s+r.ta,0))}</td>
-    <td class="num">${f(rows.reduce((s,r)=>s+(r.d.rejectedAmt||r.ta),0))}</td>
-    <td class="num">${f(rows.reduce((s,r)=>s+(r.d.creditedAmt||0),0))}</td>
-    <td class="num">${f(rows.reduce((s,r)=>s+(r.d.shortfall||0),0))}</td>
-    <td class="num">${(rows.reduce((s,r)=>s+(r.d.recoveryRate||0),0)/Math.max(rows.length,1)).toFixed(1)}%</td>
-    <td colspan="4"></td>
-  </tr></tfoot></table></div></div>`;
-  T.innerHTML=h;
-}
-
-// ══ EXPORT TO EXCEL ═══════════════════════════════════════════
-function exportRejections(){
-  const allRej=S.gcm.filter(r=>r.st===4&&!r._d);
-  if(!allRej.length){showToast('⚠️ No rejected claims to export');return;}
-
-  // Build CSV rows
-  const headers=['VIN','Invoice #','RO','Month','Exp Code','Total Asked (€)','Total Paid (€)',
-    'Rejected (€)','Rejection Type','Reason','Category','New Claim #','Resub Invoice',
-    'Resub Date','Status','Credited (€)','Credit Date','Shortfall (€)','Recovery %','Notes'];
-  const rows=allRej.map(r=>{
-    const d=S.rej[r.inv]||{};
-    const rejAmt=d.rejType==='partial'?Math.max(r.ta-r.tp,0):r.ta;
-    return [
-      r.vin, r.inv, r.ro||'', fmM(r.month), r.exp||'',
-      r.ta.toFixed(2), r.tp.toFixed(2), rejAmt.toFixed(2),
-      d.rejType||'', d.reason||'', d.cat||'', d.newClaim||'',
-      d.reInv||'', d.resubDate||'', d.status||'',
-      d.creditedAmt!=null?d.creditedAmt.toFixed(2):'',
-      d.creditDate||'',
-      d.shortfall!=null?d.shortfall.toFixed(2):'',
-      d.recoveryRate!=null?d.recoveryRate.toFixed(1)+'%':'',
-      (d.notes||'').replace(/"/g,"'")
-    ];
-  });
-  const csv=[headers,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='RejectionTracking_'+new Date().toISOString().substr(0,10)+'.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-  showToast('📥 Rejection tracking exported!');
-}
-
-function exportGCM(){
-  const rows=S.gcm.filter(r=>!r._d);
-  if(!rows.length){showToast('⚠️ No GCM data to export');return;}
-  const headers=['VIN','Invoice #','Op','RO','Month','Date','Exp Code','Exp Description','NITG',
-    'Parts Asked (€)','Parts Paid (€)','Labour Asked (€)','Labour Paid (€)',
-    'Total Asked (€)','Total Paid (€)','Status'];
-  const data=rows.map(r=>[
-    r.vin, r.inv, r.intLetter||'', r.ro||'', fmM(r.month), r.date||'',
-    r.exp||'', r.expD||'', r.nitg||'',
-    r.pa.toFixed(2), r.pp.toFixed(2), r.la.toFixed(2), r.lp.toFixed(2),
-    r.ta.toFixed(2), r.tp.toFixed(2),
-    r.st===0?'Paid':r.st===4?'Rejected':'Other'
-  ]);
-  const csv=[headers,...data].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download='GCM_Claims_'+new Date().toISOString().substr(0,10)+'.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-  showToast('📥 GCM claims exported!');
-}
-
-// ══ SUPABASE SCHEMA EXPORT ════════════════════════════════════
-// All data structures are Supabase-ready:
-// Table: warranty_rejections
-//   id: text (invoice # = primary key)
-//   vin: text, gcm_invoice: text, rejection_type: text, reason: text
-//   new_claim: text, resub_invoice: text, resub_date: date
-//   category: text, status: text, notes: text
-//   credited_amt: numeric, credit_date: date, shortfall: numeric, recovery_rate: numeric
-//   orig_asked: numeric, orig_paid: numeric, rejected_amt: numeric
-//   auto_matched: boolean, created_at: timestamptz
-//
-// When ready to link to Supabase, replace lsSave/lsLoad with:
-// async function sbSave(table, id, data){ await supabase.from(table).upsert({id,...data}); }
-// async function sbLoad(table){ const {data}=await supabase.from(table).select('*'); return data; }
-
-// ══ LANGUAGE ═════════════════════════════════════════════════
-let _lang = 'en';
-function setLang(l){
-  _lang = l;
-  document.body.classList.toggle('lang-fr', l==='fr');
-  document.getElementById('LANG_EN').classList.toggle('active', l==='en');
-  document.getElementById('LANG_FR').classList.toggle('active', l==='fr');
-  // update placeholders
-  const placeholders = {
-    'GSEARCH':     {en:'Search VIN, invoice, RO, NITG…',     fr:'Rechercher VIN, facture, OR, NITG…'},
-    'F_GQ':        {en:'VIN, invoice, RO, NITG…',            fr:'VIN, facture, OR, NITG…'},
-    'F_EQ':        {en:'Code or description…',               fr:'Code ou description…'},
-    'F_CQ':        {en:'Search VIN…',                        fr:'Rechercher VIN…'},
-    'F_IQ':        {en:'VIN, invoice, order, customer…',     fr:'VIN, facture, ordre, client…'},
-  };
-  for(const [id,v] of Object.entries(placeholders)){
-    const el=document.getElementById(id); if(el) el.placeholder = v[l]||v.en;
-  }
-  // sidebar labels
-  const siLabels = {
-    'upload':    {en:'Upload Files',    fr:'Télécharger'},
-    'gcm':       {en:'GCM Claims',      fr:'Dossiers GCM'},
-    'overview':  {en:'General View',    fr:'Vue Générale'},
-    'expense':   {en:'Expense Codes',   fr:'Codes Dépense'},
-    'comparison':{en:'Incadea vs GCM',  fr:'Incadea vs GCM'},
-    'askedpaid': {en:'Asked vs Paid',   fr:'Demandé vs Payé'},
-    'rejections':{en:'Rejections',      fr:'Rejets'},
-    'incadea':   {en:'Incadea Data',    fr:'Données Incadea'},
-    'bonus':     {en:'Bonus 1%',        fr:'Bonus 1%'},
-  };
-  document.querySelectorAll('.si[data-page]').forEach(el=>{
-    const pg = el.dataset.page;
-    if(!siLabels[pg]) return;
-    const badge = el.querySelector('.sbadge');
-    const emoji = el.querySelector('.si-emoji');
-    el.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=''; });
-    // rebuild text
-    const txt = document.createTextNode(siLabels[pg][l]||siLabels[pg].en);
-    if(emoji) el.insertBefore(txt, badge||null);
-    else el.appendChild(txt);
-  });
-  // re-render current page if data loaded
-  const active = document.querySelector('.si.active');
-  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus})[active.dataset.page]?.();
-}
-
 // ══ HELP CONTENT ══════════════════════════════════════════════
 const HELP = {
   upload:{
@@ -2761,6 +2564,121 @@ function rTrd(){
   h+=`</tbody><tfoot><tr class="tr-grand"><td>TOTAL</td><td class="num">${totClaims}</td><td class="num">${totRej}</td><td class="num">${avgRejRate.toFixed(1)}%</td><td class="num">${f(totRejAmt)}</td><td class="num">${f(sm(mr,'taPaid'))}</td></tr></tfoot></table></div></div></div>`;
   T.innerHTML=h;
 }
+
+
+// ══ SHORTFALL REPORT ══════════════════════════════════════════
+function rShf(){
+  const E=document.getElementById('SHF_E'),K=document.getElementById('SHF_K'),T=document.getElementById('SHF_T');
+  const allRej=S.gcm.filter(r=>r.st===4&&!r._d);
+  const credited=allRej.filter(r=>S.rej[r.inv]?.status==='credited'&&S.rej[r.inv]?.creditedAmt!=null);
+  const withShortfall=credited.filter(r=>(S.rej[r.inv]?.shortfall||0)>0.01);
+  const el=document.getElementById('B_SHF');
+  if(el) el.textContent=withShortfall.length||'–';
+  if(!credited.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}
+  E.style.display='none';
+  const ff=gv('F_SHFF');
+  let rows=credited.map(r=>({...r,d:S.rej[r.inv]}));
+  if(ff==='shortfall') rows=rows.filter(r=>(r.d.shortfall||0)>0.01);
+  else if(ff==='full_recovery') rows=rows.filter(r=>Math.abs(r.d.shortfall||0)<=0.01);
+  else if(ff==='overpaid') rows=rows.filter(r=>(r.d.shortfall||0)<-0.01);
+  rows.sort((a,b)=>(b.d.shortfall||0)-(a.d.shortfall||0));
+  const totCredited=credited.reduce((s,r)=>s+(r.d.creditedAmt||0),0);
+  const totShortfall=credited.reduce((s,r)=>s+(r.d.shortfall||0),0);
+  const totOverpaid=credited.filter(r=>(r.d.shortfall||0)<-0.01).reduce((s,r)=>s+Math.abs(r.d.shortfall||0),0);
+  const totRejAmt=credited.reduce((s,r)=>s+(r.d.rejectedAmt||r.ta),0);
+  const avgRate=totRejAmt>0?(totCredited/totRejAmt*100):0;
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💚 Total Credited (€)</div><div class="kv mint">${f(totCredited)}</div><div class="ks">${credited.length} claims credited by Renault</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">⚠️ Total Shortfall (€)</div><div class="kv rose">${f(Math.max(totShortfall,0))}</div><div class="ks">${withShortfall.length} claims paid less than rejected</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">💙 Overpaid by Renault (€)</div><div class="kv sky">${f(totOverpaid)}</div><div class="ks">${credited.filter(r=>(r.d.shortfall||0)<-0.01).length} claims Renault paid more</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">📊 Avg Recovery Rate</div><div class="kv ${avgRate>=100?'mint':avgRate>=70?'lem':'rose'}">${avgRate.toFixed(1)}%</div><div class="ks">Across all credited claims</div></div>
+    <div class="kpi" style="background:linear-gradient(135deg,var(--rose3),#FFE4E6);border-color:var(--rose2)"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">💸 Still Outstanding (€)</div><div class="kv rose" style="font-size:20px">${f(Math.max(totShortfall,0))}</div><div class="ks">Shortfall still owed by Renault</div></div>`;
+  if(!rows.length){T.innerHTML=`<div class="al al-g">✅ No claims match this filter.</div>`;return;}
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">📋 Shortfall Detail — ${rows.length} credited claims</div>
+  <div class="tw"><table class="t">
+  <thead><tr><th>VIN</th><th>Orig Invoice #</th><th>New Claim #</th><th>Month</th><th>Exp</th>
+    <th class="num">Orig Asked (€)</th><th class="num">Rejected (€)</th><th class="num">Credited (€)</th>
+    <th class="num">Shortfall (€)</th><th class="num">Recovery %</th>
+    <th>Credit Date</th><th>Auto?</th><th>Reason</th><th>Action</th>
+  </tr></thead><tbody>`;
+  rows.forEach(r=>{
+    const d=r.d;
+    const sf=d.shortfall||0;
+    const sfColor=sf>0.01?'var(--rose)':sf<-0.01?'var(--sky)':'var(--mint)';
+    const rate=d.recoveryRate||0;
+    const rateColor=rate>=100?'var(--mint)':rate>=70?'var(--lemon)':'var(--rose)';
+    h+=`<tr>
+      <td class="mono" style="font-size:10px">${r.vin}</td>
+      <td class="mono">${r.inv}</td>
+      <td class="mono">${d.newClaim?`<span class="badge b-mint" style="font-size:8px">✅ ${d.newClaim}</span>`:'—'}</td>
+      <td style="font-size:11px;font-weight:600">${fmM(r.month)}</td>
+      <td><span class="badge b-sun">${r.exp||'–'}</span></td>
+      <td class="num">${f(r.ta)}</td>
+      <td class="num" style="color:var(--rose)">${f(d.rejectedAmt||r.ta)}</td>
+      <td class="num" style="font-weight:700;color:var(--mint)">${f(d.creditedAmt)}</td>
+      <td class="num" style="font-weight:700;color:${sfColor}">${sf>=0?'':'+'} ${f(Math.abs(sf))}</td>
+      <td class="num"><span class="badge" style="background:${rate>=100?'var(--mint3)':rate>=70?'var(--lemon3)':'var(--rose3)'};color:${rateColor};border:1.5px solid currentColor">${rate.toFixed(1)}%</span></td>
+      <td style="font-size:10px;color:var(--mint)">${d.creditDate||'—'}</td>
+      <td>${d.autoMatched?'<span class="badge b-sky" style="font-size:8px">🤖 Auto</span>':'<span class="badge b-n" style="font-size:8px">Manual</span>'}</td>
+      <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)" title="${d.reason||''}">${d.reason||'—'}</td>
+      <td><button class="btn btn-ghost btn-xs" onclick="openModal('${esc(r.inv)}','${r.vin}')">✏️ Edit</button></td>
+    </tr>`;
+  });
+  h+=`</tbody><tfoot><tr class="tr-grand">
+    <td colspan="5">TOTAL (${rows.length})</td>
+    <td class="num">${f(rows.reduce((s,r)=>s+r.ta,0))}</td>
+    <td class="num">${f(rows.reduce((s,r)=>s+(r.d.rejectedAmt||r.ta),0))}</td>
+    <td class="num">${f(rows.reduce((s,r)=>s+(r.d.creditedAmt||0),0))}</td>
+    <td class="num">${f(rows.reduce((s,r)=>s+(r.d.shortfall||0),0))}</td>
+    <td class="num">${(rows.reduce((s,r)=>s+(r.d.recoveryRate||0),0)/Math.max(rows.length,1)).toFixed(1)}%</td>
+    <td colspan="4"></td>
+  </tr></tfoot></table></div></div>`;
+  T.innerHTML=h;
+}
+
+// ══ EXPORT TO CSV ═════════════════════════════════════════════
+function exportRejections(){
+  const allRej=S.gcm.filter(r=>r.st===4&&!r._d);
+  if(!allRej.length){showToast('⚠️ No rejected claims to export');return;}
+  const headers=['VIN','Invoice #','RO','Month','Exp Code','Total Asked','Total Paid',
+    'Rejected','Rejection Type','Reason','Category','New Claim #','Resub Invoice',
+    'Resub Date','Status','Credited','Credit Date','Shortfall','Recovery %','Notes'];
+  const data=allRej.map(r=>{
+    const d=S.rej[r.inv]||{};
+    const rejAmt=d.rejType==='partial'?Math.max(r.ta-r.tp,0):r.ta;
+    return[r.vin,r.inv,r.ro||'',fmM(r.month),r.exp||'',r.ta.toFixed(2),r.tp.toFixed(2),
+      rejAmt.toFixed(2),d.rejType||'',d.reason||'',d.cat||'',d.newClaim||'',d.reInv||'',
+      d.resubDate||'',d.status||'',d.creditedAmt!=null?d.creditedAmt.toFixed(2):'',
+      d.creditDate||'',d.shortfall!=null?d.shortfall.toFixed(2):'',
+      d.recoveryRate!=null?d.recoveryRate.toFixed(1)+'%':'',(d.notes||'').replace(/"/g,"'")];
+  });
+  const csv=[headers,...data].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='RejectionTracking_'+new Date().toISOString().substr(0,10)+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  showToast('📥 Rejection tracking exported!');
+}
+
+function exportGCM(){
+  const rows=S.gcm.filter(r=>!r._d);
+  if(!rows.length){showToast('⚠️ No GCM data to export');return;}
+  const headers=['VIN','Invoice #','Op','RO','Month','Date','Exp Code','Exp Description','NITG',
+    'Parts Asked','Parts Paid','Labour Asked','Labour Paid','Total Asked','Total Paid','Status'];
+  const data=rows.map(r=>[r.vin,r.inv,r.intLetter||'',r.ro||'',fmM(r.month),r.date||'',
+    r.exp||'',r.expD||'',r.nitg||'',r.pa.toFixed(2),r.pp.toFixed(2),r.la.toFixed(2),r.lp.toFixed(2),
+    r.ta.toFixed(2),r.tp.toFixed(2),r.st===0?'Paid':r.st===4?'Rejected':'Other']);
+  const csv=[headers,...data].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='GCM_Claims_'+new Date().toISOString().substr(0,10)+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  showToast('📥 GCM claims exported!');
+}
+
 
 // ══ LANGUAGE ═════════════════════════════════════════════════
 let _lang = 'en';
