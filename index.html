@@ -859,30 +859,57 @@ textarea.fi{resize:vertical;min-height:80px}
 .lang-btn{padding:4px 10px;border-radius:16px;font-size:10px;font-weight:700;cursor:pointer;color:rgba(255,255,255,.55);border:none;background:transparent;font-family:inherit;transition:all .18s;letter-spacing:.04em}
 .lang-btn.active{background:rgba(255,255,255,.18);color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 
-/* ── HELP PANEL ── */
-.help-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:10px;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.14);color:rgba(255,255,255,.75);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .18s;flex-shrink:0}
-.help-btn:hover{background:rgba(255,255,255,.16);color:#fff}
-.help-btn-icon{font-size:13px}
-.help-panel-bg{position:fixed;inset:0;background:rgba(30,27,46,.5);backdrop-filter:blur(4px);z-index:90;display:flex;align-items:flex-end;justify-content:flex-end;padding:20px;opacity:0;pointer-events:none;transition:opacity .22s}
+/* ── HELP BUTTON (floating) ── */
+.help-btn{display:none}/* hide old topbar button — replaced by FAB */
+.help-fab{position:fixed;bottom:28px;right:28px;z-index:200;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--sun),var(--sun2));box-shadow:0 6px 24px rgba(255,107,53,.45);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;transition:all .2s cubic-bezier(.34,1.56,.64,1);font-family:inherit}
+.help-fab:hover{transform:scale(1.12) rotate(10deg);box-shadow:0 10px 32px rgba(255,107,53,.55)}
+.help-fab.panel-open{transform:scale(1) rotate(45deg);background:linear-gradient(135deg,var(--rose),#e11d48)}
+.help-fab-tooltip{position:absolute;right:62px;background:var(--ink);color:#fff;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;font-family:'Plus Jakarta Sans',sans-serif}
+.help-fab:hover .help-fab-tooltip{opacity:1}
+
+/* ── HELP PANEL (slide-in from right) ── */
+.help-panel-bg{position:fixed;inset:0;background:rgba(14,12,30,.45);backdrop-filter:blur(6px);z-index:190;opacity:0;pointer-events:none;transition:opacity .25s}
 .help-panel-bg.open{opacity:1;pointer-events:all}
-.help-panel{background:var(--surf);border-radius:20px;width:420px;max-height:calc(100vh - 80px);overflow-y:auto;transform:translateX(30px);transition:transform .22s;box-shadow:0 24px 70px rgba(30,27,46,.22);display:flex;flex-direction:column}
+.help-panel{position:fixed;top:0;right:0;bottom:0;width:480px;max-width:96vw;background:var(--surf);box-shadow:-20px 0 60px rgba(14,12,30,.2);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:191}
 .help-panel-bg.open .help-panel{transform:translateX(0)}
-.hp-header{padding:20px 20px 14px;border-bottom:1.5px solid var(--border);display:flex;align-items:flex-start;gap:12px;position:sticky;top:0;background:var(--surf);z-index:2;border-radius:20px 20px 0 0}
-.hp-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-.hp-title{font-size:15px;font-weight:800;color:var(--ink);letter-spacing:-.2px}
-.hp-sub{font-size:11px;color:var(--muted);margin-top:2px;font-weight:500}
-.hp-close{margin-left:auto;background:var(--surf2);border:1.5px solid var(--border);border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;flex-shrink:0;transition:background .15s}
-.hp-close:hover{background:var(--border)}
-.hp-body{padding:16px 20px}
-.hp-section{margin-bottom:16px}
-.hp-section-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.hp-rule{display:flex;gap:10px;margin-bottom:8px;padding:10px 12px;background:var(--surf2);border-radius:10px;border:1.5px solid var(--border)}
-.hp-rule-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+
+/* panel header */
+.hp-header{padding:22px 22px 16px;border-bottom:1.5px solid var(--border);display:flex;align-items:flex-start;gap:14px;flex-shrink:0;background:var(--surf)}
+.hp-icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.hp-title{font-size:16px;font-weight:800;color:var(--ink);letter-spacing:-.3px;line-height:1.2}
+.hp-sub{font-size:11px;color:var(--muted);margin-top:3px;font-weight:500;line-height:1.5}
+.hp-close{margin-left:auto;background:var(--surf2);border:1.5px solid var(--border);border-radius:10px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;flex-shrink:0;transition:all .15s;color:var(--ink2)}
+.hp-close:hover{background:var(--rose3);border-color:var(--rose);color:var(--rose)}
+
+/* page nav tabs inside panel */
+.hp-tabs{display:flex;gap:4px;padding:12px 16px 0;flex-wrap:wrap;border-bottom:1.5px solid var(--border);flex-shrink:0;background:var(--surf2)}
+.hp-tab{padding:6px 12px;border-radius:8px 8px 0 0;font-size:10px;font-weight:700;cursor:pointer;border:none;background:transparent;color:var(--muted);font-family:inherit;transition:all .15s;white-space:nowrap;border:1.5px solid transparent;border-bottom:none;margin-bottom:-2px}
+.hp-tab:hover{color:var(--ink);background:var(--surf)}
+.hp-tab.active{background:var(--surf);color:var(--ink);border-color:var(--border);border-bottom-color:var(--surf)}
+
+/* scrollable body */
+.hp-body{flex:1;overflow-y:auto;padding:0}
+
+/* section blocks */
+.hp-section{padding:18px 22px;border-bottom:1.5px solid var(--border)}
+.hp-section:last-child{border-bottom:none}
+.hp-section-title{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.hp-rule{display:flex;gap:12px;margin-bottom:10px;padding:12px 14px;background:var(--surf2);border-radius:12px;border:1.5px solid var(--border);transition:border-color .15s}
+.hp-rule:hover{border-color:var(--sun2)}
+.hp-rule:last-child{margin-bottom:0}
+.hp-rule-icon{font-size:18px;flex-shrink:0;width:24px;text-align:center;margin-top:1px}
 .hp-rule-content{}
-.hp-rule-title{font-size:11px;font-weight:700;color:var(--ink);margin-bottom:2px}
-.hp-rule-desc{font-size:10px;color:var(--muted);line-height:1.6;font-weight:500}
-.hp-btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-.hp-btag{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;background:var(--surf2);border:1.5px solid var(--border);border-radius:8px;font-size:10px;font-weight:600;color:var(--ink2)}
+.hp-rule-title{font-size:12px;font-weight:700;color:var(--ink);margin-bottom:3px}
+.hp-rule-desc{font-size:11px;color:var(--muted);line-height:1.65;font-weight:500}
+
+/* button explanations */
+.hp-btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.hp-btag{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;background:var(--surf2);border:1.5px solid var(--border);border-radius:10px;font-size:11px;font-weight:600;color:var(--ink2);line-height:1.4}
+.hp-btag-label{color:var(--muted);font-weight:500;font-size:10px}
+
+/* tip block */
+.hp-tip{background:linear-gradient(135deg,var(--lemon3),#FFF8E7);border:1.5px solid var(--lemon2);border-radius:12px;padding:12px 14px;font-size:11px;color:var(--lemon);font-weight:600;line-height:1.6;margin-bottom:0}
+.hp-tip strong{color:var(--ink)}
 
 /* ── FEEDBACK MODAL ── */
 .fb-modal-bg{position:fixed;inset:0;background:rgba(30,27,46,.5);backdrop-filter:blur(4px);z-index:110;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
@@ -1113,6 +1140,12 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
     <span class="en">Help</span><span class="fr">Aide</span>
   </button>
 </div>
+
+<!-- Floating Help FAB -->
+<button class="help-fab" id="HELP_FAB" onclick="openHelp()" title="Help & Business Rules">
+  <span style="font-size:20px">❓</span>
+  <span class="help-fab-tooltip">Help & Business Rules</span>
+</button>
 
 <div class="shell">
 <!-- SIDEBAR -->
@@ -2339,244 +2372,264 @@ function setLang(l){
   if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd})[active.dataset.page]?.();
 }
 
-// ══ HELP CONTENT ══════════════════════════════════════════════
+// ══ HELP CONTENT — ALL PAGES ════════════════════════════════
 const HELP = {
   upload:{
-    icon:'⬆️', bg:'var(--sky3)',
-    en:{title:'Upload Files',sub:'How to import your monthly data',
-      rules:[
-        {icon:'📋',title:'GCM Claims File',desc:'Export from the GCM portal every month. File name: Claims_detail_MM_YYYY_LB.xlsx. Drop it on the left dropzone or click "Choose File".'},
-        {icon:'🔧',title:'INCADEA File',desc:'Export from your INCADEA DMS. The system reads the "INCADEA" sheet automatically. Drop on the right dropzone.'},
-        {icon:'🔑',title:'Duplicate Detection',desc:'A true duplicate = exact same VIN + exact same Invoice # appearing more than once. Invoice letters (a, b, c...) denote separate operations on the same order and are NOT duplicates — each is counted independently.'},
-        {icon:'🕐',title:'Last Update',desc:'The header shows how many claims were imported and the exact time of the last upload. Upload new files each month to accumulate history.'},
-      ],
-      buttons:[{icon:'📂',label:'Choose File — opens file browser'},{icon:'🗂️',label:'Drag & Drop — drop file directly on the zone'}]
-    },
-    fr:{title:'Télécharger les Fichiers',sub:'Comment importer vos données mensuelles',
-      rules:[
-        {icon:'📋',title:'Fichier GCM',desc:'Exportez depuis le portail GCM chaque mois. Nom: Claims_detail_MM_YYYY_LB.xlsx. Déposez-le dans la zone gauche.'},
-        {icon:'🔧',title:'Fichier INCADEA',desc:'Export depuis votre DMS INCADEA. Le système lit automatiquement l\'onglet "INCADEA".'},
-        {icon:'🔑',title:'Détection des Doublons',desc:'Les dossiers avec le même VIN + N° Facture sont automatiquement signalés comme doublons et exclus de tous les calculs.'},
-        {icon:'🕐',title:'Dernière Mise à Jour',desc:'L\'en-tête affiche le nombre de dossiers importés et l\'heure exacte du dernier import. Importez de nouveaux fichiers chaque mois.'},
-      ],
-      buttons:[{icon:'📂',label:'Choisir Fichier — ouvre l\'explorateur'},{icon:'🗂️',label:'Glisser-Déposer — déposez le fichier directement'}]
-    }
+    icon:'⬆️', bg:'linear-gradient(135deg,var(--sky3),#E0F2FE)',
+    title:'Upload Files', sub:'Import your monthly GCM and INCADEA data files',
+    rules:[
+      {icon:'📋',title:'GCM Claims File',desc:'Export from the Renault GCM portal every month. Expected filename: Claims_detail_MM_YYYY_LB.xlsx. The system reads Sheet1 automatically. Drop on the LEFT dropzone.'},
+      {icon:'🔧',title:'INCADEA File',desc:'Export from your INCADEA DMS. The system reads the sheet named "INCADEA" automatically. Drop on the RIGHT dropzone.'},
+      {icon:'🔤',title:'Operation Letters (a, b, c...)',desc:'In GCM, invoice INV-123a is the first operation on a repair order, INV-123b is the second, etc. These are DIFFERENT billable operations — NOT duplicates. All are counted independently.'},
+      {icon:'🔑',title:'True Duplicate Detection',desc:'A true duplicate = the exact same VIN + exact same full invoice number appearing more than once. These are flagged yellow and excluded from all calculations.'},
+      {icon:'💾',title:'Data Persistence',desc:'All uploaded data and rejection tracking is saved automatically in your browser\'s localStorage. Data survives page reloads. Use "Clear All Data" only to start completely fresh.'},
+      {icon:'🕐',title:'Monthly Accumulation',desc:'Upload new files each month. Data accumulates automatically — you do not need to clear before uploading a new month.'},
+    ],
+    buttons:[
+      {icon:'📂 Choose File',label:'Opens your file browser to select the XLSX file'},
+      {icon:'🗂️ Drag & Drop',label:'Drag the file directly onto the dropzone area'},
+      {icon:'🗑️ Clear All Data',label:'Removes ALL stored data and rejection tracking — use with caution'},
+    ]
   },
   gcm:{
-    icon:'📋', bg:'var(--sun3)',
-    en:{title:'GCM Claims',sub:'All warranty claims from the GCM portal',
-      rules:[
-        {icon:'✅',title:'Paid Claims (Status 0)',desc:'Claims where invoice_flag_state = 0. Renault has accepted and paid these. Shown with a green "Paid" badge.'},
-        {icon:'❌',title:'Rejected Claims (Status 4)',desc:'Claims where invoice_flag_state = 4. Renault has rejected these. Use the "+ Track" button to record the reason and resubmission details.'},
-        {icon:'🔑',title:'Deduplication Key',desc:'True dedup key = exact VIN + exact Invoice # (including operation letter). INV-123a and INV-123b are different operations, not duplicates. Only truly identical rows are flagged yellow and excluded.'},
-        {icon:'💰',title:'Amount Fields',desc:'Parts Asked/Paid = part amounts. Labour Asked/Paid = labour amounts. Total = sum of all. "Asked" = submitted to Renault. "Paid" = approved by Renault.'},
-        {icon:'🔍',title:'Filters & Search',desc:'Filter by Month, Expense Code, or Status. Use the search box to find any VIN, Invoice #, RO number, or NITG code instantly.'},
-      ],
-      buttons:[{icon:'+ Track',label:'Opens the rejection tracking modal for a rejected claim'},{icon:'✏️ Edit',label:'Re-open the tracking modal to update rejection details'}]
-    },
-    fr:{title:'Dossiers GCM',sub:'Tous les dossiers de garantie du portail GCM',
-      rules:[
-        {icon:'✅',title:'Dossiers Payés (Statut 0)',desc:'Dossiers où invoice_flag_state = 0. Renault a accepté et payé ces dossiers. Badge vert "Payé".'},
-        {icon:'❌',title:'Dossiers Rejetés (Statut 4)',desc:'Dossiers où invoice_flag_state = 4. Renault a rejeté ces dossiers. Utilisez le bouton "+ Suivre" pour enregistrer la raison et les détails de re-soumission.'},
-        {icon:'🔑',title:'Clé de Dédoublonnage',desc:'VIN + N° Facture est utilisé comme clé unique. Les doublons sont surlignés en jaune et exclus de tous les totaux.'},
-        {icon:'💰',title:'Champs Montants',desc:'PR Demandé/Payé = montants pièces. MO Demandé/Payé = montants main-d\'œuvre. Total Demandé = soumis à Renault. Total Payé = approuvé par Renault.'},
-        {icon:'🔍',title:'Filtres & Recherche',desc:'Filtrez par Mois, Code Dépense, ou Statut. Utilisez la recherche pour trouver VIN, N° Facture, N° OR, ou code NITG.'},
-      ],
-      buttons:[{icon:'+ Suivre',label:'Ouvre le modal de suivi de rejet'},{icon:'✏️ Modifier',label:'Rouvrir le modal pour mettre à jour les détails'}]
-    }
+    icon:'📋', bg:'linear-gradient(135deg,var(--sun3),#FEF9C3)',
+    title:'GCM Claims', sub:'All warranty claims imported from the Renault GCM portal',
+    rules:[
+      {icon:'✅',title:'Paid Claims — Status 0',desc:'invoice_flag_state = 0 means Renault accepted and fully paid. Shown with a green badge. Included in all financial totals.'},
+      {icon:'❌',title:'Rejected Claims — Status 4',desc:'invoice_flag_state = 4 means Renault rejected the claim. Use the "+ Track" button to begin the rejection protocol.'},
+      {icon:'🔤',title:'Op Column (A, B, C...)',desc:'The "Op" column shows the operation letter from the invoice suffix. A = first operation, B = second, etc. All operations on the same RO are independent claims — never duplicates.'},
+      {icon:'🔑',title:'Deduplication Rule',desc:'Only exact VIN + exact Invoice# appearing twice are flagged yellow and excluded. INV-123a and INV-123b are two separate operations and are BOTH kept.'},
+      {icon:'💰',title:'Amount Fields Explained',desc:'"Parts Asked" = part_received_amount_local_eur. "Parts Paid" = part_definitive_amount_without_pco_eur. "Labour Asked/Paid" = labour equivalents. "Total Asked" = submitted. "Total Paid" = approved by Renault.'},
+      {icon:'🔍',title:'Search & Filters',desc:'Filter by Month, Expense Code, or Status. The search box instantly searches VIN, Invoice #, RO number, and NITG code simultaneously.'},
+    ],
+    buttons:[
+      {icon:'+ Track',label:'Opens the Rejection Protocol modal — record reason, type, new claim # and status'},
+      {icon:'✏️ Edit',label:'Re-opens the modal to update existing rejection tracking details'},
+    ]
   },
   overview:{
-    icon:'📊', bg:'var(--sky3)',
-    en:{title:'General View',sub:'Monthly summary and trends',
-      rules:[
-        {icon:'📅',title:'Monthly Subtotals',desc:'Each row represents one month of data. Columns show Parts Asked, Parts Paid, Labour Asked, Labour Paid, Total Asked, Total Paid, and Deducted (difference).'},
-        {icon:'📈',title:'Chart',desc:'Bar chart shows Parts Paid (orange) and Labour Paid (blue) per month. The purple line shows Total Paid trend across months.'},
-        {icon:'📉',title:'Deducted Amount',desc:'The "Deducted" column = Total Asked − Total Paid. This is the amount Renault did not reimburse. Red values mean deductions occurred.'},
-        {icon:'🚗',title:'Unique VINs',desc:'Number of distinct vehicles (VINs) in the loaded data — each VIN is one vehicle.'},
-      ],
-      buttons:[]
-    },
-    fr:{title:'Vue Générale',sub:'Résumé mensuel et tendances',
-      rules:[
-        {icon:'📅',title:'Sous-totaux Mensuels',desc:'Chaque ligne représente un mois de données. Colonnes: PR Demandé, PR Payé, MO Demandé, MO Payé, Total Demandé, Total Payé, Déduit.'},
-        {icon:'📈',title:'Graphique',desc:'Barres: PR Payé (orange) et MO Payé (bleu) par mois. La ligne violette montre la tendance du Total Payé.'},
-        {icon:'📉',title:'Montant Déduit',desc:'Colonne "Déduit" = Total Demandé − Total Payé. C\'est le montant que Renault n\'a pas remboursé. Valeurs en rouge = déductions.'},
-        {icon:'🚗',title:'VINs Uniques',desc:'Nombre de véhicules distincts (VINs) dans les données chargées — chaque VIN = un véhicule.'},
-      ],
-      buttons:[]
-    }
+    icon:'📊', bg:'linear-gradient(135deg,var(--sky3),#E0F2FE)',
+    title:'General View', sub:'Monthly summary of all warranty activity — your top-level dashboard',
+    rules:[
+      {icon:'📅',title:'Monthly Subtotals Table',desc:'Each row = one calendar month. Shows: Claims count, Rejected count, Rejection Rate %, Parts Asked/Paid, Labour Asked/Paid, Total Asked, Total Paid, and Deducted amount.'},
+      {icon:'❌',title:'Rejection Rate Column',desc:'Rate % = (Rejected / Total) × 100. Colour-coded: green < 5%, yellow 5–10%, red > 10%. Monitor monthly to catch worsening trends early.'},
+      {icon:'📈',title:'Chart — 4 Datasets',desc:'Orange bars = Parts Paid. Blue bars = Labour Paid. Purple solid line = Total Paid trend. Red dashed line = Rejection Rate % (right axis). All by month.'},
+      {icon:'📉',title:'Deducted Amount',desc:'"Deducted" = Total Asked − Total Paid. Money Renault did not reimburse. Red values require investigation — check Asked vs Paid for detail by expense code.'},
+      {icon:'🚗',title:'Unique VINs KPI',desc:'Count of distinct vehicles in the loaded data. A high VIN count with low claim count may indicate under-claiming on certain vehicles.'},
+      {icon:'🔢',title:'5 KPI Cards',desc:'Total Claims, Parts Paid, Labour Paid, Grand Total Paid, and Rejection Rate % — all with traffic-light colour coding.'},
+    ],
+    buttons:[]
   },
   expense:{
-    icon:'🏷️', bg:'var(--lemon3)',
-    en:{title:'By Expense Code',sub:'Claims grouped by warranty expense type',
-      rules:[
-        {icon:'🏷️',title:'Expense Code',desc:'Each code (e.g. G36) represents a type of warranty expense defined by Renault. "G36" = Warranty group first year, etc.'},
-        {icon:'📊',title:'% Share',desc:'The percentage column shows what proportion of total paid amount each expense code represents.'},
-        {icon:'🔢',title:'Sorting',desc:'Table is sorted by Total Paid descending — the most expensive expense type appears first.'},
-        {icon:'🗓️',title:'Month Filter',desc:'Use the Month filter to see the expense breakdown for a specific month only.'},
-      ],
-      buttons:[]
-    },
-    fr:{title:'Par Code Dépense',sub:'Dossiers regroupés par type de dépense garantie',
-      rules:[
-        {icon:'🏷️',title:'Code Dépense',desc:'Chaque code (ex: G36) représente un type de dépense garantie défini par Renault. "G36" = Garantie groupe première année, etc.'},
-        {icon:'📊',title:'% Part',desc:'La colonne pourcentage montre la proportion du montant total payé que représente chaque code dépense.'},
-        {icon:'🔢',title:'Tri',desc:'Table triée par Total Payé décroissant — le type de dépense le plus coûteux apparaît en premier.'},
-        {icon:'🗓️',title:'Filtre Mois',desc:'Utilisez le filtre Mois pour voir la répartition par code dépense pour un mois spécifique.'},
-      ],
-      buttons:[]
-    }
+    icon:'🏷️', bg:'linear-gradient(135deg,var(--lemon3),#FEF9C3)',
+    title:'Expense Codes', sub:'Claims grouped and ranked by Renault warranty expense type',
+    rules:[
+      {icon:'🏷️',title:'What is an Expense Code?',desc:'Each code (e.g. G36, G12, D28) maps to a specific repair/replacement category defined by Renault. The code determines how Renault classifies and prices the reimbursement.'},
+      {icon:'📊',title:'% Share Column',desc:'Proportion of total paid amount for each code. High % = this code drives most of your warranty revenue. Use to prioritise which codes to optimise or defend in disputes.'},
+      {icon:'🔢',title:'Sorted by Total Paid',desc:'Always sorted descending by Total Paid — your highest-value codes appear first so you immediately see where the money is.'},
+      {icon:'🗓️',title:'Month Filter',desc:'Select a specific month to see that month\'s breakdown only. Leave blank for all-time totals.'},
+      {icon:'🔍',title:'Search Filter',desc:'Type a code (e.g. "G36") or description keyword to filter the list instantly.'},
+      {icon:'⚠️',title:'Parts vs Labour Split',desc:'A large gap between Asked and Paid in one column indicates systematic deductions for that code — worth contesting formally with Renault.'},
+    ],
+    buttons:[]
   },
   comparison:{
-    icon:'⚖️', bg:'var(--pur3)',
-    en:{title:'Incadea vs GCM',sub:'Reconciliation between your DMS and Renault portal',
-      rules:[
-        {icon:'⚖️',title:'Purpose',desc:'Compares the amounts recorded in your INCADEA DMS against what GCM (Renault portal) shows. Differences reveal data entry gaps or timing issues.'},
-        {icon:'🔴',title:'Positive Δ (red)',desc:'GCM total is HIGHER than Incadea. Renault paid more than what INCADEA recorded — check if all invoices were entered in INCADEA.'},
-        {icon:'🟢',title:'Negative Δ (green)',desc:'GCM total is LOWER than Incadea. INCADEA has more than Renault paid — check for rejected claims or missing GCM submissions.'},
-        {icon:'✅',title:'Perfect Match',desc:'Δ Total = 0.00. GCM and Incadea are in perfect agreement for this VIN. Aim to maximise this count.'},
-        {icon:'🔍',title:'Differences Only filter',desc:'Select "Differences Only" in the filter to focus on VINs that need investigation.'},
-      ],
-      buttons:[{icon:'⚠️ Differences Only',label:'Filter to show only VINs with a discrepancy'},{icon:'✅ Matches Only',label:'Filter to show only perfectly reconciled VINs'}]
-    },
-    fr:{title:'Incadea vs GCM',sub:'Rapprochement entre votre DMS et le portail Renault',
-      rules:[
-        {icon:'⚖️',title:'Objectif',desc:'Compare les montants enregistrés dans votre DMS INCADEA avec ce que GCM (portail Renault) affiche. Les écarts révèlent des oublis de saisie ou des décalages.'},
-        {icon:'🔴',title:'Δ Positif (rouge)',desc:'Total GCM SUPÉRIEUR à Incadea. Renault a payé plus que ce qu\'INCADEA a enregistré — vérifiez si toutes les factures sont saisies dans INCADEA.'},
-        {icon:'🟢',title:'Δ Négatif (vert)',desc:'Total GCM INFÉRIEUR à Incadea. INCADEA a plus que ce que Renault a payé — vérifiez les dossiers rejetés ou les soumissions GCM manquantes.'},
-        {icon:'✅',title:'Correspondance Parfaite',desc:'Δ Total = 0,00. GCM et Incadea sont en parfait accord pour ce VIN.'},
-        {icon:'🔍',title:'Filtre Écarts Seulement',desc:'Sélectionnez "Écarts Seulement" pour vous concentrer sur les VINs à investiguer.'},
-      ],
-      buttons:[{icon:'⚠️ Écarts Seulement',label:'Filtrer pour afficher uniquement les VINs avec écart'},{icon:'✅ Correspondances',label:'Filtrer pour afficher les VINs parfaitement réconciliés'}]
-    }
+    icon:'⚖️', bg:'linear-gradient(135deg,var(--pur3),#EDE9FE)',
+    title:'Incadea vs GCM', sub:'Reconcile your DMS records against what Renault shows — find every discrepancy',
+    rules:[
+      {icon:'⚖️',title:'Purpose',desc:'Compares amounts in your INCADEA DMS against GCM (Renault portal) for the same VIN. Differences reveal invoices in one system but not the other, or timing gaps.'},
+      {icon:'🔴',title:'Positive Δ (red) — GCM > Incadea',desc:'Renault shows MORE than INCADEA recorded. Check if all payments were posted in INCADEA, or if there are invoices on vehicles not yet entered.'},
+      {icon:'🟢',title:'Negative Δ (green) — GCM < Incadea',desc:'INCADEA has MORE than Renault paid. Common for rejected claims still in INCADEA, or claims not yet submitted to GCM.'},
+      {icon:'✅',title:'Perfect Match — Δ = 0.00',desc:'GCM and INCADEA agree exactly for this VIN. This is the target state. Maximise perfect match count every month.'},
+      {icon:'🔍',title:'Differences Only Filter',desc:'Hides all matched VINs to show only VINs needing investigation — your reconciliation to-do list.'},
+      {icon:'📊',title:'Sorted by Absolute Δ',desc:'Largest gaps appear first so your most critical reconciliation items are always at the top.'},
+    ],
+    buttons:[
+      {icon:'⚠️ Differences Only',label:'Show only VINs with a discrepancy between GCM and Incadea'},
+      {icon:'✅ Matches Only',label:'Show only VINs that are perfectly reconciled'},
+      {icon:'All VINs',label:'Show every VIN from both systems combined'},
+    ]
   },
   askedpaid:{
-    icon:'📈', bg:'var(--mint3)',
-    en:{title:'Asked vs Paid',sub:'Gap analysis between submitted and approved amounts',
-      rules:[
-        {icon:'📤',title:'Total Asked',desc:'The total amount submitted to Renault (received_amount_eur). This is what you claim should be reimbursed.'},
-        {icon:'💵',title:'Total Paid',desc:'The definitive amount Renault approved (definitive_amount_without_pco_eur). This is what was actually reimbursed.'},
-        {icon:'📉',title:'Deduction Rate',desc:'(Asked − Paid) / Asked × 100. A high deduction rate means Renault is regularly paying less than requested. Investigate expense codes with high gaps.'},
-        {icon:'📅',title:'Subtotals',desc:'Monthly subtotal rows (yellow) aggregate all expense codes for each month. Grand Total row (dark) shows the overall position.'},
-        {icon:'🏷️',title:'By Expense Code',desc:'Each row is one month + one expense code combination. This helps identify which expense types have the highest deduction rates.'},
-      ],
-      buttons:[]
-    },
-    fr:{title:'Demandé vs Payé',sub:'Analyse de l\'écart entre soumis et approuvé',
-      rules:[
-        {icon:'📤',title:'Total Demandé',desc:'Montant total soumis à Renault (received_amount_eur). C\'est ce que vous réclamez comme remboursement.'},
-        {icon:'💵',title:'Total Payé',desc:'Montant définitif approuvé par Renault (definitive_amount_without_pco_eur). C\'est ce qui a réellement été remboursé.'},
-        {icon:'📉',title:'Taux de Déduction',desc:'(Demandé − Payé) / Demandé × 100. Un taux élevé signifie que Renault paie régulièrement moins que demandé.'},
-        {icon:'📅',title:'Sous-totaux',desc:'Lignes de sous-total mensuels (jaune) agrègent tous les codes dépense pour chaque mois. Ligne Total Général (sombre) = position globale.'},
-        {icon:'🏷️',title:'Par Code Dépense',desc:'Chaque ligne = un mois + un code dépense. Identifie quels types de dépenses ont les taux de déduction les plus élevés.'},
-      ],
-      buttons:[]
-    }
+    icon:'📈', bg:'linear-gradient(135deg,var(--mint3),#D1FAE5)',
+    title:'Asked vs Paid', sub:'Analyse the gap between what you submitted and what Renault approved',
+    rules:[
+      {icon:'📤',title:'Total Asked',desc:'"Asked" = received_amount_eur — the full amount you submitted to Renault. This is your claim before Renault review.'},
+      {icon:'💵',title:'Total Paid',desc:'"Paid" = definitive_amount_without_pco_eur — what Renault actually approved and paid. PCO adjustments are already excluded.'},
+      {icon:'📉',title:'Deduction Rate Formula',desc:'Rate % = (Asked − Paid) / Asked × 100. Rate > 5% = warning. Rate > 10% = systematic cutting — investigate which codes are being reduced.'},
+      {icon:'📅',title:'Monthly Subtotal Rows',desc:'Yellow subtotal rows aggregate all codes for each month. Is the deduction rate improving or worsening over time?'},
+      {icon:'🏷️',title:'Row = Month + Expense Code',desc:'Each row = one month AND one expense code. Find which types of work have the highest deduction rates — those are your priority disputes.'},
+      {icon:'⚠️',title:'Δ Parts vs Δ Labour',desc:'If Δ Labour is large, Renault is cutting your labour rates. If Δ Parts is large, part prices are being disputed. Each requires a different contestation strategy.'},
+    ],
+    buttons:[]
   },
   rejections:{
-    icon:'❌', bg:'var(--rose3)',
-    en:{title:'Rejections',sub:'Track, annotate and resubmit rejected claims',
-      rules:[
-        {icon:'❌',title:'What is a Rejection?',desc:'A claim where invoice_flag_state = 4 in GCM. Renault has refused to reimburse this claim. It must be corrected and resubmitted.'},
-        {icon:'📝',title:'Recording the Rejection',desc:'Click "+ Track" to open the rejection modal. Fill in: Reason (dropdown), New Claim #, Resubmission Invoice #, Category, and free-text Notes.'},
-        {icon:'🔄',title:'Resubmission Workflow',desc:'Once corrected, enter the new claim number in the "Correct Claim #" field and the new invoice number. This tracks your resubmission history.'},
-        {icon:'🔴',title:'"No Action Yet" filter',desc:'Shows only rejected claims that have not yet been annotated — your to-do list of rejections.'},
-        {icon:'✅',title:'"Has New Claim #" filter',desc:'Shows claims that have been corrected and resubmitted with a new claim number.'},
-      ],
-      buttons:[{icon:'+ Track',label:'Open rejection modal — record reason, new claim #, notes'},{icon:'✏️ Edit',label:'Update existing rejection details'}]
-    },
-    fr:{title:'Rejets',sub:'Suivre, annoter et re-soumettre les dossiers rejetés',
-      rules:[
-        {icon:'❌',title:'Qu\'est-ce qu\'un Rejet?',desc:'Un dossier où invoice_flag_state = 4 dans GCM. Renault a refusé de rembourser ce dossier. Il doit être corrigé et re-soumis.'},
-        {icon:'📝',title:'Enregistrer le Rejet',desc:'Cliquez sur "+ Suivre" pour ouvrir le modal. Remplissez: Raison (liste), N° Nouveau Dossier, N° Facture Re-soumission, Catégorie, et Notes.'},
-        {icon:'🔄',title:'Processus de Re-soumission',desc:'Une fois corrigé, entrez le nouveau numéro de dossier dans le champ "N° Dossier Correct" et le nouveau numéro de facture.'},
-        {icon:'🔴',title:'Filtre "Aucune Action"',desc:'Affiche uniquement les dossiers rejetés qui n\'ont pas encore été annotés — votre liste de tâches de rejets.'},
-        {icon:'✅',title:'Filtre "A un N° de Dossier"',desc:'Affiche les dossiers corrigés et re-soumis avec un nouveau numéro de dossier.'},
-      ],
-      buttons:[{icon:'+ Suivre',label:'Ouvrir le modal de rejet — enregistrer raison, N° nouveau dossier'},{icon:'✏️ Modifier',label:'Mettre à jour les détails du rejet existant'}]
-    }
+    icon:'❌', bg:'linear-gradient(135deg,var(--rose3),#FFE4E6)',
+    title:'Rejection Protocol', sub:'Track, annotate, classify and resubmit every rejected claim',
+    rules:[
+      {icon:'❌',title:'What Triggers This Page?',desc:'Any claim with invoice_flag_state = 4 in GCM. Renault refused to reimburse. It must be investigated, corrected and resubmitted under a new claim number.'},
+      {icon:'⚠️',title:'Partially Rejected',desc:'Renault paid SOME of the claim. System auto-calculates: Accepted = Total Paid, Rejected portion = Total Asked − Total Paid. Only the rejected portion needs resubmission.'},
+      {icon:'❌',title:'Fully Rejected',desc:'Renault paid NOTHING. Full Total Asked is at risk. A new claim must be submitted for the complete amount.'},
+      {icon:'🔗',title:'New Claim Linkage',desc:'Enter the new GCM claim # in "New Claim Submission #". This links the rejected claim to its resubmission as an audit trail. No double-counting — amounts are tracked separately.'},
+      {icon:'🔄',title:'Status Workflow',desc:'Progress: 🔴 Pending → 🔄 Resubmitted → ⬆️ Escalated → ✅ Resolved (or 💀 Written Off). Status drives the Ageing and Recovery Rate pages.'},
+      {icon:'🗂️',title:'Filters Available',desc:'"No Action Yet" = urgent to-do. "Fully/Partially Rejected" separates the two types. "Has New Claim #" = confirmed resubmissions. "Resolved" = completed cases.'},
+    ],
+    buttons:[
+      {icon:'+ Track',label:'Opens the Rejection Protocol modal — start tracking a new rejection'},
+      {icon:'✏️ Edit',label:'Re-opens modal to update reason, status, or resubmission details'},
+      {icon:'❌ Full / ⚠️ Partial',label:'Type badge — click Edit to switch between Full and Partial rejection'},
+    ]
   },
   incadea:{
-    icon:'🔧', bg:'var(--sky3)',
-    en:{title:'Incadea Data',sub:'All records from your INCADEA DMS export',
-      rules:[
-        {icon:'📄',title:'Source',desc:'Data comes from your INCADEA DMS warranty invoice export. The system reads the "INCADEA" sheet from the uploaded file.'},
-        {icon:'🔍',title:'Search',desc:'Search across Invoice No., VIN, Service Order No., Customer name, and External Document No. simultaneously.'},
-        {icon:'🚗',title:'Make Filter',desc:'Filter by vehicle make (RENAULT, DACIA, etc.) to see only one brand\'s warranty invoices.'},
-        {icon:'⚖️',title:'Use with Comparison',desc:'These records are used in the "Incadea vs GCM" page to reconcile amounts by VIN. Upload both files to see the reconciliation.'},
-      ],
-      buttons:[]
-    },
-    fr:{title:'Données Incadea',sub:'Tous les enregistrements de votre export DMS INCADEA',
-      rules:[
-        {icon:'📄',title:'Source',desc:'Les données proviennent de votre export de factures garantie DMS INCADEA. Le système lit l\'onglet "INCADEA".'},
-        {icon:'🔍',title:'Recherche',desc:'Recherche simultanée sur N° Facture, VIN, N° Ordre de Service, Nom Client, et N° Document Externe.'},
-        {icon:'🚗',title:'Filtre Marque',desc:'Filtrez par marque (RENAULT, DACIA, etc.) pour voir uniquement les factures garantie d\'une marque.'},
-        {icon:'⚖️',title:'Utilisation avec Comparaison',desc:'Ces données sont utilisées dans la page "Incadea vs GCM" pour rapprocher les montants par VIN.'},
-      ],
-      buttons:[]
-    }
+    icon:'🔧', bg:'linear-gradient(135deg,var(--sky3),#E0F2FE)',
+    title:'Incadea Data', sub:'All warranty invoice records from your INCADEA DMS export',
+    rules:[
+      {icon:'📄',title:'Data Source',desc:'Records from your INCADEA DMS warranty invoice export. Reads the "INCADEA" sheet from the uploaded XLSX. Each row = one posted warranty invoice.'},
+      {icon:'🔍',title:'Search Scope',desc:'Searches simultaneously across: Invoice No., VIN, Service Order No., Customer Name, and External Document No. Type any partial match.'},
+      {icon:'🚗',title:'Make Filter',desc:'Filter by vehicle make code (RENAULT, DACIA, etc.) to isolate one brand\'s warranty invoices.'},
+      {icon:'⚖️',title:'Link to Comparison Page',desc:'These records are the source for the "Incadea vs GCM" reconciliation. Total Parts + Labour per VIN are summed and compared against GCM paid amounts.'},
+      {icon:'💰',title:'Amount Columns',desc:'"Parts (€)" = Total Parts from INCADEA. "Labour (€)" = Total Labors. "Amount (€)" = total invoice amount.'},
+      {icon:'⚡',title:'500-Row Display Limit',desc:'Only first 500 rows shown at a time for performance. Use search or make filter to find records beyond the visible set.'},
+    ],
+    buttons:[]
   },
   bonus:{
-    icon:'⭐', bg:'var(--lemon3)',
-    en:{title:'Bonus — 1% Labour',sub:'Monthly bonus based on paid labour amounts',
-      rules:[
-        {icon:'⭐',title:'Bonus Formula',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculated only on PAID claims (invoice_flag_state = 0). Rejected and duplicate claims are excluded.'},
-        {icon:'📅',title:'Per Month',desc:'The bonus is calculated independently for each month. The bar chart shows the relative labour amounts visually.'},
-        {icon:'❌',title:'What is Excluded',desc:'Rejected claims (status ≠ 0) and duplicate rows are excluded from the bonus calculation to avoid double-counting.'},
-        {icon:'💡',title:'How to Read',desc:'The "Your Bonus" column shows the 1% of paid labour for that month. The grand total row shows the cumulative bonus across all loaded months.'},
-      ],
-      buttons:[]
-    },
-    fr:{title:'Bonus — 1% Main-d\'Œuvre',sub:'Bonus mensuel basé sur les montants MO payés',
-      rules:[
-        {icon:'⭐',title:'Formule Bonus',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculé uniquement sur les dossiers PAYÉS (invoice_flag_state = 0). Rejets et doublons exclus.'},
-        {icon:'📅',title:'Par Mois',desc:'Le bonus est calculé indépendamment pour chaque mois. Le graphique barres montre visuellement les montants MO relatifs.'},
-        {icon:'❌',title:'Ce qui est Exclu',desc:'Dossiers rejetés (statut ≠ 0) et doublons exclus du calcul du bonus pour éviter les doubles comptages.'},
-        {icon:'💡',title:'Comment Lire',desc:'La colonne "Votre Bonus" affiche 1% de la MO payée pour ce mois. La ligne total affiche le bonus cumulé sur tous les mois chargés.'},
-      ],
-      buttons:[]
-    }
+    icon:'⭐', bg:'linear-gradient(135deg,var(--lemon3),#FEF9C3)',
+    title:'Bonus — 1% Labour', sub:'Your monthly bonus — 1% of definitively paid labour amounts',
+    rules:[
+      {icon:'⭐',title:'Bonus Formula',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Applied only to PAID claims (status = 0). Rejected claims and duplicates are always excluded.'},
+      {icon:'✅',title:'Paid Claims Only',desc:'Only status = 0 (paid) claims contribute. Rejected (status 4) and pending claims are excluded. Reflects only what Renault has confirmed paying.'},
+      {icon:'📅',title:'Calculated Per Month',desc:'Bonus calculated independently for each calendar month. Verify your entitlement month by month against actual bonus payments received.'},
+      {icon:'📊',title:'Bar Chart',desc:'Shows Labour Paid per month to scale. Longest bar = your best labour month. Spot seasonal patterns in warranty labour volumes.'},
+      {icon:'💡',title:'Verification Use',desc:'Use this to verify your bonus entitlement against what management or Renault claims you are owed. Calculation uses official GCM data only.'},
+      {icon:'❌',title:'What is Excluded',desc:'Duplicate claims, rejected claims, and any status ≠ 0 are excluded. Prevents double-counting and ensures only confirmed Renault payments are used.'},
+    ],
+    buttons:[]
+  },
+  ageing:{
+    icon:'⏰', bg:'linear-gradient(135deg,var(--rose3),#FFE4E6)',
+    title:'Rejection Ageing', sub:'How long each rejection has been outstanding — your escalation priority list',
+    rules:[
+      {icon:'⏰',title:'How Age is Calculated',desc:'Age in days = elapsed since you first saved the rejection tracking (clicked "+ Track"). Untracked claims show 0 days — track them immediately to start the clock.'},
+      {icon:'🟡',title:'30 Days — Follow Up',desc:'Over 30 days with no resolution = follow-up call or email to Renault needed. Log the contact in Notes and update status to "Resubmitted" or "Escalated".'},
+      {icon:'🟠',title:'60 Days — Escalate',desc:'Over 60 days = escalate to your Renault warranty representative. Change status to "⬆️ Escalated" and document the escalation date in Notes.'},
+      {icon:'🔴',title:'90 Days — Critical',desc:'Over 90 days = serious risk of being time-barred. Contact Renault HQ warranty department directly if local rep is unresponsive.'},
+      {icon:'💸',title:'Amount at Risk KPI',desc:'Each ageing bucket shows total € of unresolved claims in that band. "Over 30 days" is your most actionable figure — still recoverable with prompt action.'},
+      {icon:'🔢',title:'Sidebar Badge',desc:'The red sidebar badge shows unresolved claims over 30 days. Aim to keep it at zero — that is your live operational target.'},
+    ],
+    buttons:[
+      {icon:'All Unresolved',label:'Show all open rejections regardless of age'},
+      {icon:'🟡 Over 30 days',label:'Claims outstanding more than 30 days — follow up required'},
+      {icon:'🟠 Over 60 days',label:'Claims outstanding more than 60 days — escalate now'},
+      {icon:'🔴 Over 90 days',label:'Critical — at risk of being lost permanently'},
+      {icon:'✅ Resolved only',label:'Show only closed/resolved cases'},
+      {icon:'✏️ Edit',label:'Open the rejection protocol to update status or add escalation notes'},
+    ]
+  },
+  recovery:{
+    icon:'🔄', bg:'linear-gradient(135deg,var(--mint3),#D1FAE5)',
+    title:'Recovery Rate', sub:'How much of your rejected amount have you successfully recovered?',
+    rules:[
+      {icon:'💸',title:'Total Rejected (€)',desc:'Original Total Asked amounts for ALL rejected claims. This is the baseline — the maximum potentially recoverable if all rejections are successfully resubmitted and paid.'},
+      {icon:'🔄',title:'Resubmitted (€)',desc:'At-risk amounts where a New Claim # has been entered. Money actively back in the pipeline with Renault.'},
+      {icon:'✅',title:'Recovered (€)',desc:'Total Asked amounts for claims marked "✅ Resolved". Confirmed recovered money. Update to Resolved once Renault confirms payment of the resubmission.'},
+      {icon:'📊',title:'Recovery Rate %',desc:'Rate = Resolved Amount / Total Rejected × 100. Healthy system = > 70%. If below 50%, check which claims are stuck in Pending with no action.'},
+      {icon:'⚠️',title:'Still At Risk',desc:'"Still At Risk" = Total At Risk − Resolved. Money neither recovered nor written off. Minimising this is your primary warranty management goal.'},
+      {icon:'🔋',title:'Partial Rejection Credit',desc:'For partial rejections, the already-paid portion (tp) is immediately credited as recovered. Only the gap (ta−tp) is tracked as at risk.'},
+    ],
+    buttons:[]
+  },
+  trends:{
+    icon:'📉', bg:'linear-gradient(135deg,var(--pur3),#EDE9FE)',
+    title:'Rejection Trends', sub:'Monthly rejection patterns, top reasons and trajectory over time',
+    rules:[
+      {icon:'📊',title:'Dual-Axis Chart',desc:'Left axis (bars): Rejected (red) and Paid (green) claims per month. Right axis (line): Rejection Rate % in purple. Spot whether your rejection rate is improving or worsening.'},
+      {icon:'📈',title:'Trend Arrow',desc:'"Last Month Trend" compares the most recent month\'s rejection rate to the previous month. ▲ red = getting worse. ▼ green = improving.'},
+      {icon:'🏷️',title:'Top Rejection Reasons',desc:'Most frequently recorded rejection reasons across all tracked claims. The top reason = your highest-priority systemic issue to fix before the next batch.'},
+      {icon:'🗓️',title:'Monthly Detail Table',desc:'Each row: total claims, rejected count, rate % (colour-coded), rejected amount, paid amount. Correlate high-rejection months with specific filing batches.'},
+      {icon:'💡',title:'How to Use',desc:'Track reasons over time to identify systemic issues. If one reason spikes in a month, investigate that batch. Share with management to show the financial impact of rejection patterns.'},
+      {icon:'🔑',title:'Reasons Require Tracking',desc:'The reasons chart only shows data for claims you have tracked with a reason. Claims with no recorded reason do not appear. Track all rejections for complete data.'},
+    ],
+    buttons:[]
   },
 };
 
-// ══ HELP OPEN/CLOSE ══════════════════════════════════════════
+// ══ HELP OPEN/CLOSE/RENDER ════════════════════════════════════
 let _helpPage = 'upload';
 function openHelp(){
   const active = document.querySelector('.si.active');
   _helpPage = active ? active.dataset.page : 'upload';
+  renderHelpTabs();
   renderHelp();
   document.getElementById('HELP_BG').classList.add('open');
+  const fab = document.getElementById('HELP_FAB');
+  if(fab) fab.classList.add('panel-open');
 }
-function closeHelp(){ document.getElementById('HELP_BG').classList.remove('open'); }
+function closeHelp(){
+  document.getElementById('HELP_BG').classList.remove('open');
+  const fab = document.getElementById('HELP_FAB');
+  if(fab) fab.classList.remove('panel-open');
+}
+
+const PAGE_ORDER = ['upload','gcm','overview','expense','comparison','askedpaid','rejections','incadea','bonus','ageing','recovery','trends'];
+const PAGE_EMOJI = {upload:'⬆️',gcm:'📋',overview:'📊',expense:'🏷️',comparison:'⚖️',askedpaid:'📈',rejections:'❌',incadea:'🔧',bonus:'⭐',ageing:'⏰',recovery:'🔄',trends:'📉'};
+
+function renderHelpTabs(){
+  const tabs = document.getElementById('HP_TABS');
+  if(!tabs) return;
+  tabs.innerHTML = PAGE_ORDER.map(pg => {
+    const d = HELP[pg];
+    const shortTitle = d ? d.title.split(' ').slice(0,2).join(' ') : pg;
+    return `<button class="hp-tab${pg===_helpPage?' active':''}" onclick="switchHelpPage('${pg}')">${PAGE_EMOJI[pg]} ${shortTitle}</button>`;
+  }).join('');
+}
+
+function switchHelpPage(pg){
+  _helpPage = pg;
+  renderHelpTabs();
+  renderHelp();
+  const body = document.getElementById('HP_BODY');
+  if(body) body.scrollTop = 0;
+}
 
 function renderHelp(){
   const d = HELP[_helpPage] || HELP['upload'];
-  const lang = _lang;
-  const t = d[lang] || d['en'];
-
   document.getElementById('HP_ICON').textContent = d.icon;
   document.getElementById('HP_ICON').style.background = d.bg;
-  document.getElementById('HP_TITLE_EN').textContent = HELP[_helpPage]?.en?.title || t.title;
-  document.getElementById('HP_TITLE_FR').textContent = HELP[_helpPage]?.fr?.title || t.title;
-  document.getElementById('HP_SUB_EN').textContent = HELP[_helpPage]?.en?.sub || t.sub;
-  document.getElementById('HP_SUB_FR').textContent = HELP[_helpPage]?.fr?.sub || t.sub;
+  document.getElementById('HP_TITLE_EN').textContent = d.title;
+  document.getElementById('HP_SUB_EN').textContent = d.sub;
 
-  let html = '';
-  // Business Rules
-  html += `<div class="hp-section"><div class="hp-section-title">📋 <span>${lang==='fr'?'Règles Métier':'Business Rules'}</span></div>`;
-  t.rules.forEach(r => {
+  const tips = {
+    upload:'💡 <strong>Pro tip:</strong> Upload both GCM and INCADEA files at the start of each month before reviewing any other page. All analysis pages depend on both files being loaded.',
+    gcm:'💡 <strong>Pro tip:</strong> Set the Status filter to "❌ Rejected" and click "+ Track" on each one. Getting to zero untracked rejections should be your first task after every upload.',
+    overview:'💡 <strong>Pro tip:</strong> Watch the rejection rate % dashed line on the chart. An upward trend over 3 months signals a need to review your claim submission process with Renault.',
+    expense:'💡 <strong>Pro tip:</strong> Focus on the Δ (Asked − Paid) column. Expense codes with consistently high deductions are worth a formal contestation at your next quarterly Renault review.',
+    comparison:'💡 <strong>Pro tip:</strong> Run this page at month-end before closing the books. Any Δ Total above €100 for a VIN should be investigated and reconciled before the next GCM upload.',
+    askedpaid:'💡 <strong>Pro tip:</strong> If the Deduction Rate exceeds 8% for a specific expense code, prepare a formal contestation letter to Renault with the supporting repair order documentation.',
+    rejections:'💡 <strong>Pro tip:</strong> Always fill in the New Claim # immediately after resubmission. This creates the audit trail that proves you acted — essential if the case needs escalation.',
+    incadea:'💡 <strong>Pro tip:</strong> If a VIN appears in INCADEA but not in the GCM comparison, the warranty claim was never submitted to GCM. Check whether it should have been filed.',
+    bonus:'💡 <strong>Pro tip:</strong> Cross-check your bonus here against your actual bonus payment each month. Any discrepancy above €5 should be queried with your warranty supervisor immediately.',
+    ageing:'💡 <strong>Pro tip:</strong> Check this page every Monday morning. Anything reaching 60 days this week needs an escalation email sent before Friday end of business.',
+    recovery:'💡 <strong>Pro tip:</strong> Target recovery rate > 70%. If it falls below 50%, you likely have claims stuck in "Pending" with no action — use the Ageing page to identify and prioritise them.',
+    trends:'💡 <strong>Pro tip:</strong> If one rejection reason dominates the chart, fix the root cause before the next filing batch. Repeat reasons = preventable losses.',
+  };
+
+  let html = `<div class="hp-section"><div class="hp-section-title">📋 Business Rules & Logic</div>`;
+  d.rules.forEach(r => {
     html += `<div class="hp-rule"><div class="hp-rule-icon">${r.icon}</div><div class="hp-rule-content"><div class="hp-rule-title">${r.title}</div><div class="hp-rule-desc">${r.desc}</div></div></div>`;
   });
-  html += '</div>';
+  html += `</div>`;
 
-  // Buttons
-  if(t.buttons && t.buttons.length){
-    html += `<div class="hp-section"><div class="hp-section-title">🖱️ <span>${lang==='fr'?'Boutons de cette page':'Buttons on this page'}</span></div><div class="hp-btn-row">`;
-    t.buttons.forEach(b => {
-      html += `<div class="hp-btag"><span>${b.icon}</span><span>${b.label}</span></div>`;
+  if(d.buttons && d.buttons.length){
+    html += `<div class="hp-section"><div class="hp-section-title">🖱️ Buttons & Controls on This Page</div><div class="hp-btn-row">`;
+    d.buttons.forEach(b => {
+      html += `<div class="hp-btag"><span style="background:var(--surf);border:1.5px solid var(--border);border-radius:7px;padding:3px 9px;font-size:10px;font-weight:700;color:var(--ink);white-space:nowrap;flex-shrink:0">${b.icon}</span><span class="hp-btag-label">${b.label}</span></div>`;
     });
-    html += '</div></div>';
+    html += `</div></div>`;
+  }
+
+  if(tips[_helpPage]){
+    html += `<div class="hp-section"><div class="hp-tip">${tips[_helpPage]}</div></div>`;
   }
 
   document.getElementById('HP_BODY').innerHTML = html;
@@ -2624,18 +2677,18 @@ function sendFeedback(){
   <div class="help-panel">
     <div class="hp-header">
       <div class="hp-icon" id="HP_ICON" style="background:var(--sky3)">❓</div>
-      <div>
-        <div class="hp-title en" id="HP_TITLE_EN">Help & Business Rules</div>
-        <div class="hp-title fr" id="HP_TITLE_FR">Aide & Règles Métier</div>
-        <div class="hp-sub en" id="HP_SUB_EN">How this page works</div>
-        <div class="hp-sub fr" id="HP_SUB_FR">Comment fonctionne cette page</div>
+      <div style="flex:1;min-width:0">
+        <div class="hp-title" id="HP_TITLE_EN">Help & Business Rules</div>
+        <div class="hp-sub" id="HP_SUB_EN">How this page works</div>
       </div>
       <div class="hp-close" onclick="closeHelp()">✕</div>
     </div>
+    <!-- Page nav tabs -->
+    <div class="hp-tabs" id="HP_TABS"></div>
     <div class="hp-body" id="HP_BODY"></div>
     <div class="hp-footer">
       <button class="hp-idea-btn" onclick="openFeedback('idea')">💡 <span class="en">New Idea</span><span class="fr">Nouvelle Idée</span></button>
-      <button class="hp-feedback-btn" onclick="openFeedback('correction')">🔧 <span class="en">System Correction</span><span class="fr">Correction Système</span></button>
+      <button class="hp-feedback-btn" onclick="openFeedback('correction')">🔧 <span class="en">Correction</span><span class="fr">Correction</span></button>
     </div>
   </div>
 </div>
