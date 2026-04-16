@@ -4,8 +4,656 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Renault Warranty — Bassoul Heneine</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+// ══ LANGUAGE ═════════════════════════════════════════════════
+let _lang = 'en';
+function setLang(l){
+  _lang = l;
+  document.body.classList.toggle('lang-fr', l==='fr');
+  document.getElementById('LANG_EN').classList.toggle('active', l==='en');
+  document.getElementById('LANG_FR').classList.toggle('active', l==='fr');
+  // update placeholders
+  const placeholders = {
+    'GSEARCH':     {en:'Search VIN, invoice, RO, NITG…',     fr:'Rechercher VIN, facture, OR, NITG…'},
+    'F_GQ':        {en:'VIN, invoice, RO, NITG…',            fr:'VIN, facture, OR, NITG…'},
+    'F_EQ':        {en:'Code or description…',               fr:'Code ou description…'},
+    'F_CQ':        {en:'Search VIN…',                        fr:'Rechercher VIN…'},
+    'F_IQ':        {en:'VIN, invoice, order, customer…',     fr:'VIN, facture, ordre, client…'},
+  };
+  for(const [id,v] of Object.entries(placeholders)){
+    const el=document.getElementById(id); if(el) el.placeholder = v[l]||v.en;
+  }
+  // sidebar labels
+  const siLabels = {
+    'upload':    {en:'Upload Files',    fr:'Télécharger'},
+    'gcm':       {en:'GCM Claims',      fr:'Dossiers GCM'},
+    'overview':  {en:'General View',    fr:'Vue Générale'},
+    'expense':   {en:'Expense Codes',   fr:'Codes Dépense'},
+    'comparison':{en:'Incadea vs GCM',  fr:'Incadea vs GCM'},
+    'askedpaid': {en:'Asked vs Paid',   fr:'Demandé vs Payé'},
+    'rejections':{en:'Rejections',      fr:'Rejets'},
+    'incadea':   {en:'Incadea Data',    fr:'Données Incadea'},
+    'bonus':     {en:'Bonus 1%',        fr:'Bonus 1%'},
+  };
+  document.querySelectorAll('.si[data-page]').forEach(el=>{
+    const pg = el.dataset.page;
+    if(!siLabels[pg]) return;
+    const badge = el.querySelector('.sbadge');
+    const emoji = el.querySelector('.si-emoji');
+    el.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=''; });
+    // rebuild text
+    const txt = document.createTextNode(siLabels[pg][l]||siLabels[pg].en);
+    if(emoji) el.insertBefore(txt, badge||null);
+    else el.appendChild(txt);
+  });
+  // re-render current page if data loaded
+  const active = document.querySelector('.si.active');
+  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus})[active.dataset.page]?.();
+}
+
+// ══ HELP CONTENT ══════════════════════════════════════════════
+const HELP = {
+  upload:{
+    icon:'⬆️', bg:'var(--sky3)',
+    en:{title:'Upload Files',sub:'How to import your monthly data',
+      rules:[
+        {icon:'📋',title:'GCM Claims File',desc:'Export from the GCM portal every month. File name: Claims_detail_MM_YYYY_LB.xlsx. Drop it on the left dropzone or click "Choose File".'},
+        {icon:'🔧',title:'INCADEA File',desc:'Export from your INCADEA DMS. The system reads the "INCADEA" sheet automatically. Drop on the right dropzone.'},
+        {icon:'🔑',title:'Duplicate Detection',desc:'A true duplicate = exact same VIN + exact same Invoice # appearing more than once. Invoice letters (a, b, c...) denote separate operations on the same order and are NOT duplicates — each is counted independently.'},
+        {icon:'🕐',title:'Last Update',desc:'The header shows how many claims were imported and the exact time of the last upload. Upload new files each month to accumulate history.'},
+      ],
+      buttons:[{icon:'📂',label:'Choose File — opens file browser'},{icon:'🗂️',label:'Drag & Drop — drop file directly on the zone'}]
+    },
+    fr:{title:'Télécharger les Fichiers',sub:'Comment importer vos données mensuelles',
+      rules:[
+        {icon:'📋',title:'Fichier GCM',desc:'Exportez depuis le portail GCM chaque mois. Nom: Claims_detail_MM_YYYY_LB.xlsx. Déposez-le dans la zone gauche.'},
+        {icon:'🔧',title:'Fichier INCADEA',desc:'Export depuis votre DMS INCADEA. Le système lit automatiquement l\'onglet "INCADEA".'},
+        {icon:'🔑',title:'Détection des Doublons',desc:'Les dossiers avec le même VIN + N° Facture sont automatiquement signalés comme doublons et exclus de tous les calculs.'},
+        {icon:'🕐',title:'Dernière Mise à Jour',desc:'L\'en-tête affiche le nombre de dossiers importés et l\'heure exacte du dernier import. Importez de nouveaux fichiers chaque mois.'},
+      ],
+      buttons:[{icon:'📂',label:'Choisir Fichier — ouvre l\'explorateur'},{icon:'🗂️',label:'Glisser-Déposer — déposez le fichier directement'}]
+    }
+  },
+  gcm:{
+    icon:'📋', bg:'var(--sun3)',
+    en:{title:'GCM Claims',sub:'All warranty claims from the GCM portal',
+      rules:[
+        {icon:'✅',title:'Paid Claims (Status 0)',desc:'Claims where invoice_flag_state = 0. Renault has accepted and paid these. Shown with a green "Paid" badge.'},
+        {icon:'❌',title:'Rejected Claims (Status 4)',desc:'Claims where invoice_flag_state = 4. Renault has rejected these. Use the "+ Track" button to record the reason and resubmission details.'},
+        {icon:'🔑',title:'Deduplication Key',desc:'True dedup key = exact VIN + exact Invoice # (including operation letter). INV-123a and INV-123b are different operations, not duplicates. Only truly identical rows are flagged yellow and excluded.'},
+        {icon:'💰',title:'Amount Fields',desc:'Parts Asked/Paid = part amounts. Labour Asked/Paid = labour amounts. Total = sum of all. "Asked" = submitted to Renault. "Paid" = approved by Renault.'},
+        {icon:'🔍',title:'Filters & Search',desc:'Filter by Month, Expense Code, or Status. Use the search box to find any VIN, Invoice #, RO number, or NITG code instantly.'},
+      ],
+      buttons:[{icon:'+ Track',label:'Opens the rejection tracking modal for a rejected claim'},{icon:'✏️ Edit',label:'Re-open the tracking modal to update rejection details'}]
+    },
+    fr:{title:'Dossiers GCM',sub:'Tous les dossiers de garantie du portail GCM',
+      rules:[
+        {icon:'✅',title:'Dossiers Payés (Statut 0)',desc:'Dossiers où invoice_flag_state = 0. Renault a accepté et payé ces dossiers. Badge vert "Payé".'},
+        {icon:'❌',title:'Dossiers Rejetés (Statut 4)',desc:'Dossiers où invoice_flag_state = 4. Renault a rejeté ces dossiers. Utilisez le bouton "+ Suivre" pour enregistrer la raison et les détails de re-soumission.'},
+        {icon:'🔑',title:'Clé de Dédoublonnage',desc:'VIN + N° Facture est utilisé comme clé unique. Les doublons sont surlignés en jaune et exclus de tous les totaux.'},
+        {icon:'💰',title:'Champs Montants',desc:'PR Demandé/Payé = montants pièces. MO Demandé/Payé = montants main-d\'œuvre. Total Demandé = soumis à Renault. Total Payé = approuvé par Renault.'},
+        {icon:'🔍',title:'Filtres & Recherche',desc:'Filtrez par Mois, Code Dépense, ou Statut. Utilisez la recherche pour trouver VIN, N° Facture, N° OR, ou code NITG.'},
+      ],
+      buttons:[{icon:'+ Suivre',label:'Ouvre le modal de suivi de rejet'},{icon:'✏️ Modifier',label:'Rouvrir le modal pour mettre à jour les détails'}]
+    }
+  },
+  overview:{
+    icon:'📊', bg:'var(--sky3)',
+    en:{title:'General View',sub:'Monthly summary and trends',
+      rules:[
+        {icon:'📅',title:'Monthly Subtotals',desc:'Each row represents one month of data. Columns show Parts Asked, Parts Paid, Labour Asked, Labour Paid, Total Asked, Total Paid, and Deducted (difference).'},
+        {icon:'📈',title:'Chart',desc:'Bar chart shows Parts Paid (orange) and Labour Paid (blue) per month. The purple line shows Total Paid trend across months.'},
+        {icon:'📉',title:'Deducted Amount',desc:'The "Deducted" column = Total Asked − Total Paid. This is the amount Renault did not reimburse. Red values mean deductions occurred.'},
+        {icon:'🚗',title:'Unique VINs',desc:'Number of distinct vehicles (VINs) in the loaded data — each VIN is one vehicle.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Vue Générale',sub:'Résumé mensuel et tendances',
+      rules:[
+        {icon:'📅',title:'Sous-totaux Mensuels',desc:'Chaque ligne représente un mois de données. Colonnes: PR Demandé, PR Payé, MO Demandé, MO Payé, Total Demandé, Total Payé, Déduit.'},
+        {icon:'📈',title:'Graphique',desc:'Barres: PR Payé (orange) et MO Payé (bleu) par mois. La ligne violette montre la tendance du Total Payé.'},
+        {icon:'📉',title:'Montant Déduit',desc:'Colonne "Déduit" = Total Demandé − Total Payé. C\'est le montant que Renault n\'a pas remboursé. Valeurs en rouge = déductions.'},
+        {icon:'🚗',title:'VINs Uniques',desc:'Nombre de véhicules distincts (VINs) dans les données chargées — chaque VIN = un véhicule.'},
+      ],
+      buttons:[]
+    }
+  },
+  expense:{
+    icon:'🏷️', bg:'var(--lemon3)',
+    en:{title:'By Expense Code',sub:'Claims grouped by warranty expense type',
+      rules:[
+        {icon:'🏷️',title:'Expense Code',desc:'Each code (e.g. G36) represents a type of warranty expense defined by Renault. "G36" = Warranty group first year, etc.'},
+        {icon:'📊',title:'% Share',desc:'The percentage column shows what proportion of total paid amount each expense code represents.'},
+        {icon:'🔢',title:'Sorting',desc:'Table is sorted by Total Paid descending — the most expensive expense type appears first.'},
+        {icon:'🗓️',title:'Month Filter',desc:'Use the Month filter to see the expense breakdown for a specific month only.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Par Code Dépense',sub:'Dossiers regroupés par type de dépense garantie',
+      rules:[
+        {icon:'🏷️',title:'Code Dépense',desc:'Chaque code (ex: G36) représente un type de dépense garantie défini par Renault. "G36" = Garantie groupe première année, etc.'},
+        {icon:'📊',title:'% Part',desc:'La colonne pourcentage montre la proportion du montant total payé que représente chaque code dépense.'},
+        {icon:'🔢',title:'Tri',desc:'Table triée par Total Payé décroissant — le type de dépense le plus coûteux apparaît en premier.'},
+        {icon:'🗓️',title:'Filtre Mois',desc:'Utilisez le filtre Mois pour voir la répartition par code dépense pour un mois spécifique.'},
+      ],
+      buttons:[]
+    }
+  },
+  comparison:{
+    icon:'⚖️', bg:'var(--pur3)',
+    en:{title:'Incadea vs GCM',sub:'Reconciliation between your DMS and Renault portal',
+      rules:[
+        {icon:'⚖️',title:'Purpose',desc:'Compares the amounts recorded in your INCADEA DMS against what GCM (Renault portal) shows. Differences reveal data entry gaps or timing issues.'},
+        {icon:'🔴',title:'Positive Δ (red)',desc:'GCM total is HIGHER than Incadea. Renault paid more than what INCADEA recorded — check if all invoices were entered in INCADEA.'},
+        {icon:'🟢',title:'Negative Δ (green)',desc:'GCM total is LOWER than Incadea. INCADEA has more than Renault paid — check for rejected claims or missing GCM submissions.'},
+        {icon:'✅',title:'Perfect Match',desc:'Δ Total = 0.00. GCM and Incadea are in perfect agreement for this VIN. Aim to maximise this count.'},
+        {icon:'🔍',title:'Differences Only filter',desc:'Select "Differences Only" in the filter to focus on VINs that need investigation.'},
+      ],
+      buttons:[{icon:'⚠️ Differences Only',label:'Filter to show only VINs with a discrepancy'},{icon:'✅ Matches Only',label:'Filter to show only perfectly reconciled VINs'}]
+    },
+    fr:{title:'Incadea vs GCM',sub:'Rapprochement entre votre DMS et le portail Renault',
+      rules:[
+        {icon:'⚖️',title:'Objectif',desc:'Compare les montants enregistrés dans votre DMS INCADEA avec ce que GCM (portail Renault) affiche. Les écarts révèlent des oublis de saisie ou des décalages.'},
+        {icon:'🔴',title:'Δ Positif (rouge)',desc:'Total GCM SUPÉRIEUR à Incadea. Renault a payé plus que ce qu\'INCADEA a enregistré — vérifiez si toutes les factures sont saisies dans INCADEA.'},
+        {icon:'🟢',title:'Δ Négatif (vert)',desc:'Total GCM INFÉRIEUR à Incadea. INCADEA a plus que ce que Renault a payé — vérifiez les dossiers rejetés ou les soumissions GCM manquantes.'},
+        {icon:'✅',title:'Correspondance Parfaite',desc:'Δ Total = 0,00. GCM et Incadea sont en parfait accord pour ce VIN.'},
+        {icon:'🔍',title:'Filtre Écarts Seulement',desc:'Sélectionnez "Écarts Seulement" pour vous concentrer sur les VINs à investiguer.'},
+      ],
+      buttons:[{icon:'⚠️ Écarts Seulement',label:'Filtrer pour afficher uniquement les VINs avec écart'},{icon:'✅ Correspondances',label:'Filtrer pour afficher les VINs parfaitement réconciliés'}]
+    }
+  },
+  askedpaid:{
+    icon:'📈', bg:'var(--mint3)',
+    en:{title:'Asked vs Paid',sub:'Gap analysis between submitted and approved amounts',
+      rules:[
+        {icon:'📤',title:'Total Asked',desc:'The total amount submitted to Renault (received_amount_eur). This is what you claim should be reimbursed.'},
+        {icon:'💵',title:'Total Paid',desc:'The definitive amount Renault approved (definitive_amount_without_pco_eur). This is what was actually reimbursed.'},
+        {icon:'📉',title:'Deduction Rate',desc:'(Asked − Paid) / Asked × 100. A high deduction rate means Renault is regularly paying less than requested. Investigate expense codes with high gaps.'},
+        {icon:'📅',title:'Subtotals',desc:'Monthly subtotal rows (yellow) aggregate all expense codes for each month. Grand Total row (dark) shows the overall position.'},
+        {icon:'🏷️',title:'By Expense Code',desc:'Each row is one month + one expense code combination. This helps identify which expense types have the highest deduction rates.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Demandé vs Payé',sub:'Analyse de l\'écart entre soumis et approuvé',
+      rules:[
+        {icon:'📤',title:'Total Demandé',desc:'Montant total soumis à Renault (received_amount_eur). C\'est ce que vous réclamez comme remboursement.'},
+        {icon:'💵',title:'Total Payé',desc:'Montant définitif approuvé par Renault (definitive_amount_without_pco_eur). C\'est ce qui a réellement été remboursé.'},
+        {icon:'📉',title:'Taux de Déduction',desc:'(Demandé − Payé) / Demandé × 100. Un taux élevé signifie que Renault paie régulièrement moins que demandé.'},
+        {icon:'📅',title:'Sous-totaux',desc:'Lignes de sous-total mensuels (jaune) agrègent tous les codes dépense pour chaque mois. Ligne Total Général (sombre) = position globale.'},
+        {icon:'🏷️',title:'Par Code Dépense',desc:'Chaque ligne = un mois + un code dépense. Identifie quels types de dépenses ont les taux de déduction les plus élevés.'},
+      ],
+      buttons:[]
+    }
+  },
+  rejections:{
+    icon:'❌', bg:'var(--rose3)',
+    en:{title:'Rejections',sub:'Track, annotate and resubmit rejected claims',
+      rules:[
+        {icon:'❌',title:'What is a Rejection?',desc:'A claim where invoice_flag_state = 4 in GCM. Renault has refused to reimburse this claim. It must be corrected and resubmitted.'},
+        {icon:'📝',title:'Recording the Rejection',desc:'Click "+ Track" to open the rejection modal. Fill in: Reason (dropdown), New Claim #, Resubmission Invoice #, Category, and free-text Notes.'},
+        {icon:'🔄',title:'Resubmission Workflow',desc:'Once corrected, enter the new claim number in the "Correct Claim #" field and the new invoice number. This tracks your resubmission history.'},
+        {icon:'🔴',title:'"No Action Yet" filter',desc:'Shows only rejected claims that have not yet been annotated — your to-do list of rejections.'},
+        {icon:'✅',title:'"Has New Claim #" filter',desc:'Shows claims that have been corrected and resubmitted with a new claim number.'},
+      ],
+      buttons:[{icon:'+ Track',label:'Open rejection modal — record reason, new claim #, notes'},{icon:'✏️ Edit',label:'Update existing rejection details'}]
+    },
+    fr:{title:'Rejets',sub:'Suivre, annoter et re-soumettre les dossiers rejetés',
+      rules:[
+        {icon:'❌',title:'Qu\'est-ce qu\'un Rejet?',desc:'Un dossier où invoice_flag_state = 4 dans GCM. Renault a refusé de rembourser ce dossier. Il doit être corrigé et re-soumis.'},
+        {icon:'📝',title:'Enregistrer le Rejet',desc:'Cliquez sur "+ Suivre" pour ouvrir le modal. Remplissez: Raison (liste), N° Nouveau Dossier, N° Facture Re-soumission, Catégorie, et Notes.'},
+        {icon:'🔄',title:'Processus de Re-soumission',desc:'Une fois corrigé, entrez le nouveau numéro de dossier dans le champ "N° Dossier Correct" et le nouveau numéro de facture.'},
+        {icon:'🔴',title:'Filtre "Aucune Action"',desc:'Affiche uniquement les dossiers rejetés qui n\'ont pas encore été annotés — votre liste de tâches de rejets.'},
+        {icon:'✅',title:'Filtre "A un N° de Dossier"',desc:'Affiche les dossiers corrigés et re-soumis avec un nouveau numéro de dossier.'},
+      ],
+      buttons:[{icon:'+ Suivre',label:'Ouvrir le modal de rejet — enregistrer raison, N° nouveau dossier'},{icon:'✏️ Modifier',label:'Mettre à jour les détails du rejet existant'}]
+    }
+  },
+  incadea:{
+    icon:'🔧', bg:'var(--sky3)',
+    en:{title:'Incadea Data',sub:'All records from your INCADEA DMS export',
+      rules:[
+        {icon:'📄',title:'Source',desc:'Data comes from your INCADEA DMS warranty invoice export. The system reads the "INCADEA" sheet from the uploaded file.'},
+        {icon:'🔍',title:'Search',desc:'Search across Invoice No., VIN, Service Order No., Customer name, and External Document No. simultaneously.'},
+        {icon:'🚗',title:'Make Filter',desc:'Filter by vehicle make (RENAULT, DACIA, etc.) to see only one brand\'s warranty invoices.'},
+        {icon:'⚖️',title:'Use with Comparison',desc:'These records are used in the "Incadea vs GCM" page to reconcile amounts by VIN. Upload both files to see the reconciliation.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Données Incadea',sub:'Tous les enregistrements de votre export DMS INCADEA',
+      rules:[
+        {icon:'📄',title:'Source',desc:'Les données proviennent de votre export de factures garantie DMS INCADEA. Le système lit l\'onglet "INCADEA".'},
+        {icon:'🔍',title:'Recherche',desc:'Recherche simultanée sur N° Facture, VIN, N° Ordre de Service, Nom Client, et N° Document Externe.'},
+        {icon:'🚗',title:'Filtre Marque',desc:'Filtrez par marque (RENAULT, DACIA, etc.) pour voir uniquement les factures garantie d\'une marque.'},
+        {icon:'⚖️',title:'Utilisation avec Comparaison',desc:'Ces données sont utilisées dans la page "Incadea vs GCM" pour rapprocher les montants par VIN.'},
+      ],
+      buttons:[]
+    }
+  },
+  bonus:{
+    icon:'⭐', bg:'var(--lemon3)',
+    en:{title:'Bonus — 1% Labour',sub:'Monthly bonus based on paid labour amounts',
+      rules:[
+        {icon:'⭐',title:'Bonus Formula',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculated only on PAID claims (invoice_flag_state = 0). Rejected and duplicate claims are excluded.'},
+        {icon:'📅',title:'Per Month',desc:'The bonus is calculated independently for each month. The bar chart shows the relative labour amounts visually.'},
+        {icon:'❌',title:'What is Excluded',desc:'Rejected claims (status ≠ 0) and duplicate rows are excluded from the bonus calculation to avoid double-counting.'},
+        {icon:'💡',title:'How to Read',desc:'The "Your Bonus" column shows the 1% of paid labour for that month. The grand total row shows the cumulative bonus across all loaded months.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Bonus — 1% Main-d\'Œuvre',sub:'Bonus mensuel basé sur les montants MO payés',
+      rules:[
+        {icon:'⭐',title:'Formule Bonus',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculé uniquement sur les dossiers PAYÉS (invoice_flag_state = 0). Rejets et doublons exclus.'},
+        {icon:'📅',title:'Par Mois',desc:'Le bonus est calculé indépendamment pour chaque mois. Le graphique barres montre visuellement les montants MO relatifs.'},
+        {icon:'❌',title:'Ce qui est Exclu',desc:'Dossiers rejetés (statut ≠ 0) et doublons exclus du calcul du bonus pour éviter les doubles comptages.'},
+        {icon:'💡',title:'Comment Lire',desc:'La colonne "Votre Bonus" affiche 1% de la MO payée pour ce mois. La ligne total affiche le bonus cumulé sur tous les mois chargés.'},
+      ],
+      buttons:[]
+    }
+  },
+};
+
+// ══ HELP OPEN/CLOSE ══════════════════════════════════════════
+let _helpPage = 'upload';
+function openHelp(){
+  const active = document.querySelector('.si.active');
+  _helpPage = active ? active.dataset.page : 'upload';
+  renderHelp();
+  document.getElementById('HELP_BG').classList.add('open');
+}
+function closeHelp(){ document.getElementById('HELP_BG').classList.remove('open'); }
+
+function renderHelp(){
+  const d = HELP[_helpPage] || HELP['upload'];
+  const lang = _lang;
+  const t = d[lang] || d['en'];
+
+  document.getElementById('HP_ICON').textContent = d.icon;
+  document.getElementById('HP_ICON').style.background = d.bg;
+  document.getElementById('HP_TITLE_EN').textContent = HELP[_helpPage]?.en?.title || t.title;
+  document.getElementById('HP_TITLE_FR').textContent = HELP[_helpPage]?.fr?.title || t.title;
+  document.getElementById('HP_SUB_EN').textContent = HELP[_helpPage]?.en?.sub || t.sub;
+  document.getElementById('HP_SUB_FR').textContent = HELP[_helpPage]?.fr?.sub || t.sub;
+
+  let html = '';
+  // Business Rules
+  html += `<div class="hp-section"><div class="hp-section-title">📋 <span>${lang==='fr'?'Règles Métier':'Business Rules'}</span></div>`;
+  t.rules.forEach(r => {
+    html += `<div class="hp-rule"><div class="hp-rule-icon">${r.icon}</div><div class="hp-rule-content"><div class="hp-rule-title">${r.title}</div><div class="hp-rule-desc">${r.desc}</div></div></div>`;
+  });
+  html += '</div>';
+
+  // Buttons
+  if(t.buttons && t.buttons.length){
+    html += `<div class="hp-section"><div class="hp-section-title">🖱️ <span>${lang==='fr'?'Boutons de cette page':'Buttons on this page'}</span></div><div class="hp-btn-row">`;
+    t.buttons.forEach(b => {
+      html += `<div class="hp-btag"><span>${b.icon}</span><span>${b.label}</span></div>`;
+    });
+    html += '</div></div>';
+  }
+
+  document.getElementById('HP_BODY').innerHTML = html;
+}
+
+// ══ FEEDBACK / IDEA ════════════════════════════════════════════
+let _fbType = 'idea';
+function openFeedback(type){
+  _fbType = type;
+  const isIdea = type === 'idea';
+  document.getElementById('FB_EMOJI').textContent = isIdea ? '💡' : '🔧';
+  document.getElementById('FB_TITLE').textContent = _lang==='fr'
+    ? (isIdea ? 'Nouvelle Idée' : 'Correction Système')
+    : (isIdea ? 'New Idea' : 'System Correction');
+  document.getElementById('FB_SUBJECT').value = '';
+  document.getElementById('FB_SUBJECT_EN').value = '';
+  document.getElementById('FB_BODY').value = '';
+  document.getElementById('FB_BG').classList.add('open');
+}
+function closeFeedback(){ document.getElementById('FB_BG').classList.remove('open'); }
+
+function sendFeedback(){
+  const subjectEl = _lang==='fr' ? document.getElementById('FB_SUBJECT') : document.getElementById('FB_SUBJECT_EN');
+  const subject = (subjectEl?.value || '').trim();
+  const body = (document.getElementById('FB_BODY').value || '').trim();
+  const isIdea = _fbType === 'idea';
+  const prefix = _lang==='fr' ? (isIdea?'[IDÉE] ':'[CORRECTION] ') : (isIdea?'[IDEA] ':'[CORRECTION] ');
+  const pageLabel = (_helpPage||'').toUpperCase();
+  const fullSubject = prefix + (subject || (isIdea ? 'Renault Warranty System — New Idea' : 'Renault Warranty System — Correction Needed')) + ' [' + pageLabel + ']';
+  const greeting = _lang==='fr'
+    ? 'Bonjour,\n\nVoici ma suggestion / correction pour le système de garantie Renault:\n\n'
+    : 'Hello,\n\nHere is my suggestion / correction for the Renault Warranty System:\n\n';
+  const fullBody = greeting + (body || (isIdea ? 'Please describe your idea here.' : 'Please describe the correction needed here.'));
+  const mailto = 'mailto:managment@iantradingsal.com?subject=' + encodeURIComponent(fullSubject) + '&body=' + encodeURIComponent(fullBody.replace(/\\n/g,'\n'));
+  window.location.href = mailto;
+  closeFeedback();
+  closeHelp();
+  showToast('📧 ' + (_lang==='fr' ? 'Outlook ouvert !' : 'Opening Outlook!'));
+}
+
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
+// ══ LANGUAGE ═════════════════════════════════════════════════
+let _lang = 'en';
+function setLang(l){
+  _lang = l;
+  document.body.classList.toggle('lang-fr', l==='fr');
+  document.getElementById('LANG_EN').classList.toggle('active', l==='en');
+  document.getElementById('LANG_FR').classList.toggle('active', l==='fr');
+  // update placeholders
+  const placeholders = {
+    'GSEARCH':     {en:'Search VIN, invoice, RO, NITG…',     fr:'Rechercher VIN, facture, OR, NITG…'},
+    'F_GQ':        {en:'VIN, invoice, RO, NITG…',            fr:'VIN, facture, OR, NITG…'},
+    'F_EQ':        {en:'Code or description…',               fr:'Code ou description…'},
+    'F_CQ':        {en:'Search VIN…',                        fr:'Rechercher VIN…'},
+    'F_IQ':        {en:'VIN, invoice, order, customer…',     fr:'VIN, facture, ordre, client…'},
+  };
+  for(const [id,v] of Object.entries(placeholders)){
+    const el=document.getElementById(id); if(el) el.placeholder = v[l]||v.en;
+  }
+  // sidebar labels
+  const siLabels = {
+    'upload':    {en:'Upload Files',    fr:'Télécharger'},
+    'gcm':       {en:'GCM Claims',      fr:'Dossiers GCM'},
+    'overview':  {en:'General View',    fr:'Vue Générale'},
+    'expense':   {en:'Expense Codes',   fr:'Codes Dépense'},
+    'comparison':{en:'Incadea vs GCM',  fr:'Incadea vs GCM'},
+    'askedpaid': {en:'Asked vs Paid',   fr:'Demandé vs Payé'},
+    'rejections':{en:'Rejections',      fr:'Rejets'},
+    'incadea':   {en:'Incadea Data',    fr:'Données Incadea'},
+    'bonus':     {en:'Bonus 1%',        fr:'Bonus 1%'},
+  };
+  document.querySelectorAll('.si[data-page]').forEach(el=>{
+    const pg = el.dataset.page;
+    if(!siLabels[pg]) return;
+    const badge = el.querySelector('.sbadge');
+    const emoji = el.querySelector('.si-emoji');
+    el.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=''; });
+    // rebuild text
+    const txt = document.createTextNode(siLabels[pg][l]||siLabels[pg].en);
+    if(emoji) el.insertBefore(txt, badge||null);
+    else el.appendChild(txt);
+  });
+  // re-render current page if data loaded
+  const active = document.querySelector('.si.active');
+  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus})[active.dataset.page]?.();
+}
+
+// ══ HELP CONTENT ══════════════════════════════════════════════
+const HELP = {
+  upload:{
+    icon:'⬆️', bg:'var(--sky3)',
+    en:{title:'Upload Files',sub:'How to import your monthly data',
+      rules:[
+        {icon:'📋',title:'GCM Claims File',desc:'Export from the GCM portal every month. File name: Claims_detail_MM_YYYY_LB.xlsx. Drop it on the left dropzone or click "Choose File".'},
+        {icon:'🔧',title:'INCADEA File',desc:'Export from your INCADEA DMS. The system reads the "INCADEA" sheet automatically. Drop on the right dropzone.'},
+        {icon:'🔑',title:'Duplicate Detection',desc:'A true duplicate = exact same VIN + exact same Invoice # appearing more than once. Invoice letters (a, b, c...) denote separate operations on the same order and are NOT duplicates — each is counted independently.'},
+        {icon:'🕐',title:'Last Update',desc:'The header shows how many claims were imported and the exact time of the last upload. Upload new files each month to accumulate history.'},
+      ],
+      buttons:[{icon:'📂',label:'Choose File — opens file browser'},{icon:'🗂️',label:'Drag & Drop — drop file directly on the zone'}]
+    },
+    fr:{title:'Télécharger les Fichiers',sub:'Comment importer vos données mensuelles',
+      rules:[
+        {icon:'📋',title:'Fichier GCM',desc:'Exportez depuis le portail GCM chaque mois. Nom: Claims_detail_MM_YYYY_LB.xlsx. Déposez-le dans la zone gauche.'},
+        {icon:'🔧',title:'Fichier INCADEA',desc:'Export depuis votre DMS INCADEA. Le système lit automatiquement l\'onglet "INCADEA".'},
+        {icon:'🔑',title:'Détection des Doublons',desc:'Les dossiers avec le même VIN + N° Facture sont automatiquement signalés comme doublons et exclus de tous les calculs.'},
+        {icon:'🕐',title:'Dernière Mise à Jour',desc:'L\'en-tête affiche le nombre de dossiers importés et l\'heure exacte du dernier import. Importez de nouveaux fichiers chaque mois.'},
+      ],
+      buttons:[{icon:'📂',label:'Choisir Fichier — ouvre l\'explorateur'},{icon:'🗂️',label:'Glisser-Déposer — déposez le fichier directement'}]
+    }
+  },
+  gcm:{
+    icon:'📋', bg:'var(--sun3)',
+    en:{title:'GCM Claims',sub:'All warranty claims from the GCM portal',
+      rules:[
+        {icon:'✅',title:'Paid Claims (Status 0)',desc:'Claims where invoice_flag_state = 0. Renault has accepted and paid these. Shown with a green "Paid" badge.'},
+        {icon:'❌',title:'Rejected Claims (Status 4)',desc:'Claims where invoice_flag_state = 4. Renault has rejected these. Use the "+ Track" button to record the reason and resubmission details.'},
+        {icon:'🔑',title:'Deduplication Key',desc:'True dedup key = exact VIN + exact Invoice # (including operation letter). INV-123a and INV-123b are different operations, not duplicates. Only truly identical rows are flagged yellow and excluded.'},
+        {icon:'💰',title:'Amount Fields',desc:'Parts Asked/Paid = part amounts. Labour Asked/Paid = labour amounts. Total = sum of all. "Asked" = submitted to Renault. "Paid" = approved by Renault.'},
+        {icon:'🔍',title:'Filters & Search',desc:'Filter by Month, Expense Code, or Status. Use the search box to find any VIN, Invoice #, RO number, or NITG code instantly.'},
+      ],
+      buttons:[{icon:'+ Track',label:'Opens the rejection tracking modal for a rejected claim'},{icon:'✏️ Edit',label:'Re-open the tracking modal to update rejection details'}]
+    },
+    fr:{title:'Dossiers GCM',sub:'Tous les dossiers de garantie du portail GCM',
+      rules:[
+        {icon:'✅',title:'Dossiers Payés (Statut 0)',desc:'Dossiers où invoice_flag_state = 0. Renault a accepté et payé ces dossiers. Badge vert "Payé".'},
+        {icon:'❌',title:'Dossiers Rejetés (Statut 4)',desc:'Dossiers où invoice_flag_state = 4. Renault a rejeté ces dossiers. Utilisez le bouton "+ Suivre" pour enregistrer la raison et les détails de re-soumission.'},
+        {icon:'🔑',title:'Clé de Dédoublonnage',desc:'VIN + N° Facture est utilisé comme clé unique. Les doublons sont surlignés en jaune et exclus de tous les totaux.'},
+        {icon:'💰',title:'Champs Montants',desc:'PR Demandé/Payé = montants pièces. MO Demandé/Payé = montants main-d\'œuvre. Total Demandé = soumis à Renault. Total Payé = approuvé par Renault.'},
+        {icon:'🔍',title:'Filtres & Recherche',desc:'Filtrez par Mois, Code Dépense, ou Statut. Utilisez la recherche pour trouver VIN, N° Facture, N° OR, ou code NITG.'},
+      ],
+      buttons:[{icon:'+ Suivre',label:'Ouvre le modal de suivi de rejet'},{icon:'✏️ Modifier',label:'Rouvrir le modal pour mettre à jour les détails'}]
+    }
+  },
+  overview:{
+    icon:'📊', bg:'var(--sky3)',
+    en:{title:'General View',sub:'Monthly summary and trends',
+      rules:[
+        {icon:'📅',title:'Monthly Subtotals',desc:'Each row represents one month of data. Columns show Parts Asked, Parts Paid, Labour Asked, Labour Paid, Total Asked, Total Paid, and Deducted (difference).'},
+        {icon:'📈',title:'Chart',desc:'Bar chart shows Parts Paid (orange) and Labour Paid (blue) per month. The purple line shows Total Paid trend across months.'},
+        {icon:'📉',title:'Deducted Amount',desc:'The "Deducted" column = Total Asked − Total Paid. This is the amount Renault did not reimburse. Red values mean deductions occurred.'},
+        {icon:'🚗',title:'Unique VINs',desc:'Number of distinct vehicles (VINs) in the loaded data — each VIN is one vehicle.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Vue Générale',sub:'Résumé mensuel et tendances',
+      rules:[
+        {icon:'📅',title:'Sous-totaux Mensuels',desc:'Chaque ligne représente un mois de données. Colonnes: PR Demandé, PR Payé, MO Demandé, MO Payé, Total Demandé, Total Payé, Déduit.'},
+        {icon:'📈',title:'Graphique',desc:'Barres: PR Payé (orange) et MO Payé (bleu) par mois. La ligne violette montre la tendance du Total Payé.'},
+        {icon:'📉',title:'Montant Déduit',desc:'Colonne "Déduit" = Total Demandé − Total Payé. C\'est le montant que Renault n\'a pas remboursé. Valeurs en rouge = déductions.'},
+        {icon:'🚗',title:'VINs Uniques',desc:'Nombre de véhicules distincts (VINs) dans les données chargées — chaque VIN = un véhicule.'},
+      ],
+      buttons:[]
+    }
+  },
+  expense:{
+    icon:'🏷️', bg:'var(--lemon3)',
+    en:{title:'By Expense Code',sub:'Claims grouped by warranty expense type',
+      rules:[
+        {icon:'🏷️',title:'Expense Code',desc:'Each code (e.g. G36) represents a type of warranty expense defined by Renault. "G36" = Warranty group first year, etc.'},
+        {icon:'📊',title:'% Share',desc:'The percentage column shows what proportion of total paid amount each expense code represents.'},
+        {icon:'🔢',title:'Sorting',desc:'Table is sorted by Total Paid descending — the most expensive expense type appears first.'},
+        {icon:'🗓️',title:'Month Filter',desc:'Use the Month filter to see the expense breakdown for a specific month only.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Par Code Dépense',sub:'Dossiers regroupés par type de dépense garantie',
+      rules:[
+        {icon:'🏷️',title:'Code Dépense',desc:'Chaque code (ex: G36) représente un type de dépense garantie défini par Renault. "G36" = Garantie groupe première année, etc.'},
+        {icon:'📊',title:'% Part',desc:'La colonne pourcentage montre la proportion du montant total payé que représente chaque code dépense.'},
+        {icon:'🔢',title:'Tri',desc:'Table triée par Total Payé décroissant — le type de dépense le plus coûteux apparaît en premier.'},
+        {icon:'🗓️',title:'Filtre Mois',desc:'Utilisez le filtre Mois pour voir la répartition par code dépense pour un mois spécifique.'},
+      ],
+      buttons:[]
+    }
+  },
+  comparison:{
+    icon:'⚖️', bg:'var(--pur3)',
+    en:{title:'Incadea vs GCM',sub:'Reconciliation between your DMS and Renault portal',
+      rules:[
+        {icon:'⚖️',title:'Purpose',desc:'Compares the amounts recorded in your INCADEA DMS against what GCM (Renault portal) shows. Differences reveal data entry gaps or timing issues.'},
+        {icon:'🔴',title:'Positive Δ (red)',desc:'GCM total is HIGHER than Incadea. Renault paid more than what INCADEA recorded — check if all invoices were entered in INCADEA.'},
+        {icon:'🟢',title:'Negative Δ (green)',desc:'GCM total is LOWER than Incadea. INCADEA has more than Renault paid — check for rejected claims or missing GCM submissions.'},
+        {icon:'✅',title:'Perfect Match',desc:'Δ Total = 0.00. GCM and Incadea are in perfect agreement for this VIN. Aim to maximise this count.'},
+        {icon:'🔍',title:'Differences Only filter',desc:'Select "Differences Only" in the filter to focus on VINs that need investigation.'},
+      ],
+      buttons:[{icon:'⚠️ Differences Only',label:'Filter to show only VINs with a discrepancy'},{icon:'✅ Matches Only',label:'Filter to show only perfectly reconciled VINs'}]
+    },
+    fr:{title:'Incadea vs GCM',sub:'Rapprochement entre votre DMS et le portail Renault',
+      rules:[
+        {icon:'⚖️',title:'Objectif',desc:'Compare les montants enregistrés dans votre DMS INCADEA avec ce que GCM (portail Renault) affiche. Les écarts révèlent des oublis de saisie ou des décalages.'},
+        {icon:'🔴',title:'Δ Positif (rouge)',desc:'Total GCM SUPÉRIEUR à Incadea. Renault a payé plus que ce qu\'INCADEA a enregistré — vérifiez si toutes les factures sont saisies dans INCADEA.'},
+        {icon:'🟢',title:'Δ Négatif (vert)',desc:'Total GCM INFÉRIEUR à Incadea. INCADEA a plus que ce que Renault a payé — vérifiez les dossiers rejetés ou les soumissions GCM manquantes.'},
+        {icon:'✅',title:'Correspondance Parfaite',desc:'Δ Total = 0,00. GCM et Incadea sont en parfait accord pour ce VIN.'},
+        {icon:'🔍',title:'Filtre Écarts Seulement',desc:'Sélectionnez "Écarts Seulement" pour vous concentrer sur les VINs à investiguer.'},
+      ],
+      buttons:[{icon:'⚠️ Écarts Seulement',label:'Filtrer pour afficher uniquement les VINs avec écart'},{icon:'✅ Correspondances',label:'Filtrer pour afficher les VINs parfaitement réconciliés'}]
+    }
+  },
+  askedpaid:{
+    icon:'📈', bg:'var(--mint3)',
+    en:{title:'Asked vs Paid',sub:'Gap analysis between submitted and approved amounts',
+      rules:[
+        {icon:'📤',title:'Total Asked',desc:'The total amount submitted to Renault (received_amount_eur). This is what you claim should be reimbursed.'},
+        {icon:'💵',title:'Total Paid',desc:'The definitive amount Renault approved (definitive_amount_without_pco_eur). This is what was actually reimbursed.'},
+        {icon:'📉',title:'Deduction Rate',desc:'(Asked − Paid) / Asked × 100. A high deduction rate means Renault is regularly paying less than requested. Investigate expense codes with high gaps.'},
+        {icon:'📅',title:'Subtotals',desc:'Monthly subtotal rows (yellow) aggregate all expense codes for each month. Grand Total row (dark) shows the overall position.'},
+        {icon:'🏷️',title:'By Expense Code',desc:'Each row is one month + one expense code combination. This helps identify which expense types have the highest deduction rates.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Demandé vs Payé',sub:'Analyse de l\'écart entre soumis et approuvé',
+      rules:[
+        {icon:'📤',title:'Total Demandé',desc:'Montant total soumis à Renault (received_amount_eur). C\'est ce que vous réclamez comme remboursement.'},
+        {icon:'💵',title:'Total Payé',desc:'Montant définitif approuvé par Renault (definitive_amount_without_pco_eur). C\'est ce qui a réellement été remboursé.'},
+        {icon:'📉',title:'Taux de Déduction',desc:'(Demandé − Payé) / Demandé × 100. Un taux élevé signifie que Renault paie régulièrement moins que demandé.'},
+        {icon:'📅',title:'Sous-totaux',desc:'Lignes de sous-total mensuels (jaune) agrègent tous les codes dépense pour chaque mois. Ligne Total Général (sombre) = position globale.'},
+        {icon:'🏷️',title:'Par Code Dépense',desc:'Chaque ligne = un mois + un code dépense. Identifie quels types de dépenses ont les taux de déduction les plus élevés.'},
+      ],
+      buttons:[]
+    }
+  },
+  rejections:{
+    icon:'❌', bg:'var(--rose3)',
+    en:{title:'Rejections',sub:'Track, annotate and resubmit rejected claims',
+      rules:[
+        {icon:'❌',title:'What is a Rejection?',desc:'A claim where invoice_flag_state = 4 in GCM. Renault has refused to reimburse this claim. It must be corrected and resubmitted.'},
+        {icon:'📝',title:'Recording the Rejection',desc:'Click "+ Track" to open the rejection modal. Fill in: Reason (dropdown), New Claim #, Resubmission Invoice #, Category, and free-text Notes.'},
+        {icon:'🔄',title:'Resubmission Workflow',desc:'Once corrected, enter the new claim number in the "Correct Claim #" field and the new invoice number. This tracks your resubmission history.'},
+        {icon:'🔴',title:'"No Action Yet" filter',desc:'Shows only rejected claims that have not yet been annotated — your to-do list of rejections.'},
+        {icon:'✅',title:'"Has New Claim #" filter',desc:'Shows claims that have been corrected and resubmitted with a new claim number.'},
+      ],
+      buttons:[{icon:'+ Track',label:'Open rejection modal — record reason, new claim #, notes'},{icon:'✏️ Edit',label:'Update existing rejection details'}]
+    },
+    fr:{title:'Rejets',sub:'Suivre, annoter et re-soumettre les dossiers rejetés',
+      rules:[
+        {icon:'❌',title:'Qu\'est-ce qu\'un Rejet?',desc:'Un dossier où invoice_flag_state = 4 dans GCM. Renault a refusé de rembourser ce dossier. Il doit être corrigé et re-soumis.'},
+        {icon:'📝',title:'Enregistrer le Rejet',desc:'Cliquez sur "+ Suivre" pour ouvrir le modal. Remplissez: Raison (liste), N° Nouveau Dossier, N° Facture Re-soumission, Catégorie, et Notes.'},
+        {icon:'🔄',title:'Processus de Re-soumission',desc:'Une fois corrigé, entrez le nouveau numéro de dossier dans le champ "N° Dossier Correct" et le nouveau numéro de facture.'},
+        {icon:'🔴',title:'Filtre "Aucune Action"',desc:'Affiche uniquement les dossiers rejetés qui n\'ont pas encore été annotés — votre liste de tâches de rejets.'},
+        {icon:'✅',title:'Filtre "A un N° de Dossier"',desc:'Affiche les dossiers corrigés et re-soumis avec un nouveau numéro de dossier.'},
+      ],
+      buttons:[{icon:'+ Suivre',label:'Ouvrir le modal de rejet — enregistrer raison, N° nouveau dossier'},{icon:'✏️ Modifier',label:'Mettre à jour les détails du rejet existant'}]
+    }
+  },
+  incadea:{
+    icon:'🔧', bg:'var(--sky3)',
+    en:{title:'Incadea Data',sub:'All records from your INCADEA DMS export',
+      rules:[
+        {icon:'📄',title:'Source',desc:'Data comes from your INCADEA DMS warranty invoice export. The system reads the "INCADEA" sheet from the uploaded file.'},
+        {icon:'🔍',title:'Search',desc:'Search across Invoice No., VIN, Service Order No., Customer name, and External Document No. simultaneously.'},
+        {icon:'🚗',title:'Make Filter',desc:'Filter by vehicle make (RENAULT, DACIA, etc.) to see only one brand\'s warranty invoices.'},
+        {icon:'⚖️',title:'Use with Comparison',desc:'These records are used in the "Incadea vs GCM" page to reconcile amounts by VIN. Upload both files to see the reconciliation.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Données Incadea',sub:'Tous les enregistrements de votre export DMS INCADEA',
+      rules:[
+        {icon:'📄',title:'Source',desc:'Les données proviennent de votre export de factures garantie DMS INCADEA. Le système lit l\'onglet "INCADEA".'},
+        {icon:'🔍',title:'Recherche',desc:'Recherche simultanée sur N° Facture, VIN, N° Ordre de Service, Nom Client, et N° Document Externe.'},
+        {icon:'🚗',title:'Filtre Marque',desc:'Filtrez par marque (RENAULT, DACIA, etc.) pour voir uniquement les factures garantie d\'une marque.'},
+        {icon:'⚖️',title:'Utilisation avec Comparaison',desc:'Ces données sont utilisées dans la page "Incadea vs GCM" pour rapprocher les montants par VIN.'},
+      ],
+      buttons:[]
+    }
+  },
+  bonus:{
+    icon:'⭐', bg:'var(--lemon3)',
+    en:{title:'Bonus — 1% Labour',sub:'Monthly bonus based on paid labour amounts',
+      rules:[
+        {icon:'⭐',title:'Bonus Formula',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculated only on PAID claims (invoice_flag_state = 0). Rejected and duplicate claims are excluded.'},
+        {icon:'📅',title:'Per Month',desc:'The bonus is calculated independently for each month. The bar chart shows the relative labour amounts visually.'},
+        {icon:'❌',title:'What is Excluded',desc:'Rejected claims (status ≠ 0) and duplicate rows are excluded from the bonus calculation to avoid double-counting.'},
+        {icon:'💡',title:'How to Read',desc:'The "Your Bonus" column shows the 1% of paid labour for that month. The grand total row shows the cumulative bonus across all loaded months.'},
+      ],
+      buttons:[]
+    },
+    fr:{title:'Bonus — 1% Main-d\'Œuvre',sub:'Bonus mensuel basé sur les montants MO payés',
+      rules:[
+        {icon:'⭐',title:'Formule Bonus',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculé uniquement sur les dossiers PAYÉS (invoice_flag_state = 0). Rejets et doublons exclus.'},
+        {icon:'📅',title:'Par Mois',desc:'Le bonus est calculé indépendamment pour chaque mois. Le graphique barres montre visuellement les montants MO relatifs.'},
+        {icon:'❌',title:'Ce qui est Exclu',desc:'Dossiers rejetés (statut ≠ 0) et doublons exclus du calcul du bonus pour éviter les doubles comptages.'},
+        {icon:'💡',title:'Comment Lire',desc:'La colonne "Votre Bonus" affiche 1% de la MO payée pour ce mois. La ligne total affiche le bonus cumulé sur tous les mois chargés.'},
+      ],
+      buttons:[]
+    }
+  },
+};
+
+// ══ HELP OPEN/CLOSE ══════════════════════════════════════════
+let _helpPage = 'upload';
+function openHelp(){
+  const active = document.querySelector('.si.active');
+  _helpPage = active ? active.dataset.page : 'upload';
+  renderHelp();
+  document.getElementById('HELP_BG').classList.add('open');
+}
+function closeHelp(){ document.getElementById('HELP_BG').classList.remove('open'); }
+
+function renderHelp(){
+  const d = HELP[_helpPage] || HELP['upload'];
+  const lang = _lang;
+  const t = d[lang] || d['en'];
+
+  document.getElementById('HP_ICON').textContent = d.icon;
+  document.getElementById('HP_ICON').style.background = d.bg;
+  document.getElementById('HP_TITLE_EN').textContent = HELP[_helpPage]?.en?.title || t.title;
+  document.getElementById('HP_TITLE_FR').textContent = HELP[_helpPage]?.fr?.title || t.title;
+  document.getElementById('HP_SUB_EN').textContent = HELP[_helpPage]?.en?.sub || t.sub;
+  document.getElementById('HP_SUB_FR').textContent = HELP[_helpPage]?.fr?.sub || t.sub;
+
+  let html = '';
+  // Business Rules
+  html += `<div class="hp-section"><div class="hp-section-title">📋 <span>${lang==='fr'?'Règles Métier':'Business Rules'}</span></div>`;
+  t.rules.forEach(r => {
+    html += `<div class="hp-rule"><div class="hp-rule-icon">${r.icon}</div><div class="hp-rule-content"><div class="hp-rule-title">${r.title}</div><div class="hp-rule-desc">${r.desc}</div></div></div>`;
+  });
+  html += '</div>';
+
+  // Buttons
+  if(t.buttons && t.buttons.length){
+    html += `<div class="hp-section"><div class="hp-section-title">🖱️ <span>${lang==='fr'?'Boutons de cette page':'Buttons on this page'}</span></div><div class="hp-btn-row">`;
+    t.buttons.forEach(b => {
+      html += `<div class="hp-btag"><span>${b.icon}</span><span>${b.label}</span></div>`;
+    });
+    html += '</div></div>';
+  }
+
+  document.getElementById('HP_BODY').innerHTML = html;
+}
+
+// ══ FEEDBACK / IDEA ════════════════════════════════════════════
+let _fbType = 'idea';
+function openFeedback(type){
+  _fbType = type;
+  const isIdea = type === 'idea';
+  document.getElementById('FB_EMOJI').textContent = isIdea ? '💡' : '🔧';
+  document.getElementById('FB_TITLE').textContent = _lang==='fr'
+    ? (isIdea ? 'Nouvelle Idée' : 'Correction Système')
+    : (isIdea ? 'New Idea' : 'System Correction');
+  document.getElementById('FB_SUBJECT').value = '';
+  document.getElementById('FB_SUBJECT_EN').value = '';
+  document.getElementById('FB_BODY').value = '';
+  document.getElementById('FB_BG').classList.add('open');
+}
+function closeFeedback(){ document.getElementById('FB_BG').classList.remove('open'); }
+
+function sendFeedback(){
+  const subjectEl = _lang==='fr' ? document.getElementById('FB_SUBJECT') : document.getElementById('FB_SUBJECT_EN');
+  const subject = (subjectEl?.value || '').trim();
+  const body = (document.getElementById('FB_BODY').value || '').trim();
+  const isIdea = _fbType === 'idea';
+  const prefix = _lang==='fr' ? (isIdea?'[IDÉE] ':'[CORRECTION] ') : (isIdea?'[IDEA] ':'[CORRECTION] ');
+  const pageLabel = (_helpPage||'').toUpperCase();
+  const fullSubject = prefix + (subject || (isIdea ? 'Renault Warranty System — New Idea' : 'Renault Warranty System — Correction Needed')) + ' [' + pageLabel + ']';
+  const greeting = _lang==='fr'
+    ? 'Bonjour,\n\nVoici ma suggestion / correction pour le système de garantie Renault:\n\n'
+    : 'Hello,\n\nHere is my suggestion / correction for the Renault Warranty System:\n\n';
+  const fullBody = greeting + (body || (isIdea ? 'Please describe your idea here.' : 'Please describe the correction needed here.'));
+  const mailto = 'mailto:managment@iantradingsal.com?subject=' + encodeURIComponent(fullSubject) + '&body=' + encodeURIComponent(fullBody.replace(/\\n/g,'\n'));
+  window.location.href = mailto;
+  closeFeedback();
+  closeHelp();
+  showToast('📧 ' + (_lang==='fr' ? 'Outlook ouvert !' : 'Opening Outlook!'));
+}
 
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
@@ -269,14 +917,68 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
 <!-- TOAST -->
 <div class="toast" id="TOAST">✅ Saved!</div>
 
-<!-- MODAL -->
+<!-- REJECTION PROTOCOL MODAL -->
 <div class="modal-bg" id="MBGR" onclick="if(event.target===this)closeModal()">
-  <div class="modal">
-    <div class="modal-emoji">🔧</div>
-    <div class="mt" id="MTITLE">Rejected Claim</div>
+  <div class="modal" style="width:580px;max-width:96vw">
+    <div class="modal-emoji">🚫</div>
+    <div class="mt" id="MTITLE">Claim Rejection Protocol</div>
     <div class="ms" id="MSUB"></div>
-    <div class="fr">
-      <label class="flb">🚫 Rejection Reason</label>
+
+    <!-- AMOUNTS SUMMARY BANNER -->
+    <div id="M_AMT_BANNER" style="background:var(--surf2);border:1.5px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div style="text-align:center">
+        <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Total Asked</div>
+        <div style="font-size:15px;font-weight:800;color:var(--sky)" id="M_SHOW_ASKED">—</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Total Paid</div>
+        <div style="font-size:15px;font-weight:800;color:var(--mint)" id="M_SHOW_PAID">—</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Rejected Amount</div>
+        <div style="font-size:15px;font-weight:800;color:var(--rose)" id="M_SHOW_REJ">—</div>
+      </div>
+    </div>
+
+    <!-- STEP 1: REJECTION TYPE -->
+    <div style="margin-bottom:16px">
+      <label class="flb" style="margin-bottom:10px;display:block">① Rejection Type</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div id="M_TYPE_FULL" onclick="setRejType('full')" style="border:2px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;transition:all .15s;background:var(--surf2)">
+          <div style="font-size:18px;margin-bottom:6px">❌</div>
+          <div style="font-size:12px;font-weight:800;color:var(--ink);margin-bottom:3px">Fully Rejected</div>
+          <div style="font-size:10px;color:var(--muted);line-height:1.5;font-weight:500">Renault rejected the entire claim. Full amount excluded from totals. Resubmit as a new claim.</div>
+        </div>
+        <div id="M_TYPE_PART" onclick="setRejType('partial')" style="border:2px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;transition:all .15s;background:var(--surf2)">
+          <div style="font-size:18px;margin-bottom:6px">⚠️</div>
+          <div style="font-size:12px;font-weight:800;color:var(--ink);margin-bottom:3px">Partially Rejected</div>
+          <div style="font-size:10px;color:var(--muted);line-height:1.5;font-weight:500">Renault paid part of the claim. Gap (Asked − Paid) is the rejected portion. Resubmit the difference.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALCULATED AMOUNTS (shown for partial) -->
+    <div id="M_PARTIAL_INFO" style="display:none;background:linear-gradient(135deg,var(--lemon3),#FFF8E7);border:1.5px solid var(--lemon2);border-radius:12px;padding:12px 16px;margin-bottom:16px">
+      <div style="font-size:10px;font-weight:700;color:var(--lemon);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">⚡ Automatic Calculation — Partial Rejection</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:9px;color:var(--muted);font-weight:700;margin-bottom:2px">ACCEPTED (PAID)</div>
+          <div style="font-size:13px;font-weight:800;color:var(--mint)" id="M_CALC_ACCEPTED">—</div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--muted);font-weight:700;margin-bottom:2px">REJECTED PORTION</div>
+          <div style="font-size:13px;font-weight:800;color:var(--rose)" id="M_CALC_REJECTED">—</div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--muted);font-weight:700;margin-bottom:2px">TO RESUBMIT</div>
+          <div style="font-size:13px;font-weight:800;color:var(--sky)" id="M_CALC_RESUB">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: REASON -->
+    <div style="margin-bottom:14px">
+      <label class="flb">② Reason for Rejection</label>
       <select class="fi" id="M_REASON">
         <option value="">— Select reason —</option>
         <option>Test not supported</option>
@@ -288,32 +990,67 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
         <option>Labour rate incorrect</option>
         <option>VIN mismatch</option>
         <option>Already paid under different invoice</option>
+        <option>Price / Rate discrepancy</option>
+        <option>Technical justification insufficient</option>
         <option>Other (see notes)</option>
       </select>
     </div>
-    <div class="fr">
-      <label class="flb">✅ Correct / Replacement Claim Number</label>
-      <input class="fi" id="M_NEWCLAIM" placeholder="New or corrected claim number"/>
+
+    <!-- STEP 3: NEW CLAIM RESUBMISSION -->
+    <div style="background:var(--surf2);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">③ Resubmission Details</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label class="flb" style="font-size:9px">New Claim Submission # <span style="color:var(--rose)">*</span></label>
+          <input class="fi" id="M_NEWCLAIM" placeholder="e.g. CLM-2025-00123" style="font-family:'JetBrains Mono',monospace"/>
+          <div style="font-size:9px;color:var(--muted);margin-top:4px;font-weight:500">The new GCM claim # after resubmission. This links to the original rejected claim.</div>
+        </div>
+        <div>
+          <label class="flb" style="font-size:9px">Resubmission Invoice #</label>
+          <input class="fi" id="M_REINV" placeholder="e.g. INV-2025-456" style="font-family:'JetBrains Mono',monospace"/>
+          <div style="font-size:9px;color:var(--muted);margin-top:4px;font-weight:500">Invoice # used when resubmitting. May differ from original.</div>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <label class="flb" style="font-size:9px">Resubmission Date</label>
+        <input class="fi" id="M_RESUBDATE" type="date" style="font-family:'JetBrains Mono',monospace"/>
+      </div>
     </div>
-    <div class="fr">
-      <label class="flb">📋 Resubmission Invoice Number</label>
-      <input class="fi" id="M_REINV" placeholder="Invoice number after resubmission"/>
+
+    <!-- STEP 4: CATEGORY + NOTES -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div>
+        <label class="flb">④ Category of Issue</label>
+        <select class="fi" id="M_CAT">
+          <option value="">— Select —</option>
+          <option>Technical</option>
+          <option>Administrative</option>
+          <option>Financial</option>
+          <option>Data / Typing Error</option>
+          <option>System Issue</option>
+          <option>Renault Portal Error</option>
+        </select>
+      </div>
+      <div>
+        <label class="flb">⑤ Status</label>
+        <select class="fi" id="M_STATUS">
+          <option value="pending">🔴 Pending — No Action Yet</option>
+          <option value="resubmitted">🔄 Resubmitted to Renault</option>
+          <option value="escalated">⬆️ Escalated to Renault Rep</option>
+          <option value="resolved">✅ Resolved</option>
+          <option value="written_off">💀 Written Off</option>
+        </select>
+      </div>
     </div>
-    <div class="fr">
-      <label class="flb">🏷️ Category of Issue</label>
-      <select class="fi" id="M_CAT">
-        <option value="">— Select category —</option>
-        <option>Technical</option><option>Administrative</option>
-        <option>Financial</option><option>Data / Typing Error</option><option>System Issue</option>
-      </select>
+
+    <div style="margin-bottom:6px">
+      <label class="flb">📝 Notes</label>
+      <textarea class="fi" id="M_NOTES" rows="3" placeholder="Corrective action taken, context, communication with Renault, internal remarks…"></textarea>
     </div>
-    <div class="fr">
-      <label class="flb">📝 Notes / Free Text</label>
-      <textarea class="fi" id="M_NOTES" placeholder="Corrective action, context, or any remarks…"></textarea>
-    </div>
+
     <div class="fac">
       <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-sun btn-sm" onclick="saveRej()">💾 Save Details</button>
+      <button class="btn btn-sun btn-sm" onclick="saveRej()">💾 Save Rejection Protocol</button>
     </div>
   </div>
 </div>
@@ -391,8 +1128,12 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
   <div class="ss">🔢 Data</div>
   <div class="si" data-page="incadea" onclick="go(this)"><span class="si-emoji">🔧</span>Incadea Data<span class="sbadge sb-sky" id="B_INC">–</span></div>
   <div class="si" data-page="bonus" onclick="go(this)"><span class="si-emoji">⭐</span>Bonus 1%</div>
+  <div class="ss">📊 Analytics</div>
+  <div class="si" data-page="ageing" onclick="go(this)"><span class="si-emoji">⏰</span>Rejection Ageing<span class="sbadge sb-rose" id="B_AGE">–</span></div>
+  <div class="si" data-page="recovery" onclick="go(this)"><span class="si-emoji">🔄</span>Recovery Rate</div>
+  <div class="si" data-page="trends" onclick="go(this)"><span class="si-emoji">📉</span>Rejection Trends</div>
   <div class="s-foot">
-    <div class="s-foot-text">📁 GCM + INCADEA monthly<br/>🔑 Dedup: VIN + Invoice #</div>
+    <div class="s-foot-text">📁 GCM + INCADEA monthly<br/>🔑 Dedup: exact VIN + Invoice #<br/>🔤 a/b/c = separate operations, not dups</div>
     <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:9px;color:var(--faint);line-height:1.8">
       <div id="LS_STATUS" style="margin-bottom:4px"></div>
       © 2025 IanTradingSAL<br/>All rights reserved
@@ -465,7 +1206,7 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
         <div class="dzb" id="DZ_GCM" onclick="document.getElementById('FI_GCM').click()" ondragover="dzO(event,'DZ_GCM')" ondragleave="dzL('DZ_GCM')" ondrop="dzD(event,'gcm')">
           <span class="dz-emoji">📂</span>
           <div class="dz-title">Drop your GCM file here</div>
-          <div class="dz-sub">Supports .xlsx · Duplicates auto-detected<br/>by VIN + Invoice # combination</div>
+          <div class="dz-sub">Supports .xlsx · True duplicates auto-detected<br/>(same VIN + Invoice #). a/b/c = separate operations</div>
           <button class="btn btn-sun btn-sm">Choose File</button>
         </div>
         <input type="file" id="FI_GCM" accept=".xlsx,.xls" style="display:none" onchange="loadF(event,'gcm')"/>
@@ -493,7 +1234,7 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
   <!-- Feature list -->
   <div class="sdiv">✨ What this system does</div>
   <div class="feat-grid">
-    <div class="feat-item"><span>🔍</span>Duplicate detection (VIN + Invoice #)</div>
+    <div class="feat-item"><span>🔍</span>True duplicate detection — a/b/c ops kept</div>
     <div class="feat-item"><span>📊</span>Monthly summary + subtotals</div>
     <div class="feat-item"><span>🏷️</span>Expense code breakdown with % share</div>
     <div class="feat-item"><span>⚖️</span>Incadea ↔ GCM reconciliation per VIN</div>
@@ -528,7 +1269,7 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--sky3)">📊</div><div><div class="ph-title">General View</div><div class="ph-sub">Monthly summary, totals and trends</div></div></div>
     <div id="OV_E" class="al al-i" style="display:none">⬆️ Upload GCM data to generate the overview.</div>
-    <div id="OV_K" class="krow k4" style="display:none"></div>
+    <div id="OV_K" class="krow k5" style="display:none"></div>
     <div id="OV_C" class="card" style="display:none"><div class="ct">📈 Monthly Paid — Parts + Labour + Total (€)</div><canvas id="OV_CANVAS" height="72"></canvas></div>
     <div id="OV_T"></div>
   </div></div>
@@ -579,7 +1320,14 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
 <div class="page-area" id="P_rejections" style="display:none">
   <div class="filterbar">
     <div class="fg"><span class="fl">Month</span><select class="fsel" id="F_RM" onchange="rRej()"><option value="">All</option></select></div>
-    <div class="fg nobr"><span class="fl">Filter</span><select class="fsel" id="F_RF" onchange="rRej()"><option value="">All Rejected</option><option value="no_action">🔴 No Action Yet</option><option value="resubmitted">✅ Has New Claim #</option></select></div>
+    <div class="fg nobr"><span class="fl">Filter</span><select class="fsel" id="F_RF" onchange="rRej()">
+      <option value="">All Rejected</option>
+      <option value="no_action">🔴 No Action Yet</option>
+      <option value="resubmitted">✅ Has New Claim #</option>
+      <option value="full">❌ Fully Rejected</option>
+      <option value="partial">⚠️ Partially Rejected</option>
+      <option value="resolved">✅ Resolved</option>
+    </select></div>
   </div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--rose3)">❌</div><div><div class="ph-title">Rejections</div><div class="ph-sub">Track, annotate and resubmit rejected claims</div></div></div>
@@ -613,6 +1361,46 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
   </div></div>
 </div>
 
+<!-- ══ AGEING PAGE ═══════════════════════════════════════ -->
+<div class="page-area" id="P_ageing" style="display:none">
+  <div class="filterbar">
+    <div class="fg nobr"><span class="fl">Show</span><select class="fsel" id="F_AGF" onchange="rAge()">
+      <option value="">All Unresolved</option>
+      <option value="30">🟡 Over 30 days</option>
+      <option value="60">🟠 Over 60 days</option>
+      <option value="90">🔴 Over 90 days</option>
+      <option value="resolved">✅ Resolved only</option>
+    </select></div>
+  </div>
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--rose3)">⏰</div><div><div class="ph-title">Rejection Ageing</div><div class="ph-sub">Days outstanding per rejection — your follow-up priority list</div></div></div>
+    <div id="AGE_E" class="al al-i" style="display:none">⬆️ Upload GCM data and track at least one rejection to see ageing.</div>
+    <div id="AGE_K" class="krow k4" style="display:none"></div>
+    <div id="AGE_T"></div>
+  </div></div>
+</div>
+
+<!-- ══ RECOVERY RATE PAGE ════════════════════════════════ -->
+<div class="page-area" id="P_recovery" style="display:none">
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--mint3)">🔄</div><div><div class="ph-title">Recovery Rate</div><div class="ph-sub">How much of the rejected amount was recovered through resubmission?</div></div></div>
+    <div id="REC_E" class="al al-i" style="display:none">⬆️ Upload GCM data and track rejections to see recovery analysis.</div>
+    <div id="REC_K" class="krow k4" style="display:none"></div>
+    <div id="REC_T"></div>
+  </div></div>
+</div>
+
+<!-- ══ REJECTION TRENDS PAGE ════════════════════════════ -->
+<div class="page-area" id="P_trends" style="display:none">
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--pur3)">📉</div><div><div class="ph-title">Rejection Trends</div><div class="ph-sub">Monthly rejection rate, top reasons and amounts over time</div></div></div>
+    <div id="TRD_E" class="al al-i" style="display:none">⬆️ Upload GCM data to view rejection trends.</div>
+    <div id="TRD_K" class="krow k4" style="display:none"></div>
+    <div id="TRD_C" class="card" style="display:none"><div class="ct">📉 Rejection Rate % by Month</div><canvas id="TRD_CANVAS" height="80"></canvas></div>
+    <div id="TRD_T"></div>
+  </div></div>
+</div>
+
 </div></div>
 
 <script>
@@ -628,7 +1416,7 @@ function lsLoad(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):nu
 function lsClear(){
   [LS_GCM,LS_INC,LS_REJ,LS_META].forEach(k=>localStorage.removeItem(k));
   S.gcm=[];S.inc=[];S.rej={};S.lastUpdate=null;
-  ['B_GCM','B_REJ','B_INC'].forEach(id=>document.getElementById(id).textContent='–');
+  ['B_GCM','B_REJ','B_INC','B_AGE'].forEach(id=>document.getElementById(id).textContent='–');
   document.getElementById('US_GCM_COUNT').textContent='—';
   document.getElementById('US_GCM_META').textContent='No file loaded';
   document.getElementById('US_INC_COUNT').textContent='—';
@@ -667,7 +1455,18 @@ function lsRestore(){
     document.getElementById('US_INC_META').textContent=new Set(S.inc.map(r=>r.make)).size+' makes · from cache';
     fillIF();restored=true;
   }
-  if(rej)S.rej=rej;
+  if(rej){
+    S.rej=rej;
+    // Update ageing badge with over-30-days count
+    try {
+      const now=new Date();
+      const allRej=S.gcm.filter(r=>r.st===4&&!r._d);
+      const unresolved=allRej.filter(r=>{const s=S.rej[r.inv]?.status||'untracked';return s!=='resolved'&&s!=='written_off';});
+      const over30=unresolved.filter(r=>{const ts=S.rej[r.inv]?.ts;return ts?Math.floor((now-new Date(ts))/(864e5))>=30:false;});
+      const el=document.getElementById('B_AGE');
+      if(el) el.textContent=over30.length||'–';
+    } catch(e){}
+  }
   if(meta){
     S.lastUpdate=new Date(meta.ts);updTime();updPills();
     if(meta.gcmFile)document.getElementById('US_GCM_META').textContent=S.gcm.filter(r=>r._d).length+' dups excluded · '+meta.gcmFile;
@@ -680,7 +1479,6 @@ function lsRestore(){
 }
 document.addEventListener('DOMContentLoaded',lsRestore);
 
-// ══ LOCALSTORAGE PERSISTENCE ══════════════════════════════════
 
 // ══ NAV ═════════════════════════════════════════════════════
 function go(el){
@@ -689,7 +1487,7 @@ function go(el){
   document.querySelectorAll('.page-area').forEach(p=>p.style.display='none');
   const pg = el.dataset.page;
   document.getElementById('P_'+pg).style.display = 'flex';
-  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus})[pg]?.();
+  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd})[pg]?.();
 }
 
 // ══ DRAG & DROP ══════════════════════════════════════════════
@@ -732,7 +1530,6 @@ function procF(file, type){
         updTime(); updPills();
         stat('ST_INC', '✅ ' + S.inc.length + ' INCADEA records loaded', true);
       }
-      // Save to localStorage
       lsSave(LS_GCM, S.gcm);
       lsSave(LS_INC, S.inc);
       const meta = lsLoad(LS_META)||{};
@@ -741,13 +1538,6 @@ function procF(file, type){
       meta.ts = S.lastUpdate ? S.lastUpdate.toISOString() : new Date().toISOString();
       lsSave(LS_META, meta);
       updLsStatus();
-      // Persist to localStorage
-      lsSave(LS_GCM,S.gcm); lsSave(LS_INC,S.inc);
-      const _meta=lsLoad(LS_META)||{};
-      if(type==='gcm')_meta.gcmFile=file.name;
-      if(type==='inc')_meta.incFile=file.name;
-      _meta.ts=S.lastUpdate?S.lastUpdate.toISOString():new Date().toISOString();
-      lsSave(LS_META,_meta); updLsStatus();
       hideLoad(); showToast('🎉 File loaded successfully!');
     } catch(err){ hideLoad(); stat('ST_'+type.toUpperCase(), '❌ Error: ' + err.message, false); }
   };
@@ -790,27 +1580,48 @@ function updPills(){
 
 // ══ PARSERS ══════════════════════════════════════════════════
 function parseGCM(raw){
+  // DEDUP LOGIC:
+  // In Renault GCM, an invoice can have multiple operations:
+  //   INV-123a = first operation (intervention a)
+  //   INV-123b = second operation (same order, different intervention)
+  //   INV-123c = third operation, etc.
+  // These are NOT duplicates — they are separate billable operations on the same repair order.
+  // A TRUE duplicate = exact same VIN + exact same invoice number (inc. letter) appearing more than once.
+  // We detect the intervention letter as a trailing lowercase letter on the invoice number.
   const seen = new Map();
   return raw.map(r=>{
     const vin = String(r.vin||'').trim().toUpperCase();
     const inv = String(r.dealer_invoice_number||'').trim();
-    const key = vin+'||'+inv;
+
+    // Detect intervention letter: trailing lowercase a-z at end of invoice number
+    const intMatch = inv.match(/([a-zA-Z])$/);
+    const intLetter = intMatch ? intMatch[1].toUpperCase() : '';
+    // Base invoice = invoice number without the trailing letter (for display/grouping only)
+    const invBase = intLetter ? inv.slice(0,-1) : inv;
+
+    // TRUE duplicate key = exact VIN + exact full invoice (including letter)
+    const key = vin + '||' + inv;
     const isDup = seen.has(key);
-    if(!isDup&&(vin||inv)) seen.set(key,true);
-    return{_d:isDup,vin,inv,
-      ro:String(r.DEALER_REPAIT_ORDER_NUMBER||'').trim(),
-      month:String(r.yearmonth_topage||'').trim(),
-      date:String(r.date_ouv_or||'').substr(0,10),
-      exp:String(r.expense_nature_code||'').trim(),
-      expD:String(r.expense_nature_level_2_description_en||'').trim(),
-      st:parseInt(r.invoice_flag_state??-1),
-      nitg:String(r.nitg||'').trim(),
-      pa:n(r.part_received_amount_local_eur),
-      pp:n(r.part_definitive_amount_without_pco_eur),
-      la:n(r.labour_received_amount_eur),
-      lp:n(r.labour_definitive_amount_without_pco_eur),
-      ta:n(r.received_amount_eur),
-      tp:n(r.definitive_amount_without_pco_eur),
+    if(!isDup && (vin||inv)) seen.set(key, true);
+
+    return {
+      _d: isDup,
+      vin, inv,
+      invBase,           // base invoice without letter (for grouping same-order operations)
+      intLetter,         // 'A', 'B', 'C' ... or '' for first/only operation
+      ro: String(r.DEALER_REPAIT_ORDER_NUMBER||'').trim(),
+      month: String(r.yearmonth_topage||'').trim(),
+      date: String(r.date_ouv_or||'').substr(0,10),
+      exp: String(r.expense_nature_code||'').trim(),
+      expD: String(r.expense_nature_level_2_description_en||'').trim(),
+      st: parseInt(r.invoice_flag_state??-1),
+      nitg: String(r.nitg||'').trim(),
+      pa: n(r.part_received_amount_local_eur),
+      pp: n(r.part_definitive_amount_without_pco_eur),
+      la: n(r.labour_received_amount_eur),
+      lp: n(r.labour_definitive_amount_without_pco_eur),
+      ta: n(r.received_amount_eur),
+      tp: n(r.definitive_amount_without_pco_eur),
     };
   }).filter(r=>r.vin||r.inv);
 }
@@ -852,29 +1663,105 @@ function fillIF(){
   const mk=document.getElementById('F_IMK');if(mk){mk.innerHTML='<option value="">All Makes</option>';makes.forEach(m=>mk.innerHTML+=`<option value="${m}">${m}</option>`);}
 }
 
-// ══ MODAL ════════════════════════════════════════════════════
+// ══ MODAL — REJECTION PROTOCOL ══════════════════════════════
+let _rejType = 'full'; // 'full' or 'partial'
+let _mkClaim = null;   // the claim object currently being tracked
+
+function setRejType(type){
+  _rejType = type;
+  const fullEl = document.getElementById('M_TYPE_FULL');
+  const partEl = document.getElementById('M_TYPE_PART');
+  const partInfo = document.getElementById('M_PARTIAL_INFO');
+  if(type==='full'){
+    fullEl.style.border='2px solid var(--rose)';fullEl.style.background='var(--rose3)';
+    partEl.style.border='2px solid var(--border)';partEl.style.background='var(--surf2)';
+    partInfo.style.display='none';
+  } else {
+    partEl.style.border='2px solid var(--lemon)';partEl.style.background='var(--lemon3)';
+    fullEl.style.border='2px solid var(--border)';fullEl.style.background='var(--surf2)';
+    partInfo.style.display='block';
+    // populate calculated amounts
+    if(_mkClaim){
+      const ta=_mkClaim.ta||0, tp=_mkClaim.tp||0, rej=ta-tp;
+      document.getElementById('M_CALC_ACCEPTED').textContent='€'+f(tp);
+      document.getElementById('M_CALC_REJECTED').textContent='€'+f(rej>0?rej:0);
+      document.getElementById('M_CALC_RESUB').textContent='€'+f(rej>0?rej:0);
+    }
+  }
+}
+
 function openModal(inv,vin){
   _mk=inv;
-  document.getElementById('MTITLE').textContent = 'Claim — '+inv;
+  // Find the claim object for amount calculations
+  _mkClaim = S.gcm.find(r=>r.inv===inv&&!r._d)||null;
+  document.getElementById('MTITLE').textContent = 'Rejection Protocol — '+inv;
   document.getElementById('MSUB').textContent = 'VIN: '+vin;
+
+  // Populate amount banner
+  if(_mkClaim){
+    const ta=_mkClaim.ta||0, tp=_mkClaim.tp||0, rejAmt=ta-tp;
+    document.getElementById('M_SHOW_ASKED').textContent='€'+f(ta);
+    document.getElementById('M_SHOW_PAID').textContent='€'+f(tp);
+    document.getElementById('M_SHOW_REJ').textContent='€'+f(rejAmt>0?rejAmt:ta); // full rejected = full ta
+  }
+
+  // Load existing data if editing
   const d=S.rej[inv]||{};
   document.getElementById('M_REASON').value=d.reason||'';
   document.getElementById('M_NEWCLAIM').value=d.newClaim||'';
   document.getElementById('M_REINV').value=d.reInv||'';
+  document.getElementById('M_RESUBDATE').value=d.resubDate||'';
   document.getElementById('M_CAT').value=d.cat||'';
+  document.getElementById('M_STATUS').value=d.status||'pending';
   document.getElementById('M_NOTES').value=d.notes||'';
+
+  // Set rejection type toggle
+  const savedType = d.rejType||'full';
+  _rejType = savedType;
+  // Reset styles first
+  document.getElementById('M_TYPE_FULL').style.border='2px solid var(--border)';
+  document.getElementById('M_TYPE_FULL').style.background='var(--surf2)';
+  document.getElementById('M_TYPE_PART').style.border='2px solid var(--border)';
+  document.getElementById('M_TYPE_PART').style.background='var(--surf2)';
+  document.getElementById('M_PARTIAL_INFO').style.display='none';
+  setRejType(savedType);
+
   document.getElementById('MBGR').classList.add('open');
 }
-function closeModal(){document.getElementById('MBGR').classList.remove('open');_mk=null;}
+
+function closeModal(){document.getElementById('MBGR').classList.remove('open');_mk=null;_mkClaim=null;}
+
 function saveRej(){
-  if(!_mk)return;
-  S.rej[_mk]={reason:gv('M_REASON'),newClaim:gv('M_NEWCLAIM'),reInv:gv('M_REINV'),cat:gv('M_CAT'),notes:gv('M_NOTES'),ts:new Date().toISOString()};
-  closeModal(); rRej(); rGCM();
+  if(!_mk) return;
+  const claim = _mkClaim||S.gcm.find(r=>r.inv===_mk&&!r._d)||null;
+  const ta = claim?claim.ta:0;
+  const tp = claim?claim.tp:0;
+  const rejAmt = _rejType==='full' ? ta : Math.max(ta-tp,0);
+  const acceptedAmt = _rejType==='full' ? 0 : tp;
+
+  S.rej[_mk] = {
+    rejType: _rejType,          // 'full' or 'partial'
+    reason: gv('M_REASON'),
+    newClaim: gv('M_NEWCLAIM'),
+    reInv: gv('M_REINV'),
+    resubDate: gv('M_RESUBDATE'),
+    cat: gv('M_CAT'),
+    status: gv('M_STATUS'),
+    notes: gv('M_NOTES'),
+    // Calculated amounts (auto, not user-entered)
+    origAsked: ta,
+    origPaid: tp,
+    rejectedAmt: rejAmt,
+    acceptedAmt: acceptedAmt,
+    ts: new Date().toISOString()
+  };
+
+  closeModal();
+  rRej(); rGCM();
   document.getElementById('B_REJ').textContent=S.gcm.filter(r=>r.st===4&&!r._d).length;
   lsSave(LS_REJ, S.rej);
   updLsStatus();
-  lsSave(LS_REJ,S.rej); updLsStatus();
-  showToast('✅ Rejection details saved!');
+  showToast('✅ Rejection protocol saved!');
 }
 
 // ══ GLOBAL SEARCH ═════════════════════════════════════════════
@@ -923,9 +1810,9 @@ function rGCM(){
     <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Rejected</div><div class="kv rose">${rej}</div><div class="ks">${vld.length?((rej/vld.length)*100).toFixed(1)+'% of claims':''}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">✅ Action Taken</div><div class="kv lem">${vld.filter(r=>r.st===4&&S.rej[r.inv]).length}</div><div class="ks">of ${rej} rejected</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">🚗 Unique VINs</div><div class="kv pur">${new Set(vld.map(r=>r.vin)).size.toLocaleString()}</div></div>`;
-  let h=dups?`<div class="al al-w">⚠️ ${dups} duplicate rows detected (same VIN + Invoice #) — highlighted, excluded from all calculations.</div>`:'';
+  let h=dups?`<div class="al al-w">⚠️ ${dups} true duplicate rows detected (identical VIN + Invoice #) — highlighted in yellow, excluded from all calculations. Note: a/b/c operation letters are distinct rows, not duplicates.</div>`:'';
   h+=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
-    <th>VIN</th><th>Invoice #</th><th>RO / Order</th><th>Month</th><th>Date</th>
+    <th>VIN</th><th>Invoice #</th><th>Op</th><th>RO / Order</th><th>Month</th><th>Date</th>
     <th>Exp Code</th><th>NITG</th>
     <th class="num">Parts Asked</th><th class="num">Parts Paid</th>
     <th class="num">Labour Asked</th><th class="num">Labour Paid</th>
@@ -937,7 +1824,8 @@ function rGCM(){
     const isP=r.st===0,isR=r.st===4;
     h+=`<tr class="${r._d?'tr-dup':''}">
       <td class="mono">${r.vin}${r._d?' <span class="badge b-dup">DUP</span>':''}</td>
-      <td class="mono">${r.inv}</td>
+      <td class="mono">${r.invBase||r.inv}</td>
+      <td style="text-align:center">${r.intLetter?`<span class="badge b-sky" style="font-size:9px">${r.intLetter}</span>`:'<span style="color:var(--faint);font-size:9px">—</span>'}</td>
       <td class="mono" style="color:var(--muted);font-size:9px">${r.ro||'–'}</td>
       <td style="white-space:nowrap;font-size:11px;font-weight:600">${fmM(r.month)}</td>
       <td style="font-size:9px;color:var(--muted)">${r.date||'–'}</td>
@@ -947,11 +1835,11 @@ function rGCM(){
       <td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td>
       <td class="num">${f(r.ta)}</td>
       <td class="num" style="font-weight:700">${f(r.tp)}</td>
-      <td><span class="badge ${isP?'b-mint':isR?'b-rose':'b-n'}">${isP?'✅ Paid':isR?'❌ Rejected':'Stat '+r.st}</span></td>
+      <td><span class="badge ${isP?'b-mint':isR?'b-rose':'b-n'}">${isP?'✅ Paid':isR?'❌ Rejected':'Stat '+r.st}</span>${isR&&rd?.rejType?` <span class="badge ${rd.rejType==='full'?'b-rose':'b-lem'}" style="margin-left:2px">${rd.rejType==='full'?'Full':'Partial'}</span>`:''}</td>
       <td>${isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="openModal('${esc(r.inv)}','${r.vin}')">${rd?'✏️ Edit':'+ Track'}</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'}</td>
     </tr>`;
   });
-  if(rows.length>600)h+=`<tr><td colspan="15" style="text-align:center;padding:14px;color:var(--muted);font-size:11px;font-weight:500">… ${rows.length-600} more rows — use filters to narrow down 🔍</td></tr>`;
+  if(rows.length>600)h+=`<tr><td colspan="16" style="text-align:center;padding:14px;color:var(--muted);font-size:11px;font-weight:500">… ${rows.length-600} more rows — use filters to narrow down 🔍</td></tr>`;
   h+=`</tbody></table></div></div>`;
   T.innerHTML=h;
 }
@@ -961,30 +1849,57 @@ function rOV(){
   const E=document.getElementById('OV_E'),K=document.getElementById('OV_K'),C=document.getElementById('OV_C'),T=document.getElementById('OV_T');
   if(!S.gcm.length){E.style.display='flex';K.style.display='none';C.style.display='none';T.innerHTML='';return;}E.style.display='none';
   const vld=S.gcm.filter(r=>!r._d);
-  const byM={};vld.forEach(r=>{const k=r.month||'?';if(!byM[k])byM[k]={m:k,cnt:0,pa:0,pp:0,la:0,lp:0,ta:0,tp:0};byM[k].cnt++;byM[k].pa+=r.pa;byM[k].pp+=r.pp;byM[k].la+=r.la;byM[k].lp+=r.lp;byM[k].ta+=r.ta;byM[k].tp+=r.tp;});
+  const byM={};
+  vld.forEach(r=>{
+    const k=r.month||'?';
+    if(!byM[k]) byM[k]={m:k,cnt:0,rej:0,pa:0,pp:0,la:0,lp:0,ta:0,tp:0};
+    byM[k].cnt++;
+    if(r.st===4) byM[k].rej++;
+    byM[k].pa+=r.pa;byM[k].pp+=r.pp;byM[k].la+=r.la;byM[k].lp+=r.lp;byM[k].ta+=r.ta;byM[k].tp+=r.tp;
+  });
   const mks=Object.keys(byM).sort(),mr=mks.map(k=>byM[k]);
-  const tot={cnt:sm(mr,'cnt'),pp:sm(mr,'pp'),lp:sm(mr,'lp'),tp:sm(mr,'tp'),pa:sm(mr,'pa'),la:sm(mr,'la'),ta:sm(mr,'ta')};
-  const rr=vld.length?vld.filter(r=>r.st===4).length/vld.length*100:0;
+  const tot={cnt:sm(mr,'cnt'),rej:sm(mr,'rej'),pp:sm(mr,'pp'),lp:sm(mr,'lp'),tp:sm(mr,'tp'),pa:sm(mr,'pa'),la:sm(mr,'la'),ta:sm(mr,'ta')};
+  const rr=tot.cnt>0?tot.rej/tot.cnt*100:0;
+  const uniqueVINs=new Set(vld.map(r=>r.vin)).size;
   K.style.display='grid';
   K.innerHTML=`
-    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📋 Total Claims</div><div class="kv sky">${tot.cnt.toLocaleString()}</div><div class="ks">${new Set(vld.map(r=>r.vin)).size} unique VINs</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">🔩 Parts Paid (€)</div><div class="kv sun">${f(tot.pp)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">🔧 Labour Paid (€)</div><div class="kv mint">${f(tot.lp)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💰 Grand Total Paid (€)</div><div class="kv pur" style="font-size:22px">${f(tot.tp)}</div><div class="ks">Rejection rate ${rr.toFixed(1)}%</div></div>`;
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📋 Total Claims</div><div class="kv sky">${tot.cnt.toLocaleString()}</div><div class="ks">${uniqueVINs} unique VINs · ${mr.length} months</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">🔩 Parts Paid (€)</div><div class="kv sun">${f(tot.pp)}</div><div class="ks">of €${f(tot.pa)} asked</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">🔧 Labour Paid (€)</div><div class="kv mint">${f(tot.lp)}</div><div class="ks">of €${f(tot.la)} asked</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💰 Grand Total Paid (€)</div><div class="kv pur" style="font-size:22px">${f(tot.tp)}</div><div class="ks">of €${f(tot.ta)} asked · €${f(tot.ta-tot.tp)} deducted</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:${rr>10?'var(--rose)':rr>5?'var(--lemon)':'var(--mint)'}"></div><div class="kl">❌ Rejection Rate</div><div class="kv ${rr>10?'rose':rr>5?'lem':'mint'}">${rr.toFixed(1)}%</div><div class="ks">${tot.rej} rejected of ${tot.cnt} total</div></div>`;
+  // Override OV_K grid to k5
+  document.getElementById('OV_K').className='krow k5';
   C.style.display='block';if(_ovc)_ovc.destroy();
   _ovc=new Chart(document.getElementById('OV_CANVAS').getContext('2d'),{
     type:'bar',
     data:{labels:mks.map(fmM),datasets:[
-      {label:'Parts Paid',data:mr.map(r=>r.pp),backgroundColor:'rgba(255,107,53,.7)',borderRadius:6},
-      {label:'Labour Paid',data:mr.map(r=>r.lp),backgroundColor:'rgba(14,165,233,.7)',borderRadius:6},
-      {label:'Total Paid',data:mr.map(r=>r.tp),type:'line',borderColor:'#8B5CF6',backgroundColor:'transparent',pointBackgroundColor:'#8B5CF6',pointRadius:5,tension:.4,borderWidth:2.5},
+      {label:'Parts Paid',data:mr.map(r=>r.pp),backgroundColor:'rgba(255,107,53,.7)',borderRadius:6,yAxisID:'y'},
+      {label:'Labour Paid',data:mr.map(r=>r.lp),backgroundColor:'rgba(14,165,233,.7)',borderRadius:6,yAxisID:'y'},
+      {label:'Total Paid',data:mr.map(r=>r.tp),type:'line',borderColor:'#8B5CF6',backgroundColor:'transparent',pointBackgroundColor:'#8B5CF6',pointRadius:5,tension:.4,borderWidth:2.5,yAxisID:'y'},
+      {label:'Rej Rate %',data:mr.map(r=>r.cnt>0?r.rej/r.cnt*100:0),type:'line',borderColor:'#F43F5E',backgroundColor:'transparent',pointBackgroundColor:'#F43F5E',pointRadius:4,tension:.4,borderWidth:2,borderDash:[4,3],yAxisID:'y2'},
     ]},
-    options:{responsive:true,plugins:{legend:{position:'top',labels:{font:{size:11,family:'Plus Jakarta Sans',weight:'600'},boxWidth:12,borderRadius:4}}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(0,0,0,.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v,font:{size:10}}}}}
+    options:{responsive:true,plugins:{legend:{position:'top',labels:{font:{size:11,family:'Plus Jakarta Sans',weight:'600'},boxWidth:12,borderRadius:4}}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10}}},
+        y:{grid:{color:'rgba(0,0,0,.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v,font:{size:10}}},
+        y2:{position:'right',grid:{display:false},ticks:{callback:v=>v.toFixed(1)+'%',font:{size:10}},title:{display:true,text:'Rej %',font:{size:9}}}
+      }}
   });
   let h=`<div class="card"><div class="ct">📅 Monthly Subtotals</div><div class="tw"><table class="t">
-  <thead><tr><th>Month</th><th class="num">Claims</th><th class="num">Parts Asked</th><th class="num">Parts Paid</th><th class="num">Labour Asked</th><th class="num">Labour Paid</th><th class="num">Total Asked</th><th class="num">Total Paid</th><th class="num">Deducted</th></tr></thead><tbody>`;
-  mr.forEach(r=>{const ded=r.ta-r.tp;h+=`<tr><td style="font-weight:700">${fmM(r.m)}</td><td class="num">${r.cnt}</td><td class="num">${f(r.pa)}</td><td class="num">${f(r.pp)}</td><td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td><td class="num">${f(r.ta)}</td><td class="num" style="font-weight:700">${f(r.tp)}</td><td class="num ${ded>0.01?'dp':'dz'}">${f(ded)}</td></tr>`;});
-  h+=`</tbody><tfoot><tr class="tr-grand"><td>TOTAL</td><td class="num">${tot.cnt}</td><td class="num">${f(tot.pa)}</td><td class="num">${f(tot.pp)}</td><td class="num">${f(tot.la)}</td><td class="num">${f(tot.lp)}</td><td class="num">${f(tot.ta)}</td><td class="num">${f(tot.tp)}</td><td class="num">${f(tot.ta-tot.tp)}</td></tr></tfoot></table></div></div>`;
+  <thead><tr><th>Month</th><th class="num">Claims</th><th class="num">Rejected</th><th class="num">Rej %</th><th class="num">Parts Asked</th><th class="num">Parts Paid</th><th class="num">Labour Asked</th><th class="num">Labour Paid</th><th class="num">Total Asked</th><th class="num">Total Paid</th><th class="num">Deducted</th></tr></thead><tbody>`;
+  mr.forEach(r=>{
+    const ded=r.ta-r.tp,rate=r.cnt>0?r.rej/r.cnt*100:0;
+    h+=`<tr><td style="font-weight:700">${fmM(r.m)}</td><td class="num">${r.cnt}</td>
+      <td class="num" style="color:var(--rose);font-weight:700">${r.rej}</td>
+      <td class="num"><span class="badge ${rate>10?'b-rose':rate>5?'b-lem':'b-mint'}">${rate.toFixed(1)}%</span></td>
+      <td class="num">${f(r.pa)}</td><td class="num">${f(r.pp)}</td>
+      <td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td>
+      <td class="num">${f(r.ta)}</td><td class="num" style="font-weight:700">${f(r.tp)}</td>
+      <td class="num ${ded>0.01?'dp':'dz'}">${f(ded)}</td></tr>`;
+  });
+  const totalRate=tot.cnt>0?tot.rej/tot.cnt*100:0;
+  h+=`</tbody><tfoot><tr class="tr-grand"><td>TOTAL</td><td class="num">${tot.cnt}</td><td class="num">${tot.rej}</td><td class="num">${totalRate.toFixed(1)}%</td><td class="num">${f(tot.pa)}</td><td class="num">${f(tot.pp)}</td><td class="num">${f(tot.la)}</td><td class="num">${f(tot.lp)}</td><td class="num">${f(tot.ta)}</td><td class="num">${f(tot.tp)}</td><td class="num">${f(tot.ta-tot.tp)}</td></tr></tfoot></table></div></div>`;
   T.innerHTML=h;
 }
 
@@ -1076,35 +1991,79 @@ function rRej(){
     if(mf&&r.month!==mf)return false;
     if(ff==='no_action'&&S.rej[r.inv])return false;
     if(ff==='resubmitted'&&(!S.rej[r.inv]||!S.rej[r.inv].newClaim))return false;
+    if(ff==='partial'&&(!S.rej[r.inv]||S.rej[r.inv].rejType!=='partial'))return false;
+    if(ff==='full'&&(!S.rej[r.inv]||S.rej[r.inv].rejType!=='full'))return false;
+    if(ff==='resolved'&&(!S.rej[r.inv]||S.rej[r.inv].status!=='resolved'))return false;
     return true;
   });
-  const wA=allRej.filter(r=>S.rej[r.inv]).length,reSub=allRej.filter(r=>S.rej[r.inv]?.newClaim).length;
+
+  // KPI calculations
+  const wA=allRej.filter(r=>S.rej[r.inv]).length;
+  const reSub=allRej.filter(r=>S.rej[r.inv]?.newClaim).length;
+  const fullRej=allRej.filter(r=>S.rej[r.inv]?.rejType==='full');
+  const partRej=allRej.filter(r=>S.rej[r.inv]?.rejType==='partial');
+  // For "at risk" amount: fully rejected claims use ta; partial use (ta-tp)
+  const totalAtRisk = allRej.reduce((s,r)=>{
+    const d=S.rej[r.inv];
+    if(!d) return s+r.ta; // untracked = full amount still at risk
+    if(d.rejType==='full') return s+r.ta;
+    if(d.rejType==='partial') return s+Math.max(r.ta-r.tp,0);
+    return s+r.ta;
+  },0);
+  const resolvedAmt = allRej.filter(r=>S.rej[r.inv]?.status==='resolved').reduce((s,r)=>s+r.ta,0);
+
   K.style.display='grid';
   K.innerHTML=`
-    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Total Rejected</div><div class="kv rose">${allRej.length}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💸 Amount Rejected (€)</div><div class="kv sun">${f(allRej.reduce((s,r)=>s+r.ta,0))}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">✏️ Action Recorded</div><div class="kv lem">${wA}</div><div class="ks">of ${allRej.length} claims</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">🔄 Resubmitted</div><div class="kv mint">${reSub}</div><div class="ks">with new claim #</div></div>`;
-  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">❌ Rejected Claims — Full Tracking</div><div class="tw"><table class="t">
-  <thead><tr><th>VIN</th><th>Invoice #</th><th>RO / Order</th><th>Month</th><th>Exp Code</th><th class="num">Asked (€)</th><th>Reason</th><th>New Claim #</th><th>Resubmission Inv.</th><th>Category</th><th>Notes</th><th>Action</th></tr></thead><tbody>`;
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Total Rejected Claims</div><div class="kv rose">${allRej.length}</div><div class="ks">${allRej.filter(r=>S.rej[r.inv]?.rejType==='full').length} full · ${allRej.filter(r=>S.rej[r.inv]?.rejType==='partial').length} partial tracked</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💸 Amount At Risk (€)</div><div class="kv sun">${f(totalAtRisk)}</div><div class="ks">Unresolved rejected amounts</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">✏️ Action Recorded</div><div class="kv lem">${wA}</div><div class="ks">of ${allRej.length} claims · ${allRej.length-wA} need action</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">🔄 Resubmitted</div><div class="kv mint">${reSub}</div><div class="ks">with new claim # linked</div></div>`;
+
+  // Status legend
+  const statusBadge=(s)=>{
+    const map={pending:'<span class="badge b-rose">🔴 Pending</span>',resubmitted:'<span class="badge b-sky">🔄 Resubmitted</span>',escalated:'<span class="badge b-pur">⬆️ Escalated</span>',resolved:'<span class="badge b-mint">✅ Resolved</span>',written_off:'<span class="badge b-n">💀 Written Off</span>'};
+    return map[s]||'<span style="color:var(--faint)">—</span>';
+  };
+  const rejTypeBadge=(d)=>{
+    if(!d||!d.rejType) return '<span style="color:var(--faint)">—</span>';
+    return d.rejType==='full'
+      ? '<span class="badge b-rose">❌ Full</span>'
+      : '<span class="badge b-lem">⚠️ Partial</span>';
+  };
+
+  let h=`<div class="card" style="padding:0;overflow:hidden">
+  <div class="ct" style="padding:14px 16px 0">❌ Rejected Claims — Full Tracking Protocol</div>
+  <div class="tw"><table class="t">
+  <thead><tr>
+    <th>VIN</th><th>Invoice #</th><th>RO</th><th>Month</th><th>Exp</th>
+    <th class="num">Asked (€)</th><th class="num">Paid (€)</th><th class="num">Rejected (€)</th>
+    <th>Type</th><th>Reason</th><th>New Claim #</th><th>Resub Inv.</th><th>Resub Date</th><th>Status</th><th>Notes</th><th>Action</th>
+  </tr></thead><tbody>`;
+
   rows.forEach(r=>{
     const d=S.rej[r.inv]||{};
+    const rejAmt = d.rejType==='partial' ? Math.max(r.ta-r.tp,0) : (d.rejType==='full'?r.ta:(r.ta));
     h+=`<tr>
       <td class="mono">${r.vin}</td>
       <td class="mono">${r.inv}</td>
       <td class="mono" style="font-size:9px;color:var(--muted)">${r.ro||'–'}</td>
       <td style="font-size:11px;font-weight:600;white-space:nowrap">${fmM(r.month)}</td>
       <td><span class="badge b-sun">${r.exp||'–'}</span></td>
-      <td class="num" style="font-weight:700">${f(r.ta)}</td>
-      <td>${d.reason?`<span class="badge b-rose">${d.reason}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="num" style="font-weight:600">${f(r.ta)}</td>
+      <td class="num">${f(r.tp)}</td>
+      <td class="num" style="font-weight:700;color:var(--rose)">${d.rejType?f(rejAmt):'<span style="color:var(--faint)">—</span>'}</td>
+      <td>${rejTypeBadge(d)}</td>
+      <td>${d.reason?`<span class="badge b-rose" style="font-size:8px;max-width:100px;overflow:hidden;text-overflow:ellipsis;display:inline-block;white-space:nowrap" title="${d.reason}">${d.reason}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
       <td class="mono">${d.newClaim?`<span class="badge b-mint">✅ ${d.newClaim}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
       <td class="mono" style="font-size:10px">${d.reInv||'<span style="color:var(--faint)">—</span>'}</td>
-      <td style="font-size:10px;font-weight:500">${d.cat||'—'}</td>
-      <td style="font-size:10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)" title="${d.notes||''}">${d.notes||'—'}</td>
+      <td style="font-size:10px;color:var(--muted)">${d.resubDate||'<span style="color:var(--faint)">—</span>'}</td>
+      <td>${statusBadge(d.status)}</td>
+      <td style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)" title="${d.notes||''}">${d.notes||'—'}</td>
       <td><button class="btn btn-sm ${d.reason?'btn-ghost':'btn-sun'}" onclick="openModal('${esc(r.inv)}','${r.vin}')">${d.reason?'✏️ Edit':'+ Track'}</button></td>
     </tr>`;
   });
-  h+=`</tbody></table></div></div>`;T.innerHTML=h;
+  h+=`</tbody></table></div></div>`;
+  T.innerHTML=h;
 }
 
 // ══ RENDER INCADEA ════════════════════════════════════════════
@@ -1153,62 +2112,186 @@ function rBonus(){
   C.innerHTML=h;
 }
 
+// ══ RENDER AGEING ═════════════════════════════════════════════
+function rAge(){
+  const E=document.getElementById('AGE_E'),K=document.getElementById('AGE_K'),T=document.getElementById('AGE_T');
+  const allRej=S.gcm.filter(r=>r.st===4&&!r._d);
+  if(!allRej.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}
+  E.style.display='none';
+  const ff=gv('F_AGF');
+  const now=new Date();
+  const daysSince=ts=>ts?Math.floor((now-new Date(ts))/(864e5)):0;
+  let rows=allRej.map(r=>{
+    const d=S.rej[r.inv]||{};
+    const days=daysSince(d.ts);
+    const status=d.status||'untracked';
+    return{...r,d,days,status,isResolved:status==='resolved'||status==='written_off'};
+  });
+  if(ff==='resolved') rows=rows.filter(r=>r.isResolved);
+  else{
+    rows=rows.filter(r=>!r.isResolved);
+    if(ff==='30') rows=rows.filter(r=>r.days>=30);
+    if(ff==='60') rows=rows.filter(r=>r.days>=60);
+    if(ff==='90') rows=rows.filter(r=>r.days>=90);
+  }
+  rows.sort((a,b)=>b.days-a.days);
+  const unresolved=allRej.filter(r=>{const s=S.rej[r.inv]?.status||'untracked';return s!=='resolved'&&s!=='written_off';});
+  const ds=r=>daysSince(S.rej[r.inv]?.ts);
+  const over30=unresolved.filter(r=>ds(r)>=30);
+  const over60=unresolved.filter(r=>ds(r)>=60);
+  const over90=unresolved.filter(r=>ds(r)>=90);
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">🔴 Unresolved</div><div class="kv rose">${unresolved.length}</div><div class="ks">of ${allRej.length} total rejected</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🟡 Over 30 days</div><div class="kv lem">${over30.length}</div><div class="ks">€${f(over30.reduce((s,r)=>s+r.ta,0))} at risk</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">🟠 Over 60 days</div><div class="kv sun">${over60.length}</div><div class="ks">€${f(over60.reduce((s,r)=>s+r.ta,0))} at risk</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">🔴 Over 90 days</div><div class="kv rose">${over90.length}</div><div class="ks">URGENT — escalate immediately</div></div>`;
+  const ageBadge=days=>days>=90?`<span class="badge b-rose">🔴 ${days}d</span>`:days>=60?`<span class="badge b-sun">🟠 ${days}d</span>`:days>=30?`<span class="badge b-lem">🟡 ${days}d</span>`:`<span class="badge b-n">${days}d</span>`;
+  const sBadge=s=>({pending:'<span class="badge b-rose">🔴 Pending</span>',resubmitted:'<span class="badge b-sky">🔄 Resubmitted</span>',escalated:'<span class="badge b-pur">⬆️ Escalated</span>',resolved:'<span class="badge b-mint">✅ Resolved</span>',written_off:'<span class="badge b-n">💀 Written Off</span>',untracked:'<span class="badge b-n">⚪ Not Tracked</span>'})[s]||`<span class="badge b-n">${s}</span>`;
+  if(!rows.length){T.innerHTML=`<div class="al al-g">✅ No rejections match this filter.</div>`;return;}
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">⏰ Ageing — ${rows.length} claims</div><div class="tw"><table class="t">
+  <thead><tr><th>Age</th><th>VIN</th><th>Invoice #</th><th>Month</th><th class="num">Asked (€)</th><th>Type</th><th>Reason</th><th>New Claim #</th><th>Status</th><th>Action</th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    h+=`<tr>
+      <td style="white-space:nowrap">${ageBadge(r.days)}</td>
+      <td class="mono" style="font-size:10px">${r.vin}</td><td class="mono">${r.inv}</td>
+      <td style="font-size:11px;font-weight:600">${fmM(r.month)}</td>
+      <td class="num" style="font-weight:700">${f(r.ta)}</td>
+      <td>${r.d.rejType?`<span class="badge ${r.d.rejType==='full'?'b-rose':'b-lem'}">${r.d.rejType==='full'?'❌ Full':'⚠️ Partial'}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
+      <td style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.d.reason||''}">${r.d.reason||'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="mono">${r.d.newClaim?`<span class="badge b-mint">✅ ${r.d.newClaim}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
+      <td>${sBadge(r.status)}</td>
+      <td><button class="btn btn-ghost btn-xs" onclick="openModal('${esc(r.inv)}','${r.vin}')">✏️ Edit</button></td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div></div>`;
+  T.innerHTML=h;
+  const urgentEl=document.getElementById('B_AGE');
+  if(urgentEl) urgentEl.textContent=over30.length||'–';
+}
 
-</script>
+// ══ RENDER RECOVERY RATE ══════════════════════════════════════
+function rRec(){
+  const E=document.getElementById('REC_E'),K=document.getElementById('REC_K'),T=document.getElementById('REC_T');
+  const allRej=S.gcm.filter(r=>r.st===4&&!r._d);
+  if(!allRej.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}
+  E.style.display='none';
+  const totalRejAmt=allRej.reduce((s,r)=>s+r.ta,0);
+  let totalAtRisk=0,totalPartialRecovered=0,totalResubmitted=0,totalResolved=0,totalWrittenOff=0;
+  const bySt={pending:0,resubmitted:0,escalated:0,resolved:0,written_off:0,untracked:0};
+  const byStAmt={pending:0,resubmitted:0,escalated:0,resolved:0,written_off:0,untracked:0};
+  allRej.forEach(r=>{
+    const d=S.rej[r.inv];const s=d?.status||'untracked';
+    bySt[s]=(bySt[s]||0)+1;
+    const atRisk=d?.rejType==='partial'?Math.max(r.ta-r.tp,0):r.ta;
+    byStAmt[s]=(byStAmt[s]||0)+atRisk;totalAtRisk+=atRisk;
+    if(d?.rejType==='partial') totalPartialRecovered+=r.tp;
+    if(d?.newClaim) totalResubmitted+=atRisk;
+    if(s==='resolved') totalResolved+=r.ta;
+    if(s==='written_off') totalWrittenOff+=r.ta;
+  });
+  const recRate=totalRejAmt>0?(totalResolved/totalRejAmt*100):0;
+  const resubRate=totalRejAmt>0?(totalResubmitted/totalRejAmt*100):0;
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">💸 Total Rejected (€)</div><div class="kv rose">${f(totalRejAmt)}</div><div class="ks">Original asked amount of all rejections</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">🔄 Resubmitted (€)</div><div class="kv sky">${f(totalResubmitted)}</div><div class="ks">${resubRate.toFixed(1)}% sent back to Renault</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">✅ Recovered (€)</div><div class="kv mint">${f(totalResolved)}</div><div class="ks">${recRate.toFixed(1)}% recovery rate</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Still At Risk (€)</div><div class="kv lem">${f(totalAtRisk-totalResolved)}</div><div class="ks">Unresolved rejected portions</div></div>`;
+  const stLabels={pending:'🔴 Pending',resubmitted:'🔄 Resubmitted',escalated:'⬆️ Escalated',resolved:'✅ Resolved',written_off:'💀 Written Off',untracked:'⚪ Not Tracked'};
+  const stColors={pending:'var(--rose)',resubmitted:'var(--sky)',escalated:'var(--pur)',resolved:'var(--mint)',written_off:'var(--muted)',untracked:'var(--border2)'};
+  const maxAmt=Math.max(...Object.values(byStAmt),1);
+  let h=`<div class="g2"><div class="card"><div class="ct">📊 By Status</div>`;
+  Object.entries(stLabels).forEach(([k,label])=>{
+    const cnt=bySt[k]||0,amt=byStAmt[k]||0;if(!cnt) return;
+    h+=`<div class="bb" style="margin-bottom:12px">
+      <div style="width:130px;flex-shrink:0;font-size:10px;font-weight:600;color:var(--ink2)">${label}</div>
+      <div style="flex:1"><div class="bbt"><div class="bbf" style="width:${(amt/maxAmt*100).toFixed(1)}%;background:${stColors[k]}"></div></div>
+      <div style="font-size:9px;color:var(--muted);margin-top:2px">${cnt} claim${cnt!==1?'s':''}</div></div>
+      <div style="font-size:11px;font-weight:800;color:${stColors[k]};margin-left:12px;flex-shrink:0;width:90px;text-align:right">€${f(amt)}</div></div>`;
+  });
+  h+=`</div><div class="card"><div class="ct">🏆 Recovery Summary</div><div>
+    ${[['Partial — already paid portion',totalPartialRecovered,'var(--mint)'],['Resubmitted to Renault',totalResubmitted,'var(--sky)'],['Marked as Resolved',totalResolved,'var(--mint)'],['Written Off',totalWrittenOff,'var(--muted)']].map(([l,a,c])=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:11px;font-weight:600;color:var(--ink2)">${l}</span><span style="font-size:12px;font-weight:800;color:${c}">€${f(a)}</span></div>`).join('')}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--mint3);border-radius:10px;margin-top:10px;border:1.5px solid rgba(16,185,129,.2)"><span style="font-size:12px;font-weight:700;color:var(--mint)">💰 Recovery Rate</span><span style="font-size:22px;font-weight:800;color:var(--mint)">${recRate.toFixed(1)}%</span></div>
+  </div></div></div>`;
+  const sBadge=s=>({pending:'<span class="badge b-rose">🔴 Pending</span>',resubmitted:'<span class="badge b-sky">🔄 Resubmitted</span>',escalated:'<span class="badge b-pur">⬆️ Escalated</span>',resolved:'<span class="badge b-mint">✅ Resolved</span>',written_off:'<span class="badge b-n">💀 Written Off</span>',untracked:'<span class="badge b-n">⚪ Not Tracked</span>'})[s]||'—';
+  h+=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">🔄 Per-Claim Detail</div><div class="tw"><table class="t">
+  <thead><tr><th>VIN</th><th>Invoice #</th><th>Month</th><th class="num">Asked (€)</th><th class="num">Paid (€)</th><th class="num">Rejected (€)</th><th>Type</th><th>New Claim #</th><th>Status</th></tr></thead><tbody>`;
+  allRej.forEach(r=>{
+    const d=S.rej[r.inv]||{};const rejAmt=d.rejType==='partial'?Math.max(r.ta-r.tp,0):r.ta;
+    h+=`<tr><td class="mono" style="font-size:10px">${r.vin}</td><td class="mono">${r.inv}</td><td style="font-size:11px;font-weight:600">${fmM(r.month)}</td><td class="num">${f(r.ta)}</td><td class="num">${f(r.tp)}</td><td class="num" style="font-weight:700;color:var(--rose)">${f(rejAmt)}</td>
+      <td>${d.rejType?`<span class="badge ${d.rejType==='full'?'b-rose':'b-lem'}">${d.rejType==='full'?'❌ Full':'⚠️ Partial'}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="mono">${d.newClaim?`<span class="badge b-mint">✅ ${d.newClaim}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
+      <td>${sBadge(d.status||'untracked')}</td></tr>`;
+  });
+  h+=`</tbody></table></div></div>`;T.innerHTML=h;
+}
 
-<!-- ══ HELP PANEL ══════════════════════════════════════════ -->
-<div class="help-panel-bg" id="HELP_BG" onclick="if(event.target===this)closeHelp()">
-  <div class="help-panel">
-    <div class="hp-header">
-      <div class="hp-icon" id="HP_ICON" style="background:var(--sky3)">❓</div>
-      <div>
-        <div class="hp-title en" id="HP_TITLE_EN">Help & Business Rules</div>
-        <div class="hp-title fr" id="HP_TITLE_FR">Aide & Règles Métier</div>
-        <div class="hp-sub en" id="HP_SUB_EN">How this page works</div>
-        <div class="hp-sub fr" id="HP_SUB_FR">Comment fonctionne cette page</div>
-      </div>
-      <div class="hp-close" onclick="closeHelp()">✕</div>
-    </div>
-    <div class="hp-body" id="HP_BODY"></div>
-    <div class="hp-footer">
-      <button class="hp-idea-btn" onclick="openFeedback('idea')">💡 <span class="en">New Idea</span><span class="fr">Nouvelle Idée</span></button>
-      <button class="hp-feedback-btn" onclick="openFeedback('correction')">🔧 <span class="en">System Correction</span><span class="fr">Correction Système</span></button>
-    </div>
-  </div>
-</div>
+// ══ RENDER REJECTION TRENDS ═══════════════════════════════════
+let _trdChart=null;
+function rTrd(){
+  const E=document.getElementById('TRD_E'),K=document.getElementById('TRD_K'),C=document.getElementById('TRD_C'),T=document.getElementById('TRD_T');
+  if(!S.gcm.length){E.style.display='flex';K.style.display='none';C.style.display='none';T.innerHTML='';return;}
+  E.style.display='none';
+  const vld=S.gcm.filter(r=>!r._d);
+  const byM={};
+  vld.forEach(r=>{
+    const k=r.month||'?';if(!byM[k]) byM[k]={m:k,total:0,rej:0,paid:0,taRej:0,taPaid:0};
+    byM[k].total++;
+    if(r.st===4){byM[k].rej++;byM[k].taRej+=r.ta;}
+    if(r.st===0){byM[k].paid++;byM[k].taPaid+=r.tp;}
+  });
+  const mks=Object.keys(byM).sort(),mr=mks.map(k=>byM[k]);
+  const totClaims=sm(mr,'total'),totRej=sm(mr,'rej');
+  const avgRejRate=totClaims>0?totRej/totClaims*100:0;
+  const totRejAmt=sm(mr,'taRej');
+  const trend=mr.length>=2?((mr[mr.length-1].rej/Math.max(mr[mr.length-1].total,1))-(mr[mr.length-2].rej/Math.max(mr[mr.length-2].total,1)))*100:0;
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">📊 Avg Rejection Rate</div><div class="kv ${avgRejRate>10?'rose':avgRejRate>5?'lem':'mint'}">${avgRejRate.toFixed(1)}%</div><div class="ks">Across all loaded months</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💸 Total Rejected (€)</div><div class="kv sun">${f(totRejAmt)}</div><div class="ks">${totRej} rejected claims</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📅 Months of Data</div><div class="kv sky">${mr.length}</div><div class="ks">${fmM(mks[0])} → ${fmM(mks[mks.length-1])}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:${trend>0?'var(--rose)':'var(--mint)'}"></div><div class="kl">📈 Last Month Trend</div><div class="kv ${trend>0?'rose':'mint'}">${trend>0?'▲':trend<0?'▼':'='} ${Math.abs(trend).toFixed(1)}%</div><div class="ks">vs previous month rejection rate</div></div>`;
+  C.style.display='block';
+  if(_trdChart) _trdChart.destroy();
+  _trdChart=new Chart(document.getElementById('TRD_CANVAS').getContext('2d'),{
+    type:'bar',
+    data:{labels:mks.map(fmM),datasets:[
+      {label:'Rejected',data:mr.map(r=>r.rej),backgroundColor:'rgba(244,63,94,.7)',borderRadius:5,yAxisID:'y'},
+      {label:'Paid',data:mr.map(r=>r.paid),backgroundColor:'rgba(16,185,129,.35)',borderRadius:5,yAxisID:'y'},
+      {label:'Rate %',data:mr.map(r=>r.total>0?(r.rej/r.total*100):0),type:'line',borderColor:'#8B5CF6',backgroundColor:'transparent',pointBackgroundColor:'#8B5CF6',pointRadius:5,tension:.4,borderWidth:2.5,yAxisID:'y2'},
+    ]},
+    options:{responsive:true,plugins:{legend:{position:'top',labels:{font:{size:11,family:'Plus Jakarta Sans',weight:'600'},boxWidth:12,borderRadius:4}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:10}}},
+        y:{grid:{color:'rgba(0,0,0,.04)'},ticks:{font:{size:10}}},
+        y2:{position:'right',grid:{display:false},ticks:{callback:v=>v.toFixed(1)+'%',font:{size:10}}}}}
+  });
+  const allReasons={};
+  vld.filter(r=>r.st===4).forEach(r=>{const d=S.rej[r.inv];if(d?.reason) allReasons[d.reason]=(allReasons[d.reason]||0)+1;});
+  const topReasons=Object.entries(allReasons).sort((a,b)=>b[1]-a[1]);
+  const maxR=topReasons[0]?.[1]||1;
+  let h=`<div class="g2"><div class="card"><div class="ct">🏷️ Top Rejection Reasons</div>`;
+  if(!topReasons.length){
+    h+=`<div style="color:var(--muted);font-size:11px;padding:8px 0">No reasons recorded yet. Use "+ Track" on rejected claims to log reasons.</div>`;
+  } else {
+    topReasons.slice(0,10).forEach(([reason,cnt])=>{
+      h+=`<div class="bb" style="margin-bottom:10px"><div style="flex:1;min-width:0"><div style="font-size:10px;font-weight:600;color:var(--ink2);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${reason}">${reason}</div>
+      <div class="bbt"><div class="bbf" style="width:${(cnt/maxR*100).toFixed(1)}%;background:var(--rose)"></div></div></div>
+      <div style="font-size:12px;font-weight:800;color:var(--rose);margin-left:12px;flex-shrink:0">${cnt}×</div></div>`;
+    });
+  }
+  h+=`</div><div class="card"><div class="ct">📅 Monthly Rejection Detail</div><div class="tw" style="max-height:340px"><table class="t">
+  <thead><tr><th>Month</th><th class="num">Total</th><th class="num">Rejected</th><th class="num">Rate %</th><th class="num">Rej Amount (€)</th><th class="num">Paid (€)</th></tr></thead><tbody>`;
+  mr.forEach(r=>{
+    const rate=r.total>0?r.rej/r.total*100:0;
+    h+=`<tr><td style="font-weight:700">${fmM(r.m)}</td><td class="num">${r.total}</td><td class="num" style="color:var(--rose);font-weight:700">${r.rej}</td>
+      <td class="num"><span class="badge ${rate>10?'b-rose':rate>5?'b-lem':'b-mint'}">${rate.toFixed(1)}%</span></td>
+      <td class="num" style="color:var(--rose)">${f(r.taRej)}</td><td class="num" style="color:var(--mint)">${f(r.taPaid)}</td></tr>`;
+  });
+  h+=`</tbody><tfoot><tr class="tr-grand"><td>TOTAL</td><td class="num">${totClaims}</td><td class="num">${totRej}</td><td class="num">${avgRejRate.toFixed(1)}%</td><td class="num">${f(totRejAmt)}</td><td class="num">${f(sm(mr,'taPaid'))}</td></tr></tfoot></table></div></div></div>`;
+  T.innerHTML=h;
+}
 
-<!-- ══ FEEDBACK MODAL ══════════════════════════════════════ -->
-<div class="fb-modal-bg" id="FB_BG" onclick="if(event.target===this)closeFeedback()">
-  <div class="fb-modal">
-    <div style="font-size:28px;margin-bottom:8px" id="FB_EMOJI">💡</div>
-    <div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:4px" id="FB_TITLE">New Idea</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:20px;font-weight:500">
-      <span class="en">This will open Outlook with a pre-filled email to the management team.</span>
-      <span class="fr">Cela ouvrira Outlook avec un e-mail pré-rempli pour l'équipe de direction.</span>
-    </div>
-    <div class="fr" style="margin-bottom:14px">
-      <label class="flb" style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block">Titre / Subject</label>
-      <input class="fi" id="FB_SUBJECT" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);font-family:inherit;outline:none;background:var(--surf2)" placeholder="Short title of your idea or correction…"/>
-    </div>
-    <div class="en-b" style="margin-bottom:14px">
-      <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block">Subject</label>
-      <input class="fi" id="FB_SUBJECT_EN" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);font-family:inherit;outline:none;background:var(--surf2)" placeholder="Short title of your idea or correction…"/>
-    </div>
-    <div style="margin-bottom:14px">
-      <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block">
-        <span class="en">Description</span><span class="fr">Description</span>
-      </label>
-      <textarea class="fi" id="FB_BODY" rows="5" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);font-family:inherit;outline:none;background:var(--surf2);resize:vertical" placeholder="Describe your idea or the correction needed…"></textarea>
-    </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:16px;border-top:1.5px solid var(--border)">
-      <button class="btn btn-ghost btn-sm" onclick="closeFeedback()"><span class="en">Cancel</span><span class="fr">Annuler</span></button>
-      <button class="btn btn-sun btn-sm" onclick="sendFeedback()">📧 <span class="en">Open in Outlook</span><span class="fr">Ouvrir dans Outlook</span></button>
-    </div>
-  </div>
-</div>
-
-
-<script>
 // ══ LANGUAGE ═════════════════════════════════════════════════
 let _lang = 'en';
 function setLang(l){
@@ -1238,6 +2321,9 @@ function setLang(l){
     'rejections':{en:'Rejections',      fr:'Rejets'},
     'incadea':   {en:'Incadea Data',    fr:'Données Incadea'},
     'bonus':     {en:'Bonus 1%',        fr:'Bonus 1%'},
+    'ageing':    {en:'Rejection Ageing',fr:'Ancienneté Rejets'},
+    'recovery':  {en:'Recovery Rate',   fr:'Taux de Récupération'},
+    'trends':    {en:'Rejection Trends',fr:'Tendances Rejets'},
   };
   document.querySelectorAll('.si[data-page]').forEach(el=>{
     const pg = el.dataset.page;
@@ -1245,14 +2331,12 @@ function setLang(l){
     const badge = el.querySelector('.sbadge');
     const emoji = el.querySelector('.si-emoji');
     el.childNodes.forEach(n=>{ if(n.nodeType===3) n.textContent=''; });
-    // rebuild text
     const txt = document.createTextNode(siLabels[pg][l]||siLabels[pg].en);
     if(emoji) el.insertBefore(txt, badge||null);
     else el.appendChild(txt);
   });
-  // re-render current page if data loaded
   const active = document.querySelector('.si.active');
-  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus})[active.dataset.page]?.();
+  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd})[active.dataset.page]?.();
 }
 
 // ══ HELP CONTENT ══════════════════════════════════════════════
@@ -1263,7 +2347,7 @@ const HELP = {
       rules:[
         {icon:'📋',title:'GCM Claims File',desc:'Export from the GCM portal every month. File name: Claims_detail_MM_YYYY_LB.xlsx. Drop it on the left dropzone or click "Choose File".'},
         {icon:'🔧',title:'INCADEA File',desc:'Export from your INCADEA DMS. The system reads the "INCADEA" sheet automatically. Drop on the right dropzone.'},
-        {icon:'🔑',title:'Duplicate Detection',desc:'Claims with the same VIN + Invoice # combination are automatically flagged as duplicates and excluded from all calculations.'},
+        {icon:'🔑',title:'Duplicate Detection',desc:'A true duplicate = exact same VIN + exact same Invoice # appearing more than once. Invoice letters (a, b, c...) denote separate operations on the same order and are NOT duplicates — each is counted independently.'},
         {icon:'🕐',title:'Last Update',desc:'The header shows how many claims were imported and the exact time of the last upload. Upload new files each month to accumulate history.'},
       ],
       buttons:[{icon:'📂',label:'Choose File — opens file browser'},{icon:'🗂️',label:'Drag & Drop — drop file directly on the zone'}]
@@ -1271,11 +2355,11 @@ const HELP = {
     fr:{title:'Télécharger les Fichiers',sub:'Comment importer vos données mensuelles',
       rules:[
         {icon:'📋',title:'Fichier GCM',desc:'Exportez depuis le portail GCM chaque mois. Nom: Claims_detail_MM_YYYY_LB.xlsx. Déposez-le dans la zone gauche.'},
-        {icon:'🔧',title:'Fichier INCADEA',desc:'Export depuis votre DMS INCADEA. Le système lit automatiquement l'onglet "INCADEA".'},
+        {icon:'🔧',title:'Fichier INCADEA',desc:'Export depuis votre DMS INCADEA. Le système lit automatiquement l\'onglet "INCADEA".'},
         {icon:'🔑',title:'Détection des Doublons',desc:'Les dossiers avec le même VIN + N° Facture sont automatiquement signalés comme doublons et exclus de tous les calculs.'},
-        {icon:'🕐',title:'Dernière Mise à Jour',desc:'L'en-tête affiche le nombre de dossiers importés et l'heure exacte du dernier import. Importez de nouveaux fichiers chaque mois.'},
+        {icon:'🕐',title:'Dernière Mise à Jour',desc:'L\'en-tête affiche le nombre de dossiers importés et l\'heure exacte du dernier import. Importez de nouveaux fichiers chaque mois.'},
       ],
-      buttons:[{icon:'📂',label:'Choisir Fichier — ouvre l'explorateur'},{icon:'🗂️',label:'Glisser-Déposer — déposez le fichier directement'}]
+      buttons:[{icon:'📂',label:'Choisir Fichier — ouvre l\'explorateur'},{icon:'🗂️',label:'Glisser-Déposer — déposez le fichier directement'}]
     }
   },
   gcm:{
@@ -1284,7 +2368,7 @@ const HELP = {
       rules:[
         {icon:'✅',title:'Paid Claims (Status 0)',desc:'Claims where invoice_flag_state = 0. Renault has accepted and paid these. Shown with a green "Paid" badge.'},
         {icon:'❌',title:'Rejected Claims (Status 4)',desc:'Claims where invoice_flag_state = 4. Renault has rejected these. Use the "+ Track" button to record the reason and resubmission details.'},
-        {icon:'🔑',title:'Deduplication Key',desc:'VIN + Invoice # is used as the unique key. Duplicates are highlighted in yellow and excluded from all totals.'},
+        {icon:'🔑',title:'Deduplication Key',desc:'True dedup key = exact VIN + exact Invoice # (including operation letter). INV-123a and INV-123b are different operations, not duplicates. Only truly identical rows are flagged yellow and excluded.'},
         {icon:'💰',title:'Amount Fields',desc:'Parts Asked/Paid = part amounts. Labour Asked/Paid = labour amounts. Total = sum of all. "Asked" = submitted to Renault. "Paid" = approved by Renault.'},
         {icon:'🔍',title:'Filters & Search',desc:'Filter by Month, Expense Code, or Status. Use the search box to find any VIN, Invoice #, RO number, or NITG code instantly.'},
       ],
@@ -1295,7 +2379,7 @@ const HELP = {
         {icon:'✅',title:'Dossiers Payés (Statut 0)',desc:'Dossiers où invoice_flag_state = 0. Renault a accepté et payé ces dossiers. Badge vert "Payé".'},
         {icon:'❌',title:'Dossiers Rejetés (Statut 4)',desc:'Dossiers où invoice_flag_state = 4. Renault a rejeté ces dossiers. Utilisez le bouton "+ Suivre" pour enregistrer la raison et les détails de re-soumission.'},
         {icon:'🔑',title:'Clé de Dédoublonnage',desc:'VIN + N° Facture est utilisé comme clé unique. Les doublons sont surlignés en jaune et exclus de tous les totaux.'},
-        {icon:'💰',title:'Champs Montants',desc:'PR Demandé/Payé = montants pièces. MO Demandé/Payé = montants main-d'œuvre. Total Demandé = soumis à Renault. Total Payé = approuvé par Renault.'},
+        {icon:'💰',title:'Champs Montants',desc:'PR Demandé/Payé = montants pièces. MO Demandé/Payé = montants main-d\'œuvre. Total Demandé = soumis à Renault. Total Payé = approuvé par Renault.'},
         {icon:'🔍',title:'Filtres & Recherche',desc:'Filtrez par Mois, Code Dépense, ou Statut. Utilisez la recherche pour trouver VIN, N° Facture, N° OR, ou code NITG.'},
       ],
       buttons:[{icon:'+ Suivre',label:'Ouvre le modal de suivi de rejet'},{icon:'✏️ Modifier',label:'Rouvrir le modal pour mettre à jour les détails'}]
@@ -1316,7 +2400,7 @@ const HELP = {
       rules:[
         {icon:'📅',title:'Sous-totaux Mensuels',desc:'Chaque ligne représente un mois de données. Colonnes: PR Demandé, PR Payé, MO Demandé, MO Payé, Total Demandé, Total Payé, Déduit.'},
         {icon:'📈',title:'Graphique',desc:'Barres: PR Payé (orange) et MO Payé (bleu) par mois. La ligne violette montre la tendance du Total Payé.'},
-        {icon:'📉',title:'Montant Déduit',desc:'Colonne "Déduit" = Total Demandé − Total Payé. C'est le montant que Renault n'a pas remboursé. Valeurs en rouge = déductions.'},
+        {icon:'📉',title:'Montant Déduit',desc:'Colonne "Déduit" = Total Demandé − Total Payé. C\'est le montant que Renault n\'a pas remboursé. Valeurs en rouge = déductions.'},
         {icon:'🚗',title:'VINs Uniques',desc:'Nombre de véhicules distincts (VINs) dans les données chargées — chaque VIN = un véhicule.'},
       ],
       buttons:[]
@@ -1358,7 +2442,7 @@ const HELP = {
     fr:{title:'Incadea vs GCM',sub:'Rapprochement entre votre DMS et le portail Renault',
       rules:[
         {icon:'⚖️',title:'Objectif',desc:'Compare les montants enregistrés dans votre DMS INCADEA avec ce que GCM (portail Renault) affiche. Les écarts révèlent des oublis de saisie ou des décalages.'},
-        {icon:'🔴',title:'Δ Positif (rouge)',desc:'Total GCM SUPÉRIEUR à Incadea. Renault a payé plus que ce qu'INCADEA a enregistré — vérifiez si toutes les factures sont saisies dans INCADEA.'},
+        {icon:'🔴',title:'Δ Positif (rouge)',desc:'Total GCM SUPÉRIEUR à Incadea. Renault a payé plus que ce qu\'INCADEA a enregistré — vérifiez si toutes les factures sont saisies dans INCADEA.'},
         {icon:'🟢',title:'Δ Négatif (vert)',desc:'Total GCM INFÉRIEUR à Incadea. INCADEA a plus que ce que Renault a payé — vérifiez les dossiers rejetés ou les soumissions GCM manquantes.'},
         {icon:'✅',title:'Correspondance Parfaite',desc:'Δ Total = 0,00. GCM et Incadea sont en parfait accord pour ce VIN.'},
         {icon:'🔍',title:'Filtre Écarts Seulement',desc:'Sélectionnez "Écarts Seulement" pour vous concentrer sur les VINs à investiguer.'},
@@ -1378,10 +2462,10 @@ const HELP = {
       ],
       buttons:[]
     },
-    fr:{title:'Demandé vs Payé',sub:'Analyse de l'écart entre soumis et approuvé',
+    fr:{title:'Demandé vs Payé',sub:'Analyse de l\'écart entre soumis et approuvé',
       rules:[
-        {icon:'📤',title:'Total Demandé',desc:'Montant total soumis à Renault (received_amount_eur). C'est ce que vous réclamez comme remboursement.'},
-        {icon:'💵',title:'Total Payé',desc:'Montant définitif approuvé par Renault (definitive_amount_without_pco_eur). C'est ce qui a réellement été remboursé.'},
+        {icon:'📤',title:'Total Demandé',desc:'Montant total soumis à Renault (received_amount_eur). C\'est ce que vous réclamez comme remboursement.'},
+        {icon:'💵',title:'Total Payé',desc:'Montant définitif approuvé par Renault (definitive_amount_without_pco_eur). C\'est ce qui a réellement été remboursé.'},
         {icon:'📉',title:'Taux de Déduction',desc:'(Demandé − Payé) / Demandé × 100. Un taux élevé signifie que Renault paie régulièrement moins que demandé.'},
         {icon:'📅',title:'Sous-totaux',desc:'Lignes de sous-total mensuels (jaune) agrègent tous les codes dépense pour chaque mois. Ligne Total Général (sombre) = position globale.'},
         {icon:'🏷️',title:'Par Code Dépense',desc:'Chaque ligne = un mois + un code dépense. Identifie quels types de dépenses ont les taux de déduction les plus élevés.'},
@@ -1403,10 +2487,10 @@ const HELP = {
     },
     fr:{title:'Rejets',sub:'Suivre, annoter et re-soumettre les dossiers rejetés',
       rules:[
-        {icon:'❌',title:'Qu'est-ce qu'un Rejet?',desc:'Un dossier où invoice_flag_state = 4 dans GCM. Renault a refusé de rembourser ce dossier. Il doit être corrigé et re-soumis.'},
+        {icon:'❌',title:'Qu\'est-ce qu\'un Rejet?',desc:'Un dossier où invoice_flag_state = 4 dans GCM. Renault a refusé de rembourser ce dossier. Il doit être corrigé et re-soumis.'},
         {icon:'📝',title:'Enregistrer le Rejet',desc:'Cliquez sur "+ Suivre" pour ouvrir le modal. Remplissez: Raison (liste), N° Nouveau Dossier, N° Facture Re-soumission, Catégorie, et Notes.'},
         {icon:'🔄',title:'Processus de Re-soumission',desc:'Une fois corrigé, entrez le nouveau numéro de dossier dans le champ "N° Dossier Correct" et le nouveau numéro de facture.'},
-        {icon:'🔴',title:'Filtre "Aucune Action"',desc:'Affiche uniquement les dossiers rejetés qui n'ont pas encore été annotés — votre liste de tâches de rejets.'},
+        {icon:'🔴',title:'Filtre "Aucune Action"',desc:'Affiche uniquement les dossiers rejetés qui n\'ont pas encore été annotés — votre liste de tâches de rejets.'},
         {icon:'✅',title:'Filtre "A un N° de Dossier"',desc:'Affiche les dossiers corrigés et re-soumis avec un nouveau numéro de dossier.'},
       ],
       buttons:[{icon:'+ Suivre',label:'Ouvrir le modal de rejet — enregistrer raison, N° nouveau dossier'},{icon:'✏️ Modifier',label:'Mettre à jour les détails du rejet existant'}]
@@ -1418,16 +2502,16 @@ const HELP = {
       rules:[
         {icon:'📄',title:'Source',desc:'Data comes from your INCADEA DMS warranty invoice export. The system reads the "INCADEA" sheet from the uploaded file.'},
         {icon:'🔍',title:'Search',desc:'Search across Invoice No., VIN, Service Order No., Customer name, and External Document No. simultaneously.'},
-        {icon:'🚗',title:'Make Filter',desc:'Filter by vehicle make (RENAULT, DACIA, etc.) to see only one brand's warranty invoices.'},
+        {icon:'🚗',title:'Make Filter',desc:'Filter by vehicle make (RENAULT, DACIA, etc.) to see only one brand\'s warranty invoices.'},
         {icon:'⚖️',title:'Use with Comparison',desc:'These records are used in the "Incadea vs GCM" page to reconcile amounts by VIN. Upload both files to see the reconciliation.'},
       ],
       buttons:[]
     },
     fr:{title:'Données Incadea',sub:'Tous les enregistrements de votre export DMS INCADEA',
       rules:[
-        {icon:'📄',title:'Source',desc:'Les données proviennent de votre export de factures garantie DMS INCADEA. Le système lit l'onglet "INCADEA".'},
+        {icon:'📄',title:'Source',desc:'Les données proviennent de votre export de factures garantie DMS INCADEA. Le système lit l\'onglet "INCADEA".'},
         {icon:'🔍',title:'Recherche',desc:'Recherche simultanée sur N° Facture, VIN, N° Ordre de Service, Nom Client, et N° Document Externe.'},
-        {icon:'🚗',title:'Filtre Marque',desc:'Filtrez par marque (RENAULT, DACIA, etc.) pour voir uniquement les factures garantie d'une marque.'},
+        {icon:'🚗',title:'Filtre Marque',desc:'Filtrez par marque (RENAULT, DACIA, etc.) pour voir uniquement les factures garantie d\'une marque.'},
         {icon:'⚖️',title:'Utilisation avec Comparaison',desc:'Ces données sont utilisées dans la page "Incadea vs GCM" pour rapprocher les montants par VIN.'},
       ],
       buttons:[]
@@ -1444,7 +2528,7 @@ const HELP = {
       ],
       buttons:[]
     },
-    fr:{title:'Bonus — 1% Main-d'Œuvre',sub:'Bonus mensuel basé sur les montants MO payés',
+    fr:{title:'Bonus — 1% Main-d\'Œuvre',sub:'Bonus mensuel basé sur les montants MO payés',
       rules:[
         {icon:'⭐',title:'Formule Bonus',desc:'Bonus = 1% × labour_definitive_amount_without_pco_eur. Calculé uniquement sur les dossiers PAYÉS (invoice_flag_state = 0). Rejets et doublons exclus.'},
         {icon:'📅',title:'Par Mois',desc:'Le bonus est calculé indépendamment pour chaque mois. Le graphique barres montre visuellement les montants MO relatifs.'},
@@ -1532,6 +2616,59 @@ function sendFeedback(){
   closeHelp();
   showToast('📧 ' + (_lang==='fr' ? 'Outlook ouvert !' : 'Opening Outlook!'));
 }
+
 </script>
+
+<!-- ══ HELP PANEL ══════════════════════════════════════════ -->
+<div class="help-panel-bg" id="HELP_BG" onclick="if(event.target===this)closeHelp()">
+  <div class="help-panel">
+    <div class="hp-header">
+      <div class="hp-icon" id="HP_ICON" style="background:var(--sky3)">❓</div>
+      <div>
+        <div class="hp-title en" id="HP_TITLE_EN">Help & Business Rules</div>
+        <div class="hp-title fr" id="HP_TITLE_FR">Aide & Règles Métier</div>
+        <div class="hp-sub en" id="HP_SUB_EN">How this page works</div>
+        <div class="hp-sub fr" id="HP_SUB_FR">Comment fonctionne cette page</div>
+      </div>
+      <div class="hp-close" onclick="closeHelp()">✕</div>
+    </div>
+    <div class="hp-body" id="HP_BODY"></div>
+    <div class="hp-footer">
+      <button class="hp-idea-btn" onclick="openFeedback('idea')">💡 <span class="en">New Idea</span><span class="fr">Nouvelle Idée</span></button>
+      <button class="hp-feedback-btn" onclick="openFeedback('correction')">🔧 <span class="en">System Correction</span><span class="fr">Correction Système</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ FEEDBACK MODAL ══════════════════════════════════════ -->
+<div class="fb-modal-bg" id="FB_BG" onclick="if(event.target===this)closeFeedback()">
+  <div class="fb-modal">
+    <div style="font-size:28px;margin-bottom:8px" id="FB_EMOJI">💡</div>
+    <div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:4px" id="FB_TITLE">New Idea</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:20px;font-weight:500">
+      <span class="en">This will open Outlook with a pre-filled email to the management team.</span>
+      <span class="fr">Cela ouvrira Outlook avec un e-mail pré-rempli pour l'équipe de direction.</span>
+    </div>
+    <div class="fr" style="margin-bottom:14px">
+      <label class="flb" style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block">Titre / Subject</label>
+      <input class="fi" id="FB_SUBJECT" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);font-family:inherit;outline:none;background:var(--surf2)" placeholder="Short title of your idea or correction…"/>
+    </div>
+    <div class="en-b" style="margin-bottom:14px">
+      <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block">Subject</label>
+      <input class="fi" id="FB_SUBJECT_EN" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);font-family:inherit;outline:none;background:var(--surf2)" placeholder="Short title of your idea or correction…"/>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;display:block">
+        <span class="en">Description</span><span class="fr">Description</span>
+      </label>
+      <textarea class="fi" id="FB_BODY" rows="5" style="width:100%;border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);font-family:inherit;outline:none;background:var(--surf2);resize:vertical" placeholder="Describe your idea or the correction needed…"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:16px;border-top:1.5px solid var(--border)">
+      <button class="btn btn-ghost btn-sm" onclick="closeFeedback()"><span class="en">Cancel</span><span class="fr">Annuler</span></button>
+      <button class="btn btn-sun btn-sm" onclick="sendFeedback()">📧 <span class="en">Open in Outlook</span><span class="fr">Ouvrir dans Outlook</span></button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
