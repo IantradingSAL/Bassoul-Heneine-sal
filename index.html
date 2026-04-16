@@ -5,6 +5,158 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Renault Warranty — Bassoul Heneine</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+
+// ══ SHORTFALL REPORT ══════════════════════════════════════════
+function rShf(){
+  const E=document.getElementById('SHF_E'),K=document.getElementById('SHF_K'),T=document.getElementById('SHF_T');
+  const allRej=S.gcm.filter(r=>r.st===4&&!r._d);
+  const credited=allRej.filter(r=>S.rej[r.inv]?.status==='credited'&&S.rej[r.inv]?.creditedAmt!=null);
+
+  // Update sidebar badge — number of claims with shortfall > 0
+  const withShortfall=credited.filter(r=>(S.rej[r.inv]?.shortfall||0)>0.01);
+  const el=document.getElementById('B_SHF');
+  if(el) el.textContent=withShortfall.length||'–';
+
+  if(!credited.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}
+  E.style.display='none';
+
+  const ff=gv('F_SHFF');
+  let rows=credited.map(r=>({...r,d:S.rej[r.inv]}));
+  if(ff==='shortfall') rows=rows.filter(r=>(r.d.shortfall||0)>0.01);
+  else if(ff==='full_recovery') rows=rows.filter(r=>Math.abs(r.d.shortfall||0)<=0.01);
+  else if(ff==='overpaid') rows=rows.filter(r=>(r.d.shortfall||0)<-0.01);
+  rows.sort((a,b)=>(b.d.shortfall||0)-(a.d.shortfall||0));
+
+  const totRejAmt=credited.reduce((s,r)=>s+(r.d.rejectedAmt||r.ta),0);
+  const totCredited=credited.reduce((s,r)=>s+(r.d.creditedAmt||0),0);
+  const totShortfall=credited.reduce((s,r)=>s+(r.d.shortfall||0),0);
+  const totOverpaid=credited.filter(r=>(r.d.shortfall||0)<-0.01).reduce((s,r)=>s+Math.abs(r.d.shortfall||0),0);
+  const avgRate=totRejAmt>0?(totCredited/totRejAmt*100):0;
+
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💚 Total Credited (€)</div><div class="kv mint">${f(totCredited)}</div><div class="ks">${credited.length} claims credited by Renault</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">⚠️ Total Shortfall (€)</div><div class="kv rose">${f(Math.max(totShortfall,0))}</div><div class="ks">${withShortfall.length} claims paid less than rejected</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">💙 Overpaid by Renault (€)</div><div class="kv sky">${f(totOverpaid)}</div><div class="ks">${credited.filter(r=>(r.d.shortfall||0)<-0.01).length} claims Renault paid more</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">📊 Avg Recovery Rate</div><div class="kv ${avgRate>=100?'mint':avgRate>=70?'lem':'rose'}">${avgRate.toFixed(1)}%</div><div class="ks">Across all credited claims</div></div>
+    <div class="kpi" style="background:linear-gradient(135deg,var(--rose3),#FFE4E6);border-color:var(--rose2)"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">💸 Still Outstanding (€)</div><div class="kv rose" style="font-size:20px">${f(Math.max(totShortfall,0))}</div><div class="ks">Shortfall still owed by Renault</div></div>`;
+
+  if(!rows.length){T.innerHTML=`<div class="al al-g">✅ No claims match this filter.</div>`;return;}
+
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">📋 Shortfall Detail — ${rows.length} credited claims</div>
+  <div class="tw"><table class="t">
+  <thead><tr>
+    <th>VIN</th><th>Orig Invoice #</th><th>New Claim #</th><th>Month</th><th>Exp Code</th>
+    <th class="num">Orig Asked (€)</th><th class="num">Rejected (€)</th>
+    <th class="num">Credited (€)</th><th class="num">Shortfall (€)</th><th class="num">Recovery %</th>
+    <th>Credit Date</th><th>Auto?</th><th>Reason</th><th>Action</th>
+  </tr></thead><tbody>`;
+
+  rows.forEach(r=>{
+    const d=r.d;
+    const sf=d.shortfall||0;
+    const sfColor=sf>0.01?'var(--rose)':sf<-0.01?'var(--sky)':'var(--mint)';
+    const rate=d.recoveryRate||0;
+    const rateColor=rate>=100?'var(--mint)':rate>=70?'var(--lemon)':'var(--rose)';
+    h+=`<tr>
+      <td class="mono" style="font-size:10px">${r.vin}</td>
+      <td class="mono">${r.inv}</td>
+      <td class="mono">${d.newClaim?`<span class="badge b-mint" style="font-size:8px">✅ ${d.newClaim}</span>`:'—'}</td>
+      <td style="font-size:11px;font-weight:600">${fmM(r.month)}</td>
+      <td><span class="badge b-sun">${r.exp||'–'}</span></td>
+      <td class="num">${f(r.ta)}</td>
+      <td class="num" style="color:var(--rose)">${f(d.rejectedAmt||r.ta)}</td>
+      <td class="num" style="font-weight:700;color:var(--mint)">${f(d.creditedAmt)}</td>
+      <td class="num" style="font-weight:700;color:${sfColor}">${sf>=0?'':'+'} ${f(Math.abs(sf))}</td>
+      <td class="num"><span class="badge" style="background:${rate>=100?'var(--mint3)':rate>=70?'var(--lemon3)':'var(--rose3)'};color:${rateColor};border:1.5px solid currentColor">${rate.toFixed(1)}%</span></td>
+      <td style="font-size:10px;color:var(--mint)">${d.creditDate||'—'}</td>
+      <td>${d.autoMatched?'<span class="badge b-sky" style="font-size:8px">🤖 Auto</span>':'<span class="badge b-n" style="font-size:8px">Manual</span>'}</td>
+      <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)" title="${d.reason||''}">${d.reason||'—'}</td>
+      <td><button class="btn btn-ghost btn-xs" onclick="openModal('${esc(r.inv)}','${r.vin}')">✏️ Edit</button></td>
+    </tr>`;
+  });
+  h+=`</tbody><tfoot><tr class="tr-grand">
+    <td colspan="5">TOTAL (${rows.length} claims)</td>
+    <td class="num">${f(rows.reduce((s,r)=>s+r.ta,0))}</td>
+    <td class="num">${f(rows.reduce((s,r)=>s+(r.d.rejectedAmt||r.ta),0))}</td>
+    <td class="num">${f(rows.reduce((s,r)=>s+(r.d.creditedAmt||0),0))}</td>
+    <td class="num">${f(rows.reduce((s,r)=>s+(r.d.shortfall||0),0))}</td>
+    <td class="num">${(rows.reduce((s,r)=>s+(r.d.recoveryRate||0),0)/Math.max(rows.length,1)).toFixed(1)}%</td>
+    <td colspan="4"></td>
+  </tr></tfoot></table></div></div>`;
+  T.innerHTML=h;
+}
+
+// ══ EXPORT TO EXCEL ═══════════════════════════════════════════
+function exportRejections(){
+  const allRej=S.gcm.filter(r=>r.st===4&&!r._d);
+  if(!allRej.length){showToast('⚠️ No rejected claims to export');return;}
+
+  // Build CSV rows
+  const headers=['VIN','Invoice #','RO','Month','Exp Code','Total Asked (€)','Total Paid (€)',
+    'Rejected (€)','Rejection Type','Reason','Category','New Claim #','Resub Invoice',
+    'Resub Date','Status','Credited (€)','Credit Date','Shortfall (€)','Recovery %','Notes'];
+  const rows=allRej.map(r=>{
+    const d=S.rej[r.inv]||{};
+    const rejAmt=d.rejType==='partial'?Math.max(r.ta-r.tp,0):r.ta;
+    return [
+      r.vin, r.inv, r.ro||'', fmM(r.month), r.exp||'',
+      r.ta.toFixed(2), r.tp.toFixed(2), rejAmt.toFixed(2),
+      d.rejType||'', d.reason||'', d.cat||'', d.newClaim||'',
+      d.reInv||'', d.resubDate||'', d.status||'',
+      d.creditedAmt!=null?d.creditedAmt.toFixed(2):'',
+      d.creditDate||'',
+      d.shortfall!=null?d.shortfall.toFixed(2):'',
+      d.recoveryRate!=null?d.recoveryRate.toFixed(1)+'%':'',
+      (d.notes||'').replace(/"/g,"'")
+    ];
+  });
+  const csv=[headers,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='RejectionTracking_'+new Date().toISOString().substr(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast('📥 Rejection tracking exported!');
+}
+
+function exportGCM(){
+  const rows=S.gcm.filter(r=>!r._d);
+  if(!rows.length){showToast('⚠️ No GCM data to export');return;}
+  const headers=['VIN','Invoice #','Op','RO','Month','Date','Exp Code','Exp Description','NITG',
+    'Parts Asked (€)','Parts Paid (€)','Labour Asked (€)','Labour Paid (€)',
+    'Total Asked (€)','Total Paid (€)','Status'];
+  const data=rows.map(r=>[
+    r.vin, r.inv, r.intLetter||'', r.ro||'', fmM(r.month), r.date||'',
+    r.exp||'', r.expD||'', r.nitg||'',
+    r.pa.toFixed(2), r.pp.toFixed(2), r.la.toFixed(2), r.lp.toFixed(2),
+    r.ta.toFixed(2), r.tp.toFixed(2),
+    r.st===0?'Paid':r.st===4?'Rejected':'Other'
+  ]);
+  const csv=[headers,...data].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='GCM_Claims_'+new Date().toISOString().substr(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast('📥 GCM claims exported!');
+}
+
+// ══ SUPABASE SCHEMA EXPORT ════════════════════════════════════
+// All data structures are Supabase-ready:
+// Table: warranty_rejections
+//   id: text (invoice # = primary key)
+//   vin: text, gcm_invoice: text, rejection_type: text, reason: text
+//   new_claim: text, resub_invoice: text, resub_date: date
+//   category: text, status: text, notes: text
+//   credited_amt: numeric, credit_date: date, shortfall: numeric, recovery_rate: numeric
+//   orig_asked: numeric, orig_paid: numeric, rejected_amt: numeric
+//   auto_matched: boolean, created_at: timestamptz
+//
+// When ready to link to Supabase, replace lsSave/lsLoad with:
+// async function sbSave(table, id, data){ await supabase.from(table).upsert({id,...data}); }
+// async function sbLoad(table){ const {data}=await supabase.from(table).select('*'); return data; }
+
 // ══ LANGUAGE ═════════════════════════════════════════════════
 let _lang = 'en';
 function setLang(l){
@@ -1060,13 +1212,48 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
       </div>
       <div>
         <label class="flb">⑤ Status</label>
-        <select class="fi" id="M_STATUS">
+        <select class="fi" id="M_STATUS" onchange="onStatusChange()">
           <option value="pending">🔴 Pending — No Action Yet</option>
           <option value="resubmitted">🔄 Resubmitted to Renault</option>
           <option value="escalated">⬆️ Escalated to Renault Rep</option>
+          <option value="credited">💚 Credited — Renault Paid Resubmission</option>
           <option value="resolved">✅ Resolved</option>
           <option value="written_off">💀 Written Off</option>
         </select>
+      </div>
+    </div>
+
+    <!-- CREDIT DETAILS — shown when status = credited or resolved -->
+    <div id="M_CREDIT_BLOCK" style="display:none;background:linear-gradient(135deg,var(--mint3),#D1FAE5);border:1.5px solid rgba(16,185,129,.3);border-radius:12px;padding:14px 16px;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:var(--mint);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">💚 Credit / Payment Details — Resubmission Result</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label class="flb" style="font-size:9px">Amount Credited by Renault (€) <span style="color:var(--rose)">*</span></label>
+          <input class="fi" id="M_CREDITED_AMT" type="number" step="0.01" min="0" placeholder="e.g. 450.00" oninput="calcCreditRecovery()"/>
+          <div style="font-size:9px;color:var(--muted);margin-top:3px">Actual amount Renault paid on the resubmitted claim</div>
+        </div>
+        <div>
+          <label class="flb" style="font-size:9px">Credit Date</label>
+          <input class="fi" id="M_CREDIT_DATE" type="date"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:var(--surf);border-radius:10px;padding:10px 12px;border:1.5px solid var(--border)">
+        <div>
+          <div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:3px">ORIGINAL REJECTED (€)</div>
+          <div style="font-size:13px;font-weight:800;color:var(--rose)" id="M_CR_ORIG">—</div>
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:3px">CREDITED (€)</div>
+          <div style="font-size:13px;font-weight:800;color:var(--mint)" id="M_CR_CREDITED">—</div>
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:3px">SHORTFALL (€)</div>
+          <div style="font-size:13px;font-weight:800" id="M_CR_SHORTFALL">—</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surf);border-radius:8px;border:1.5px solid var(--border)">
+        <span style="font-size:11px;font-weight:600;color:var(--ink2)">Recovery Rate:</span>
+        <span style="font-size:16px;font-weight:800;color:var(--mint)" id="M_CR_RATE">—</span>
       </div>
     </div>
 
@@ -1162,13 +1349,18 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
   <div class="si" data-page="incadea" onclick="go(this)"><span class="si-emoji">🔧</span>Incadea Data<span class="sbadge sb-sky" id="B_INC">–</span></div>
   <div class="si" data-page="bonus" onclick="go(this)"><span class="si-emoji">⭐</span>Bonus 1%</div>
   <div class="ss">📊 Analytics</div>
+  <div class="si" data-page="shortfall" onclick="go(this)"><span class="si-emoji">📋</span>Shortfall Report<span class="sbadge sb-rose" id="B_SHF">–</span></div>
   <div class="si" data-page="ageing" onclick="go(this)"><span class="si-emoji">⏰</span>Rejection Ageing<span class="sbadge sb-rose" id="B_AGE">–</span></div>
   <div class="si" data-page="recovery" onclick="go(this)"><span class="si-emoji">🔄</span>Recovery Rate</div>
   <div class="si" data-page="trends" onclick="go(this)"><span class="si-emoji">📉</span>Rejection Trends</div>
   <div class="s-foot">
     <div class="s-foot-text">📁 GCM + INCADEA monthly<br/>🔑 Dedup: exact VIN + Invoice #<br/>🔤 a/b/c = separate operations, not dups</div>
     <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:9px;color:var(--faint);line-height:1.8">
-      <div id="LS_STATUS" style="margin-bottom:4px"></div>
+      <div id="LS_STATUS" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-xs" onclick="exportGCM()" title="Export all GCM claims as CSV">📥 Export GCM</button>
+        <button class="btn btn-ghost btn-xs" onclick="exportRejections()" title="Export rejection tracking as CSV">📥 Export Rejections</button>
+      </div>
       © 2025 IanTradingSAL<br/>All rights reserved
     </div>
 
@@ -1324,8 +1516,12 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
 <!-- ══ COMPARISON PAGE ══════════════════════════════════ -->
 <div class="page-area" id="P_comparison" style="display:none">
   <div class="filterbar">
+    <div class="fg"><span class="fl">View</span><select class="fsel" id="F_CV" onchange="rComp()">
+      <option value="vin">📊 VIN Summary</option>
+      <option value="invoice">🔍 Invoice Deep Dive</option>
+    </select></div>
     <div class="fg"><span class="fl">Show</span><select class="fsel" id="F_CD" onchange="rComp()"><option value="">All VINs</option><option value="diff">⚠️ Differences Only</option><option value="match">✅ Matches Only</option></select></div>
-    <div class="fg nobr"><span class="fl">Search VIN</span><input class="finput" id="F_CQ" placeholder="Search VIN…" oninput="rComp()"/></div>
+    <div class="fg nobr"><span class="fl">Search VIN</span><input class="finput" id="F_CQ" placeholder="Search VIN or model…" oninput="rComp()"/></div>
   </div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--pur3)">⚖️</div><div><div class="ph-title">Incadea vs GCM</div><div class="ph-sub">Reconciliation per VIN — spot every difference</div></div></div>
@@ -1359,13 +1555,15 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
       <option value="resubmitted">✅ Has New Claim #</option>
       <option value="full">❌ Fully Rejected</option>
       <option value="partial">⚠️ Partially Rejected</option>
+      <option value="credited">💚 Credited by Renault</option>
       <option value="resolved">✅ Resolved</option>
     </select></div>
   </div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--rose3)">❌</div><div><div class="ph-title">Rejections</div><div class="ph-sub">Track, annotate and resubmit rejected claims</div></div></div>
+    <div style="padding:8px 22px 0;display:flex;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="exportRejections()" style="font-size:10px">📥 Export to CSV</button></div>
     <div id="REJ_E" class="al al-i" style="display:none">✅ No rejected claims found. GCM rejections = invoice_flag_state = 4.</div>
-    <div id="REJ_K" class="krow k4" style="display:none"></div>
+    <div id="REJ_K" class="krow k5" style="display:none"></div>
     <div id="REJ_T"></div>
   </div></div>
 </div>
@@ -1374,6 +1572,7 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
 <div class="page-area" id="P_incadea" style="display:none">
   <div class="filterbar">
     <div class="fg"><span class="fl">Make</span><select class="fsel" id="F_IMK" onchange="rInc()"><option value="">All Makes</option></select></div>
+    <div class="fg"><span class="fl">Location</span><select class="fsel" id="F_ILOC" onchange="rInc()"><option value="">All Locations</option></select></div>
     <div class="fg nobr"><span class="fl">Search</span><input class="finput" id="F_IQ" placeholder="VIN, invoice, order, customer…" oninput="rInc()"/></div>
   </div>
   <div class="scroll"><div class="page">
@@ -1434,6 +1633,24 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
   </div></div>
 </div>
 
+
+<!-- ══ SHORTFALL REPORT PAGE ══════════════════════════════ -->
+<div class="page-area" id="P_shortfall" style="display:none">
+  <div class="filterbar">
+    <div class="fg nobr"><span class="fl">Filter</span><select class="fsel" id="F_SHFF" onchange="rShf()">
+      <option value="">All Credited Claims</option>
+      <option value="shortfall">⚠️ Has Shortfall</option>
+      <option value="full_recovery">✅ Full Recovery Only</option>
+      <option value="overpaid">💙 Overpaid by Renault</option>
+    </select></div>
+  </div>
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--rose3)">📋</div><div><div class="ph-title">Shortfall Report</div><div class="ph-sub">Credited claims where Renault paid less than the rejected amount — money still owed</div></div></div>
+    <div id="SHF_E" class="al al-i" style="display:none">No credited claims yet. Mark rejected claims as "💚 Credited" in the Rejection Protocol to populate this report.</div>
+    <div id="SHF_K" class="krow k5" style="display:none"></div>
+    <div id="SHF_T"></div>
+  </div></div>
+</div>
 </div></div>
 
 <script>
@@ -1449,7 +1666,7 @@ function lsLoad(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):nu
 function lsClear(){
   [LS_GCM,LS_INC,LS_REJ,LS_META].forEach(k=>localStorage.removeItem(k));
   S.gcm=[];S.inc=[];S.rej={};S.lastUpdate=null;
-  ['B_GCM','B_REJ','B_INC','B_AGE'].forEach(id=>document.getElementById(id).textContent='–');
+  ['B_GCM','B_REJ','B_INC','B_AGE','B_SHF'].forEach(id=>document.getElementById(id).textContent='–');
   document.getElementById('US_GCM_COUNT').textContent='—';
   document.getElementById('US_GCM_META').textContent='No file loaded';
   document.getElementById('US_INC_COUNT').textContent='—';
@@ -1520,7 +1737,7 @@ function go(el){
   document.querySelectorAll('.page-area').forEach(p=>p.style.display='none');
   const pg = el.dataset.page;
   document.getElementById('P_'+pg).style.display = 'flex';
-  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd})[pg]?.();
+  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf})[pg]?.();
 }
 
 // ══ DRAG & DROP ══════════════════════════════════════════════
@@ -1552,6 +1769,31 @@ function procF(file, type){
         document.getElementById('US_REJ_META').textContent = valid.length ? ((rejCount/valid.length)*100).toFixed(1)+'% rejection rate' : '';
         updTime(); updPills();
         stat('ST_GCM', '✅ ' + valid.length + ' claims loaded · ' + S.gcm.filter(r=>r._d).length + ' duplicates flagged', true);
+        // ── AUTO-MATCH: check if any tracked newClaim # now appears as a paid GCM claim ──
+        let autoMatched = 0;
+        const gcmByInv = {};
+        S.gcm.filter(r=>!r._d).forEach(r=>{ gcmByInv[r.inv]=r; });
+        Object.entries(S.rej).forEach(([origInv, d]) => {
+          if(!d.newClaim || d.status==='credited' || d.status==='resolved') return;
+          const newClaimRow = gcmByInv[d.newClaim];
+          if(newClaimRow && newClaimRow.st===0){
+            // Renault paid the resubmission — auto-credit it
+            S.rej[origInv] = Object.assign({}, d, {
+              status: 'credited',
+              creditedAmt: newClaimRow.tp,
+              creditDate: newClaimRow.date || new Date().toISOString().substr(0,10),
+              shortfall: (d.rejectedAmt||d.origAsked||0) - newClaimRow.tp,
+              recoveryRate: (d.rejectedAmt||d.origAsked||0) > 0 ? (newClaimRow.tp/(d.rejectedAmt||d.origAsked||0)*100) : 100,
+              autoMatched: true,
+              ts: d.ts // keep original timestamp
+            });
+            autoMatched++;
+          }
+        });
+        if(autoMatched > 0){
+          lsSave(LS_REJ, S.rej);
+          showToast('💚 ' + autoMatched + ' resubmission' + (autoMatched>1?'s':'')+' auto-matched as Credited!');
+        }
       } else if(type==='inc'){
         const sn = wb.SheetNames.find(s=>/incadea/i.test(s)) || wb.SheetNames[0];
         S.inc = parseINC(XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:''}));
@@ -1659,15 +1901,27 @@ function parseGCM(raw){
   }).filter(r=>r.vin||r.inv);
 }
 function parseINC(raw){
-  return raw.filter(r=>r['No.']||r['VIN']).map(r=>({
-    no:String(r['No.']||'').trim(),vin:String(r['VIN']||'').trim().toUpperCase(),
-    model:String(r['Model']||'').trim(),make:String(r['Make Code']||'').trim(),
-    cust:String(r['Sell-to Customer Name']||'').trim(),
+  return raw.filter(r=>r['No.']||r['Reference VIN']||r['VIN']).map(r=>({
+    no:    String(r['No.']||'').trim(),
+    vin:   String(r['Reference VIN']||r['VIN']||'').trim().toUpperCase(),
+    model: String(r['Model']||'').trim(),
+    make:  String(r['Make Code']||'').trim(),
+    cust:  String(r['Sell-to Customer Name']||'').trim(),
+    custNo:String(r['Sell-to Customer No.']||'').trim(),
     svcOrd:String(r['Service Order No.']||'').trim(),
     extDoc:String(r['External Document No.']||'').trim(),
-    date:String(r['Posting Date']||'').substr(0,10),
-    month:mKey(String(r['Posting Date']||'')),
-    lab:n(r['Total Labors']),parts:n(r['Total Parts']),amt:n(r['Amount']),
+    loc:   String(r['Location Code']||'').trim(),
+    salesPerson: String(r['Salesperson Code']||'').trim(),
+    postGrp: String(r['Service Posting Group Description']||r['Service Posting Group']||'').trim(),
+    payMethod: String(r['Payment Method Code']||'').trim(),
+    date:  String(r['Posting Date']||'').substr(0,10),
+    month: mKey(String(r['Posting Date']||'')),
+    initReg: (() => { const v=r['Initial Registration']; if(!v||v==='nan') return ''; const s=String(v).substr(0,10); return s; })(),
+    mileage: n(r['Vehicle Mileage']||r['Service Mileage']||0),
+    lab:   n(r['Total Labors']),
+    parts: n(r['Total Parts']),
+    amt:   n(r['Amount']),
+    amtVat:n(r['Amount Including VAT']||0),
   }));
 }
 
@@ -1693,7 +1947,11 @@ function fillGF(){
 }
 function fillIF(){
   const makes=[...new Set(S.inc.map(r=>r.make))].filter(Boolean).sort();
-  const mk=document.getElementById('F_IMK');if(mk){mk.innerHTML='<option value="">All Makes</option>';makes.forEach(m=>mk.innerHTML+=`<option value="${m}">${m}</option>`);}
+  const locs=[...new Set(S.inc.map(r=>r.loc))].filter(Boolean).sort();
+  const mk=document.getElementById('F_IMK');
+  if(mk){mk.innerHTML='<option value="">All Makes</option>';makes.forEach(m=>mk.innerHTML+=`<option value="${m}">${m}</option>`);}
+  const lc=document.getElementById('F_ILOC');
+  if(lc){lc.innerHTML='<option value="">All Locations</option>';locs.forEach(l=>lc.innerHTML+=`<option value="${l}">${l}</option>`);}
 }
 
 // ══ MODAL — REJECTION PROTOCOL ══════════════════════════════
@@ -1723,22 +1981,42 @@ function setRejType(type){
   }
 }
 
+function onStatusChange(){
+  const s=gv('M_STATUS');
+  const block=document.getElementById('M_CREDIT_BLOCK');
+  if(block) block.style.display=(s==='credited'||s==='resolved')?'block':'none';
+  if(s==='credited'||s==='resolved') calcCreditRecovery();
+}
+
+function calcCreditRecovery(){
+  if(!_mkClaim) return;
+  const rejAmt = _rejType==='full' ? (_mkClaim.ta||0) : Math.max((_mkClaim.ta||0)-(_mkClaim.tp||0),0);
+  const credited = parseFloat(document.getElementById('M_CREDITED_AMT')?.value||0)||0;
+  const shortfall = rejAmt - credited;
+  const rate = rejAmt>0 ? (credited/rejAmt*100) : 0;
+  const origEl=document.getElementById('M_CR_ORIG');
+  const credEl=document.getElementById('M_CR_CREDITED');
+  const sfEl=document.getElementById('M_CR_SHORTFALL');
+  const rateEl=document.getElementById('M_CR_RATE');
+  if(origEl) origEl.textContent='€'+f(rejAmt);
+  if(credEl) credEl.textContent='€'+f(credited);
+  if(sfEl){ sfEl.textContent='€'+f(Math.abs(shortfall)); sfEl.style.color=shortfall>0.01?'var(--rose)':shortfall<-0.01?'var(--sky)':'var(--mint)'; }
+  if(rateEl){ rateEl.textContent=rate.toFixed(1)+'%'; rateEl.style.color=rate>=100?'var(--mint)':rate>=70?'var(--lemon)':'var(--rose)'; }
+}
+
 function openModal(inv,vin){
   _mk=inv;
-  // Find the claim object for amount calculations
   _mkClaim = S.gcm.find(r=>r.inv===inv&&!r._d)||null;
   document.getElementById('MTITLE').textContent = 'Rejection Protocol — '+inv;
   document.getElementById('MSUB').textContent = 'VIN: '+vin;
 
-  // Populate amount banner
   if(_mkClaim){
     const ta=_mkClaim.ta||0, tp=_mkClaim.tp||0, rejAmt=ta-tp;
     document.getElementById('M_SHOW_ASKED').textContent='€'+f(ta);
     document.getElementById('M_SHOW_PAID').textContent='€'+f(tp);
-    document.getElementById('M_SHOW_REJ').textContent='€'+f(rejAmt>0?rejAmt:ta); // full rejected = full ta
+    document.getElementById('M_SHOW_REJ').textContent='€'+f(rejAmt>0?rejAmt:ta);
   }
 
-  // Load existing data if editing
   const d=S.rej[inv]||{};
   document.getElementById('M_REASON').value=d.reason||'';
   document.getElementById('M_NEWCLAIM').value=d.newClaim||'';
@@ -1747,17 +2025,22 @@ function openModal(inv,vin){
   document.getElementById('M_CAT').value=d.cat||'';
   document.getElementById('M_STATUS').value=d.status||'pending';
   document.getElementById('M_NOTES').value=d.notes||'';
+  // Credit fields
+  const creditedAmtEl=document.getElementById('M_CREDITED_AMT');
+  const creditDateEl=document.getElementById('M_CREDIT_DATE');
+  if(creditedAmtEl) creditedAmtEl.value=d.creditedAmt||'';
+  if(creditDateEl) creditDateEl.value=d.creditDate||'';
 
-  // Set rejection type toggle
-  const savedType = d.rejType||'full';
-  _rejType = savedType;
-  // Reset styles first
+  const savedType=d.rejType||'full';
+  _rejType=savedType;
   document.getElementById('M_TYPE_FULL').style.border='2px solid var(--border)';
   document.getElementById('M_TYPE_FULL').style.background='var(--surf2)';
   document.getElementById('M_TYPE_PART').style.border='2px solid var(--border)';
   document.getElementById('M_TYPE_PART').style.background='var(--surf2)';
   document.getElementById('M_PARTIAL_INFO').style.display='none';
   setRejType(savedType);
+  onStatusChange();
+  if(d.creditedAmt) calcCreditRecovery();
 
   document.getElementById('MBGR').classList.add('open');
 }
@@ -1766,33 +2049,41 @@ function closeModal(){document.getElementById('MBGR').classList.remove('open');_
 
 function saveRej(){
   if(!_mk) return;
-  const claim = _mkClaim||S.gcm.find(r=>r.inv===_mk&&!r._d)||null;
-  const ta = claim?claim.ta:0;
-  const tp = claim?claim.tp:0;
-  const rejAmt = _rejType==='full' ? ta : Math.max(ta-tp,0);
-  const acceptedAmt = _rejType==='full' ? 0 : tp;
+  const claim=_mkClaim||S.gcm.find(r=>r.inv===_mk&&!r._d)||null;
+  const ta=claim?claim.ta:0;
+  const tp=claim?claim.tp:0;
+  const rejAmt=_rejType==='full'?ta:Math.max(ta-tp,0);
+  const acceptedAmt=_rejType==='full'?0:tp;
+  const creditedAmt=parseFloat(document.getElementById('M_CREDITED_AMT')?.value||0)||0;
+  const creditDate=document.getElementById('M_CREDIT_DATE')?.value||'';
+  const shortfall=rejAmt-creditedAmt;
+  const recoveryRate=rejAmt>0?(creditedAmt/rejAmt*100):0;
 
-  S.rej[_mk] = {
-    rejType: _rejType,          // 'full' or 'partial'
-    reason: gv('M_REASON'),
-    newClaim: gv('M_NEWCLAIM'),
-    reInv: gv('M_REINV'),
-    resubDate: gv('M_RESUBDATE'),
-    cat: gv('M_CAT'),
-    status: gv('M_STATUS'),
-    notes: gv('M_NOTES'),
-    // Calculated amounts (auto, not user-entered)
-    origAsked: ta,
-    origPaid: tp,
-    rejectedAmt: rejAmt,
-    acceptedAmt: acceptedAmt,
-    ts: new Date().toISOString()
+  S.rej[_mk]={
+    rejType:_rejType,
+    reason:gv('M_REASON'),
+    newClaim:gv('M_NEWCLAIM'),
+    reInv:gv('M_REINV'),
+    resubDate:gv('M_RESUBDATE'),
+    cat:gv('M_CAT'),
+    status:gv('M_STATUS'),
+    notes:gv('M_NOTES'),
+    // Credit/payment details
+    creditedAmt:creditedAmt||null,
+    creditDate:creditDate||null,
+    shortfall:shortfall,
+    recoveryRate:recoveryRate,
+    // Calculated amounts
+    origAsked:ta,
+    origPaid:tp,
+    rejectedAmt:rejAmt,
+    acceptedAmt:acceptedAmt,
+    ts:new Date().toISOString()
   };
 
-  closeModal();
-  rRej(); rGCM();
+  closeModal(); rRej(); rGCM();
   document.getElementById('B_REJ').textContent=S.gcm.filter(r=>r.st===4&&!r._d).length;
-  lsSave(LS_REJ, S.rej);
+  lsSave(LS_REJ,S.rej);
   updLsStatus();
   showToast('✅ Rejection protocol saved!');
 }
@@ -1957,15 +2248,19 @@ function rExp(){
 function rComp(){
   const E=document.getElementById('CMP_E'),K=document.getElementById('CMP_K'),T=document.getElementById('CMP_T');
   if(!S.gcm.length||!S.inc.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}E.style.display='none';
-  const df=gv('F_CD'),qf=gv('F_CQ').toLowerCase();
-  const gcmV={};S.gcm.filter(r=>!r._d).forEach(r=>{if(!gcmV[r.vin])gcmV[r.vin]={pp:0,lp:0,tp:0};gcmV[r.vin].pp+=r.pp;gcmV[r.vin].lp+=r.lp;gcmV[r.vin].tp+=r.tp;});
-  const incV={};S.inc.forEach(r=>{if(!incV[r.vin])incV[r.vin]={pp:0,lp:0,tp:0,make:r.make,model:r.model};incV[r.vin].pp+=r.parts;incV[r.vin].lp+=r.lab;incV[r.vin].tp+=r.amt;});
+  const df=gv('F_CD'),qf=gv('F_CQ').toLowerCase(),view=gv('F_CV')||'vin';
+
+  // ── VIN LEVEL ─────────────────────────────────────────────
+  const gcmV={};S.gcm.filter(r=>!r._d).forEach(r=>{if(!gcmV[r.vin])gcmV[r.vin]={pp:0,lp:0,tp:0,cnt:0,invs:[]};gcmV[r.vin].pp+=r.pp;gcmV[r.vin].lp+=r.lp;gcmV[r.vin].tp+=r.tp;gcmV[r.vin].cnt++;gcmV[r.vin].invs.push(r.inv);});
+  const incV={};S.inc.forEach(r=>{if(!incV[r.vin])incV[r.vin]={pp:0,lp:0,tp:0,make:r.make,model:r.model,locs:new Set()};incV[r.vin].pp+=r.parts;incV[r.vin].lp+=r.lab;incV[r.vin].tp+=r.amt;incV[r.vin].locs.add(r.loc);});
+
   let mg=[...new Set([...Object.keys(gcmV),...Object.keys(incV)])].filter(Boolean).map(vin=>{
-    const g=gcmV[vin]||{pp:0,lp:0,tp:0};const i=incV[vin]||{pp:0,lp:0,tp:0};
-    return{vin,make:incV[vin]?.make||'',model:incV[vin]?.model||'',gpp:g.pp,glp:g.lp,gtp:g.tp,ipp:i.pp,ilp:i.lp,itp:i.tp,dpp:g.pp-i.pp,dlp:g.lp-i.lp,dtp:g.tp-i.tp};
+    const g=gcmV[vin]||{pp:0,lp:0,tp:0,cnt:0,invs:[]};const i=incV[vin]||{pp:0,lp:0,tp:0};
+    const locs=incV[vin]?[...incV[vin].locs].join(', '):'';
+    return{vin,make:incV[vin]?.make||'',model:incV[vin]?.model||'',locs,gpp:g.pp,glp:g.lp,gtp:g.tp,gcnt:g.cnt,invs:g.invs,ipp:i.pp,ilp:i.lp,itp:i.tp,dpp:g.pp-i.pp,dlp:g.lp-i.lp,dtp:g.tp-i.tp};
   });
   if(df==='diff')mg=mg.filter(r=>Math.abs(r.dtp)>0.01);else if(df==='match')mg=mg.filter(r=>Math.abs(r.dtp)<=0.01);
-  if(qf)mg=mg.filter(r=>r.vin.toLowerCase().includes(qf));
+  if(qf)mg=mg.filter(r=>r.vin.toLowerCase().includes(qf)||r.make.toLowerCase().includes(qf)||r.model.toLowerCase().includes(qf));
   mg.sort((a,b)=>Math.abs(b.dtp)-Math.abs(a.dtp));
   const tG=mg.reduce((s,r)=>s+r.gtp,0),tI=mg.reduce((s,r)=>s+r.itp,0),tD=tG-tI;
   const mtch=mg.filter(r=>Math.abs(r.dtp)<=0.01).length;
@@ -1975,13 +2270,101 @@ function rComp(){
     <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">🔧 Incadea Total (€)</div><div class="kv sky">${f(tI)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚖️ Difference (€)</div><div class="kv ${Math.abs(tD)>0.01?'lem':'mint'}">${f(tD)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">✅ Perfect Matches</div><div class="kv mint">${mtch}</div><div class="ks">of ${mg.length} VINs</div></div>`;
+
   const dc=v=>Math.abs(v)<=0.01?'dz':v>0?'dp':'dn';
-  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">⚖️ Incadea ↔ GCM by VIN — ${mg.length} records</div><div class="tw"><table class="t">
-  <thead><tr><th>VIN</th><th>Make / Model</th><th class="num">GCM Parts</th><th class="num">INC Parts</th><th class="num">Δ Parts</th><th class="num">GCM Labour</th><th class="num">INC Labour</th><th class="num">Δ Labour</th><th class="num">GCM Total</th><th class="num">INC Total</th><th class="num">Δ Total</th></tr></thead><tbody>`;
-  mg.slice(0,400).forEach(r=>{h+=`<tr><td class="mono">${r.vin}</td><td style="font-size:10px;font-weight:600">${r.make} ${r.model}</td><td class="num">${f(r.gpp)}</td><td class="num">${f(r.ipp)}</td><td class="num ${dc(r.dpp)}">${f(r.dpp)}</td><td class="num">${f(r.glp)}</td><td class="num">${f(r.ilp)}</td><td class="num ${dc(r.dlp)}">${f(r.dlp)}</td><td class="num">${f(r.gtp)}</td><td class="num">${f(r.itp)}</td><td class="num ${dc(r.dtp)}" style="font-weight:700">${f(r.dtp)}</td></tr>`;});
-  if(mg.length>400)h+=`<tr><td colspan="11" style="text-align:center;padding:12px;color:var(--muted);font-size:11px">… ${mg.length-400} more</td></tr>`;
-  h+=`</tbody><tfoot><tr class="tr-grand"><td colspan="2">TOTAL</td><td class="num">${f(mg.reduce((s,r)=>s+r.gpp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.ipp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.dpp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.glp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.ilp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.dlp,0))}</td><td class="num">${f(tG)}</td><td class="num">${f(tI)}</td><td class="num">${f(tD)}</td></tr></tfoot></table></div></div>`;
-  T.innerHTML=h;
+
+  // ── VIN SUMMARY VIEW ──────────────────────────────────────
+  if(view==='vin'){
+    let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">⚖️ Incadea ↔ GCM by VIN — ${mg.length} records</div>
+    <div class="tw"><table class="t">
+    <thead><tr><th>VIN</th><th>Make / Model</th><th>Location</th><th class="num">GCM Claims</th><th class="num">GCM Parts</th><th class="num">INC Parts</th><th class="num">Δ Parts</th><th class="num">GCM Labour</th><th class="num">INC Labour</th><th class="num">Δ Labour</th><th class="num">GCM Total</th><th class="num">INC Total</th><th class="num">Δ Total</th><th>Drill</th></tr></thead><tbody>`;
+    mg.slice(0,400).forEach(r=>{
+      h+=`<tr>
+        <td class="mono">${r.vin}</td>
+        <td style="font-size:10px;font-weight:600">${r.make} ${r.model}</td>
+        <td style="font-size:10px;color:var(--sky)">${r.locs||'–'}</td>
+        <td class="num" style="font-size:10px;color:var(--muted)">${r.gcnt}</td>
+        <td class="num">${f(r.gpp)}</td><td class="num">${f(r.ipp)}</td><td class="num ${dc(r.dpp)}">${f(r.dpp)}</td>
+        <td class="num">${f(r.glp)}</td><td class="num">${f(r.ilp)}</td><td class="num ${dc(r.dlp)}">${f(r.dlp)}</td>
+        <td class="num">${f(r.gtp)}</td><td class="num">${f(r.itp)}</td>
+        <td class="num ${dc(r.dtp)}" style="font-weight:700">${f(r.dtp)}</td>
+        <td><button class="btn btn-ghost btn-xs" onclick="showVinDrill('${esc(r.vin)}')">🔍 Detail</button></td>
+      </tr>`;
+    });
+    if(mg.length>400)h+=`<tr><td colspan="14" style="text-align:center;padding:12px;color:var(--muted);font-size:11px">… ${mg.length-400} more</td></tr>`;
+    h+=`</tbody><tfoot><tr class="tr-grand"><td colspan="3">TOTAL</td><td class="num">${mg.reduce((s,r)=>s+r.gcnt,0)}</td><td class="num">${f(mg.reduce((s,r)=>s+r.gpp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.ipp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.dpp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.glp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.ilp,0))}</td><td class="num">${f(mg.reduce((s,r)=>s+r.dlp,0))}</td><td class="num">${f(tG)}</td><td class="num">${f(tI)}</td><td class="num">${f(tD)}</td><td></td></tr></tfoot></table></div></div>`;
+    T.innerHTML=h;
+    return;
+  }
+
+  // ── INVOICE DEEP DIVE VIEW ────────────────────────────────
+  // Build per-invoice rows — match GCM invoices to INCADEA invoices by VIN
+  // GCM key: inv (invoice#). INCADEA key: no (invoice#) or svcOrd
+  const gcmRows=S.gcm.filter(r=>!r._d);
+  const incByVin={};S.inc.forEach(r=>{if(!incByVin[r.vin])incByVin[r.vin]=[];incByVin[r.vin].push(r);});
+  const incByNo={};S.inc.forEach(r=>{if(r.no)incByNo[r.no]=r;});
+
+  let qfInv=qf;
+  let deepRows=[];
+  // For each GCM claim, try to find matching INCADEA invoice
+  gcmRows.forEach(g=>{
+    if(qfInv&&![g.vin,g.inv,g.ro].join('|').toLowerCase().includes(qfInv)) return;
+    const incMatch=incByNo[g.inv]||incByNo[g.ro]||null;
+    const gTotal=g.tp;
+    const iTotal=incMatch?incMatch.amt:null;
+    const delta=iTotal!==null?gTotal-iTotal:null;
+    deepRows.push({source:'gcm',vin:g.vin,gcmInv:g.inv,gcmRo:g.ro,gcmMonth:g.month,gcmExp:g.exp,gcmAsked:g.ta,gcmPaid:g.tp,gcmSt:g.st,incNo:incMatch?.no||null,incSvcOrd:incMatch?.svcOrd||null,incAmt:iTotal,incLoc:incMatch?.loc||null,incDate:incMatch?.date||null,incMileage:incMatch?.mileage||null,delta,hasMatch:!!incMatch});
+  });
+  // INCADEA invoices NOT matched to any GCM claim
+  const matchedIncNos=new Set(deepRows.filter(r=>r.incNo).map(r=>r.incNo));
+  S.inc.forEach(i=>{
+    if(matchedIncNos.has(i.no)) return;
+    if(qfInv&&![i.vin,i.no,i.svcOrd].join('|').toLowerCase().includes(qfInv)) return;
+    deepRows.push({source:'inc_only',vin:i.vin,gcmInv:null,gcmRo:null,gcmMonth:null,gcmExp:null,gcmAsked:null,gcmPaid:null,gcmSt:null,incNo:i.no,incSvcOrd:i.svcOrd,incAmt:i.amt,incLoc:i.loc,incDate:i.date,incMileage:i.mileage,delta:null,hasMatch:false});
+  });
+  deepRows.sort((a,b)=>{if(a.vin<b.vin)return -1;if(a.vin>b.vin)return 1;return 0;});
+
+  const stBadge=st=>st===0?'<span class="badge b-mint">✅ Paid</span>':st===4?'<span class="badge b-rose">❌ Rejected</span>':'<span class="badge b-n">—</span>';
+  let h2=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">🔍 Invoice Deep Dive — ${deepRows.length} rows</div>
+  <div class="tw"><table class="t">
+  <thead><tr>
+    <th>VIN</th><th>GCM Invoice #</th><th>GCM RO</th><th>Month</th><th>Exp</th><th>GCM Status</th>
+    <th class="num">GCM Asked (€)</th><th class="num">GCM Paid (€)</th>
+    <th>INC Invoice #</th><th>INC Svc Order</th><th>INC Location</th><th>INC Date</th><th class="num">INC Mileage</th>
+    <th class="num">INC Amount (€)</th><th class="num">Δ (€)</th>
+  </tr></thead><tbody>`;
+  deepRows.slice(0,600).forEach(r=>{
+    const rowStyle=r.source==='inc_only'?'background:rgba(14,165,233,.05)':!r.hasMatch?'background:rgba(244,63,94,.05)':'';
+    const dCell=r.delta!==null?`<span class="${dc(r.delta)}" style="font-weight:700">${f(r.delta)}</span>`:r.source==='inc_only'?'<span class="badge b-sky" style="font-size:8px">INC only</span>':'<span class="badge b-rose" style="font-size:8px">No INC match</span>';
+    h2+=`<tr style="${rowStyle}">
+      <td class="mono" style="font-size:10px">${r.vin}</td>
+      <td class="mono">${r.gcmInv||'—'}</td>
+      <td class="mono" style="font-size:9px;color:var(--muted)">${r.gcmRo||'—'}</td>
+      <td style="font-size:11px;font-weight:600;white-space:nowrap">${r.gcmMonth?fmM(r.gcmMonth):'—'}</td>
+      <td>${r.gcmExp?`<span class="badge b-sun">${r.gcmExp}</span>`:'—'}</td>
+      <td>${r.gcmSt!==null?stBadge(r.gcmSt):'—'}</td>
+      <td class="num">${r.gcmAsked!==null?f(r.gcmAsked):'—'}</td>
+      <td class="num" style="font-weight:700">${r.gcmPaid!==null?f(r.gcmPaid):'—'}</td>
+      <td class="mono">${r.incNo||'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="mono" style="color:var(--muted);font-size:9px">${r.incSvcOrd||'—'}</td>
+      <td style="font-size:10px;color:var(--sky)">${r.incLoc||'—'}</td>
+      <td style="font-size:10px;white-space:nowrap">${r.incDate||'—'}</td>
+      <td class="num" style="font-size:10px;color:var(--muted)">${r.incMileage?r.incMileage.toLocaleString():'—'}</td>
+      <td class="num">${r.incAmt!==null?f(r.incAmt):'—'}</td>
+      <td class="num">${dCell}</td>
+    </tr>`;
+  });
+  if(deepRows.length>600)h2+=`<tr><td colspan="15" style="text-align:center;padding:12px;color:var(--muted);font-size:11px">… ${deepRows.length-600} more rows</td></tr>`;
+  h2+=`</tbody></table></div></div>
+  <div class="al al-i" style="margin-top:12px">🔵 Blue rows = in INCADEA only (no matching GCM claim). 🔴 Red rows = in GCM with no matching INCADEA invoice (matched by invoice # or RO #).</div>`;
+  T.innerHTML=h2;
+}
+
+function showVinDrill(vin){
+  // Switch to invoice view filtered to this VIN
+  const el=document.getElementById('F_CV');if(el)el.value='invoice';
+  const qEl=document.getElementById('F_CQ');if(qEl)qEl.value=vin;
+  rComp();
 }
 
 // ══ RENDER ASKED vs PAID ══════════════════════════════════════
@@ -2026,6 +2409,7 @@ function rRej(){
     if(ff==='resubmitted'&&(!S.rej[r.inv]||!S.rej[r.inv].newClaim))return false;
     if(ff==='partial'&&(!S.rej[r.inv]||S.rej[r.inv].rejType!=='partial'))return false;
     if(ff==='full'&&(!S.rej[r.inv]||S.rej[r.inv].rejType!=='full'))return false;
+    if(ff==='credited'&&(!S.rej[r.inv]||S.rej[r.inv].status!=='credited'))return false;
     if(ff==='resolved'&&(!S.rej[r.inv]||S.rej[r.inv].status!=='resolved'))return false;
     return true;
   });
@@ -2033,35 +2417,50 @@ function rRej(){
   // KPI calculations
   const wA=allRej.filter(r=>S.rej[r.inv]).length;
   const reSub=allRej.filter(r=>S.rej[r.inv]?.newClaim).length;
-  const fullRej=allRej.filter(r=>S.rej[r.inv]?.rejType==='full');
-  const partRej=allRej.filter(r=>S.rej[r.inv]?.rejType==='partial');
-  // For "at risk" amount: fully rejected claims use ta; partial use (ta-tp)
+  const creditedClaims=allRej.filter(r=>S.rej[r.inv]?.status==='credited');
+  const creditedTotal=creditedClaims.reduce((s,r)=>s+(S.rej[r.inv]?.creditedAmt||0),0);
   const totalAtRisk = allRej.reduce((s,r)=>{
     const d=S.rej[r.inv];
-    if(!d) return s+r.ta; // untracked = full amount still at risk
+    if(!d) return s+r.ta;
     if(d.rejType==='full') return s+r.ta;
     if(d.rejType==='partial') return s+Math.max(r.ta-r.tp,0);
     return s+r.ta;
   },0);
-  const resolvedAmt = allRej.filter(r=>S.rej[r.inv]?.status==='resolved').reduce((s,r)=>s+r.ta,0);
 
   K.style.display='grid';
+  document.getElementById('REJ_K').className='krow k5';
   K.innerHTML=`
-    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Total Rejected Claims</div><div class="kv rose">${allRej.length}</div><div class="ks">${allRej.filter(r=>S.rej[r.inv]?.rejType==='full').length} full · ${allRej.filter(r=>S.rej[r.inv]?.rejType==='partial').length} partial tracked</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Total Rejected</div><div class="kv rose">${allRej.length}</div><div class="ks">${allRej.filter(r=>S.rej[r.inv]?.rejType==='full').length} full · ${allRej.filter(r=>S.rej[r.inv]?.rejType==='partial').length} partial tracked</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💸 Amount At Risk (€)</div><div class="kv sun">${f(totalAtRisk)}</div><div class="ks">Unresolved rejected amounts</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">✏️ Action Recorded</div><div class="kv lem">${wA}</div><div class="ks">of ${allRej.length} claims · ${allRej.length-wA} need action</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">🔄 Resubmitted</div><div class="kv mint">${reSub}</div><div class="ks">with new claim # linked</div></div>`;
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">✏️ Action Recorded</div><div class="kv lem">${wA}</div><div class="ks">of ${allRej.length} · ${allRej.length-wA} need action</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">🔄 Resubmitted</div><div class="kv mint">${reSub}</div><div class="ks">with new claim # linked</div></div>
+    <div class="kpi" style="background:linear-gradient(135deg,#D1FAE5,#ECFDF5);border-color:#6EE7B7"><div class="kpi-accent" style="background:#10B981"></div><div class="kl">💚 Credited by Renault (€)</div><div class="kv" style="color:#065F46;font-size:20px">${f(creditedTotal)}</div><div class="ks">${creditedClaims.length} claim${creditedClaims.length!==1?'s':''} confirmed paid</div></div>`;
 
   // Status legend
-  const statusBadge=(s)=>{
+  const statusBadge=(s,d)=>{
+    if(s==='credited'){
+      const rate=d?.recoveryRate;
+      return `<span class="badge" style="background:linear-gradient(135deg,#D1FAE5,#A7F3D0);color:#065F46;border:1.5px solid #6EE7B7;font-size:8px">💚 Credited${rate?' '+rate.toFixed(0)+'%':''}</span>`;
+    }
     const map={pending:'<span class="badge b-rose">🔴 Pending</span>',resubmitted:'<span class="badge b-sky">🔄 Resubmitted</span>',escalated:'<span class="badge b-pur">⬆️ Escalated</span>',resolved:'<span class="badge b-mint">✅ Resolved</span>',written_off:'<span class="badge b-n">💀 Written Off</span>'};
     return map[s]||'<span style="color:var(--faint)">—</span>';
   };
   const rejTypeBadge=(d)=>{
     if(!d||!d.rejType) return '<span style="color:var(--faint)">—</span>';
-    return d.rejType==='full'
-      ? '<span class="badge b-rose">❌ Full</span>'
-      : '<span class="badge b-lem">⚠️ Partial</span>';
+    return d.rejType==='full'?'<span class="badge b-rose">❌ Full</span>':'<span class="badge b-lem">⚠️ Partial</span>';
+  };
+  const claimChain=(d,r)=>{
+    // Shows: original inv → new claim # → credited amount
+    if(!d||!d.newClaim) return '<span style="color:var(--faint)">—</span>';
+    let chain=`<span class="badge b-mint" style="font-size:8px">✅ ${d.newClaim}</span>`;
+    if(d.status==='credited'&&d.creditedAmt){
+      chain+=` <span style="color:var(--muted);font-size:9px">→</span> <span class="badge" style="background:#D1FAE5;color:#065F46;border:1.5px solid #6EE7B7;font-size:8px">💚 €${f(d.creditedAmt)}</span>`;
+      if(d.shortfall&&Math.abs(d.shortfall)>0.01){
+        const col=d.shortfall>0?'var(--rose)':'var(--sky)';
+        chain+=` <span style="font-size:9px;color:${col};font-weight:700">${d.shortfall>0?'−':'+'} €${f(Math.abs(d.shortfall))}</span>`;
+      }
+    }
+    return chain;
   };
 
   let h=`<div class="card" style="padding:0;overflow:hidden">
@@ -2070,13 +2469,19 @@ function rRej(){
   <thead><tr>
     <th>VIN</th><th>Invoice #</th><th>RO</th><th>Month</th><th>Exp</th>
     <th class="num">Asked (€)</th><th class="num">Paid (€)</th><th class="num">Rejected (€)</th>
-    <th>Type</th><th>Reason</th><th>New Claim #</th><th>Resub Inv.</th><th>Resub Date</th><th>Status</th><th>Notes</th><th>Action</th>
+    <th>Type</th><th>Reason</th>
+    <th>Resubmission Chain</th>
+    <th>Resub Date</th><th>Credit Date</th>
+    <th class="num">Credited (€)</th><th class="num">Shortfall (€)</th>
+    <th>Status</th><th>Notes</th><th>Action</th>
   </tr></thead><tbody>`;
 
   rows.forEach(r=>{
     const d=S.rej[r.inv]||{};
-    const rejAmt = d.rejType==='partial' ? Math.max(r.ta-r.tp,0) : (d.rejType==='full'?r.ta:(r.ta));
-    h+=`<tr>
+    const rejAmt=d.rejType==='partial'?Math.max(r.ta-r.tp,0):(d.rejType==='full'?r.ta:r.ta);
+    const isCredited=d.status==='credited';
+    const rowBg=isCredited?'background:rgba(16,185,129,.04)':'';
+    h+=`<tr style="${rowBg}">
       <td class="mono">${r.vin}</td>
       <td class="mono">${r.inv}</td>
       <td class="mono" style="font-size:9px;color:var(--muted)">${r.ro||'–'}</td>
@@ -2087,11 +2492,13 @@ function rRej(){
       <td class="num" style="font-weight:700;color:var(--rose)">${d.rejType?f(rejAmt):'<span style="color:var(--faint)">—</span>'}</td>
       <td>${rejTypeBadge(d)}</td>
       <td>${d.reason?`<span class="badge b-rose" style="font-size:8px;max-width:100px;overflow:hidden;text-overflow:ellipsis;display:inline-block;white-space:nowrap" title="${d.reason}">${d.reason}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
-      <td class="mono">${d.newClaim?`<span class="badge b-mint">✅ ${d.newClaim}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
-      <td class="mono" style="font-size:10px">${d.reInv||'<span style="color:var(--faint)">—</span>'}</td>
-      <td style="font-size:10px;color:var(--muted)">${d.resubDate||'<span style="color:var(--faint)">—</span>'}</td>
-      <td>${statusBadge(d.status)}</td>
-      <td style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)" title="${d.notes||''}">${d.notes||'—'}</td>
+      <td style="white-space:nowrap">${claimChain(d,r)}</td>
+      <td style="font-size:10px;color:var(--muted);white-space:nowrap">${d.resubDate||'<span style="color:var(--faint)">—</span>'}</td>
+      <td style="font-size:10px;color:var(--mint);white-space:nowrap">${d.creditDate||'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="num" style="font-weight:700;color:var(--mint)">${d.creditedAmt?'€'+f(d.creditedAmt):'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="num">${(()=>{ if(d.creditedAmt==null||d.shortfall==null) return '<span style="color:var(--faint)">—</span>'; const sc=d.shortfall>0.01?'var(--rose)':d.shortfall<-0.01?'var(--sky)':'var(--mint)'; return '<span style="color:'+sc+';font-weight:700">€'+f(Math.abs(d.shortfall))+'</span>'; })()}</td>
+      <td>${statusBadge(d.status,d)}</td>
+      <td style="font-size:10px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)" title="${d.notes||''}">${d.notes||'—'}</td>
       <td><button class="btn btn-sm ${d.reason?'btn-ghost':'btn-sun'}" onclick="openModal('${esc(r.inv)}','${r.vin}')">${d.reason?'✏️ Edit':'+ Track'}</button></td>
     </tr>`;
   });
@@ -2103,21 +2510,51 @@ function rRej(){
 function rInc(){
   const E=document.getElementById('INC_E'),K=document.getElementById('INC_K'),T=document.getElementById('INC_T');
   if(!S.inc.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}E.style.display='none';
-  const mkf=gv('F_IMK'),qf=gv('F_IQ').toLowerCase();
+  const mkf=gv('F_IMK'),locf=gv('F_ILOC')||'',qf=gv('F_IQ').toLowerCase();
   let rows=S.inc.filter(r=>{
     if(mkf&&r.make!==mkf)return false;
-    if(qf&&![r.vin,r.no,r.svcOrd,r.cust,r.extDoc].join('|').toLowerCase().includes(qf))return false;
+    if(locf&&r.loc!==locf)return false;
+    if(qf&&![r.vin,r.no,r.svcOrd,r.cust,r.extDoc,r.model].join('|').toLowerCase().includes(qf))return false;
     return true;
   });
   K.style.display='grid';
   K.innerHTML=`
-    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📄 Invoices</div><div class="kv sky">${rows.length.toLocaleString()}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📄 Invoices</div><div class="kv sky">${rows.length.toLocaleString()}</div><div class="ks">${new Set(rows.map(r=>r.vin)).size} unique VINs</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">🔩 Parts (€)</div><div class="kv sun">${f(rows.reduce((s,r)=>s+r.parts,0))}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">🔧 Labour (€)</div><div class="kv mint">${f(rows.reduce((s,r)=>s+r.lab,0))}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💰 Total Amount (€)</div><div class="kv pur">${f(rows.reduce((s,r)=>s+r.amt,0))}</div></div>`;
-  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>Invoice No.</th><th>VIN</th><th>Make / Model</th><th>Customer</th><th>Service Order</th><th>Posting Date</th><th>Ext. Doc</th><th class="num">Parts (€)</th><th class="num">Labour (€)</th><th class="num">Amount (€)</th></tr></thead><tbody>`;
-  rows.slice(0,500).forEach(r=>{h+=`<tr><td class="mono" style="font-weight:600">${r.no}</td><td class="mono" style="font-size:9px">${r.vin||'–'}</td><td style="font-size:10px;font-weight:600">${r.make} ${r.model}</td><td style="font-size:10px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500" title="${r.cust}">${r.cust}</td><td class="mono" style="color:var(--muted)">${r.svcOrd||'–'}</td><td style="font-size:10px;white-space:nowrap;font-weight:500">${r.date}</td><td class="mono" style="font-size:9px;color:var(--muted)">${r.extDoc||'–'}</td><td class="num">${f(r.parts)}</td><td class="num">${f(r.lab)}</td><td class="num" style="font-weight:700">${f(r.amt)}</td></tr>`;});
-  if(rows.length>500)h+=`<tr><td colspan="10" style="text-align:center;padding:14px;color:var(--muted);font-size:11px;font-weight:500">… ${rows.length-500} more records — use filters to narrow 🔍</td></tr>`;
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t">
+  <thead><tr>
+    <th>Invoice No.</th><th>VIN</th><th>Make / Model</th><th>Customer</th>
+    <th>Service Order</th><th>Location</th><th>Post Group</th>
+    <th>Posting Date</th><th>Init. Reg.</th><th class="num">Mileage</th>
+    <th class="num">Parts (€)</th><th class="num">Labour (€)</th><th class="num">Amount (€)</th><th>Payment</th>
+  </tr></thead><tbody>`;
+  rows.slice(0,500).forEach(r=>{
+    const payBadge = r.payMethod==='CREDIT'
+      ? `<span class="badge b-mint">💳 CREDIT</span>`
+      : r.payMethod ? `<span class="badge b-n">${r.payMethod}</span>` : '—';
+    const pgBadge = r.postGrp
+      ? `<span class="badge b-pur" style="font-size:8px;max-width:110px;overflow:hidden;text-overflow:ellipsis;display:inline-block;white-space:nowrap" title="${r.postGrp}">${r.postGrp}</span>`
+      : '<span style="color:var(--faint)">—</span>';
+    h+=`<tr>
+      <td class="mono" style="font-weight:600">${r.no}</td>
+      <td class="mono" style="font-size:9px">${r.vin||'–'}</td>
+      <td style="font-size:10px;font-weight:600">${r.make} ${r.model}</td>
+      <td style="font-size:10px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500" title="${r.cust}">${r.cust}</td>
+      <td class="mono" style="color:var(--muted)">${r.svcOrd||'–'}</td>
+      <td style="font-size:10px;font-weight:600;color:var(--sky)">${r.loc||'–'}</td>
+      <td>${pgBadge}</td>
+      <td style="font-size:10px;white-space:nowrap">${r.date}</td>
+      <td style="font-size:10px;color:var(--muted);white-space:nowrap">${r.initReg||'–'}</td>
+      <td class="num" style="font-size:10px;color:var(--muted)">${r.mileage?r.mileage.toLocaleString():'–'}</td>
+      <td class="num">${f(r.parts)}</td>
+      <td class="num">${f(r.lab)}</td>
+      <td class="num" style="font-weight:700">${f(r.amt)}</td>
+      <td>${payBadge}</td>
+    </tr>`;
+  });
+  if(rows.length>500)h+=`<tr><td colspan="14" style="text-align:center;padding:14px;color:var(--muted);font-size:11px;font-weight:500">… ${rows.length-500} more records — use filters to narrow 🔍</td></tr>`;
   h+=`</tbody></table></div></div>`;T.innerHTML=h;
 }
 
@@ -2180,7 +2617,7 @@ function rAge(){
     <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">🟠 Over 60 days</div><div class="kv sun">${over60.length}</div><div class="ks">€${f(over60.reduce((s,r)=>s+r.ta,0))} at risk</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">🔴 Over 90 days</div><div class="kv rose">${over90.length}</div><div class="ks">URGENT — escalate immediately</div></div>`;
   const ageBadge=days=>days>=90?`<span class="badge b-rose">🔴 ${days}d</span>`:days>=60?`<span class="badge b-sun">🟠 ${days}d</span>`:days>=30?`<span class="badge b-lem">🟡 ${days}d</span>`:`<span class="badge b-n">${days}d</span>`;
-  const sBadge=s=>({pending:'<span class="badge b-rose">🔴 Pending</span>',resubmitted:'<span class="badge b-sky">🔄 Resubmitted</span>',escalated:'<span class="badge b-pur">⬆️ Escalated</span>',resolved:'<span class="badge b-mint">✅ Resolved</span>',written_off:'<span class="badge b-n">💀 Written Off</span>',untracked:'<span class="badge b-n">⚪ Not Tracked</span>'})[s]||`<span class="badge b-n">${s}</span>`;
+  const sBadge=s=>({pending:'<span class="badge b-rose">🔴 Pending</span>',resubmitted:'<span class="badge b-sky">🔄 Resubmitted</span>',escalated:'<span class="badge b-pur">⬆️ Escalated</span>',credited:'<span class="badge" style="background:#D1FAE5;color:#065F46;border:1.5px solid #6EE7B7">💚 Credited</span>',resolved:'<span class="badge b-mint">✅ Resolved</span>',written_off:'<span class="badge b-n">💀 Written Off</span>',untracked:'<span class="badge b-n">⚪ Not Tracked</span>'})[s]||`<span class="badge b-n">${s}</span>`;
   if(!rows.length){T.innerHTML=`<div class="al al-g">✅ No rejections match this filter.</div>`;return;}
   let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">⏰ Ageing — ${rows.length} claims</div><div class="tw"><table class="t">
   <thead><tr><th>Age</th><th>VIN</th><th>Invoice #</th><th>Month</th><th class="num">Asked (€)</th><th>Type</th><th>Reason</th><th>New Claim #</th><th>Status</th><th>Action</th></tr></thead><tbody>`;
@@ -2220,7 +2657,7 @@ function rRec(){
     byStAmt[s]=(byStAmt[s]||0)+atRisk;totalAtRisk+=atRisk;
     if(d?.rejType==='partial') totalPartialRecovered+=r.tp;
     if(d?.newClaim) totalResubmitted+=atRisk;
-    if(s==='resolved') totalResolved+=r.ta;
+    if(s==='resolved'||s==='credited') totalResolved+=(S.rej[r.inv]?.creditedAmt||r.ta);
     if(s==='written_off') totalWrittenOff+=r.ta;
   });
   const recRate=totalRejAmt>0?(totalResolved/totalRejAmt*100):0;
@@ -2247,7 +2684,7 @@ function rRec(){
     ${[['Partial — already paid portion',totalPartialRecovered,'var(--mint)'],['Resubmitted to Renault',totalResubmitted,'var(--sky)'],['Marked as Resolved',totalResolved,'var(--mint)'],['Written Off',totalWrittenOff,'var(--muted)']].map(([l,a,c])=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:11px;font-weight:600;color:var(--ink2)">${l}</span><span style="font-size:12px;font-weight:800;color:${c}">€${f(a)}</span></div>`).join('')}
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--mint3);border-radius:10px;margin-top:10px;border:1.5px solid rgba(16,185,129,.2)"><span style="font-size:12px;font-weight:700;color:var(--mint)">💰 Recovery Rate</span><span style="font-size:22px;font-weight:800;color:var(--mint)">${recRate.toFixed(1)}%</span></div>
   </div></div></div>`;
-  const sBadge=s=>({pending:'<span class="badge b-rose">🔴 Pending</span>',resubmitted:'<span class="badge b-sky">🔄 Resubmitted</span>',escalated:'<span class="badge b-pur">⬆️ Escalated</span>',resolved:'<span class="badge b-mint">✅ Resolved</span>',written_off:'<span class="badge b-n">💀 Written Off</span>',untracked:'<span class="badge b-n">⚪ Not Tracked</span>'})[s]||'—';
+  const sBadge=s=>({pending:'<span class="badge b-rose">🔴 Pending</span>',resubmitted:'<span class="badge b-sky">🔄 Resubmitted</span>',escalated:'<span class="badge b-pur">⬆️ Escalated</span>',credited:'<span class="badge" style="background:#D1FAE5;color:#065F46;border:1.5px solid #6EE7B7">💚 Credited</span>',resolved:'<span class="badge b-mint">✅ Resolved</span>',written_off:'<span class="badge b-n">💀 Written Off</span>',untracked:'<span class="badge b-n">⚪ Not Tracked</span>'})[s]||'—';
   h+=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">🔄 Per-Claim Detail</div><div class="tw"><table class="t">
   <thead><tr><th>VIN</th><th>Invoice #</th><th>Month</th><th class="num">Asked (€)</th><th class="num">Paid (€)</th><th class="num">Rejected (€)</th><th>Type</th><th>New Claim #</th><th>Status</th></tr></thead><tbody>`;
   allRej.forEach(r=>{
@@ -2357,6 +2794,7 @@ function setLang(l){
     'ageing':    {en:'Rejection Ageing',fr:'Ancienneté Rejets'},
     'recovery':  {en:'Recovery Rate',   fr:'Taux de Récupération'},
     'trends':    {en:'Rejection Trends',fr:'Tendances Rejets'},
+    'shortfall':  {en:'Shortfall Report', fr:'Rapport Écart'},
   };
   document.querySelectorAll('.si[data-page]').forEach(el=>{
     const pg = el.dataset.page;
@@ -2369,7 +2807,7 @@ function setLang(l){
     else el.appendChild(txt);
   });
   const active = document.querySelector('.si.active');
-  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd})[active.dataset.page]?.();
+  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf})[active.dataset.page]?.();
 }
 
 // ══ HELP CONTENT — ALL PAGES ════════════════════════════════
@@ -2539,6 +2977,24 @@ const HELP = {
     ],
     buttons:[]
   },
+  shortfall:{
+    icon:'📋', bg:'linear-gradient(135deg,var(--rose3),#FFE4E6)',
+    title:'Shortfall Report', sub:'Credited claims where Renault paid less than the rejected amount',
+    rules:[
+      {icon:'💚',title:'What is a Credited Claim?',desc:'A rejected claim where you received payment on the resubmission. Mark as "💚 Credited" in the Rejection Protocol and enter the amount Renault paid.'},
+      {icon:'⚠️',title:'What is a Shortfall?',desc:'Shortfall = Rejected Amount − Credited Amount. Positive = Renault paid less than the full rejected amount. These cases represent money still owed to you.'},
+      {icon:'💙',title:'Overpaid Cases',desc:'Shortfall < 0 means Renault paid MORE than the rejected portion (e.g. paid the full original asked amount). This is a positive outcome worth noting.'},
+      {icon:'📊',title:'Recovery Rate',desc:'Rate = Credited / Rejected × 100. 100% = full recovery. Below 70% = significant shortfall — consider escalating the difference to your Renault representative.'},
+      {icon:'🤖',title:'Auto-Matched Badge',desc:'When a new GCM upload is processed, the system automatically checks if any new claim # you recorded now appears as a paid GCM claim. If found, it is auto-credited and tagged "🤖 Auto".'},
+      {icon:'💸',title:'Still Outstanding',desc:'The red KPI "Still Outstanding" is the total shortfall across all credited claims — money Renault has paid but not in full. This is your formal dispute amount if you choose to escalate.'},
+    ],
+    buttons:[
+      {icon:'⚠️ Has Shortfall',label:'Show only claims where Renault paid less than the full rejected amount'},
+      {icon:'✅ Full Recovery',label:'Show claims where Renault paid the full amount (shortfall = 0)'},
+      {icon:'💙 Overpaid',label:'Show claims where Renault paid more than expected'},
+      {icon:'✏️ Edit',label:'Open rejection protocol to update credit details'},
+    ]
+  },
   trends:{
     icon:'📉', bg:'linear-gradient(135deg,var(--pur3),#EDE9FE)',
     title:'Rejection Trends', sub:'Monthly rejection patterns, top reasons and trajectory over time',
@@ -2571,8 +3027,8 @@ function closeHelp(){
   if(fab) fab.classList.remove('panel-open');
 }
 
-const PAGE_ORDER = ['upload','gcm','overview','expense','comparison','askedpaid','rejections','incadea','bonus','ageing','recovery','trends'];
-const PAGE_EMOJI = {upload:'⬆️',gcm:'📋',overview:'📊',expense:'🏷️',comparison:'⚖️',askedpaid:'📈',rejections:'❌',incadea:'🔧',bonus:'⭐',ageing:'⏰',recovery:'🔄',trends:'📉'};
+const PAGE_ORDER = ['upload','gcm','overview','expense','comparison','askedpaid','rejections','incadea','bonus','ageing','recovery','trends','shortfall'];
+const PAGE_EMOJI = {upload:'⬆️',gcm:'📋',overview:'📊',expense:'🏷️',comparison:'⚖️',askedpaid:'📈',rejections:'❌',incadea:'🔧',bonus:'⭐',ageing:'⏰',recovery:'🔄',trends:'📉',shortfall:'📋'};
 
 function renderHelpTabs(){
   const tabs = document.getElementById('HP_TABS');
@@ -2612,6 +3068,7 @@ function renderHelp(){
     ageing:'💡 <strong>Pro tip:</strong> Check this page every Monday morning. Anything reaching 60 days this week needs an escalation email sent before Friday end of business.',
     recovery:'💡 <strong>Pro tip:</strong> Target recovery rate > 70%. If it falls below 50%, you likely have claims stuck in "Pending" with no action — use the Ageing page to identify and prioritise them.',
     trends:'💡 <strong>Pro tip:</strong> If one rejection reason dominates the chart, fix the root cause before the next filing batch. Repeat reasons = preventable losses.',
+    shortfall:'💡 <strong>Pro tip:</strong> Any shortfall above €50 is worth a formal follow-up with your Renault warranty contact. Document the original rejection, the resubmission, and the shortfall amount in your email.',
   };
 
   let html = `<div class="hp-section"><div class="hp-section-title">📋 Business Rules & Logic</div>`;
