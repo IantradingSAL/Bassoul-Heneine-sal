@@ -334,6 +334,7 @@ tbody tr:hover{background:#f8fafc}
         <span class="ct" id="navOpen">—</span>
       </a>
       <a class="nav-link" href="warranty.html"><span class="ic">🚗</span>Renault Warranty</a>
+    <a class="nav-link" href="chat.html"><span class="ic">💬</span>Team Chat</a>
 
       <div class="sb-sec">Admin</div>
       <a class="nav-link" href="settings.html"><span class="ic">⚙️</span>Settings</a>
@@ -644,10 +645,28 @@ $('loginForm').addEventListener('submit', async (e) => {
     const { data: signIn, error: signErr } = await sb.auth.signInWithPassword({ email, password: pw })
     if (signErr) throw signErr
 
-    // Fetch the employee profile for nav badges + greeting.
-    const { data: emp } = await sb.from('employees')
-      .select('name, role, custom_role')
+    // Fetch the employee profile. Try matching by auth_user_id first;
+    // if no match (because the admin created the profile without
+    // pasting in the UUID), fall back to email and link it now.
+    let { data: emp } = await sb.from('employees')
+      .select('id, name, role, custom_role, auth_user_id')
       .eq('auth_user_id', signIn.user.id).maybeSingle()
+
+    if (!emp) {
+      const { data: empByEmail } = await sb.from('employees')
+        .select('id, name, role, custom_role, auth_user_id')
+        .eq('email', email).maybeSingle()
+      if (empByEmail) {
+        if (!empByEmail.auth_user_id) {
+          // First-time login — link this auth user to the employee row.
+          await sb.from('employees')
+            .update({ auth_user_id: signIn.user.id })
+            .eq('id', empByEmail.id)
+        }
+        emp = empByEmail
+      }
+    }
+
     if (emp) {
       sessionStorage.setItem('cw_current_emp', emp.name || '')
       sessionStorage.setItem('cw_role', emp.custom_role || emp.role || 'employee')
