@@ -25,7 +25,6 @@
 body{font-family:var(--f);background:var(--bg);color:var(--txt);min-height:100vh}
 a{color:inherit;text-decoration:none}
 
-/* SIDEBAR (mirrors index) */
 .sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:var(--card);border-right:1px solid var(--bdr);display:flex;flex-direction:column;z-index:100;overflow-y:auto}
 .sb-top{display:flex;align-items:center;gap:12px;padding:20px 18px 16px;border-bottom:1px solid var(--bdr)}
 .sb-logo{width:40px;height:40px;border-radius:12px;flex-shrink:0;background:linear-gradient(135deg,#3b5fe2,#6366f1);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;letter-spacing:-.5px;color:#fff;box-shadow:0 4px 12px rgba(59,95,226,.3)}
@@ -47,8 +46,7 @@ a{color:inherit;text-decoration:none}
 .tb-l .tb-date{font-size:12px;color:var(--mu);margin-top:2px}
 .body{padding:24px 28px 80px}
 
-/* TABS */
-.tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--bdr);border-radius:12px;padding:4px;margin-bottom:18px;width:fit-content;box-shadow:var(--sh)}
+.tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--bdr);border-radius:12px;padding:4px;margin-bottom:18px;width:fit-content;box-shadow:var(--sh);flex-wrap:wrap}
 .tab{padding:8px 18px;font-size:13px;font-weight:600;border:none;background:transparent;color:var(--mu);border-radius:8px;cursor:pointer;font-family:var(--f);transition:all .12s}
 .tab:hover{color:var(--txt)}
 .tab.on{background:var(--blue);color:#fff;font-weight:700;box-shadow:0 2px 6px rgba(59,95,226,.25)}
@@ -57,9 +55,8 @@ a{color:inherit;text-decoration:none}
 
 .section-h{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px;gap:8px;flex-wrap:wrap}
 .section-t{font-size:15px;font-weight:800;letter-spacing:-.1px}
-.section-s{font-size:12px;color:var(--mu);margin-top:3px;max-width:560px}
+.section-s{font-size:12px;color:var(--mu);margin-top:3px;max-width:600px;line-height:1.5}
 
-/* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;font-weight:600;border:none;border-radius:9px;cursor:pointer;font-family:var(--f);transition:all .12s;line-height:1.2}
 .btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:#2e4fc7}
 .btn-ghost{background:var(--card);border:1px solid var(--bdr);color:var(--mu)}.btn-ghost:hover{color:var(--txt);border-color:var(--blue)}
@@ -67,40 +64,49 @@ a{color:inherit;text-decoration:none}
 .btn-sm{padding:5px 10px;font-size:12px}
 .btn-icon{padding:6px 9px;font-size:14px}
 
-/* TABLE */
 .tw{overflow-x:auto;border-radius:12px;border:1px solid var(--bdr);background:var(--card);box-shadow:var(--sh)}
 table{width:100%;border-collapse:collapse}
 thead th{padding:11px 16px;font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;background:#f8fafc;border-bottom:1px solid var(--bdr);white-space:nowrap;text-align:left}
 tbody td{padding:13px 16px;font-size:13px;border-bottom:1px solid var(--bdr);color:var(--txt);vertical-align:middle}
 tbody tr:last-child td{border:none}
 tbody tr:hover{background:#f8fafc}
-.bdg{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700}
-.b-g{background:var(--g100);color:#15803d}.b-gray{background:#f1f5f9;color:var(--mu)}
+.bdg{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;line-height:1.3}
+.b-g{background:var(--g100);color:#15803d}
+.b-gray{background:#f1f5f9;color:var(--mu)}
 .b-b{background:var(--b100);color:#1e40af}
+.b-a{background:var(--a100);color:#92400e}
 .empty{text-align:center;padding:40px 20px;color:var(--dim);font-size:13px}
 .av{width:32px;height:32px;border-radius:9px;color:#fff;font-weight:800;font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:10px;vertical-align:middle}
 
-/* ROLE CARDS */
-.role-grid{display:grid;grid-template-columns:1fr;gap:12px}
-.role-card{background:var(--card);border-radius:14px;border:1px solid var(--bdr);box-shadow:var(--sh);overflow:hidden}
-.role-head{display:flex;align-items:center;gap:14px;padding:16px 20px;cursor:pointer;background:var(--card);transition:background .12s}
+/* ════ ROLE CARDS — more professional grid ════════════════════ */
+.role-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
+.role-card{background:var(--card);border-radius:14px;border:1px solid var(--bdr);box-shadow:var(--sh);overflow:hidden;transition:box-shadow .15s,transform .12s}
+.role-card:hover{box-shadow:var(--sh2)}
+.role-head{display:flex;align-items:center;gap:14px;padding:16px 20px;cursor:pointer;background:var(--card);transition:background .12s;border-bottom:1px solid transparent}
 .role-head:hover{background:#f8fafc}
-.role-icon{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;color:#fff;background:var(--blue)}
+.role-card.open .role-head{background:#f8fafc;border-bottom-color:var(--bdr)}
+.role-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;color:#fff;background:var(--blue);box-shadow:0 2px 6px rgba(0,0,0,.1)}
 .role-info{flex:1;min-width:0}
-.role-label{font-size:14px;font-weight:800;letter-spacing:-.1px}
-.role-key{font-size:11px;color:var(--mu);font-family:var(--mono);margin-top:2px}
+.role-label{font-size:14px;font-weight:800;letter-spacing:-.1px;line-height:1.2}
+.role-meta{font-size:11px;color:var(--mu);font-family:var(--mono);margin-top:4px;display:flex;gap:10px;align-items:center}
+.role-meta .built-in{background:var(--b50);color:var(--blue);padding:1px 7px;border-radius:5px;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.3px;font-family:var(--f)}
+.role-emp-count{display:inline-flex;align-items:center;gap:4px;background:var(--bg);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;color:var(--mu);font-family:var(--f)}
+.role-emp-count.has{background:var(--g50);color:var(--green)}
 .role-actions{display:flex;gap:6px;flex-shrink:0}
-.role-perm{padding:0 20px 16px;display:none}
-.role-card.open .role-perm{display:block;border-top:1px solid var(--bdr);padding-top:14px}
-.role-card.open .role-head{background:#f8fafc}
-.perm-row{display:grid;grid-template-columns:1fr 280px;align-items:center;gap:12px;padding:8px 0;border-bottom:1px dashed var(--bdr)}
-.perm-row:last-child{border:none}
+.role-toggle{font-size:14px;color:var(--mu);transition:transform .15s}
+.role-card.open .role-toggle{transform:rotate(180deg)}
+.role-perm{padding:0;display:none;background:#f8fafc}
+.role-card.open .role-perm{display:block}
+.perm-row{display:grid;grid-template-columns:1fr 240px;align-items:center;gap:12px;padding:11px 20px;border-bottom:1px solid var(--bdr)}
+.perm-row:last-child{border-bottom:none}
+.perm-row:hover{background:var(--card)}
 .perm-page{font-size:13px;font-weight:600;color:var(--txt)}
-.perm-page-s{font-size:11px;color:var(--mu);font-weight:500;margin-top:2px}
-.perm-pills{display:flex;gap:4px;background:var(--bg);border-radius:9px;padding:3px}
-.perm-pill{flex:1;padding:6px 10px;font-size:11px;font-weight:700;border:none;background:transparent;color:var(--mu);border-radius:7px;cursor:pointer;font-family:var(--f);transition:all .12s;text-align:center}
-.perm-pill:hover{color:var(--txt)}
-.perm-pill.on[data-l="none"]{background:#f1f5f9;color:var(--mu);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.perm-page-s{font-size:11px;color:var(--mu);font-weight:500;margin-top:2px;line-height:1.4}
+.perm-pills{display:flex;gap:3px;background:var(--card);border:1px solid var(--bdr);border-radius:9px;padding:3px}
+.perm-pill{flex:1;padding:6px 10px;font-size:11px;font-weight:700;border:none;background:transparent;color:var(--mu);border-radius:6px;cursor:pointer;font-family:var(--f);transition:all .12s;text-align:center}
+.perm-pill:hover:not(:disabled){color:var(--txt)}
+.perm-pill:disabled{cursor:not-allowed;opacity:.45}
+.perm-pill.on[data-l="none"]{background:#f1f5f9;color:var(--mu)}
 .perm-pill.on[data-l="view"]{background:var(--amber);color:#fff;box-shadow:0 1px 3px rgba(217,119,6,.4)}
 .perm-pill.on[data-l="edit"]{background:var(--green);color:#fff;box-shadow:0 1px 3px rgba(22,163,74,.4)}
 
@@ -109,13 +115,13 @@ tbody tr:hover{background:#f8fafc}
 .modal-bg.on{display:flex}
 .modal{background:var(--card);border-radius:18px;box-shadow:var(--sh2);width:100%;max-width:560px;padding:28px}
 .m-h{font-size:18px;font-weight:800;letter-spacing:-.3px;margin-bottom:6px}
-.m-s{font-size:12px;color:var(--mu);margin-bottom:20px}
+.m-s{font-size:12px;color:var(--mu);margin-bottom:20px;line-height:1.5}
 .fg{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .fg .full{grid-column:1/-1}
 .fl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px}
+.fl-help{font-size:11px;color:var(--mu);font-weight:500;margin-top:4px;font-style:italic;line-height:1.4;text-transform:none;letter-spacing:0}
 .fi{width:100%;padding:9px 12px;border:1.5px solid var(--bdr);border-radius:9px;font-family:var(--f);font-size:13px;font-weight:500;background:var(--card);color:var(--txt);transition:border-color .12s,box-shadow .12s}
 .fi:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,95,226,.12)}
-textarea.fi{resize:vertical;min-height:60px}
 .fi[readonly]{background:#f8fafc;color:var(--mu)}
 .cb-row{display:flex;flex-wrap:wrap;gap:14px;padding:6px 0}
 .cb-row label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--txt);font-weight:600;cursor:pointer}
@@ -123,18 +129,29 @@ textarea.fi{resize:vertical;min-height:60px}
 .swatch{width:32px;height:32px;border-radius:8px;border:2px solid var(--bdr);cursor:pointer;flex-shrink:0}
 .m-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:22px;padding-top:18px;border-top:1px solid var(--bdr)}
 
-/* Notif */
-.notif{position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:10px;background:var(--card);box-shadow:var(--sh2);font-size:13px;font-weight:600;z-index:300;transform:translateY(120%);transition:transform .25s ease}
+.notif{position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:10px;background:var(--card);box-shadow:var(--sh2);font-size:13px;font-weight:600;z-index:300;transform:translateY(120%);transition:transform .25s ease;max-width:380px}
 .notif.on{transform:translateY(0)}
 .notif.ok{border-left:4px solid var(--green);color:var(--green)}
 .notif.err{border-left:4px solid var(--red);color:var(--red)}
 
-/* Form sections */
+/* CFG cards (system tab) */
 .cfg-card{background:var(--card);border-radius:14px;border:1px solid var(--bdr);box-shadow:var(--sh);padding:22px;margin-bottom:14px}
 .cfg-h{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .cfg-h .ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 .cfg-t{font-size:14px;font-weight:800;letter-spacing:-.1px}
-.cfg-s{font-size:12px;color:var(--mu);margin:0 0 14px 44px}
+.cfg-s{font-size:12px;color:var(--mu);margin:0 0 14px 44px;line-height:1.5}
+
+/* CATEGORIES */
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.cat-card{background:var(--card);border:1px solid var(--bdr);border-radius:11px;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .12s;box-shadow:var(--sh)}
+.cat-card:hover{border-color:var(--blue);transform:translateY(-1px);box-shadow:var(--sh2)}
+.cat-card.inactive{opacity:.55}
+.cat-ic{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--bg);flex-shrink:0}
+.cat-info{flex:1;min-width:0}
+.cat-label{font-size:13px;font-weight:700;letter-spacing:-.1px}
+.cat-key{font-size:10px;color:var(--mu);font-family:var(--mono);margin-top:2px}
+.cat-edit{font-size:14px;color:var(--dim);flex-shrink:0;opacity:0;transition:opacity .12s}
+.cat-card:hover .cat-edit{opacity:1;color:var(--blue)}
 
 .foot{position:fixed;bottom:0;left:240px;right:0;background:var(--card);border-top:1px solid var(--bdr);padding:6px 20px;display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--dim);z-index:99}
 
@@ -164,11 +181,9 @@ textarea.fi{resize:vertical;min-height:60px}
   <nav class="sb-nav">
     <div class="sb-sec">Overview</div>
     <a class="nav-link" href="index.html"><span class="ic">🏠</span>Dashboard</a>
-
     <div class="sb-sec">Modules</div>
     <a class="nav-link" href="customer_feedback.html"><span class="ic">📣</span>Customer Feedback</a>
     <a class="nav-link" href="warranty.html"><span class="ic">🚗</span>Renault Warranty</a>
-
     <div class="sb-sec">Admin</div>
     <a class="nav-link active" href="settings.html"><span class="ic">⚙️</span>Settings</a>
   </nav>
@@ -183,7 +198,7 @@ textarea.fi{resize:vertical;min-height:60px}
       <button class="menu-btn" id="menuBtn">☰</button>
       <div class="tb-l">
         <div class="tb-hi">⚙️ Settings</div>
-        <div class="tb-date">Manage employees, roles, page access &amp; system config</div>
+        <div class="tb-date">Manage employees, roles, categories &amp; system config</div>
       </div>
     </div>
   </div>
@@ -193,6 +208,7 @@ textarea.fi{resize:vertical;min-height:60px}
     <div class="tabs" role="tablist">
       <button class="tab on" data-tab="emp">👥 Employees</button>
       <button class="tab"    data-tab="rol">🎭 Roles &amp; Access</button>
+      <button class="tab"    data-tab="cat">🗂️ Categories</button>
       <button class="tab"    data-tab="sys">📡 System</button>
     </div>
 
@@ -201,7 +217,7 @@ textarea.fi{resize:vertical;min-height:60px}
       <div class="section-h">
         <div>
           <div class="section-t">Employees</div>
-          <div class="section-s">Each employee is a person who logs in. Set their role here; this controls which pages they can open and edit. To create the matching login, add the user in Supabase → Authentication → Users, then paste the resulting User UUID into the "Auth User ID" field below.</div>
+          <div class="section-s">Each row is a person who can sign in. The login they use is their email address (set in Supabase → Authentication → Users) plus the password set there. Their <strong>role</strong> below controls which pages they can open and edit.</div>
         </div>
         <button class="btn btn-blue editor-only" id="addEmpBtn">+ Add employee</button>
       </div>
@@ -230,11 +246,25 @@ textarea.fi{resize:vertical;min-height:60px}
       <div class="section-h">
         <div>
           <div class="section-t">Roles &amp; page access</div>
-          <div class="section-s">Each role has a permission level on every page: <strong>Edit</strong> (full access), <strong>View</strong> (read-only — buttons disabled, forms locked), or <strong>None</strong> (page is blocked). Click a role to expand the matrix. The built-in <strong>Manager</strong> role always has Edit on everything, regardless of what's set here.</div>
+          <div class="section-s">Each role grants a level on every page: <strong>Edit</strong> (full access), <strong>View</strong> (read-only — buttons disabled, forms locked), or <strong>None</strong> (page is blocked). Click a role to expand its matrix, click any pill to change. Saves immediately. The <strong>Manager (system)</strong> role always has Edit on everything.</div>
         </div>
         <button class="btn btn-blue editor-only" id="addRoleBtn">+ Add role</button>
       </div>
       <div class="role-grid" id="roleGrid">
+        <div class="empty">⏳ Loading…</div>
+      </div>
+    </div>
+
+    <!-- ════ CATEGORIES TAB ════════════════════════════════════ -->
+    <div class="panel" id="P_cat">
+      <div class="section-h">
+        <div>
+          <div class="section-t">Feedback categories</div>
+          <div class="section-s">These categories appear in the Customer Feedback form's category dropdown. Add as many as you need — they're loaded fresh every time someone opens the form, so changes are instant.</div>
+        </div>
+        <button class="btn btn-blue editor-only" id="addCatBtn">+ Add category</button>
+      </div>
+      <div class="cat-grid" id="catGrid">
         <div class="empty">⏳ Loading…</div>
       </div>
     </div>
@@ -244,16 +274,14 @@ textarea.fi{resize:vertical;min-height:60px}
       <div class="section-h">
         <div>
           <div class="section-t">System configuration</div>
-          <div class="section-s">Stored in <code style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:4px">public.system_settings</code>. The Customer Feedback module reads these to send email / WhatsApp / SMS notifications when records are created or reassigned.</div>
+          <div class="section-s">Stored in <code style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:4px">public.system_settings</code>. Read by the notification module when records are created or reassigned.</div>
         </div>
       </div>
 
       <div class="cfg-card">
         <div class="cfg-h">
           <div class="ic" style="background:var(--b50);color:var(--blue)">📧</div>
-          <div>
-            <div class="cfg-t">Brevo (email + WhatsApp)</div>
-          </div>
+          <div><div class="cfg-t">Brevo (email + WhatsApp)</div></div>
         </div>
         <div class="cfg-s">Used for outbound emails and WhatsApp messages. Get your API key from Brevo → SMTP &amp; API.</div>
         <div class="fg">
@@ -275,11 +303,9 @@ textarea.fi{resize:vertical;min-height:60px}
       <div class="cfg-card">
         <div class="cfg-h">
           <div class="ic" style="background:var(--p50);color:var(--purple)">📱</div>
-          <div>
-            <div class="cfg-t">Twilio (SMS)</div>
-          </div>
+          <div><div class="cfg-t">Twilio (SMS)</div></div>
         </div>
-        <div class="cfg-s">Optional — only needed if you want SMS in addition to (or instead of) WhatsApp. The phone number must be in E.164 format including the country code.</div>
+        <div class="cfg-s">Optional — only needed if you want SMS in addition to (or instead of) WhatsApp. Phone number must be E.164 with country code.</div>
         <div class="fg">
           <div>
             <label class="fl" for="twilio_account_sid">Account SID</label>
@@ -305,7 +331,7 @@ textarea.fi{resize:vertical;min-height:60px}
 
   <div class="foot">
     <span>© 2026 <strong style="color:var(--mu)">IanTradingSAL</strong> · All rights reserved</span>
-    <span>Bassoul, Heneine Sal · Settings v1.0</span>
+    <span>Bassoul, Heneine Sal · Settings v2.0</span>
   </div>
 </div>
 
@@ -313,8 +339,9 @@ textarea.fi{resize:vertical;min-height:60px}
 <div class="modal-bg" id="empModal">
   <div class="modal">
     <div class="m-h" id="empModalTitle">Add employee</div>
-    <div class="m-s">Fill in the profile, then create the matching login user in Supabase Authentication and paste their UUID below.</div>
+    <div class="m-s">The <strong>email</strong> below must match a user already created in <strong>Supabase → Authentication → Users</strong>. The system links them automatically — you no longer need to copy any UUID.</div>
     <input type="hidden" id="empId"/>
+    <input type="hidden" id="empAuthUid"/>
     <div class="fg">
       <div>
         <label class="fl">Full name *</label>
@@ -323,10 +350,11 @@ textarea.fi{resize:vertical;min-height:60px}
       <div>
         <label class="fl">Username</label>
         <input class="fi" type="text" id="empUsername" placeholder="imad" autocomplete="off"/>
+        <div class="fl-help">Optional shorthand for login. They can also use their full email.</div>
       </div>
-      <div>
-        <label class="fl">Email</label>
-        <input class="fi" type="email" id="empEmail" placeholder="imad@bashen.com"/>
+      <div class="full">
+        <label class="fl">Email * <span style="font-weight:500;color:var(--mu);text-transform:none;letter-spacing:0">(must already exist as a Supabase auth user)</span></label>
+        <input class="fi" type="email" id="empEmail" placeholder="imad@bashen.com" required/>
       </div>
       <div>
         <label class="fl">Phone</label>
@@ -336,20 +364,10 @@ textarea.fi{resize:vertical;min-height:60px}
         <label class="fl">WhatsApp phone</label>
         <input class="fi" type="text" id="empWhats" placeholder="+961 …"/>
       </div>
-      <div>
+      <div class="full">
         <label class="fl">Role *</label>
-        <select class="fi" id="empRole">
-          <option value="manager">👔 Manager (full access)</option>
-          <option value="employee" selected>👤 Employee</option>
-        </select>
-      </div>
-      <div class="full">
-        <label class="fl">Custom role (optional — must match a role created in Roles tab)</label>
-        <select class="fi" id="empCustomRole"><option value="">— None —</option></select>
-      </div>
-      <div class="full">
-        <label class="fl">Auth User ID (from Supabase → Authentication → Users)</label>
-        <input class="fi" type="text" id="empAuthUid" placeholder="00000000-0000-0000-0000-000000000000" autocomplete="off"/>
+        <select class="fi" id="empRole"></select>
+        <div class="fl-help">Sets which pages this person can access. Manage the list and permissions in the <strong>Roles &amp; Access</strong> tab.</div>
       </div>
       <div class="full">
         <label class="fl">Notification channels</label>
@@ -377,7 +395,7 @@ textarea.fi{resize:vertical;min-height:60px}
 <div class="modal-bg" id="roleModal">
   <div class="modal" style="max-width:480px">
     <div class="m-h" id="roleModalTitle">Add role</div>
-    <div class="m-s">Roles group page permissions. Once saved, expand the role on the page to set per-page access.</div>
+    <div class="m-s">Roles group page permissions. Once saved, expand the role on the page to set per-page access levels.</div>
     <input type="hidden" id="roleOrigName"/>
     <div class="fg">
       <div>
@@ -393,7 +411,7 @@ textarea.fi{resize:vertical;min-height:60px}
         <input class="fi" type="text" id="roleIcon" placeholder="🛠️" maxlength="3"/>
       </div>
       <div>
-        <label class="fl">Color (hex)</label>
+        <label class="fl">Color</label>
         <div style="display:flex;gap:8px;align-items:center">
           <input class="fi" type="text" id="roleColor" placeholder="#3b5fe2" style="flex:1"/>
           <div class="swatch" id="roleColorPreview" style="background:#3b5fe2"></div>
@@ -408,6 +426,48 @@ textarea.fi{resize:vertical;min-height:60px}
   </div>
 </div>
 
+<!-- ════ CATEGORY MODAL ════════════════════════════════════════ -->
+<div class="modal-bg" id="catModal">
+  <div class="modal" style="max-width:480px">
+    <div class="m-h" id="catModalTitle">Add category</div>
+    <div class="m-s">Categories appear in the Customer Feedback form. Use them to classify the type of issue (e.g. Engine, Transmission, Body, Brakes).</div>
+    <input type="hidden" id="catId"/>
+    <div class="fg">
+      <div>
+        <label class="fl">Machine key *</label>
+        <input class="fi" type="text" id="catKey" placeholder="engine_mechanical" pattern="[a-z0-9_]+" required/>
+        <div class="fl-help">Lowercase, underscores. Cannot be changed after save.</div>
+      </div>
+      <div>
+        <label class="fl">Display label *</label>
+        <input class="fi" type="text" id="catLabel" placeholder="Engine / Mechanical" required/>
+      </div>
+      <div>
+        <label class="fl">Icon (single emoji)</label>
+        <input class="fi" type="text" id="catIcon" placeholder="🔧" maxlength="3"/>
+      </div>
+      <div>
+        <label class="fl">Sort order</label>
+        <input class="fi" type="number" id="catOrder" value="100" step="10"/>
+      </div>
+      <div class="full">
+        <label class="fl">Helper text (optional)</label>
+        <input class="fi" type="text" id="catDesc" placeholder="Shown under the dropdown when this category is selected"/>
+      </div>
+      <div class="full">
+        <div class="cb-row">
+          <label><input type="checkbox" id="catActive" checked/>Active (shows in feedback form)</label>
+        </div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-red" id="catDeleteBtn" style="display:none;margin-right:auto">🗑️ Delete</button>
+      <button class="btn btn-ghost" data-close>Cancel</button>
+      <button class="btn btn-blue" id="catSaveBtn">💾 Save category</button>
+    </div>
+  </div>
+</div>
+
 <div class="notif" id="notif"></div>
 
 <script type="module">
@@ -415,13 +475,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { SUPABASE_CONFIG } from './config.js'
 const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
 
-// ─── helpers ────────────────────────────────────────────────────
 const $ = id => document.getElementById(id)
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 function ntf(msg, kind){
   const el = $('notif'); el.textContent = msg
   el.className = 'notif on ' + (kind === 'err' ? 'err' : 'ok')
-  setTimeout(() => { el.className = 'notif' }, 3500)
+  setTimeout(() => { el.className = 'notif' }, 4500)
 }
 function initials(name){
   if (!name) return '—'
@@ -432,22 +491,20 @@ function avatarColor(name){
   let h = 0; for (const c of (name||'')) h = (h*31 + c.charCodeAt(0)) >>> 0
   return palette[h % palette.length]
 }
-// Default permission for any page not in the role's map
 function defaultLevel(roleName, pageId){
   if (roleName === 'manager') return 'edit'
   if (pageId === 'dashboard') return 'view'
   return 'none'
 }
 
-// ─── pages list (the matrix columns) ────────────────────────────
 const PAGES = [
-  { id: 'dashboard',         label: 'Dashboard',         desc: 'Always accessible to authenticated users (no None option)' },
+  { id: 'dashboard',         label: 'Dashboard',         desc: 'Always accessible (no None option)' },
   { id: 'customer_feedback', label: 'Customer Feedback', desc: 'The feedback / complaints register' },
   { id: 'warranty',          label: 'Renault Warranty',  desc: 'GCM claims, INCADEA reconciliation' },
-  { id: 'settings',          label: 'Settings',          desc: 'This page — employees, roles, system config' }
+  { id: 'settings',          label: 'Settings',          desc: 'This page — employees, roles, categories, system' }
 ]
 
-// ─── tab switching ──────────────────────────────────────────────
+// Tabs
 document.querySelectorAll('.tab').forEach(t => {
   t.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'))
@@ -457,7 +514,7 @@ document.querySelectorAll('.tab').forEach(t => {
   })
 })
 
-// ─── modal open/close helpers ───────────────────────────────────
+// Modal helpers
 function openModal(id) { $(id).classList.add('on') }
 function closeModal(id){ $(id).classList.remove('on') }
 document.querySelectorAll('[data-close]').forEach(b => {
@@ -467,7 +524,6 @@ document.querySelectorAll('.modal-bg').forEach(bg => {
   bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('on') })
 })
 
-// ─── sign out ───────────────────────────────────────────────────
 $('signOutBtn').addEventListener('click', async () => {
   try { await sb.auth.signOut() } catch {}
   sessionStorage.clear()
@@ -475,12 +531,12 @@ $('signOutBtn').addEventListener('click', async () => {
 })
 $('menuBtn').addEventListener('click', () => $('sidebar').classList.toggle('open'))
 
-// ════════════════════════════════════════════════════════════════
-//  STATE
-// ════════════════════════════════════════════════════════════════
-let employees = []
-let roles     = []
-let settings  = {}    // system_settings key→value
+// State
+let employees   = []
+let roles       = []
+let categories  = []
+let settings    = {}
+let employeeCounts = {}   // { roleName: count }
 
 // ════════════════════════════════════════════════════════════════
 //  EMPLOYEES
@@ -501,18 +557,21 @@ function renderEmployees(){
     return
   }
   tbody.innerHTML = employees.map(e => {
-    const role = e.custom_role
-      ? `<span class="bdg b-b">${esc(roleLabelFor(e.custom_role))}</span>`
-      : (e.role === 'manager' ? `<span class="bdg b-b">👔 Manager</span>` : `<span class="bdg b-gray">👤 Employee</span>`)
+    const effectiveRole = e.custom_role || e.role || 'employee'
+    const role = roles.find(x => x.name === effectiveRole)
+    const roleHtml = role
+      ? `<span class="bdg" style="background:${esc(role.color||'#3b5fe2')};color:#fff">${esc(role.icon||'👥')} ${esc(role.label)}</span>`
+      : `<span class="bdg b-gray">${esc(effectiveRole)}</span>`
+    const linked = e.auth_user_id ? '' : `<span class="bdg b-a" style="margin-left:6px" title="No matching Supabase auth user — they cannot sign in until you create one">⚠️ unlinked</span>`
     return `<tr>
       <td>
         <span class="av" style="background:${avatarColor(e.name)}">${initials(e.name)}</span>
-        <strong>${esc(e.name)}</strong>
+        <strong>${esc(e.name)}</strong>${linked}
       </td>
       <td>${esc(e.username || '—')}</td>
       <td style="color:var(--mu)">${esc(e.email || '—')}</td>
       <td style="color:var(--mu)">${esc(e.phone || '—')}</td>
-      <td>${role}</td>
+      <td>${roleHtml}</td>
       <td>${e.is_active ? '<span class="bdg b-g">Active</span>' : '<span class="bdg b-gray">Inactive</span>'}</td>
       <td class="editor-only" style="text-align:right">
         <button class="btn btn-ghost btn-sm" data-edit-emp="${e.id}">✏️ Edit</button>
@@ -524,32 +583,45 @@ function renderEmployees(){
   })
 }
 
-function roleLabelFor(name){
-  const r = roles.find(x => x.name === name)
-  return r ? `${r.icon || '👥'} ${r.label}` : name
+function populateRoleDropdown(selected){
+  // Single unified dropdown — all roles in one list, grouped.
+  // Built-in 'manager' / 'employee' first, then everything else.
+  const sel = $('empRole')
+  const builtIn  = roles.filter(r => r.name === 'manager' || r.name === 'employee')
+  const business = roles.filter(r => r.name !== 'manager' && r.name !== 'employee')
+  const opt = r => `<option value="${esc(r.name)}">${esc(r.icon||'👥')} ${esc(r.label||r.name)}</option>`
+  let html = ''
+  if (builtIn.length) {
+    html += `<optgroup label="System roles">`
+      + builtIn.map(opt).join('')
+      + `</optgroup>`
+  }
+  if (business.length) {
+    html += `<optgroup label="Business roles">`
+      + business.map(opt).join('')
+      + `</optgroup>`
+  }
+  sel.innerHTML = html
+  if (selected) sel.value = selected
+  else sel.value = 'employee'
 }
 
 function fillEmpModal(e){
   $('empId').value         = e?.id || ''
+  $('empAuthUid').value    = e?.auth_user_id || ''
   $('empName').value       = e?.name || ''
   $('empUsername').value   = e?.username || ''
   $('empEmail').value      = e?.email || ''
   $('empPhone').value      = e?.phone || ''
   $('empWhats').value      = e?.whatsapp_phone || ''
-  $('empRole').value       = e?.role || 'employee'
-  $('empCustomRole').value = e?.custom_role || ''
-  $('empAuthUid').value    = e?.auth_user_id || ''
   $('empActive').checked   = e?.is_active !== false
   const prefs = e?.notification_prefs || { email:true, whatsapp:true, sms:true }
   $('empPrefEmail').checked = prefs.email !== false
   $('empPrefWa').checked    = prefs.whatsapp !== false
   $('empPrefSms').checked   = prefs.sms !== false
-  // Custom role dropdown — populate from current roles list (excl. built-ins)
-  const sel = $('empCustomRole')
-  sel.innerHTML = '<option value="">— None —</option>' + roles
-    .filter(r => r.name !== 'manager' && r.name !== 'employee')
-    .map(r => `<option value="${esc(r.name)}">${esc(r.icon||'👥')} ${esc(r.label)}</option>`).join('')
-  if (e?.custom_role) sel.value = e.custom_role
+  // Effective role: custom_role overrides role
+  const effective = e?.custom_role || e?.role || 'employee'
+  populateRoleDropdown(effective)
   $('empDeleteBtn').style.display = e?.id ? '' : 'none'
   $('empModalTitle').textContent  = e?.id ? 'Edit employee' : 'Add employee'
 }
@@ -561,18 +633,39 @@ function editEmployee(id){
 }
 
 $('empSaveBtn').addEventListener('click', async () => {
-  const name = $('empName').value.trim()
+  const name  = $('empName').value.trim()
+  const email = $('empEmail').value.trim()
   if (!name) { ntf('Name is required', 'err'); return }
-  const id   = $('empId').value
-  const rec  = {
+  if (!email) { ntf('Email is required', 'err'); return }
+
+  // Resolve auth_user_id from email automatically.
+  // The RPC returns NULL if no matching auth.users row exists.
+  let authUid = $('empAuthUid').value || null
+  let { data: foundUid, error: rpcErr } = await sb.rpc('find_auth_user_by_email', { p_email: email })
+  if (rpcErr) {
+    ntf('Could not look up auth user: ' + rpcErr.message, 'err'); return
+  }
+  authUid = foundUid || null
+
+  // Map the unified role dropdown back to schema columns.
+  const selectedRole = $('empRole').value
+  let roleCol, customRoleCol
+  if (selectedRole === 'manager' || selectedRole === 'employee') {
+    roleCol = selectedRole; customRoleCol = null
+  } else {
+    roleCol = 'employee'; customRoleCol = selectedRole
+  }
+
+  const id  = $('empId').value
+  const rec = {
     name,
     username:        $('empUsername').value.trim() || null,
-    email:           $('empEmail').value.trim() || null,
+    email,
     phone:           $('empPhone').value.trim() || null,
     whatsapp_phone:  $('empWhats').value.trim() || null,
-    role:            $('empRole').value,
-    custom_role:     $('empCustomRole').value || null,
-    auth_user_id:    $('empAuthUid').value.trim() || null,
+    role:            roleCol,
+    custom_role:     customRoleCol,
+    auth_user_id:    authUid,
     is_active:       $('empActive').checked,
     notification_prefs: {
       email:    $('empPrefEmail').checked,
@@ -584,14 +677,20 @@ $('empSaveBtn').addEventListener('click', async () => {
   if (id) res = await sb.from('employees').update(rec).eq('id', id)
   else    res = await sb.from('employees').insert([rec])
   if (res.error) { ntf('Save failed: ' + res.error.message, 'err'); return }
-  ntf(id ? 'Employee updated' : 'Employee created', 'ok')
+
+  // Helpful tip if no auth match was found.
+  if (!authUid) {
+    ntf(`Saved — but no Supabase auth user with email ${email} yet. Create one in Supabase → Authentication → Users, then re-save this employee to link them.`, 'err')
+  } else {
+    ntf(id ? 'Employee updated' : 'Employee created and linked', 'ok')
+  }
   closeModal('empModal')
   loadEmployees()
 })
 
 $('empDeleteBtn').addEventListener('click', async () => {
   const id = $('empId').value; if (!id) return
-  if (!confirm('Delete this employee permanently?\n\nThis removes their profile but does NOT delete their Supabase auth user. Do that separately in Supabase → Authentication → Users.')) return
+  if (!confirm('Delete this employee profile?\n\nThis does NOT delete their Supabase auth user — do that separately in Supabase → Authentication → Users.')) return
   const { error } = await sb.from('employees').delete().eq('id', id)
   if (error) { ntf('Delete failed: ' + error.message, 'err'); return }
   ntf('Employee deleted', 'ok')
@@ -599,72 +698,79 @@ $('empDeleteBtn').addEventListener('click', async () => {
 })
 
 // ════════════════════════════════════════════════════════════════
-//  ROLES & PERMISSIONS
+//  ROLES & PERMISSIONS  (more polished layout)
 // ════════════════════════════════════════════════════════════════
 async function loadRoles(){
-  const { data, error } = await sb.from('role_templates')
-    .select('name,label,icon,color,permissions')
-    .order('label', { ascending: true })
-  if (error) { ntf('Could not load roles: ' + error.message, 'err'); return }
-  roles = (data || []).map(r => ({ ...r, permissions: r.permissions || {} }))
+  const [rRes, cRes] = await Promise.all([
+    sb.from('role_templates').select('name,label,icon,color,permissions').order('label', { ascending: true }),
+    sb.rpc('count_employees_per_role')
+  ])
+  if (rRes.error) { ntf('Could not load roles: ' + rRes.error.message, 'err'); return }
+  roles = (rRes.data || []).map(r => ({ ...r, permissions: r.permissions || {} }))
+  employeeCounts = {}
+  ;(cRes.data || []).forEach(r => { employeeCounts[r.role_name] = Number(r.employee_count) || 0 })
   renderRoles()
 }
 
 function renderRoles(){
   const grid = $('roleGrid')
-  if (!roles.length) {
-    grid.innerHTML = `<div class="empty">📭 No roles defined yet.</div>`
-    return
-  }
-  grid.innerHTML = roles.map(r => `
-    <div class="role-card" data-role="${esc(r.name)}">
+  if (!roles.length) { grid.innerHTML = `<div class="empty">📭 No roles defined yet.</div>`; return }
+  grid.innerHTML = roles.map(r => {
+    const isBuiltIn = r.name === 'manager' || r.name === 'employee'
+    const count = employeeCounts[r.name] || 0
+    const countCls = count > 0 ? 'has' : ''
+    const countTxt = count === 0 ? 'No one assigned'
+                  : count === 1 ? '1 person'
+                  : `${count} people`
+    return `<div class="role-card" data-role="${esc(r.name)}">
       <div class="role-head" data-toggle>
-        <div class="role-icon" style="background:${esc(r.color || 'var(--blue)')}">${esc(r.icon || '👥')}</div>
+        <div class="role-icon" style="background:${esc(r.color || '#3b5fe2')}">${esc(r.icon || '👥')}</div>
         <div class="role-info">
           <div class="role-label">${esc(r.label || r.name)}</div>
-          <div class="role-key">${esc(r.name)}${r.name==='manager'?' · built-in (always full access)':''}</div>
+          <div class="role-meta">
+            ${isBuiltIn ? '<span class="built-in">built-in</span>' : `<span style="font-family:var(--mono)">${esc(r.name)}</span>`}
+            <span class="role-emp-count ${countCls}">👤 ${countTxt}</span>
+          </div>
         </div>
         <div class="role-actions editor-only">
           <button class="btn btn-ghost btn-icon" data-edit-role="${esc(r.name)}" title="Edit role">✏️</button>
         </div>
-        <div style="font-size:11px;color:var(--mu);margin-left:8px" class="ts-arrow">▾</div>
+        <div class="role-toggle">▾</div>
       </div>
       <div class="role-perm">
         ${PAGES.map(p => permRow(r, p)).join('')}
       </div>
-    </div>
-  `).join('')
+    </div>`
+  }).join('')
 
-  // Toggle expand
   grid.querySelectorAll('[data-toggle]').forEach(h => {
     h.addEventListener('click', e => {
       if (e.target.closest('[data-edit-role]')) return
       h.parentElement.classList.toggle('open')
     })
   })
-  // Edit
   grid.querySelectorAll('[data-edit-role]').forEach(b => {
     b.addEventListener('click', e => { e.stopPropagation(); editRole(b.dataset.editRole) })
   })
-  // Permission pills
   grid.querySelectorAll('.perm-pill').forEach(p => {
-    p.addEventListener('click', () => updatePerm(p))
+    if (!p.disabled) p.addEventListener('click', () => updatePerm(p))
   })
 }
 
 function permRow(role, page){
   const isManager = role.name === 'manager'
   const cur = isManager ? 'edit' : (role.permissions?.[page.id] || defaultLevel(role.name, page.id))
-  const noOption = page.id === 'dashboard'   // can't deny dashboard
+  const noOption = page.id === 'dashboard'
+  const lock = isManager ? 'disabled' : ''
   return `<div class="perm-row" data-role="${esc(role.name)}" data-page="${esc(page.id)}">
     <div>
       <div class="perm-page">${esc(page.label)}</div>
       <div class="perm-page-s">${esc(page.desc)}</div>
     </div>
     <div class="perm-pills">
-      ${noOption ? '' : `<button type="button" class="perm-pill ${cur==='none'?'on':''}" data-l="none" ${isManager?'disabled':''}>None</button>`}
-      <button type="button" class="perm-pill ${cur==='view'?'on':''}" data-l="view" ${isManager?'disabled':''}>View</button>
-      <button type="button" class="perm-pill ${cur==='edit'?'on':''}" data-l="edit" ${isManager?'disabled':''}>Edit</button>
+      ${noOption ? '' : `<button type="button" class="perm-pill ${cur==='none'?'on':''}" data-l="none" ${lock}>None</button>`}
+      <button type="button" class="perm-pill ${cur==='view'?'on':''}" data-l="view" ${lock}>View</button>
+      <button type="button" class="perm-pill ${cur==='edit'?'on':''}" data-l="edit" ${lock}>Edit</button>
     </div>
   </div>`
 }
@@ -674,10 +780,9 @@ async function updatePerm(pill){
   const roleName = row.dataset.role
   const pageId   = row.dataset.page
   const level    = pill.dataset.l
-  if (roleName === 'manager') { ntf('Manager always has full access — cannot change.', 'err'); return }
+  if (roleName === 'manager') return
   const role = roles.find(r => r.name === roleName); if (!role) return
 
-  // Optimistic UI
   row.querySelectorAll('.perm-pill').forEach(p => p.classList.remove('on'))
   pill.classList.add('on')
 
@@ -701,9 +806,7 @@ function fillRoleModal(r){
   $('roleModalTitle').textContent  = r ? `Edit role · ${r.label || r.name}` : 'Add role'
   openModal('roleModal')
 }
-function editRole(name){
-  const r = roles.find(x => x.name === name); if (r) fillRoleModal(r)
-}
+function editRole(name){ const r = roles.find(x => x.name === name); if (r) fillRoleModal(r) }
 $('roleColor').addEventListener('input', e => {
   const v = e.target.value.trim()
   if (/^#[0-9a-fA-F]{6}$/.test(v)) $('roleColorPreview').style.background = v
@@ -726,7 +829,7 @@ $('roleSaveBtn').addEventListener('click', async () => {
 $('roleDeleteBtn').addEventListener('click', async () => {
   const name = $('roleOrigName').value
   if (!name || name === 'manager' || name === 'employee') return
-  if (!confirm(`Delete role "${name}" permanently?\n\nEmployees currently assigned to it will need to be reassigned manually.`)) return
+  if (!confirm(`Delete role "${name}" permanently?\n\nEmployees currently assigned to it will need to be reassigned.`)) return
   const { error } = await sb.from('role_templates').delete().eq('name', name)
   if (error) { ntf('Delete failed: ' + error.message, 'err'); return }
   ntf('Role deleted', 'ok')
@@ -734,17 +837,90 @@ $('roleDeleteBtn').addEventListener('click', async () => {
 })
 
 // ════════════════════════════════════════════════════════════════
+//  CATEGORIES
+// ════════════════════════════════════════════════════════════════
+async function loadCategories(){
+  const { data, error } = await sb.from('feedback_categories')
+    .select('id,key,label,icon,description,sort_order,is_active')
+    .order('sort_order', { ascending: true })
+  if (error) { ntf('Could not load categories: ' + error.message, 'err'); return }
+  categories = data || []
+  renderCategories()
+}
+
+function renderCategories(){
+  const grid = $('catGrid')
+  if (!categories.length) {
+    grid.innerHTML = `<div class="empty">📭 No categories defined yet — click "Add category" to start.</div>`; return
+  }
+  grid.innerHTML = categories.map(c => `
+    <div class="cat-card ${c.is_active ? '' : 'inactive'}" data-cat="${esc(c.id)}">
+      <div class="cat-ic">${esc(c.icon || '📋')}</div>
+      <div class="cat-info">
+        <div class="cat-label">${esc(c.label)}${c.is_active ? '' : ' <span style="color:var(--mu);font-weight:500;font-size:11px">(hidden)</span>'}</div>
+        <div class="cat-key">${esc(c.key)}</div>
+      </div>
+      <div class="cat-edit">✏️</div>
+    </div>
+  `).join('')
+  grid.querySelectorAll('[data-cat]').forEach(card => {
+    card.addEventListener('click', () => editCategory(card.dataset.cat))
+  })
+}
+
+function fillCatModal(c){
+  $('catId').value     = c?.id || ''
+  $('catKey').value    = c?.key || ''
+  $('catLabel').value  = c?.label || ''
+  $('catIcon').value   = c?.icon || ''
+  $('catOrder').value  = c?.sort_order ?? 100
+  $('catDesc').value   = c?.description || ''
+  $('catActive').checked = c?.is_active !== false
+  $('catKey').disabled = !!c
+  $('catDeleteBtn').style.display = c?.id ? '' : 'none'
+  $('catModalTitle').textContent  = c?.id ? `Edit category · ${c.label}` : 'Add category'
+  openModal('catModal')
+}
+$('addCatBtn').addEventListener('click', () => fillCatModal(null))
+function editCategory(id){ const c = categories.find(x => x.id === id); if (c) fillCatModal(c) }
+
+$('catSaveBtn').addEventListener('click', async () => {
+  const id = $('catId').value
+  const key   = $('catKey').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
+  const label = $('catLabel').value.trim()
+  if (!key || !label) { ntf('Machine key and label are required', 'err'); return }
+  const rec = {
+    key, label,
+    icon:        $('catIcon').value.trim() || '📋',
+    description: $('catDesc').value.trim() || null,
+    sort_order:  parseInt($('catOrder').value, 10) || 100,
+    is_active:   $('catActive').checked
+  }
+  let res
+  if (id) res = await sb.from('feedback_categories').update(rec).eq('id', id)
+  else    res = await sb.from('feedback_categories').insert([rec])
+  if (res.error) { ntf('Save failed: ' + res.error.message, 'err'); return }
+  ntf(id ? 'Category updated' : 'Category created', 'ok')
+  closeModal('catModal'); await loadCategories()
+})
+
+$('catDeleteBtn').addEventListener('click', async () => {
+  const id = $('catId').value; if (!id) return
+  if (!confirm('Delete this category?\n\nFeedback records that referenced it will keep the old key in their data, but the dropdown will no longer offer it.')) return
+  const { error } = await sb.from('feedback_categories').delete().eq('id', id)
+  if (error) { ntf('Delete failed: ' + error.message, 'err'); return }
+  ntf('Category deleted', 'ok')
+  closeModal('catModal'); await loadCategories()
+})
+
+// ════════════════════════════════════════════════════════════════
 //  SYSTEM SETTINGS
 // ════════════════════════════════════════════════════════════════
-const SYS_KEYS = [
-  'brevo_api_key','brevo_sender_name','brevo_sender_email',
-  'twilio_account_sid','twilio_auth_token','twilio_from'
-]
+const SYS_KEYS = ['brevo_api_key','brevo_sender_name','brevo_sender_email','twilio_account_sid','twilio_auth_token','twilio_from']
 async function loadSystem(){
   const { data, error } = await sb.from('system_settings').select('key,value').in('key', SYS_KEYS)
   if (error) { ntf('Could not load system settings: ' + error.message, 'err'); return }
-  settings = {}
-  ;(data || []).forEach(r => settings[r.key] = r.value)
+  settings = {}; (data || []).forEach(r => settings[r.key] = r.value)
   SYS_KEYS.forEach(k => { const el = $(k); if (el) el.value = settings[k] || '' })
 }
 $('saveSysBtn').addEventListener('click', async () => {
@@ -758,9 +934,9 @@ $('saveSysBtn').addEventListener('click', async () => {
 //  INITIAL LOAD
 // ════════════════════════════════════════════════════════════════
 ;(async () => {
-  // Roles must load before employees so the role labels resolve in the table.
-  await loadRoles()
+  await loadRoles()       // roles must come first — employees table renders role badges
   await loadEmployees()
+  await loadCategories()
   await loadSystem()
 })()
 </script>
