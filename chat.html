@@ -6,6 +6,7 @@
 <title>Bassoul, Heneine Sal — Team Chat</title>
 <script type="module" src="config.js"></script>
 <script type="module" src="auth_guard.js"></script>
+<script type="module" src="notifications.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
 :root{
@@ -279,7 +280,15 @@ async function bootstrap(){
   employeeById.set(me.id, me)
 
   renderConvoList()
-  await openConversation({ type: 'group', id: null })
+  // Honor ?convo=group or ?convo=dm&partner=<id> from notification links
+  const params = new URLSearchParams(location.search)
+  const convoQ = params.get('convo')
+  const partnerQ = params.get('partner')
+  if (convoQ === 'dm' && partnerQ && employeeById.has(partnerQ)) {
+    await openConversation({ type: 'dm', id: partnerQ })
+  } else {
+    await openConversation({ type: 'group', id: null })
+  }
   subscribeRealtime()
 }
 

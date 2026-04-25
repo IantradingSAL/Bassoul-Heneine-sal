@@ -24,6 +24,7 @@
 <meta name="cw-page" content="customer_feedback"/>
 <title>Bassoul, Heneine Sal — Customer Feedback</title>
 <script type="module" src="auth_guard.js?v=20260422c"></script>
+<script type="module" src="notifications.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
 <style>
 
@@ -1157,7 +1158,7 @@ window.exportFilteredCsv = () => {
     if(af){af.value='__mine__'}
   }
   await load()
-  // ?open=<id> support — jump straight to a specific complaint.
+  // ?open=<id> support — view modal (read-only)
   const openId=qp.get('open')
   if(openId){
     const match=all.find(x=>String(x.id)===String(openId))
@@ -1165,6 +1166,17 @@ window.exportFilteredCsv = () => {
       const idx=filtered.findIndex(x=>String(x.id)===String(openId))
       if(idx>=0){pg=Math.floor(idx/PAGE);render()}
       if(typeof viewRec==='function')viewRec(openId)
+    }
+  }
+  // ?case=<id> support — opens edit modal with discussion thread
+  // (used by notification links so users land directly on the case + reply)
+  const caseId=qp.get('case')
+  if(caseId){
+    const match=all.find(x=>String(x.id)===String(caseId))
+    if(match){
+      const idx=filtered.findIndex(x=>String(x.id)===String(caseId))
+      if(idx>=0){pg=Math.floor(idx/PAGE);render()}
+      if(typeof editRec==='function')editRec(caseId)
     }
   }
 })()
