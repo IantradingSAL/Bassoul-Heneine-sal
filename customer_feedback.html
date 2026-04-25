@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- CW defensive help cleanup -->
+<script>
+(function(){
+  function kill(){
+    var el=document.getElementById("cw-help-btn");if(el)el.remove();
+    var root=document.getElementById("cw-help-root");if(root)root.remove();
+  }
+  document.addEventListener("DOMContentLoaded",function(){
+    kill();
+    // If stale access.js injects later, kill as it appears.
+    try{
+      var mo=new MutationObserver(kill);
+      mo.observe(document.body,{childList:true,subtree:false});
+      setTimeout(function(){mo.disconnect()},5000);
+    }catch(e){}
+  });
+})();
+</script>
+
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Cedarwings SAS — Customer Feedback</title>
+<script type="module" src="auth_guard.js?v=20260422c"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
+<style>
+
+:root{
+  --bg:#f0f4f8;--card:#fff;--bdr:#e2e8f0;--txt:#0f172a;--mu:#64748b;--dim:#94a3b8;
+  --blue:#3b5fe2;--b50:#eef2ff;--b100:#e0e7ff;
+  --green:#16a34a;--g50:#f0fdf4;--g100:#dcfce7;
+  --amber:#d97706;--a50:#fffbeb;--a100:#fef3c7;
+  --red:#dc2626;--r50:#fef2f2;--r100:#fee2e2;
+  --purple:#7c3aed;--p50:#f5f3ff;--p100:#ede9fe;
+  --teal:#0d9488;--t50:#f0fdfa;--t100:#ccfbf1;
+  --f:'DM Sans',sans-serif;--mono:'JetBrains Mono',monospace;
+  --sh:0 1px 3px rgba(0,0,0,.07),0 0 0 1px rgba(0,0,0,.04);
+  --sh2:0 6px 24px rgba(0,0,0,.09),0 0 0 1px rgba(0,0,0,.04)
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--f);background:var(--bg);color:var(--txt);min-height:100vh;opacity:1!important}
+/* SIDEBAR */
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:var(--card);border-right:1px solid var(--bdr);display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+.sb-top{display:flex;align-items:center;gap:12px;padding:20px 18px 16px;border-bottom:1px solid var(--bdr)}
+.sb-logo{width:40px;height:40px;background:linear-gradient(135deg,#3b5fe2,#6366f1);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;box-shadow:0 4px 12px rgba(59,95,226,.3)}
+.sb-name{font-weight:800;font-size:14px;letter-spacing:-.2px}
+.sb-badge{display:inline-flex;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;margin-top:3px;background:var(--b50);color:var(--blue)}
+.sb-nav{flex:1;padding:10px}
+.sb-sec{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;padding:14px 8px 6px}
+.nav-link{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;font-size:13px;font-weight:500;color:var(--mu);text-decoration:none;transition:background .12s,color .12s}
+.nav-link:hover{background:var(--bg);color:var(--txt)}
+.nav-link.active{background:var(--b50);color:var(--blue);font-weight:700}
+.nav-link .ic{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+.sb-foot{padding:12px 10px;border-top:1px solid var(--bdr)}
+.sb-s{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;padding:14px 8px 6px}
+.nl{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;font-size:13px;font-weight:500;color:var(--mu);text-decoration:none;transition:all .12s}
+.nl:hover{background:var(--bg);color:var(--txt)}
+.nl.on{background:var(--b50);color:var(--blue);font-weight:700}
+.nl .ic{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+/* MAIN CONTENT */
+.content{margin-left:240px;min-height:100vh}
+.topbar{background:var(--card);border-bottom:1px solid var(--bdr);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.top-left .page-title{font-size:20px;font-weight:800;letter-spacing:-.4px}
+.top-left .page-date{font-size:12px;color:var(--mu);margin-top:2px}
+.top-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.live-badge{display:flex;align-items:center;gap:6px;background:var(--g50);border:1px solid var(--g100);padding:5px 13px;border-radius:999px;font-size:12px;font-weight:700;color:var(--green)}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.4)}60%{box-shadow:0 0 0 5px rgba(22,163,74,0)}}
+/* RANGE TABS */
+.range-tabs{display:flex;background:var(--bg);border:1px solid var(--bdr);border-radius:9px;padding:3px;gap:2px}
+.rt{padding:5px 14px;font-size:12px;font-weight:600;border:none;background:transparent;color:var(--mu);border-radius:7px;cursor:pointer;font-family:var(--f);transition:all .12s}
+.rt.active{background:var(--card);color:var(--blue);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:700}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;font-size:13px;font-weight:600;border:none;border-radius:9px;cursor:pointer;font-family:var(--f);transition:all .12s}
+.btn-ghost{background:var(--card);border:1px solid var(--bdr);color:var(--mu)}.btn-ghost:hover{color:var(--txt);border-color:var(--blue)}
+.btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:#2e4fc7}
+/* PAGE BODY */
+.body{padding:20px 28px 80px}
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:14px;margin-bottom:22px}
+.kpi{background:var(--card);border-radius:16px;box-shadow:var(--sh);padding:20px 18px 16px;position:relative;overflow:hidden;transition:box-shadow .2s;cursor:default;cursor:pointer;transition:box-shadow .15s,transform .12s;text-decoration:none;display:block;color:inherit}
+.kpi:hover{box-shadow:var(--sh2);transform:translateY(-2px)}
+.kpi:hover{box-shadow:var(--sh2);transform:translateY(-1px)}
+.kpi-stripe{position:absolute;top:0;left:0;right:0;height:3px}
+.kpi-ico{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:14px}
+.kpi-val{font-size:32px;font-weight:800;font-family:var(--mono);letter-spacing:-1.5px;line-height:1;color:var(--txt)}
+.kpi-lbl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-top:8px}
+.kpi-sub{font-size:11px;color:var(--dim);margin-top:4px;min-height:16px}
+/* SECTION */
+.section-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:8px}
+.section-title{font-size:15px;font-weight:700;letter-spacing:-.1px}
+.section-sub{font-size:12px;color:var(--mu);margin-top:3px}
+/* CARDS */
+.card{background:var(--card);border-radius:16px;box-shadow:var(--sh);padding:22px;margin-bottom:16px}
+/* GRIDS */
+.g2{display:grid;grid-template-columns:3fr 2fr;gap:16px;margin-bottom:16px}
+.g2e{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+/* TABLE */
+.tw{overflow-x:auto;border-radius:12px;border:1px solid var(--bdr)}
+table{width:100%;border-collapse:collapse}
+thead th{padding:10px 14px;font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;background:#f8fafc;border-bottom:1px solid var(--bdr);white-space:nowrap;text-align:left}
+tbody td{padding:12px 14px;font-size:13px;border-bottom:1px solid var(--bdr);color:var(--txt)}
+tbody tr:last-child td{border:none}
+tbody tr:hover{background:#f8fafc}
+.mono{font-family:var(--mono);font-size:12px}
+/* BADGES */
+.bdg{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700}
+.b-g{background:var(--g100);color:#15803d}
+.b-a{background:var(--a100);color:#92400e}
+.b-r{background:var(--r100);color:#991b1b}
+.b-b{background:var(--b100);color:#1e40af}
+.b-p{background:var(--p100);color:#5b21b6}
+.b-t{background:var(--t100);color:#0f766e}
+.b-gray{background:#f1f5f9;color:var(--mu)}
+/* ACTIVE SESSION CARDS */
+.ac{background:var(--bg);border:1.5px solid var(--bdr);border-radius:12px;padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;transition:border-color .15s}
+.ac:hover{border-color:var(--blue)}
+.ac-av{width:42px;height:42px;border-radius:12px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0}
+.ac-name{font-size:14px;font-weight:700}
+.ac-meta{font-size:12px;color:var(--mu);margin-top:3px;line-height:1.5}
+.ac-time{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--green);line-height:1}
+.ac-time.waste{color:var(--amber)}
+.ac-type{font-size:11px;font-weight:600;margin-top:3px}
+/* ALERT ITEMS */
+.ali{display:flex;gap:10px;padding:11px 14px;border-radius:10px;margin-bottom:7px;align-items:flex-start}
+.ali-d{background:var(--r50);border:1px solid var(--r100)}
+.ali-w{background:var(--a50);border:1px solid var(--a100)}
+.ali-i{font-size:20px;flex-shrink:0;margin-top:1px}
+.ali-title{font-size:13px;font-weight:700}
+.ali-desc{font-size:11px;color:var(--mu);margin-top:2px}
+/* EFF BAR */
+.eff{display:flex;align-items:center;gap:8px}
+.eff-bg{flex:1;height:7px;background:var(--bg);border-radius:999px;overflow:hidden;border:1px solid var(--bdr)}
+.eff-f{height:100%;border-radius:999px}
+.eff-pct{font-family:var(--mono);font-size:11px;min-width:34px;font-weight:700}
+/* EMPTY */
+.empty-cell{color:var(--dim)!important;text-align:center;padding:28px!important}
+/* REQ ITEM */
+.req-i{background:var(--bg);border:1px solid var(--bdr);border-radius:10px;padding:12px;margin-bottom:7px;display:flex;gap:10px;align-items:flex-start}
+.req-name{font-size:13px;font-weight:700}
+.req-meta{font-size:11px;color:var(--mu);margin-top:3px}
+@media(max-width:1400px){.kpi-grid{grid-template-columns:repeat(4,1fr)}}@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.g2,.g3{grid-template-columns:1fr}.sidebar{display:none}.content{margin-left:0}}
+@media(max-width:640px){.kpi-grid{grid-template-columns:1fr 1fr}.g2e{grid-template-columns:1fr}}
+
+
+.main{margin-left:240px;min-height:100vh}
+.body{padding:20px 28px 80px}
+.badge{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap}
+.b-g{background:var(--g100);color:#15803d}.b-a{background:var(--a100);color:#92400e}
+.b-b{background:var(--b100);color:#1e40af}.b-gray{background:#f1f5f9;color:#475569}
+.b-r{background:var(--r100);color:#991b1b}.b-p{background:var(--p100);color:#5b21b6}
+.b-t{background:var(--t100);color:#0f766e}
+.modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:600;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-bg.on{display:flex}
+.modal{background:var(--card);border-radius:18px;padding:28px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto;box-shadow:var(--sh2)}
+.fi{padding:8px 11px;border:1.5px solid var(--bdr);border-radius:8px;font-family:var(--f);font-size:12px;background:var(--card);outline:none;color:var(--txt);width:100%;transition:border .15s}
+.fi:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,95,226,.1)}
+textarea.fi{resize:vertical}
+.form-label{font-size:11px;font-weight:700;color:var(--mu);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px}
+.notif{position:fixed;bottom:24px;right:24px;padding:13px 18px;border-radius:12px;font-size:13px;font-weight:600;z-index:9999;display:none;box-shadow:0 6px 24px rgba(0,0,0,.15)}
+.notif.on{display:block}.notif.ok{background:#15803d;color:#fff}.notif.err{background:var(--red);color:#fff}
+/* COLLAPSIBLE SECTIONS (feedback modal) */
+.fb-section{border:1px solid var(--bdr);border-radius:10px;margin-top:12px;overflow:hidden;background:var(--card)}
+.fb-section>summary{padding:12px 14px;font-size:13px;font-weight:700;color:var(--txt);cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;background:#f8fafc;user-select:none}
+.fb-section>summary::-webkit-details-marker{display:none}
+.fb-section>summary::before{content:'\25B8';color:var(--mu);font-size:11px;transition:transform .15s;display:inline-block}
+.fb-section[open]>summary::before{transform:rotate(90deg)}
+.fb-section[open]>summary{border-bottom:1px solid var(--bdr);background:var(--b50);color:var(--blue)}
+.fb-section-body{padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fb-section-body .fw{grid-column:1/-1}
+/* PRIORITY PILLS */
+.pri-row{display:flex;gap:8px;flex-wrap:wrap}
+.pri-pill{flex:1;min-width:70px;padding:10px 8px;border:1.5px solid var(--bdr);border-radius:10px;font-size:12px;font-weight:700;color:var(--mu);background:var(--card);cursor:pointer;font-family:var(--f);text-align:center;transition:all .12s;user-select:none}
+.pri-pill:hover{border-color:var(--mu);color:var(--txt)}
+.pri-pill.on[data-p="low"]{background:#f1f5f9;border-color:#94a3b8;color:#334155}
+.pri-pill.on[data-p="medium"]{background:#fef9c3;border-color:#eab308;color:#854d0e}
+.pri-pill.on[data-p="high"]{background:#ffedd5;border-color:#f97316;color:#9a3412}
+.pri-pill.on[data-p="critical"]{background:#fee2e2;border-color:#dc2626;color:#991b1b}
+/* PRIORITY COLOR ON LIST-VIEW BADGES */
+.pri-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap}
+.pri-badge[data-p="low"]{background:#f1f5f9;color:#334155}
+.pri-badge[data-p="medium"]{background:#fef9c3;color:#854d0e}
+.pri-badge[data-p="high"]{background:#ffedd5;color:#9a3412}
+.pri-badge[data-p="critical"]{background:#fee2e2;color:#991b1b}
+.tw{overflow-x:auto;border-radius:11px;border:1px solid var(--bdr)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{padding:9px 14px;font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;background:#f8fafc;border-bottom:1px solid var(--bdr);text-align:left;white-space:nowrap}
+tbody td{padding:10px 14px;border-bottom:1px solid var(--bdr);vertical-align:middle}
+tbody tr:last-child td{border:none}tbody tr:hover{background:#f8fafc}
+.ec{color:var(--dim)!important;text-align:center!important;padding:32px!important}
+.mono{font-family:var(--mono);font-size:11px}
+.pager{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--mu)}
+.card{background:var(--card);border-radius:16px;box-shadow:var(--sh);padding:20px;margin-bottom:16px}
+.kpi-grid{display:grid;gap:12px;margin-bottom:20px}
+.kpi{background:var(--card);border-radius:12px;box-shadow:var(--sh);padding:16px;border-top:3px solid var(--bdr)}
+.kpi-val{font-size:24px;font-weight:800;font-family:var(--mono)}
+.kpi-lbl{font-size:11px;color:var(--mu);font-weight:600;margin-top:2px}
+
+</style>
+<script>const PAGE_KEY='customer_feedback'</script>
+<script src="access.js?v=20260422c"></script>
+<script src="lang.js?v=20260423b"></script>
+</head>
+<body><aside class="sidebar">
+  <div class="sb-top" style="flex-direction:column;align-items:flex-start">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div class="sb-logo">⚙</div>
+      <div><div class="sb-name">Cedarwings SAS</div><div class="sb-badge" id="sb-role-lbl">Manager</div></div>
+    </div>
+    <div style="width:100%;background:#f8fafc;border-radius:8px;padding:5px 8px;display:flex;align-items:center;gap:6px;border:1px solid #e2e8f0;margin-top:2px">
+      <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAkACQAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAG2BIEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9U6KKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooqvqGoW2k2M97e3EdraW6GSWeZgqIoGSST0FAFiivi34uf8FFrHR7250/wDpEWsNG2warqW9bdiOpSMFWYe5K/SvGY/+Cg3xYS884y6LJHuz9naw+THpkNux+OaAP04or43+Ev/AAUT0fxBfW+neOdIXw/LKwT+0rJmktgT3dD8yD3y2K+wbG+t9Ss4bu0njubWZBJFNCwZHU8ggjqKAJ6KKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAr5c/aa/bC1T4CeP7Xw9ZeHLTVoprCO8M89w8bAs7rtwAePk/WvqOvzY/wCCjH/JctN/7AkH/o2agDqP+HmGv/8AQkab/wCBsn/xNfWX7O3xcufjb8M7XxRd6dFpc01xLCbeGQuoCNjOSO9fj9X6h/sDf8m66b/1/XX/AKHQB9F0UUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABUN5MbaznmUAtHGzgHpwM1NVXVf+QXef9cX/wDQTQB+eX/Dybx//wBC34b/AO/dx/8AHa0fDf8AwUU8d614i0vT5fD3h1Iru6igdkjn3BWcKSMy9ea+N63fAf8AyPHh3/sI2/8A6NWgD9saKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAr89/29/wBoO417xFJ8OtEuZItK05gdUkjfAuZ+ojOOqpx16t/uivvXxRrkXhfwzq2szqXh0+0mu3UdSsaFyPyFfkH8N9BuvjN8atG0+/drifXdVEl5JnkqzF5W/wC+QxoA99/ZR/Yti+JOkweL/Gxmg0Gb5rHTYiUkulBx5jt1VOOMct1yB1+y7H9nD4W6fp4so/AHh54Qu3dPp8csnTH+sYFs++a9AsrOHTrOC1tolht4I1ijjQYVFUYAA7AAVPQB8gfHn9gbw9rejXWqfD2I6LrUKmQaY0jNb3OOqLuJMbenOO2B1HFfsD/G2/0PW9S+GviGVo7OKOa5svtJKtayR8zRc9Bjc2OxU+vH3pX5dftqab/wgv7SGt3WjyNYvqVotxIYDtOZojHKP+BDdn13GgD6R+Hv/BQLQvE3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/Ry1D+xL/wAm76D/ANfF3/6Peuz+Pnw3vviz8MdT8M6ddW9nd3TxMs11u8sbXDHO0E9vSmfs/fDO/wDhF8L9N8MaldW95d2ssztNa7vLIeRnGNwB6H0r3vb0v7J9hze/7S9vLltc+Z+rVv7c+s8vueztfz5r2Pm34yRrJ+3Z4MR1DIxsQVYZBGX4pPh7rVt+yz+0f4x8OajcfZfCeqW0l9btIflVVVpYse4HmR+5x7V6146/Z21rxV+0doHxEt9SsIdL042xktZC/nN5ZJOMLt5z60/9qL9mmb47DRb3Sb2003WLAvFJNdhtssDchTtBOVYZH+81ezDHYWcaOGqz9yVPll5Nap/L9T5+pluMpyr4yhD95Gq5R/vRas181+R4H4H0C58bfC340/FjV4ma81aCe2s2k52x7lZ9vsMIgPbYR617b+wb/wAkIX/sKXH8krvdS+Doi+AM/wAOtHlgtnOmfYknlBCGQ8s7YBPLbieO9R/s3/CfUfgx8OB4d1S8tb66+2S3Hm2m7ZtYLgfMAc8elcmMzClisJVinZua5V/dSsjuy/K62Dx1CbV0qb5pf35Suz1Kiiivkz7gKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigD/2Q==" style="height:16px;object-fit:contain" alt="Bloom Aligner"/>
+      <span style="font-size:9px;color:#64748b;font-weight:600">Bloom Aligner Partner</span>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-s">Operations</div>
+    <a href="manager.html" class="nl"><span class="ic">📊</span>Dashboard</a>
+    <a href="production.html" class="nl"><span class="ic">🏭</span>Production</a>
+    <a href="production_materials.html" class="nl"><span class="ic">🧪</span>Materials & Lots</a>
+    <a href="machines.html" class="nl"><span class="ic">⚙</span>Machines</a>
+    <a href="maintenance_history.html" class="nl"><span class="ic">🔧</span>Maintenance History</a>
+    <div class="sb-s">Team</div>
+    <a href="employees.html" class="nl"><span class="ic">👥</span>Employees</a>
+    <a href="employee_profile.html" class="nl"><span class="ic">👤</span>Employee Profile</a>
+    <a href="time_report.html" class="nl"><span class="ic">📈</span>Time Report</a>
+    <div class="sb-s">Quality</div>
+    <a href="tracabilite.html" class="nl"><span class="ic">🔖</span>Traceability</a>
+    <a href="qualite.html" class="nl"><span class="ic">✅</span>Quality Control</a>
+    <a href="non_conformity.html" class="nl"><span class="ic">⚠️</span>Non-Conformity</a>
+    <a href="suppliers.html" class="nl"><span class="ic">🏭</span>Suppliers</a>
+    <a href="customer_feedback.html" class="nl"><span class="ic">💬</span>Customer Feedback</a>
+    <a href="internal_audit.html" class="nl"><span class="ic">🔍</span>Internal Audits</a>
+    <div class="sb-s">Resources</div>
+    <a href="inventory.html" class="nl"><span class="ic">📦</span>Inventory</a>
+    <div class="sb-s">Integrations</div>
+    <a href="bloom_import.html" class="nl"><span class="ic">🌸</span>Bloom Import</a>
+    <div class="sb-s">System</div>
+    <a href="iso_compliance.html" class="nl"><span class="ic">✅</span>ISO 13485 Compliance</a>
+    <a href="settings.html" class="nl"><span class="ic">⚙</span>Settings</a>
+    <a href="changelog.html" class="nl"><span class="ic">📝</span>Changelog</a>
+    <a href="roles.html" class="nl"><span class="ic">🔑</span>Roles</a>
+    <div class="sb-s">Terminal</div>
+    <a href="clocking.html" class="nl"><span class="ic">⏱</span>Clocking Terminal</a>
+  </nav>
+  <div class="sb-foot">
+<button id="sbLangBtn" title="Changer la langue / Switch Language"
+  onclick="(function(){const l=localStorage.getItem('cw_lang')||'fr';const n=l==='fr'?'en':'fr';localStorage.setItem('cw_lang',n);document.getElementById('sbLangBtn').innerHTML=n==='fr'?'🇬🇧 EN':'🇫🇷 FR';if(typeof CW_LANG!=='undefined')CW_LANG.apply();})()"
+  style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;
+         font-size:12px;font-weight:600;color:var(--mu);background:none;border:none;
+         cursor:pointer;width:100%;text-align:left;font-family:var(--f);
+         transition:background .12s,color .12s"
+  onmouseover="this.style.background='var(--bg)';this.style.color='var(--txt)'"
+  onmouseout="this.style.background='none';this.style.color='var(--mu)'">
+  🇫🇷 FR
+</button>
+<script>(function(){const l=localStorage.getItem('cw_lang')||'fr';const b=document.getElementById('sbLangBtn');if(b)b.innerHTML=l==='fr'?'🇬🇧 EN':'🇫🇷 FR';})()</script>
+    <a href="index.html" class="nl"><span class="ic">←</span>Switch Role</a>
+  </div>
+</aside>
+<div class="main">
+  <div class="topbar">
+  
+    <div>
+      <div style="font-size:16px;font-weight:800">💬 Customer Feedback</div>
+      <div style="font-size:11px;color:var(--mu)">ISO 13485 Clause 8.2.1 — Customer Complaints & Feedback Register</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <select class="fi" id="typeFilter" style="width:150px">
+        <option value="">All Types</option>
+        <option value="complaint">Complaint</option>
+        <option value="feedback">Positive Feedback</option>
+        <option value="suggestion">Suggestion</option>
+        <option value="warranty">Warranty Claim</option>
+        <option value="inquiry">Inquiry</option>
+        <option value="return">Return Request</option>
+        <option value="service_request">Service Request</option>
+      </select>
+      <select class="fi" id="statusFilter" style="width:130px">
+        <option value="">All Status</option>
+        <option value="open">Open</option>
+        <option value="in_progress">In Progress</option>
+        <option value="resolved">Resolved</option>
+        <option value="closed">Closed</option>
+      </select>
+      <select class="fi" id="assignedFilter" style="width:150px">
+        <option value="">All Assignees</option>
+        <option value="__mine__">🙋 Assigned to me</option>
+        <option value="__unassigned__">⏳ Unassigned</option>
+        <option value="__followup_mine__">⏰ My follow-ups due</option>
+        <option value="__followup_overdue__">⚠️ Overdue follow-ups</option>
+        <option value="__open_unread__">📧 Open &amp; unread</option>
+      </select>
+      <button class="btn bgh" onclick="exportFilteredCsv()" title="Download current view as CSV">⬇ CSV</button>
+      <button class="btn bb" onclick="openNew()">+ Log Feedback</button>
+    </div>
+  </div>
+  <div class="body">
+    <div id="ncPromptBanner" style="display:none;margin-bottom:16px"></div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
+      <div class="kpi" style="border-top-color:var(--red)"><div class="kpi-val" id="kComplaints" style="color:var(--red)">—</div><div class="kpi-lbl">Complaints</div></div>
+      <div class="kpi" style="border-top-color:var(--amber)"><div class="kpi-val" id="kOpen" style="color:var(--amber)">—</div><div class="kpi-lbl">Open</div></div>
+      <div class="kpi" style="border-top-color:var(--green)"><div class="kpi-val" id="kResolved" style="color:var(--green)">—</div><div class="kpi-lbl">Resolved</div></div>
+      <div class="kpi" style="border-top-color:var(--blue)"><div class="kpi-val" id="kFeedback">—</div><div class="kpi-lbl">Positive Feedback</div></div>
+      <div class="kpi" style="border-top-color:var(--mu)"><div class="kpi-val" id="kTotal">—</div><div class="kpi-lbl">Total Records</div></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:14px;font-weight:800">📋 Feedback & Complaints Register</div>
+        <input class="fi" id="searchInput" placeholder="Search customer, order, description..." style="width:280px"/>
+      </div>
+      <!-- Saved views: inline chip row (per-user, cross-device via public.user_views) -->
+      <div id="savedViewsMount" style="margin-bottom:12px"></div>
+      <!-- Bulk-action bar mount (rendered by bulk_actions.js) -->
+      <div id="bulkBarMount"></div>
+      <div class="tw"><table>
+        <thead><tr>
+          <th class="no-sort" style="width:28px;text-align:center"><input type="checkbox" id="bulkAllCb" title="Select all on this page" style="cursor:pointer"></th>
+          <th></th><th>Ref #</th><th>Date</th><th>Customer / Distributor</th><th>Type</th><th>Category</th><th>Case #</th><th>Description</th><th>Priority</th><th>Assigned To</th><th>⏰ Follow-up</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody id="tBody"><tr><td colspan="14" class="ec">Loading...</td></tr></tbody>
+      </table></div>
+      <div class="pager"><span id="pInfo"></span>
+        <div style="display:flex;gap:6px">
+          <button class="btn bgh" id="btnPrev" style="padding:5px 12px">‹</button>
+          <button class="btn bgh" id="btnNext" style="padding:5px 12px">›</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-bg" id="modal">
+  <div class="modal" style="max-width:640px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-size:16px;font-weight:800" id="mTitle">💬 Log Feedback</div>
+      <button class="btn bgh" onclick="closeModal()" style="padding:5px 12px">✕</button>
+    </div>
+    <!-- ESSENTIAL FIELDS (always visible) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div><label class="form-label">Date *</label><input type="date" class="fi" id="fDate"/></div>
+      <div><label class="form-label">Type *</label>
+        <select class="fi" id="fType" onchange="onTypeChange()">
+          <option value="complaint">🚫 Complaint</option>
+          <option value="feedback">👍 Positive Feedback</option>
+          <option value="suggestion">💡 Suggestion</option>
+          <option value="warranty">🛡️ Warranty Claim</option>
+          <option value="inquiry">❓ Inquiry</option>
+          <option value="return">📦 Return Request</option>
+          <option value="service_request">🛠️ Service Request</option>
+        </select>
+      </div>
+      <div><label class="form-label">Customer / Distributor *</label><input type="text" class="fi" id="fCustomer" placeholder="Name"/></div>
+      <div><label class="form-label">Doctor</label><input type="text" class="fi" id="fDoctor" placeholder="Doctor name (optional)"/></div>
+      <div><label class="form-label">Assigned To</label>
+        <select class="fi" id="fAssigned">
+          <option value="">— Unassigned —</option>
+        </select>
+      </div>
+      <div><label class="form-label">Resolved Date</label><input type="date" class="fi" id="fClosed"/></div>
+      <div style="grid-column:1/-1"><label class="form-label">Description *</label><textarea class="fi" id="fDesc" rows="3" placeholder="Describe the feedback or complaint..."></textarea></div>
+    </div>
+
+    <!-- COLLAPSIBLE: Categorisation & Bloom Case -->
+    <details class="fb-section">
+      <summary>🗂️ Categorisation &amp; Bloom Case</summary>
+      <div class="fb-section-body">
+        <div id="fCategoryWrap" class="fw"><label class="form-label">Complaint Category</label>
+          <select class="fi" id="fCategory" onchange="onCategoryChange()">
+            <option value="">— Select category —</option>
+            <option value="product_quality">Product Quality (defect, fit)</option>
+            <option value="delivery">Delivery / Shipping</option>
+            <option value="fitting">Aligner Fitting</option>
+            <option value="packaging">Packaging Damage</option>
+            <option value="communication">Communication</option>
+            <option value="documentation">Documentation / Label</option>
+            <option value="traceability">Traceability / Case ID Issue</option>
+            <option value="billing">Billing</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div id="fProtocolGuide" class="fw" style="display:none"></div>
+        <div class="fw"><label class="form-label">Bloom Case #</label>
+          <input type="text" class="fi" id="fCase" list="bloomCases" placeholder="Type to search — e.g. 5234 or patient name" autocomplete="off"/>
+          <datalist id="bloomCases"></datalist>
+        </div>
+      </div>
+    </details>
+
+    <!-- COLLAPSIBLE: Resolution (priority, status, root cause, action, assignee, resolved date) -->
+    <details class="fb-section">
+      <summary>✅ Resolution</summary>
+      <div class="fb-section-body">
+        <div class="fw"><label class="form-label">Priority</label>
+          <div class="pri-row" id="fPriorityPills" role="radiogroup" aria-label="Priority">
+            <button type="button" class="pri-pill" data-p="low"      onclick="setPriority('low')">Low</button>
+            <button type="button" class="pri-pill on" data-p="medium"   onclick="setPriority('medium')">Medium</button>
+            <button type="button" class="pri-pill" data-p="high"     onclick="setPriority('high')">High</button>
+            <button type="button" class="pri-pill" data-p="critical" onclick="setPriority('critical')">Critical</button>
+          </div>
+          <input type="hidden" id="fPriority" value="medium"/>
+        </div>
+        <div class="fw"><label class="form-label">Status</label>
+          <select class="fi" id="fStatus">
+            <option value="open">Open</option><option value="in_progress">In Progress</option>
+            <option value="resolved">Resolved</option><option value="closed">Closed</option>
+          </select>
+        </div>
+        <div class="fw"><label class="form-label">Root Cause</label><textarea class="fi" id="fRoot" rows="2" placeholder="Why did this happen?"></textarea></div>
+        <div class="fw"><label class="form-label">Resolution / Response</label><textarea class="fi" id="fAction" rows="2" placeholder="What was done to address this?"></textarea></div>
+      </div>
+    </details>
+
+    <!-- COLLAPSIBLE: Follow-up Reminder -->
+    <details class="fb-section">
+      <summary>⏰ Follow-up Reminder</summary>
+      <div class="fb-section-body">
+        <div><label class="form-label">Follow-up Date</label><input type="date" class="fi" id="fFollowDate" placeholder="Remind on this day"/></div>
+        <div><label class="form-label">Follow-up Owner</label>
+          <select class="fi" id="fFollowAssignee">
+            <option value="__self__">👤 Me (current user)</option>
+            <option value="">— Same as Assigned To —</option>
+          </select>
+        </div>
+        <div class="fw"><label class="form-label">Follow-up Note (what to do)</label>
+          <input type="text" class="fi" id="fFollowNote" placeholder="e.g. Call doctor for confirmation, send replacement aligners…"/>
+        </div>
+      </div>
+    </details>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+      <button class="btn bgh" onclick="closeModal()">Cancel</button>
+      <button class="btn bb" onclick="save()">💾 Save Record</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW MODAL -->
+<div class="modal-bg" id="viewModal">
+  <div class="modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-size:16px;font-weight:800" id="vTitle">Feedback Record</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn bb" id="vEditBtn" style="padding:6px 14px">✏️ Edit</button>
+        <button class="btn bgh" onclick="window.print()" style="padding:5px 12px">🖨️</button>
+        <button class="btn bgh" onclick="closeView()" style="padding:5px 12px">✕</button>
+      </div>
+    </div>
+    <div id="vBody"></div>
+    <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
+      <button class="btn bb" id="vEditBtnBottom">✏️ Edit this record</button>
+      <button class="btn bgh" onclick="closeView()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="notif" id="notif"></div>
+<div style="position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--bdr);padding:6px 20px;display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--dim);z-index:999;font-family:var(--f)">
+  <span>© 2026 <strong style="color:var(--mu)">Cedarwings SAS</strong> — Dental Aligner Manufacturing Platform</span>
+  <span>v2.0 · ISO 13485 Compliant · All rights reserved</span>
+</div>
+<style>@media print{.sidebar,.topbar,#modal,.notif,div[style*="position:fixed;bottom"]{display:none!important}.main{margin-left:0!important}}</style>
+<script type="module">
+import{createClient}from'https://esm.sh/@supabase/supabase-js@2';
+import{SUPABASE_CONFIG}from'./config.js';
+const sb=createClient(SUPABASE_CONFIG.url,SUPABASE_CONFIG.anonKey);
+const PAGE=20
+let all=[],filtered=[],pg=0,editId=null,employees=[],bloomCases=[],roles=[]
+let routingRules={}
+let userPrimaryRole='', userExtraRoles=[]
+const currentUser=sessionStorage.getItem('cw_current_emp')||localStorage.getItem('cw_current_emp')||''
+const userRole=(sessionStorage.getItem('cw_role')||'').toLowerCase()
+const CATEGORY_LABELS={product_quality:'Product Quality',delivery:'Delivery',fitting:'Fitting',packaging:'Packaging',communication:'Communication',documentation:'Documentation',traceability:'Traceability',billing:'Billing',other:'Other'}
+const TYPE_LABELS={complaint:'🚫 Complaint',feedback:'👍 Feedback',suggestion:'💡 Suggestion',warranty:'🛡️ Warranty',inquiry:'❓ Inquiry',return:'📦 Return',service_request:'🛠️ Service'}
+
+// An assignee can be either a person ('Bastien') or a role ('role:quality_control').
+function roleKeyFor(r){ return 'role:'+r }
+function isRoleAssignee(v){ return typeof v==='string' && v.startsWith('role:') }
+function prettyAssignee(v){
+  if(!v) return '—'
+  if(isRoleAssignee(v)){
+    const n=v.slice(5)
+    const r=roles.find(x=>x.name===n)
+    return (r?.icon||'👥')+' '+(r?.label||n)+' (role)'
+  }
+  return v
+}
+function assignedToMe(v){
+  if(!v) return false
+  if(!isRoleAssignee(v)) return v===currentUser
+  const rn=v.slice(5)
+  return rn===userPrimaryRole || userExtraRoles.includes(rn)
+}
+
+function ntf(t,tp){const el=document.getElementById('notif');el.textContent=t;el.className='notif on '+(tp==='ok'?'ok':'err');setTimeout(()=>el.className='notif',3500)}
+function fdt(v){if(!v)return'—';const d=new Date(v);return isNaN(d.getTime())?v:d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
+function refNum(){const n=new Date();return`FB-${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(Math.floor(Math.random()*900)+100)}`}
+
+window.onTypeChange=()=>{
+  const t=document.getElementById('fType').value
+  const show=(t==='complaint'||t==='warranty'||t==='return')
+  document.getElementById('fCategoryWrap').style.display=show?'':'none'
+  if(!show){
+    const g=document.getElementById('fProtocolGuide')
+    if(g){ g.style.display='none'; g.innerHTML='' }
+  } else {
+    window.onCategoryChange && window.onCategoryChange()
+  }
+}
+
+const PROTOCOLS={
+  product_quality:{icon:'🔬',title:'Product Quality (defect, fit)',iso:'ISO 13485 Clause 8.3 — Non-Conformity',accent:'red',urgency:'Non-Conformity required',priority:'High or Critical',
+    steps:[
+      {t:'Open a Non-Conformity Report',d:'Any product defect requires an NC record with root cause + CAPA. The system will prompt you after saving.'},
+      {t:'Trace the affected lot',d:'Use Traceability to identify the production lot, machine, material lot, and operator involved (Clause 7.5.9).'},
+      {t:'Re-check QC checkpoints',d:'Review the 16-point QC form for that batch — dimensional accuracy, surface quality, fit (Clause 8.2.4).'},
+      {t:'Root cause + CAPA',d:'Document why it happened in the Root Cause field below. The linked NC captures the corrective/preventive action.'}
+    ],
+    links:[{l:'Non-Conformity',h:'non_conformity.html'},{l:'Traceability',h:'tracabilite.html'},{l:'Quality Control',h:'qualite.html'}]},
+  delivery:{icon:'🚚',title:'Delivery / Shipping',iso:'ISO 13485 Clause 7.5.1 — Product Preservation',accent:'amber',urgency:'Verify shipment',priority:'Medium / High',
+    steps:[
+      {t:'Check the shipment record',d:'Open Bloom Import → Shipping tab. Locate the box number, aligner count, and dispatch date for the affected case.'},
+      {t:'Is the carrier at fault?',d:'If yes, log a supplier evaluation note against the carrier in Suppliers (Clause 7.4). Repeat incidents lower their ASL score.'},
+      {t:'Arrange replacement / reship',d:'Coordinate reshipment with the customer and capture the new tracking number in the Resolution field below.'}
+    ],
+    links:[{l:'Bloom Import',h:'bloom_import.html'},{l:'Suppliers (Carriers)',h:'suppliers.html'}]},
+  fitting:{icon:'🦷',title:'Aligner Fitting',iso:'ISO 13485 Clause 8.3 + 8.2.4',accent:'red',urgency:'Non-Conformity required',priority:'High',
+    steps:[
+      {t:'Clinical verification by doctor',d:'Request photos or impressions from the doctor to confirm the fitting problem before action.'},
+      {t:'Dimensional review',d:'Re-check the dimensional accuracy checkpoint in Quality Control for the affected production lot.'},
+      {t:'Open Non-Conformity',d:'Create the NC — classify severity by the number of affected aligners (upper/lower) and patient impact.'},
+      {t:'Flag refinement if needed',d:'In Bloom Import, mark the case as RefinementOrder so the re-production cycle is tracked properly.'}
+    ],
+    links:[{l:'Non-Conformity',h:'non_conformity.html'},{l:'Quality Control',h:'qualite.html'},{l:'Bloom Cases',h:'bloom_import.html'}]},
+  packaging:{icon:'📦',title:'Packaging Damage',iso:'ISO 13485 Clause 8.3 — Non-Conformity',accent:'amber',urgency:'NC + Supplier review',priority:'Medium',
+    steps:[
+      {t:'Identify the packaging lot',d:'Open Materials & Lots and find the packaging material lot used (FEFO order) for the affected batch.'},
+      {t:'Material fault vs operator fault',d:'If the material is defective → NC + hit the supplier score in Suppliers (Clause 7.4). If operator-caused → retrain.'},
+      {t:'Add to internal audit scope',d:'If packaging defects are repeating, include Packaging in the next Internal Audit scope (Clause 8.2.2).'}
+    ],
+    links:[{l:'Materials & Lots',h:'production_materials.html'},{l:'Suppliers',h:'suppliers.html'},{l:'Non-Conformity',h:'non_conformity.html'}]},
+  communication:{icon:'💬',title:'Communication',iso:'ISO 13485 Clause 8.2.1 — Post-Market Surveillance',accent:'blue',urgency:'Log — no NC required',priority:'Low / Medium',
+    steps:[
+      {t:'Document the gap',d:'Capture the specifics of the communication issue (missed call, unclear message, slow response) in the Description.'},
+      {t:'Assign an owner',d:'Route to customer service or the distributor liaison. No Non-Conformity is required unless it becomes a pattern.'},
+      {t:'Track for audit',d:'If this is a repeat pattern, add "Customer Communication" as a topic in the next Internal Audit (Clause 8.2.2).'}
+    ],
+    links:[{l:'Internal Audits',h:'internal_audit.html'}]},
+  documentation:{icon:'📄',title:'Documentation / Label',iso:'ISO 13485 Annex C + Clause 8.3 — Regulatory',accent:'red',urgency:'Regulatory — NC mandatory',priority:'Critical',
+    steps:[
+      {t:'Open NC immediately',d:'Labelling and documentation defects are regulator-visible. A Non-Conformity report is MANDATORY under Annex C.'},
+      {t:'Isolate every affected unit',d:'Use Traceability to list every product that carries the faulty label or documentation — they may need recall.'},
+      {t:'Document control review',d:'Update the label / document template in Settings (Clause 4.2.4). Re-issue the revised version with a new revision number.'},
+      {t:'Notify distributor and doctor',d:'If any affected product has already shipped, the distributor and prescribing doctor must be formally notified.'}
+    ],
+    links:[{l:'Non-Conformity',h:'non_conformity.html'},{l:'Traceability',h:'tracabilite.html'},{l:'Settings / Docs',h:'settings.html'}]},
+  traceability:{icon:'🔗',title:'Traceability / Case ID Issue',iso:'ISO 13485 Clause 7.5.9 — Identification & Traceability',accent:'purple',urgency:'Verify + NC if confirmed',priority:'High',
+    steps:[
+      {t:'Verify the case in Bloom Import',d:'Search the case number in Bloom Import → Cases tab. Confirm the case exists and that the patient/doctor mapping is correct.'},
+      {t:'If missing, re-import',d:'Re-run the CSV or Excel import from bloomaligner.fr so the case record is created in the system.'},
+      {t:'If data is wrong, open NC',d:'Incorrect case ID, patient mapping, or aligner count is a traceability non-conformity (Clause 8.3).'},
+      {t:'Add to audit scope',d:'Flag Traceability as a scope in the next Internal Audit (Clause 8.2.2) to confirm root cause is fixed.'}
+    ],
+    links:[{l:'Bloom Import',h:'bloom_import.html'},{l:'Traceability',h:'tracabilite.html'},{l:'Non-Conformity',h:'non_conformity.html'}]},
+  billing:{icon:'💳',title:'Billing',iso:'Administrative — outside QMS scope',accent:'blue',urgency:'Route to Finance',priority:'Low',
+    steps:[
+      {t:'Route to finance / admin',d:'Assign to the finance team. No Non-Conformity is required unless fraud or regulatory invoicing is involved.'},
+      {t:'Invoice verification',d:'Cross-check the invoice against the order number in Bloom Import and the production lot records.'}
+    ],
+    links:[]},
+  other:{icon:'📋',title:'Other',iso:'Manager triage required',accent:'blue',urgency:'Manager review',priority:'Medium',
+    steps:[
+      {t:'Capture all the facts',d:'Describe the issue fully in the Description field so the manager can re-classify it into the correct category.'},
+      {t:'Assign to Manager',d:'Route to the manager for triage. They will re-categorise and decide whether an NC is required.'}
+    ],
+    links:[]}
+}
+
+window.onCategoryChange=()=>{
+  const cat=document.getElementById('fCategory').value
+  const box=document.getElementById('fProtocolGuide')
+  if(!box) return
+  if(!cat||!PROTOCOLS[cat]){ box.style.display='none'; box.innerHTML=''; return }
+  const p=PROTOCOLS[cat]
+  const A={red:{bg:'var(--r50)',bd:'var(--r100)',fg:'var(--red)'},amber:{bg:'var(--a50)',bd:'var(--a100)',fg:'var(--amber)'},blue:{bg:'var(--b50)',bd:'var(--b100)',fg:'var(--blue)'},purple:{bg:'var(--p50)',bd:'var(--p100)',fg:'var(--purple)'}}[p.accent]||{bg:'var(--b50)',bd:'var(--b100)',fg:'var(--blue)'}
+  const steps=p.steps.map((s,i)=>`
+    <div style="display:flex;gap:12px;padding:11px 13px;background:var(--card);border:1px solid var(--bdr);border-radius:10px;margin-bottom:7px">
+      <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:${A.fg};color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;font-family:var(--mono)">${i+1}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--txt);letter-spacing:-.1px">${s.t}</div><div style="font-size:12px;color:var(--mu);margin-top:3px;line-height:1.55">${s.d}</div></div>
+    </div>`).join('')
+  const links=p.links.length?`
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;padding-top:12px;border-top:1px dashed ${A.bd}">
+      <div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;width:100%;margin-bottom:4px">Related pages</div>
+      ${p.links.map(l=>`<a href="${l.h}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:var(--card);border:1px solid var(--bdr);border-radius:999px;font-size:11px;font-weight:700;color:${A.fg};text-decoration:none;transition:all .12s" onmouseover="this.style.borderColor='${A.fg}'" onmouseout="this.style.borderColor='var(--bdr)'">→ ${l.l}</a>`).join('')}
+    </div>`:''
+  box.innerHTML=`
+    <div style="background:${A.bg};border:1px solid ${A.bd};border-left:4px solid ${A.fg};border-radius:12px;padding:18px 20px;margin-top:4px">
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px">
+        <div style="font-size:32px;line-height:1;flex-shrink:0">${p.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:${A.fg};color:#fff;border-radius:999px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📘 Protocol Guide · ${p.urgency}</div>
+          <div style="font-size:16px;font-weight:800;color:var(--txt);letter-spacing:-.3px">${p.title}</div>
+          <div style="font-size:12px;color:var(--mu);margin-top:4px">${p.iso} · Recommended priority: <strong style="color:${A.fg}">${p.priority}</strong></div>
+        </div>
+      </div>
+      <div style="font-size:10px;font-weight:800;color:var(--mu);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Steps to follow</div>
+      ${steps}
+      ${links}
+    </div>`
+  box.style.display='block'
+}
+
+async function loadDropdowns(){
+  // Employees + roles — Assigned To dropdown will group them.
+  const[eRes,rRes,csRes,meRes]=await Promise.all([
+    sb.from('employees').select('name,custom_role,extra_roles').eq('is_active',true).order('name'),
+    sb.from('role_templates').select('name,label,icon,color').order('label',{ascending:true}),
+    sb.from('system_settings').select('value').eq('key','complaint_routing').maybeSingle(),
+    currentUser
+      ? sb.from('employees').select('custom_role,extra_roles,role').ilike('name',currentUser).maybeSingle()
+      : Promise.resolve({data:null})
+  ])
+  employees=(eRes.data||[]).map(e=>e.name).filter(Boolean)
+  roles=rRes.data||[]
+  try{ routingRules = csRes.data?.value ? JSON.parse(csRes.data.value) : {} }catch{ routingRules={} }
+  // Current user's role memberships (used for the 'assigned to me' filter)
+  const me=meRes.data
+  userPrimaryRole = me?.custom_role || me?.role || ''
+  try{
+    const raw=me?.extra_roles
+    userExtraRoles = Array.isArray(raw) ? raw : (typeof raw==='string' ? JSON.parse(raw||'[]') : [])
+  }catch{ userExtraRoles=[] }
+
+  const roleOpts=roles.map(r=>`<option value="${roleKeyFor(r.name)}">${r.icon||'👥'} ${r.label||r.name} (role)</option>`).join('')
+  const empOpts=employees.map(n=>`<option value="${n}">👤 ${n}</option>`).join('')
+  const sel=document.getElementById('fAssigned')
+  sel.innerHTML = '<option value="">— Unassigned —</option>'
+    + (roleOpts?`<optgroup label="— Roles (any holder gets notified) —">${roleOpts}</optgroup>`:'')
+    + (empOpts?`<optgroup label="— Individuals —">${empOpts}</optgroup>`:'')
+  // Follow-up owner dropdown — same role + person options as the main assignee
+  const followSel=document.getElementById('fFollowAssignee')
+  if(followSel){
+    followSel.innerHTML = '<option value="__self__">👤 Me (current user)</option>'
+      + '<option value="">— Same as Assigned To —</option>'
+      + (roleOpts?`<optgroup label="— Roles —">${roleOpts}</optgroup>`:'')
+      + (empOpts?`<optgroup label="— Individuals —">${empOpts}</optgroup>`:'')
+  }
+  // Assignee filter — roles + individuals
+  const af=document.getElementById('assignedFilter')
+  af.insertAdjacentHTML('beforeend',
+    (roleOpts?`<optgroup label="— Roles —">${roleOpts}</optgroup>`:'')
+    + (empOpts?`<optgroup label="— Individuals —">${empOpts}</optgroup>`:''))
+  // Bloom cases for datalist (paginated past 1000)
+  try{
+    const PAGEn=1000
+    let from=0
+    bloomCases=[]
+    while(true){
+      const{data:bs,error}=await sb.from('bloom_cases')
+        .select('case_id,patient_name,doctor')
+        .order('case_id',{ascending:false}).range(from,from+PAGEn-1)
+      if(error||!bs?.length)break
+      bloomCases.push(...bs)
+      if(bs.length<PAGEn)break
+      from+=PAGEn
+    }
+    const dl=document.getElementById('bloomCases')
+    dl.innerHTML=bloomCases.slice(0,5000).map(b=>`<option value="${b.case_id}">${b.patient_name||''}${b.doctor?' · '+b.doctor:''}</option>`).join('')
+  }catch(e){console.warn('bloom load',e)}
+}
+
+async function load(){
+  const r=await sb.from('customer_feedback').select('*').order('received_date',{ascending:false})
+  all=r.data||[]
+  document.getElementById('kComplaints').textContent=all.filter(x=>x.type==='complaint').length
+  document.getElementById('kOpen').textContent=all.filter(x=>x.status==='open'||x.status==='in_progress').length
+  document.getElementById('kResolved').textContent=all.filter(x=>x.status==='resolved'||x.status==='closed').length
+  document.getElementById('kFeedback').textContent=all.filter(x=>x.type==='feedback').length
+  document.getElementById('kTotal').textContent=all.length
+  // Unseen assignments for current user OR their role → toast
+  if(currentUser){
+    const unseen=all.filter(r=>assignedToMe(r.assigned_to) && !r.notification_seen_at && (r.status==='open'||r.status==='in_progress'))
+    if(unseen.length){
+      ntf(`🔔 You have ${unseen.length} case${unseen.length>1?'s':''} assigned to you. Open them to mark as seen.`,'ok')
+    }
+  }
+  applyFilter()
+}
+function applyFilter(){
+  const tf=document.getElementById('typeFilter').value
+  const sf=document.getElementById('statusFilter').value
+  const af=document.getElementById('assignedFilter').value
+  const term=(document.getElementById('searchInput').value||'').toLowerCase()
+  filtered=all.filter(r=>{
+    if(tf&&r.type!==tf)return false
+    if(sf&&r.status!==sf)return false
+    const today=new Date().toISOString().slice(0,10)
+    const fuDueForMe = r.follow_up_date && !r.follow_up_done_at && r.follow_up_date<=today && (r.follow_up_assignee===currentUser || (isRoleAssignee(r.follow_up_assignee) && (r.follow_up_assignee.slice(5)===userPrimaryRole || userExtraRoles.includes(r.follow_up_assignee.slice(5)))))
+    const fuOverdue = r.follow_up_date && !r.follow_up_done_at && r.follow_up_date<today
+    if(af==='__mine__' && !assignedToMe(r.assigned_to))return false
+    if(af==='__unassigned__' && r.assigned_to)return false
+    if(af==='__followup_mine__' && !fuDueForMe)return false
+    if(af==='__followup_overdue__' && !fuOverdue)return false
+    if(af==='__open_unread__' && (r.notification_seen_at || r.status==='resolved' || r.status==='closed'))return false
+    if(af && !['__mine__','__unassigned__','__followup_mine__','__followup_overdue__','__open_unread__'].includes(af) && r.assigned_to!==af)return false
+    if(term){
+      const hay=`${r.customer_name||''} ${r.description||''} ${r.case_id||''} ${r.order_no||''} ${r.doctor||''}`.toLowerCase()
+      if(!hay.includes(term))return false
+    }
+    return true
+  })
+  pg=0;render()
+}
+function render(){
+  const start=pg*PAGE,slice=filtered.slice(start,start+PAGE)
+  document.getElementById('tBody').innerHTML=slice.length?slice.map(r=>{
+    const tc=r.type==='complaint'?'b-r':r.type==='feedback'?'b-g':r.type==='warranty'?'b-p':r.type==='return'?'b-a':r.type==='service_request'?'b-b':'b-gray'
+    const sc=r.status==='open'?'b-r':r.status==='in_progress'?'b-a':r.status==='resolved'?'b-g':'b-gray'
+    const pc=r.severity==='critical'?'b-r':r.severity==='high'?'b-a':r.severity==='medium'?'b-b':'b-gray'
+    const mine=assignedToMe(r.assigned_to)
+    const assigneeCell = r.assigned_to
+      ? (mine
+          ? `<strong style="color:var(--blue)">${prettyAssignee(r.assigned_to)}${!isRoleAssignee(r.assigned_to)?' (you)':' — you'}</strong>`
+          : prettyAssignee(r.assigned_to))
+      : '<span style="color:var(--dim)">—</span>'
+    // Envelope icon: 📧 open+unread, 📬 open+seen, ✅ resolved/closed
+    const isClosed = r.status==='resolved'||r.status==='closed'
+    const isUnread = !isClosed && !r.notification_seen_at
+    const envIcon = isClosed ? '✅' : isUnread ? '📧' : '📬'
+    const envTitle = isClosed ? 'Resolved / closed' : isUnread ? 'Open · unread' : 'Open · seen'
+    // Follow-up column: date + status dot
+    const today = new Date().toISOString().slice(0,10)
+    let fuHtml = '<span style="color:var(--dim)">—</span>'
+    if (r.follow_up_date) {
+      const done = !!r.follow_up_done_at
+      const overdue = !done && r.follow_up_date < today
+      const dueToday = !done && r.follow_up_date === today
+      const color = done ? 'var(--green)' : overdue ? 'var(--red)' : dueToday ? 'var(--amber)' : 'var(--blue)'
+      const ico = done ? '✅' : overdue ? '⚠️' : dueToday ? '⏰' : '📅'
+      fuHtml = `<span data-sort="${r.follow_up_date||''}" title="${r.follow_up_assignee || ''}" style="display:inline-flex;align-items:center;gap:4px;color:${color};font-weight:700;font-size:12px">${ico} ${fdt(r.follow_up_date)}</span>`
+    }
+    // Build envelope tooltip with full activity trail
+    const trailParts=[envTitle]
+    if(r.notification_seen_at) trailParts.push(`📬 Seen by ${prettyAssignee(r.notification_seen_by)||'(before tracking)'} on ${fdt(r.notification_seen_at)}`)
+    else if(r.assigned_to && !isClosed) trailParts.push('📧 Assignee has not yet opened this record')
+    if(r.last_viewed_at) trailParts.push(`👁 Last viewed by ${prettyAssignee(r.last_viewed_by)||'?'} on ${fdt(r.last_viewed_at)}`)
+    if(r.last_edited_at) trailParts.push(`✏️ Last edited by ${prettyAssignee(r.last_edited_by)||'?'} on ${fdt(r.last_edited_at)}`)
+    const envTip=trailParts.join('\n')
+    // Hover/click whole row → opens the view, except when clicking inside a button
+    const rowStyle = (mine?'background:#eef6ff;':'')+'cursor:pointer'
+    return `<tr style="${rowStyle}" onclick="if(!event.target.closest('button,a,input[type=checkbox]')) viewRec('${r.id}')" title="Click anywhere to open this record">
+      <td style="text-align:center" data-sort="0"><input type="checkbox" class="bulk-cb" value="${r.id}" onclick="event.stopPropagation();onBulkCbChange()" style="cursor:pointer"></td>
+      <td style="font-size:16px;text-align:center;white-space:pre-line" title="${envTip.replace(/"/g,'&quot;')}">${envIcon}</td>
+      <td class="mono" style="font-weight:700">${r.feedback_no||'—'}</td>
+      <td class="mono" data-sort="${r.received_date||''}">${fdt(r.received_date)}</td>
+      <td style="font-weight:600">${r.customer_name||'—'}</td>
+      <td><span class="badge ${tc}">${TYPE_LABELS[r.type]||r.type||'—'}</span></td>
+      <td>${CATEGORY_LABELS[r.category]||'—'}</td>
+      <td class="mono">${r.case_id||r.order_no||'—'}</td>
+      <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.description||'—'}</td>
+      <td data-sort="${({low:1,medium:2,high:3,critical:4})[r.severity]||0}"><span class="pri-badge" data-p="${r.severity||'medium'}">${r.severity||'—'}</span></td>
+      <td style="font-size:12px">${assigneeCell}</td>
+      <td data-sort="${r.follow_up_date||''}">${fuHtml}</td>
+      <td><span class="badge ${sc}">${(r.status||'open').replace(/_/g,' ')}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn bgh" style="padding:4px 10px;font-size:11px;margin-right:4px" onclick="event.stopPropagation();viewRec('${r.id}')" title="View">👁</button>
+        <button class="btn bgh" style="padding:4px 10px;font-size:11px" onclick="event.stopPropagation();editRec('${r.id}')" title="Edit">✏️</button>
+      </td>
+    </tr>`
+  }).join(''):'<tr><td colspan="14" class="ec">No feedback records. Log the first one.</td></tr>'
+  const tot=filtered.length,tp=Math.ceil(tot/PAGE)||1
+  document.getElementById('pInfo').textContent=`${tot} records (page ${pg+1}/${tp})`
+  document.getElementById('btnPrev').disabled=pg===0
+  document.getElementById('btnNext').disabled=pg>=tp-1
+}
+
+// Priority pill helpers — single source of truth is the hidden
+// <input id="fPriority">. setPriority updates both the visual
+// pills and the hidden value; save() / editRec still read via
+// fPriority.value.
+window.setPriority = (p) => {
+  const h = document.getElementById('fPriority'); if (h) h.value = p
+  document.querySelectorAll('#fPriorityPills .pri-pill').forEach(b => {
+    b.classList.toggle('on', b.dataset.p === p)
+  })
+}
+// Expand the collapsible sections that already have data — so an
+// editor landing on an existing record immediately sees every
+// field that's been filled in, without hunting through closed
+// accordions.
+function _fbAutoExpandSections() {
+  document.querySelectorAll('#modal .fb-section').forEach(sec => {
+    const body = sec.querySelector('.fb-section-body'); if (!body) return
+    const filled = Array.from(body.querySelectorAll('input, textarea, select, [type="hidden"]')).some(el => {
+      const v = (el.value || '').trim()
+      if (!v) return false
+      // Ignore default-only values
+      if (el.id === 'fPriority' && v === 'medium') return false
+      if (el.id === 'fStatus'   && v === 'open') return false
+      if (el.id === 'fFollowAssignee' && v === '__self__') return false
+      return true
+    })
+    sec.open = filled
+  })
+}
+function _fbCollapseAllSections() {
+  document.querySelectorAll('#modal .fb-section').forEach(s => { s.open = false })
+}
+window.openNew=()=>{
+  editId=null
+  document.getElementById('mTitle').textContent='💬 Log Feedback'
+  document.getElementById('fDate').value=new Date().toISOString().slice(0,10)
+  ;['fCustomer','fDoctor','fCase','fDesc','fRoot','fAction','fClosed','fFollowDate','fFollowNote'].forEach(id=>document.getElementById(id).value='')
+  // Default follow-up owner = Me (so 'remind me to check back')
+  const fa=document.getElementById('fFollowAssignee'); if(fa) fa.value='__self__'
+  document.getElementById('fType').value='complaint'
+  document.getElementById('fCategory').value=''
+  setPriority('medium')
+  document.getElementById('fStatus').value='open'
+  document.getElementById('fAssigned').value=''
+  _fbCollapseAllSections()
+  onTypeChange()
+  window.onCategoryChange && window.onCategoryChange()
+  document.getElementById('modal').classList.add('on')
+}
+window.closeModal=()=>{document.getElementById('modal').classList.remove('on');editId=null}
+window.closeView=()=>document.getElementById('viewModal').classList.remove('on')
+
+window.editRec=(id)=>{
+  const r=all.find(x=>String(x.id)===String(id));if(!r)return
+  editId=id
+  document.getElementById('mTitle').textContent='✏️ Edit — '+(r.feedback_no||'Feedback')
+  document.getElementById('fDate').value=r.received_date||''
+  document.getElementById('fType').value=r.type||'complaint'
+  document.getElementById('fCategory').value=r.category||''
+  document.getElementById('fCustomer').value=r.customer_name||''
+  document.getElementById('fDoctor').value=r.doctor||''
+  document.getElementById('fCase').value=r.case_id||r.order_no||''
+  setPriority(r.severity||'medium')
+  document.getElementById('fStatus').value=r.status||'open'
+  document.getElementById('fDesc').value=r.description||''
+  document.getElementById('fRoot').value=r.notes||''
+  document.getElementById('fAction').value=r.resolution||''
+  document.getElementById('fAssigned').value=r.assigned_to||''
+  document.getElementById('fClosed').value=r.resolved_at?String(r.resolved_at).slice(0,10):''
+  // Follow-up fields — stored owner value maps back to the dropdown;
+  // if follow-up owner is same as main assignee, select the blank option;
+  // if it's the current user, show 'Me'.
+  const fDateEl=document.getElementById('fFollowDate'); if(fDateEl) fDateEl.value=r.follow_up_date||''
+  const fNoteEl=document.getElementById('fFollowNote'); if(fNoteEl) fNoteEl.value=r.follow_up_note||''
+  const faEl=document.getElementById('fFollowAssignee')
+  if(faEl){
+    const fa=r.follow_up_assignee||''
+    if(!fa) faEl.value=''
+    else if(fa===currentUser) faEl.value='__self__'
+    else if([...faEl.options].some(o=>o.value===fa)) faEl.value=fa
+    else { const o=document.createElement('option'); o.value=fa; o.textContent=fa+' (from source)'; faEl.appendChild(o); faEl.value=fa }
+  }
+  onTypeChange()
+  window.onCategoryChange && window.onCategoryChange()
+  _fbAutoExpandSections()
+  document.getElementById('modal').classList.add('on')
+}
+
+window.viewRec=async(id)=>{
+  const r=all.find(x=>String(x.id)===String(id));if(!r)return
+  // Record view activity + auto-mark seen if this viewer is an assignee (user or role)
+  const nowIso=new Date().toISOString()
+  const patch={last_viewed_by:currentUser, last_viewed_at:nowIso}
+  if(assignedToMe(r.assigned_to) && !r.notification_seen_at){
+    patch.notification_seen_at=nowIso
+    patch.notification_seen_by=currentUser
+  }
+  try{
+    await sb.from('customer_feedback').update(patch).eq('id',id)
+    Object.assign(r, patch)
+  }catch{}
+  const tc=r.type==='complaint'?'b-r':r.type==='feedback'?'b-g':'b-b'
+  const sc=r.status==='open'?'b-r':r.status==='in_progress'?'b-a':r.status==='resolved'?'b-g':'b-gray'
+  document.getElementById('vTitle').textContent='💬 '+(r.feedback_no||'Feedback')
+  const case_ref=r.case_id||r.order_no||''
+  document.getElementById('vBody').innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <span class="badge ${tc}">${TYPE_LABELS[r.type]||r.type}</span>
+      ${r.category?`<span class="badge b-gray">${CATEGORY_LABELS[r.category]||r.category}</span>`:''}
+      <span class="badge ${sc}">${(r.status||'').replace(/_/g,' ')}</span>
+      <span class="pri-badge" data-p="${r.severity||'medium'}">${r.severity||'—'} priority</span>
+    </div>
+    <table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:14px">
+    ${[['Date',fdt(r.received_date)],['Customer',r.customer_name],['Doctor',r.doctor],['Case #',case_ref],['Assigned To',prettyAssignee(r.assigned_to)]]
+      .map(([k,v])=>`<tr><td style="padding:7px 10px;color:var(--mu);font-weight:600;width:35%;border-bottom:1px solid var(--bdr)">${k}</td><td style="padding:7px 10px;border-bottom:1px solid var(--bdr)">${v||'—'}</td></tr>`).join('')}
+    </table>
+    <div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:4px">DESCRIPTION</div><div style="background:var(--r50);border-radius:8px;padding:12px;font-size:13px">${r.description||'—'}</div></div>
+    ${r.notes?`<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:4px">ROOT CAUSE / NOTES</div><div style="background:var(--a50);border-radius:8px;padding:12px;font-size:13px">${r.notes}</div></div>`:''}
+    ${r.resolution?`<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--mu);margin-bottom:4px">RESOLUTION</div><div style="background:var(--g50);border-radius:8px;padding:12px;font-size:13px">${r.resolution}</div></div>`:''}
+    ${r.follow_up_date?(() => {
+      const today=new Date().toISOString().slice(0,10)
+      const overdue = !r.follow_up_done_at && r.follow_up_date < today
+      const dueToday = !r.follow_up_done_at && r.follow_up_date === today
+      const bg = r.follow_up_done_at ? 'var(--g50)' : overdue ? 'var(--r50)' : dueToday ? 'var(--a50)' : 'var(--b50)'
+      const bc = r.follow_up_done_at ? 'var(--green)' : overdue ? 'var(--red)' : dueToday ? 'var(--amber)' : 'var(--blue)'
+      const label = r.follow_up_done_at ? '✅ Follow-up done' : overdue ? '⚠️ Follow-up OVERDUE' : dueToday ? '⏰ Follow-up TODAY' : '⏰ Follow-up scheduled'
+      return `<div style="background:${bg};border:1px solid ${bc}33;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:800;color:${bc};margin-bottom:4px">${label}</div>
+        <div style="font-size:13px">📅 ${fdt(r.follow_up_date)} · 👤 ${prettyAssignee(r.follow_up_assignee)||'—'}</div>
+        ${r.follow_up_note?`<div style="font-size:12px;color:var(--mu);margin-top:4px">“${r.follow_up_note}”</div>`:''}
+        ${!r.follow_up_done_at?`<button onclick="markFollowUpDone('${r.id}')" style="margin-top:10px;padding:6px 14px;background:${bc};color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--f)">✓ Mark Follow-up Done</button>`:`<div style="font-size:11px;color:var(--mu);margin-top:4px">Done: ${fdt(r.follow_up_done_at)}</div>`}
+      </div>`
+    })():''}
+    ${r.resolved_at?`<div style="font-size:12px;color:var(--green);font-weight:700">✅ Resolved: ${fdt(r.resolved_at)}</div>`:''}
+    <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--bdr);font-size:11px;color:var(--mu);line-height:1.8">
+      <div style="font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;color:var(--dim)">Activity trail</div>
+      ${r.notification_seen_at
+        ? `<div>📬 <strong style="color:var(--txt)">Seen first</strong> · ${prettyAssignee(r.notification_seen_by)||'(before tracking)'} on ${fdt(r.notification_seen_at)}</div>`
+        : (r.assigned_to ? `<div style="color:var(--amber);font-weight:700">📧 Assignee has NOT yet opened this record</div>` : '')}
+      ${r.last_viewed_at ? `<div>👁 <strong style="color:var(--txt)">Last viewed</strong> · ${prettyAssignee(r.last_viewed_by)||'—'} on ${fdt(r.last_viewed_at)}</div>` : ''}
+      ${r.last_edited_at ? `<div>✏️ <strong style="color:var(--txt)">Last edited</strong> · ${prettyAssignee(r.last_edited_by)||'—'} on ${fdt(r.last_edited_at)}</div>` : ''}
+      <div style="color:var(--dim)">📝 Created ${fdt(r.created_at)}${r.received_by?' by '+prettyAssignee(r.received_by):''}</div>
+    </div>`
+  document.getElementById('viewModal').classList.add('on')
+  // Wire the Edit buttons in the view modal to open the edit modal for this record
+  const openEditFromView = () => { closeView(); editRec(r.id) }
+  const eb1 = document.getElementById('vEditBtn'); if (eb1) eb1.onclick = openEditFromView
+  const eb2 = document.getElementById('vEditBtnBottom'); if (eb2) eb2.onclick = openEditFromView
+}
+
+window.markFollowUpDone=async(id)=>{
+  if(!confirm('Mark the follow-up as done?')) return
+  const{error}=await sb.from('customer_feedback').update({follow_up_done_at:new Date().toISOString()}).eq('id',id)
+  if(error){ntf('Error: '+error.message,'err');return}
+  ntf('Follow-up marked done','ok')
+  closeView()
+  await load()
+}
+
+window.save=async()=>{
+  const date=document.getElementById('fDate').value
+  const cust=document.getElementById('fCustomer').value.trim()
+  const desc=document.getElementById('fDesc').value.trim()
+  if(!date||!cust||!desc){ntf('Fill required fields (*)','err');return}
+  const rawCase=document.getElementById('fCase').value.trim()
+  const prev=editId?all.find(x=>String(x.id)===String(editId)):null
+  const chosenAssignee=document.getElementById('fAssigned').value||null
+  const category=document.getElementById('fCategory').value||null
+  // Auto-routing: if no assignee was picked but the category has a role
+  // rule in Settings, auto-assign to role:<name> so every holder of that
+  // role gets notified.
+  let autoRouted=false
+  let newAssignee=chosenAssignee
+  if(!newAssignee && category && routingRules[category]){
+    newAssignee = roleKeyFor(routingRules[category])
+    autoRouted = true
+  }
+  const assigneeChanged=prev?prev.assigned_to!==newAssignee:!!newAssignee
+  const rec={
+    received_date:date,
+    type:document.getElementById('fType').value,
+    category,
+    customer_name:cust,
+    doctor:document.getElementById('fDoctor').value.trim()||null,
+    case_id:rawCase||null,
+    order_no:rawCase||null,
+    severity:document.getElementById('fPriority').value,
+    status:document.getElementById('fStatus').value,
+    description:desc,
+    notes:document.getElementById('fRoot').value.trim()||null,
+    resolution:document.getElementById('fAction').value.trim()||null,
+    assigned_to:newAssignee,
+    resolved_at:document.getElementById('fClosed').value||null,
+    received_by:currentUser||null
+  }
+  // Follow-up fields
+  const fDate=document.getElementById('fFollowDate').value||null
+  const fNote=document.getElementById('fFollowNote').value.trim()||null
+  const faSel=document.getElementById('fFollowAssignee').value
+  let fAssignee
+  if(faSel==='__self__') fAssignee = currentUser || null
+  else if(faSel==='')    fAssignee = newAssignee || null   // follow main assignee
+  else                   fAssignee = faSel
+  rec.follow_up_date = fDate
+  rec.follow_up_note = fNote
+  rec.follow_up_assignee = fDate ? fAssignee : null
+  // If follow-up date changed, reset the done timestamp so the reminder fires again
+  if(prev && prev.follow_up_date !== fDate) rec.follow_up_done_at = null
+  // Reset the "seen" flag when assignment changes so the assignee gets a fresh toast
+  if(assigneeChanged){
+    rec.notification_seen_at=null
+    rec.notification_seen_by=null
+  }
+  // Track edit activity (only for updates — inserts are "created_at/received_by")
+  if(editId){
+    rec.last_edited_by=currentUser||null
+    rec.last_edited_at=new Date().toISOString()
+  }
+  if(!editId)rec.feedback_no=refNum()
+  const{data,error}=editId?await sb.from('customer_feedback').update(rec).eq('id',editId).select().single():await sb.from('customer_feedback').insert([rec]).select().single()
+  if(error){ntf('Error: '+error.message,'err');return}
+  ntf(editId?'Updated!':'Record logged!','ok')
+  if(assigneeChanged && newAssignee && newAssignee!==currentUser){
+    const suffix=autoRouted?' (auto-routed by category)':''
+    ntf(`📩 ${prettyAssignee(newAssignee)} has been notified of this assignment.${suffix}`,'ok')
+    // Fire-and-forget email via Brevo. Resolves role-assignees to
+    // every active employee in that role. Silent-skips if Brevo
+    // isn't configured in Settings — the toast above already
+    // covered the logged-in case.
+    const savedRec = editId ? { ...rec, id: editId } : { ...rec, id: null }
+    _notifyAssignees(newAssignee, savedRec).catch(e => console.warn('[feedback notify]', e))
+  }
+  // Follow-up assignee also gets email/SMS/WhatsApp if it's
+  // a new or changed assignment. Self-targeted follow-ups
+  // ("Me") are skipped to avoid pinging yourself.
+  const prevFu = prev ? (prev.follow_up_assignee || null) : null
+  if (rec.follow_up_assignee && rec.follow_up_assignee !== prevFu && rec.follow_up_assignee !== currentUser) {
+    const savedRec = editId ? { ...rec, id: editId } : { ...rec, id: null }
+    _notifyFollowupAssignee(rec.follow_up_assignee, savedRec).catch(e => console.warn('[feedback follow-up notify]', e))
+  }
+  // Resolution confirmation: when status flips to resolved /
+  // closed, notify the person who originally logged the record
+  // (received_by). They often aren't the assignee, so they'd
+  // otherwise not know it was dealt with.
+  const prevStatus = prev ? (prev.status || null) : null
+  const becameResolved = (rec.status === 'resolved' || rec.status === 'closed')
+    && prevStatus !== rec.status
+  const creator = prev ? (prev.received_by || null) : null
+  if (becameResolved && creator && creator !== currentUser) {
+    const savedRec = editId ? { ...rec, id: editId } : { ...rec, id: null }
+    _notifyResolved(creator, savedRec).catch(e => console.warn('[feedback resolved notify]', e))
+  }
+  // High-severity escalation: every new critical / high
+  // complaint pings all managers immediately, regardless of
+  // assignment. Safety-first — leadership shouldn't learn
+  // about a patient-safety complaint hours later from the
+  // register.
+  const isNewHighSev = !editId && rec.type === 'complaint'
+    && (rec.severity === 'critical' || rec.severity === 'high')
+  if (isNewHighSev) {
+    const savedRec = editId ? { ...rec, id: editId } : { ...rec, id: data?.id || null }
+    _notifyEscalation(savedRec).catch(e => console.warn('[feedback escalation]', e))
+  }
+
+  // If complaint type or critical/high priority — show NC creation prompt
+  if(!editId){
+    const isComplaint=rec.type==='complaint'||rec.severity==='critical'||rec.severity==='high'
+    if(isComplaint){
+      const banner=document.getElementById('ncPromptBanner')
+      if(banner){
+        banner.style.display='block'
+        const caseRef=rec.case_id||rec.order_no||rec.customer_name||'—'
+        banner.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 18px;background:var(--r50);border:1.5px solid var(--r100);border-radius:12px">
+          <div>
+            <div style="font-size:14px;font-weight:800;color:var(--red)">⚠️ Complaint Logged — Non-Conformity Recommended</div>
+            <div style="font-size:12px;color:var(--mu);margin-top:3px">Customer: <strong>${rec.customer_name}</strong> · Category: <strong>${CATEGORY_LABELS[rec.category]||'—'}</strong> · Priority: <strong>${rec.severity}</strong></div>
+          </div>
+          <a href="non_conformity.html?source=feedback&case=${encodeURIComponent(caseRef)}&desc=${encodeURIComponent(rec.description||'Customer complaint')}&det=${encodeURIComponent(rec.customer_name||'')}"
+             style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--red);color:#fff;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap">
+            ⚠️ Create NC Report →
+          </a>
+        </div>`
+        banner.scrollIntoView({behavior:'smooth',block:'center'})
+      }
+    }
+  }
+  window.closeModal();load()
+}
+
+;['typeFilter','statusFilter','assignedFilter'].forEach(id=>document.getElementById(id).addEventListener('change',applyFilter))
+document.getElementById('searchInput').addEventListener('input',applyFilter)
+document.getElementById('btnPrev').addEventListener('click',()=>{if(pg>0){pg--;render()}})
+document.getElementById('btnNext').addEventListener('click',()=>{pg++;render()})
+
+// Saved views — delegated to the shared module (user_views.js).
+import { mountSavedViews } from './user_views.js?v=20260423d'
+mountSavedViews({
+  sb,
+  page:        'customer_feedback',
+  mountEl:     document.getElementById('savedViewsMount'),
+  filterIds:   ['typeFilter','statusFilter','assignedFilter','searchInput'],
+  applyFilter: () => applyFilter(),
+  ntf:         (m, t) => ntf(m, t),
+  currentUser,
+})
+
+// ─── NOTIFICATION ON ASSIGNMENT (email + WhatsApp) ────────────
+// Delegates to the shared notify_assignment.js module. Same
+// behaviour as before (email + WhatsApp via Brevo), just shared
+// with non_conformity and internal_audit now.
+import { notifyAssignees } from './notify_assignment.js'
+function _notifyEscalation(rec) {
+  const ref     = rec.feedback_no || rec.id || ''
+  const typeLbl = TYPE_LABELS[rec.type] || rec.type || 'Complaint'
+  const sev     = (rec.severity || 'high').toUpperCase()
+  const sevCol  = rec.severity === 'critical' ? '#dc2626' : '#f97316'
+  const origin  = location.origin + location.pathname.replace(/[^/]+$/, '')
+  const link    = rec.id ? `${origin}customer_feedback.html?open=${rec.id}` : `${origin}customer_feedback.html`
+  return notifyAssignees(sb, 'role:manager', {
+    type:          'feedback_escalation',
+    subjectPrefix: `[Cedarwings] ${sev}`,
+    title:         `${sev} ${typeLbl}${ref?' '+ref:''}`,
+    headline:      `A ${sev.toLowerCase()}-severity complaint was just logged`,
+    iso:           'Customer Feedback register · ISO 13485 §8.2.1',
+    severity:      sev,
+    severityColor: sevCol,
+    facts: [
+      ['Customer', rec.customer_name],
+      ['Doctor',   rec.doctor],
+      ['Case #',   rec.case_id],
+      ['Category', rec.category],
+    ],
+    body: (rec.description || '').slice(0, 200),
+    link,
+  })
+}
+function _notifyResolved(recipient, rec) {
+  const ref     = rec.feedback_no || rec.id || ''
+  const typeLbl = TYPE_LABELS[rec.type] || rec.type || 'Feedback'
+  const origin  = location.origin + location.pathname.replace(/[^/]+$/, '')
+  const link    = rec.id ? `${origin}customer_feedback.html?open=${rec.id}` : `${origin}customer_feedback.html`
+  const statusLabel = (rec.status||'').replace(/_/g,' ')
+  return notifyAssignees(sb, recipient, {
+    type:          'feedback_resolved',
+    subjectPrefix: `[Cedarwings] ${typeLbl}${ref?' '+ref:''}`,
+    title:         `${typeLbl}${ref?' '+ref:''} — ${statusLabel}`,
+    headline:      `A record you logged has been marked "${statusLabel}"`,
+    iso:           'Customer Feedback register · ISO 13485 §8.2.1',
+    facts: [
+      ['Customer',        rec.customer_name],
+      ['Case #',          rec.case_id],
+      ['Resolved Date',   rec.resolved_at],
+      ['Handled By',      rec.assigned_to],
+      ['Resolution',      rec.resolution],
+    ],
+    body: (rec.description || '').slice(0, 200),
+    link,
+  })
+}
+function _notifyFollowupAssignee(assignee, rec) {
+  const ref     = rec.feedback_no || rec.id || ''
+  const typeLbl = TYPE_LABELS[rec.type] || rec.type || 'Feedback'
+  const origin  = location.origin + location.pathname.replace(/[^/]+$/, '')
+  const link    = rec.id ? `${origin}customer_feedback.html?open=${rec.id}` : `${origin}customer_feedback.html`
+  return notifyAssignees(sb, assignee, {
+    type:          'feedback_followup_assignment',
+    subjectPrefix: `[Cedarwings] Follow-up`,
+    title:         `Follow-up due ${rec.follow_up_date || ''}${ref?' · '+ref:''}`,
+    headline:      'A follow-up reminder has been assigned to you',
+    iso:           'Customer Feedback register · ISO 13485 §8.2.1',
+    facts: [
+      ['Customer',      rec.customer_name],
+      ['Case #',        rec.case_id],
+      ['Follow-up Date',rec.follow_up_date],
+      ['Note',          rec.follow_up_note],
+    ],
+    body: (rec.description || '').slice(0, 200),
+    link,
+  })
+}
+function _notifyAssignees(assignee, rec) {
+  const ref     = rec.feedback_no || rec.id || ''
+  const typeLbl = TYPE_LABELS[rec.type] || rec.type || 'Feedback'
+  const sev     = (rec.severity || 'medium')
+  const sevCol  = sev === 'critical' ? '#dc2626' : sev === 'high' ? '#f97316' : sev === 'low' ? '#94a3b8' : '#eab308'
+  const origin  = location.origin + location.pathname.replace(/[^/]+$/, '')
+  const link    = rec.id ? `${origin}customer_feedback.html?open=${rec.id}` : `${origin}customer_feedback.html`
+  return notifyAssignees(sb, assignee, {
+    type:          'feedback_assignment',
+    subjectPrefix: `[Cedarwings] ${typeLbl}${ref?' '+ref:''}`,
+    title:         `${typeLbl}${ref?' '+ref:''} assigned to you`,
+    headline:      'A complaint / feedback record has been assigned to you',
+    iso:           'Customer Feedback register · ISO 13485 §8.2.1',
+    severity:      sev.toUpperCase(),
+    severityColor: sevCol,
+    facts: [
+      ['Customer', rec.customer_name],
+      ['Doctor',   rec.doctor],
+      ['Case #',   rec.case_id],
+    ],
+    body: (rec.description || '').slice(0, 200) + ((rec.description||'').length>200?'…':''),
+    link,
+  })
+}
+
+// Bulk actions — delegated to the shared module (bulk_actions.js)
+import { mountBulkActions } from './bulk_actions.js?v=20260423e'
+mountBulkActions({
+  table:     'customer_feedback',
+  sb,
+  ntf:       (m,t) => ntf(m,t),
+  mountEl:   document.getElementById('bulkBarMount'),
+  headerCb:  document.getElementById('bulkAllCb'),
+  tableBody: document.getElementById('tBody'),
+  onComplete: () => load(),
+  actions: [
+    { label:'✅ Mark resolved', pastTense:'marked resolved',
+      confirm: n => `Mark ${n} record${n===1?'':'s'} as resolved? Resolved Date will be stamped to today.`,
+      patch: { status:'resolved', resolved_at: () => new Date().toISOString() } },
+    { label:'👤 Reassign…',
+      reassign: () => {
+        const src = document.getElementById('fAssigned')
+        return {
+          column: 'assigned_to',
+          options: src ? [...src.options].map(o => ({ v:o.value, t:o.text })) : [],
+          // Fire email + WhatsApp to the newly-assigned party for
+          // each record bulk-reassigned.
+          afterValue: async (value, ids) => {
+            if (!value) return
+            const { data: rows } = await sb.from('customer_feedback')
+              .select('id, feedback_no, type, severity, description, customer_name, doctor, case_id')
+              .in('id', ids)
+            for (const r of (rows || [])) {
+              _notifyAssignees(value, r).catch(e => console.warn('[feedback notify]', e))
+            }
+          },
+        }
+      } },
+    { label:'🗑️ Delete', danger:true, delete:true },
+  ],
+})
+window.onBulkCbChange = () => {}  // legacy no-op — inline onclick still fires
+
+// CSV export of the currently-filtered rows — feeds directly into
+// ISO 13485 external audits (complaints register export).
+import { downloadCsv, todayIso } from './csv_export.js?v=20260423d'
+window.exportFilteredCsv = () => {
+  downloadCsv(`feedback_${todayIso()}.csv`, [
+    { header:'Ref #',             get: r => r.feedback_no || '' },
+    { header:'Date',              get: r => r.received_date || '' },
+    { header:'Type',              get: r => TYPE_LABELS[r.type] || r.type || '' },
+    { header:'Category',          get: r => CATEGORY_LABELS[r.category] || r.category || '' },
+    { header:'Customer',          get: r => r.customer_name || '' },
+    { header:'Doctor',            get: r => r.doctor || '' },
+    { header:'Case #',            get: r => r.case_id || r.order_no || '' },
+    { header:'Priority',          get: r => r.severity || '' },
+    { header:'Status',            get: r => r.status || '' },
+    { header:'Assigned To',       get: r => r.assigned_to || '' },
+    { header:'Follow-up Date',    get: r => r.follow_up_date || '' },
+    { header:'Follow-up Owner',   get: r => r.follow_up_assignee || '' },
+    { header:'Resolved Date',     get: r => r.resolved_at || '' },
+    { header:'Description',       get: r => r.description || '' },
+    { header:'Root Cause',        get: r => r.notes || '' },
+    { header:'Resolution',        get: r => r.resolution || '' },
+  ], filtered)
+}
+
+;(async()=>{
+  await loadDropdowns()
+  // Deep-link filters from the 🔔 login modal — applied BEFORE load/render.
+  // Saved views (user_views.js) apply themselves when the module boots;
+  // the deep-link here overrides whatever view was active.
+  const qp=new URLSearchParams(location.search)
+  if(qp.get('filter')==='mine'){
+    const af=document.getElementById('assignedFilter')
+    if(af){af.value='__mine__'}
+  }
+  await load()
+  // ?open=<id> support — jump straight to a specific complaint.
+  const openId=qp.get('open')
+  if(openId){
+    const match=all.find(x=>String(x.id)===String(openId))
+    if(match){
+      const idx=filtered.findIndex(x=>String(x.id)===String(openId))
+      if(idx>=0){pg=Math.floor(idx/PAGE);render()}
+      if(typeof viewRec==='function')viewRec(openId)
+    }
+  }
+})()
+</script>
+
+
+
+<!-- HELP PANEL PLACEHOLDER - filled by lang.js CW_HELP -->
+<div id="helpPanelMount"></div>
+<script>
+(function() {
+  // Wait for lang.js to load then build the panel
+  function mountHelp() {
+    if (typeof CW_HELP === 'undefined' || typeof CW_HELP.buildPanel !== 'function') {
+      setTimeout(mountHelp, 50); return;
+    }
+    const html = CW_HELP.buildPanel('customer_feedback', '💬', 'Retours Clients', 'Customer Feedback');
+    document.getElementById('helpPanelMount').innerHTML = html;
+    CW_HELP.init('customer_feedback', '💬', 'Retours Clients', 'Customer Feedback');
+  }
+  document.addEventListener('DOMContentLoaded', mountHelp);
+})();
+</script>
+
+
+<script src="table_sort.js?v=20260423a"></script>
+</body></html>
