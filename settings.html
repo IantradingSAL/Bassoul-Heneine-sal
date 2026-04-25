@@ -686,25 +686,25 @@ $('empSaveBtn').addEventListener('click', async () => {
       try {
         $('empSaveBtn').disabled = true
         $('empSaveBtn').textContent = '⏳ Creating login…'
-        const { data: { session } } = await sb.auth.getSession()
-        if (!session) { ntf('Session expired — please sign in again', 'err'); return }
-        const fnUrl = `${SUPABASE_CONFIG.url}/functions/v1/admin-create-user`
-        const res = await fetch(fnUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey':        SUPABASE_CONFIG.anonKey,
-          },
-          body: JSON.stringify({ email, password })
+        // Use a separate Supabase client with persistSession=false so the
+        // new user's session does NOT replace the current admin's session
+        // in localStorage. The temp client lives only for this one call.
+        const tempClient = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
         })
-        const result = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          ntf('Could not create login: ' + (result.error || res.statusText), 'err')
+        const { data, error } = await tempClient.auth.signUp({ email, password })
+        if (error) {
+          ntf('Could not create login: ' + error.message, 'err')
           return
         }
-        authUid      = result.user_id
+        if (!data || !data.user) {
+          ntf('Login was not created. Make sure "Confirm email" is OFF in Supabase → Authentication → Providers → Email.', 'err')
+          return
+        }
+        authUid      = data.user.id
         createdLogin = true
+        // Best-effort: sign the temp client out (cleans up its in-memory session)
+        try { await tempClient.auth.signOut() } catch {}
       } catch (err) {
         ntf('Network error creating login: ' + err.message, 'err'); return
       } finally {
