@@ -339,7 +339,7 @@ tbody tr:hover{background:#f8fafc}
 <div class="modal-bg" id="empModal">
   <div class="modal">
     <div class="m-h" id="empModalTitle">Add employee</div>
-    <div class="m-s">The <strong>email</strong> below must match a user already created in <strong>Supabase → Authentication → Users</strong>. The system links them automatically — you no longer need to copy any UUID.</div>
+    <div class="m-s">Fill in the details below — the system will check if a Supabase login already exists for this email. If yes, it links automatically. If not, it creates one using the password you provide. No more manually creating users in the Supabase dashboard.</div>
     <input type="hidden" id="empId"/>
     <input type="hidden" id="empAuthUid"/>
     <div class="fg">
@@ -363,6 +363,17 @@ tbody tr:hover{background:#f8fafc}
       <div>
         <label class="fl">WhatsApp phone</label>
         <input class="fi" type="text" id="empWhats" placeholder="+961 …"/>
+      </div>
+      <div class="full" id="empPasswordWrap">
+        <label class="fl">Login password
+          <span style="font-weight:500;color:var(--mu);text-transform:none;letter-spacing:0">— used to create the Supabase login</span>
+        </label>
+        <div style="display:flex;gap:6px">
+          <input class="fi" type="text" id="empPassword" placeholder="Min 6 characters" autocomplete="new-password" style="flex:1"/>
+          <button class="btn btn-ghost btn-sm" id="empGenPwd" type="button" title="Generate strong random password" style="flex-shrink:0;padding:9px 14px;font-size:14px">🎲</button>
+          <button class="btn btn-ghost btn-sm" id="empCopyPwd" type="button" title="Copy password" style="flex-shrink:0;padding:9px 14px;font-size:14px">📋</button>
+        </div>
+        <div class="fl-help">If a Supabase login already exists for this email, it'll be linked automatically and this is ignored. If not, a new login is created with this password — share it securely with the employee. You can change it later in Supabase → Authentication → Users.</div>
       </div>
       <div class="full">
         <label class="fl">Role *</label>
@@ -614,6 +625,7 @@ function fillEmpModal(e){
   $('empEmail').value      = e?.email || ''
   $('empPhone').value      = e?.phone || ''
   $('empWhats').value      = e?.whatsapp_phone || ''
+  $('empPassword').value   = ''
   $('empActive').checked   = e?.is_active !== false
   const prefs = e?.notification_prefs || { email:true, whatsapp:true, sms:true }
   $('empPrefEmail').checked = prefs.email !== false
@@ -622,9 +634,29 @@ function fillEmpModal(e){
   // Effective role: custom_role overrides role
   const effective = e?.custom_role || e?.role || 'employee'
   populateRoleDropdown(effective)
+  // Show password field only when there's no existing auth link
+  // (new employee, OR existing employee that's still ⚠️ unlinked).
+  const isLinked = !!e?.auth_user_id
+  $('empPasswordWrap').style.display = isLinked ? 'none' : ''
   $('empDeleteBtn').style.display = e?.id ? '' : 'none'
   $('empModalTitle').textContent  = e?.id ? 'Edit employee' : 'Add employee'
 }
+
+// Generate a strong random password and copy helpers
+$('empGenPwd').addEventListener('click', () => {
+  const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*'
+  const arr = new Uint8Array(14)
+  crypto.getRandomValues(arr)
+  let pwd = ''
+  for (const x of arr) pwd += chars[x % chars.length]
+  $('empPassword').value = pwd
+})
+$('empCopyPwd').addEventListener('click', async () => {
+  const v = $('empPassword').value
+  if (!v) { ntf('Nothing to copy', 'err'); return }
+  try { await navigator.clipboard.writeText(v); ntf('Password copied to clipboard', 'ok') }
+  catch { ntf('Could not access clipboard', 'err') }
+})
 
 $('addEmpBtn').addEventListener('click', () => { fillEmpModal(null); openModal('empModal') })
 function editEmployee(id){
@@ -634,20 +666,56 @@ function editEmployee(id){
 
 $('empSaveBtn').addEventListener('click', async () => {
   const name  = $('empName').value.trim()
-  const email = $('empEmail').value.trim()
-  if (!name) { ntf('Name is required', 'err'); return }
+  const email = $('empEmail').value.trim().toLowerCase()
+  if (!name)  { ntf('Name is required', 'err'); return }
   if (!email) { ntf('Email is required', 'err'); return }
 
-  // Resolve auth_user_id from email automatically.
-  // The RPC returns NULL if no matching auth.users row exists.
-  let authUid = $('empAuthUid').value || null
+  // ── 1. Try to find an existing Supabase auth user for this email
   let { data: foundUid, error: rpcErr } = await sb.rpc('find_auth_user_by_email', { p_email: email })
-  if (rpcErr) {
-    ntf('Could not look up auth user: ' + rpcErr.message, 'err'); return
-  }
-  authUid = foundUid || null
+  if (rpcErr) { ntf('Could not look up auth user: ' + rpcErr.message, 'err'); return }
 
-  // Map the unified role dropdown back to schema columns.
+  let authUid       = foundUid || null
+  let createdLogin  = false
+  const wasUnlinked = !$('empAuthUid').value && !foundUid
+  const password    = $('empPassword').value
+
+  // ── 2. If no existing login AND a password is provided, create one
+  if (!authUid) {
+    if (password) {
+      if (password.length < 6) { ntf('Password must be at least 6 characters', 'err'); return }
+      try {
+        $('empSaveBtn').disabled = true
+        $('empSaveBtn').textContent = '⏳ Creating login…'
+        const { data: { session } } = await sb.auth.getSession()
+        if (!session) { ntf('Session expired — please sign in again', 'err'); return }
+        const fnUrl = `${SUPABASE_CONFIG.url}/functions/v1/admin-create-user`
+        const res = await fetch(fnUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey':        SUPABASE_CONFIG.anonKey,
+          },
+          body: JSON.stringify({ email, password })
+        })
+        const result = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          ntf('Could not create login: ' + (result.error || res.statusText), 'err')
+          return
+        }
+        authUid      = result.user_id
+        createdLogin = true
+      } catch (err) {
+        ntf('Network error creating login: ' + err.message, 'err'); return
+      } finally {
+        $('empSaveBtn').disabled = false
+        $('empSaveBtn').textContent = '💾 Save employee'
+      }
+    }
+    // else: no password provided → save unlinked, manager can fill it in later
+  }
+
+  // ── 3. Map the unified role dropdown back to schema columns
   const selectedRole = $('empRole').value
   let roleCol, customRoleCol
   if (selectedRole === 'manager' || selectedRole === 'employee') {
@@ -656,6 +724,7 @@ $('empSaveBtn').addEventListener('click', async () => {
     roleCol = 'employee'; customRoleCol = selectedRole
   }
 
+  // ── 4. Save the employee row
   const id  = $('empId').value
   const rec = {
     name,
@@ -678,11 +747,13 @@ $('empSaveBtn').addEventListener('click', async () => {
   else    res = await sb.from('employees').insert([rec])
   if (res.error) { ntf('Save failed: ' + res.error.message, 'err'); return }
 
-  // Helpful tip if no auth match was found.
-  if (!authUid) {
-    ntf(`Saved — but no Supabase auth user with email ${email} yet. Create one in Supabase → Authentication → Users, then re-save this employee to link them.`, 'err')
+  // ── 5. Tailored success/warning toast
+  if (createdLogin) {
+    ntf(`✅ Login created — ${name} can sign in with ${email}`, 'ok')
+  } else if (authUid) {
+    ntf(id ? 'Employee updated' : 'Employee created and linked to existing login', 'ok')
   } else {
-    ntf(id ? 'Employee updated' : 'Employee created and linked', 'ok')
+    ntf(`Saved as ⚠️ unlinked — provide a password to create a Supabase login next time you edit them.`, 'err')
   }
   closeModal('empModal')
   loadEmployees()
