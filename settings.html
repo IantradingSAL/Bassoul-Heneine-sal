@@ -339,7 +339,7 @@ tbody tr:hover{background:#f8fafc}
 <div class="modal-bg" id="empModal">
   <div class="modal">
     <div class="m-h" id="empModalTitle">Add employee</div>
-    <div class="m-s">Fill in the details below — the system will check if a Supabase login already exists for this email. If yes, it links automatically. If not, it creates one using the password you provide. No more manually creating users in the Supabase dashboard.</div>
+    <div class="m-s">Fill in the details — the system creates the Supabase login automatically and emails a confirmation link to the employee. They click the link, then they can sign in with the password you set below.</div>
     <input type="hidden" id="empId"/>
     <input type="hidden" id="empAuthUid"/>
     <div class="fg">
@@ -373,7 +373,11 @@ tbody tr:hover{background:#f8fafc}
           <button class="btn btn-ghost btn-sm" id="empGenPwd" type="button" title="Generate strong random password" style="flex-shrink:0;padding:9px 14px;font-size:14px">🎲</button>
           <button class="btn btn-ghost btn-sm" id="empCopyPwd" type="button" title="Copy password" style="flex-shrink:0;padding:9px 14px;font-size:14px">📋</button>
         </div>
-        <div class="fl-help">If a Supabase login already exists for this email, it'll be linked automatically and this is ignored. If not, a new login is created with this password — share it securely with the employee. You can change it later in Supabase → Authentication → Users.</div>
+        <div class="fl-help">If a Supabase login already exists for this email, it'll be linked automatically and this is ignored. If not, a new login is created with this password and a confirmation email is sent to <em>them</em> — they click it, then sign in with this password. Share it securely; they can change it later.</div>
+      </div>
+      <div class="full" id="empResendWrap" style="display:none">
+        <button class="btn btn-ghost btn-sm" id="empResendConfirm" type="button">📧 Resend confirmation email</button>
+        <div class="fl-help" style="margin-top:6px">This employee hasn't confirmed their email yet. Click above to send them a fresh confirmation link.</div>
       </div>
       <div class="full">
         <label class="fl">Role *</label>
@@ -547,17 +551,23 @@ let employees   = []
 let roles       = []
 let categories  = []
 let settings    = {}
-let employeeCounts = {}   // { roleName: count }
+let employeeCounts  = {}     // { roleName: count }
+let unconfirmedUids = new Set()  // auth_user_ids whose email_confirmed_at IS NULL
 
 // ════════════════════════════════════════════════════════════════
 //  EMPLOYEES
 // ════════════════════════════════════════════════════════════════
 async function loadEmployees(){
-  const { data, error } = await sb.from('employees')
-    .select('id,name,username,email,phone,whatsapp_phone,role,custom_role,extra_roles,is_active,auth_user_id,notification_prefs')
-    .order('name')
-  if (error) { ntf('Could not load employees: ' + error.message, 'err'); return }
-  employees = data || []
+  const [empRes, unconfRes] = await Promise.all([
+    sb.from('employees')
+      .select('id,name,username,email,phone,whatsapp_phone,role,custom_role,extra_roles,is_active,auth_user_id,notification_prefs')
+      .order('name'),
+    sb.rpc('list_unconfirmed_auth_uids')
+  ])
+  if (empRes.error) { ntf('Could not load employees: ' + empRes.error.message, 'err'); return }
+  employees = empRes.data || []
+  // unconfRes may error if the RPC isn't deployed — fall back gracefully
+  unconfirmedUids = new Set(unconfRes.error ? [] : (unconfRes.data || []))
   renderEmployees()
 }
 
@@ -573,11 +583,16 @@ function renderEmployees(){
     const roleHtml = role
       ? `<span class="bdg" style="background:${esc(role.color||'#3b5fe2')};color:#fff">${esc(role.icon||'👥')} ${esc(role.label)}</span>`
       : `<span class="bdg b-gray">${esc(effectiveRole)}</span>`
-    const linked = e.auth_user_id ? '' : `<span class="bdg b-a" style="margin-left:6px" title="No matching Supabase auth user — they cannot sign in until you create one">⚠️ unlinked</span>`
+    let statusBadge = ''
+    if (!e.auth_user_id) {
+      statusBadge = `<span class="bdg b-a" style="margin-left:6px" title="No matching Supabase auth user — they cannot sign in until you create one">⚠️ unlinked</span>`
+    } else if (unconfirmedUids.has(e.auth_user_id)) {
+      statusBadge = `<span class="bdg b-a" style="margin-left:6px" title="They received a confirmation email but haven't clicked the link yet">📧 awaiting confirmation</span>`
+    }
     return `<tr>
       <td>
         <span class="av" style="background:${avatarColor(e.name)}">${initials(e.name)}</span>
-        <strong>${esc(e.name)}</strong>${linked}
+        <strong>${esc(e.name)}</strong>${statusBadge}
       </td>
       <td>${esc(e.username || '—')}</td>
       <td style="color:var(--mu)">${esc(e.email || '—')}</td>
@@ -634,10 +649,12 @@ function fillEmpModal(e){
   // Effective role: custom_role overrides role
   const effective = e?.custom_role || e?.role || 'employee'
   populateRoleDropdown(effective)
-  // Show password field only when there's no existing auth link
-  // (new employee, OR existing employee that's still ⚠️ unlinked).
-  const isLinked = !!e?.auth_user_id
+  // Password field appears only for not-yet-linked employees.
+  // Resend-confirmation button appears for linked-but-unconfirmed.
+  const isLinked  = !!e?.auth_user_id
+  const isPending = isLinked && unconfirmedUids.has(e.auth_user_id)
   $('empPasswordWrap').style.display = isLinked ? 'none' : ''
+  $('empResendWrap').style.display   = isPending ? '' : 'none'
   $('empDeleteBtn').style.display = e?.id ? '' : 'none'
   $('empModalTitle').textContent  = e?.id ? 'Edit employee' : 'Add employee'
 }
@@ -658,6 +675,23 @@ $('empCopyPwd').addEventListener('click', async () => {
   catch { ntf('Could not access clipboard', 'err') }
 })
 
+$('empResendConfirm').addEventListener('click', async () => {
+  const email = $('empEmail').value.trim().toLowerCase()
+  if (!email) { ntf('No email to resend to', 'err'); return }
+  $('empResendConfirm').disabled = true
+  $('empResendConfirm').textContent = '⏳ Sending…'
+  try {
+    const { error } = await sb.auth.resend({ type: 'signup', email })
+    if (error) { ntf('Resend failed: ' + error.message, 'err'); return }
+    ntf('📧 Confirmation email re-sent to ' + email, 'ok')
+  } catch (err) {
+    ntf('Resend error: ' + err.message, 'err')
+  } finally {
+    $('empResendConfirm').disabled = false
+    $('empResendConfirm').textContent = '📧 Resend confirmation email'
+  }
+})
+
 $('addEmpBtn').addEventListener('click', () => { fillEmpModal(null); openModal('empModal') })
 function editEmployee(id){
   const e = employees.find(x => x.id === id); if (!e) return
@@ -674,10 +708,10 @@ $('empSaveBtn').addEventListener('click', async () => {
   let { data: foundUid, error: rpcErr } = await sb.rpc('find_auth_user_by_email', { p_email: email })
   if (rpcErr) { ntf('Could not look up auth user: ' + rpcErr.message, 'err'); return }
 
-  let authUid       = foundUid || null
-  let createdLogin  = false
-  const wasUnlinked = !$('empAuthUid').value && !foundUid
-  const password    = $('empPassword').value
+  let authUid             = foundUid || null
+  let createdLogin        = false
+  let confirmationPending = false
+  const password          = $('empPassword').value
 
   // ── 2. If no existing login AND a password is provided, create one
   if (!authUid) {
@@ -698,12 +732,13 @@ $('empSaveBtn').addEventListener('click', async () => {
           return
         }
         if (!data || !data.user) {
-          ntf('Login was not created. Make sure "Confirm email" is OFF in Supabase → Authentication → Providers → Email.', 'err')
+          ntf('Login was not created — no user returned by Supabase.', 'err')
           return
         }
-        authUid      = data.user.id
-        createdLogin = true
-        // Best-effort: sign the temp client out (cleans up its in-memory session)
+        authUid             = data.user.id
+        createdLogin        = true
+        // When email confirmation is ON, signUp returns user but no session
+        confirmationPending = !data.session
         try { await tempClient.auth.signOut() } catch {}
       } catch (err) {
         ntf('Network error creating login: ' + err.message, 'err'); return
@@ -712,7 +747,7 @@ $('empSaveBtn').addEventListener('click', async () => {
         $('empSaveBtn').textContent = '💾 Save employee'
       }
     }
-    // else: no password provided → save unlinked, manager can fill it in later
+    // else: no password provided → save unlinked
   }
 
   // ── 3. Map the unified role dropdown back to schema columns
@@ -749,11 +784,15 @@ $('empSaveBtn').addEventListener('click', async () => {
 
   // ── 5. Tailored success/warning toast
   if (createdLogin) {
-    ntf(`✅ Login created — ${name} can sign in with ${email}`, 'ok')
+    if (confirmationPending) {
+      ntf(`📧 Login created. A confirmation email was sent to ${email} — they must click the link before they can sign in.`, 'ok')
+    } else {
+      ntf(`✅ Login created — ${name} can sign in with ${email}`, 'ok')
+    }
   } else if (authUid) {
     ntf(id ? 'Employee updated' : 'Employee created and linked to existing login', 'ok')
   } else {
-    ntf(`Saved as ⚠️ unlinked — provide a password to create a Supabase login next time you edit them.`, 'err')
+    ntf(`Saved as ⚠️ unlinked — provide a password next time you edit them to create a Supabase login.`, 'err')
   }
   closeModal('empModal')
   loadEmployees()
