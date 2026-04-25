@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="cw-page" content="settings"/>
+<title>Bassoul, Heneine Sal — Settings</title>
+<script type="module" src="config.js"></script>
+<script type="module" src="auth_guard.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#f0f4f8;--card:#fff;--bdr:#e2e8f0;--txt:#0f172a;--mu:#64748b;--dim:#94a3b8;
+  --blue:#3b5fe2;--b50:#eef2ff;--b100:#e0e7ff;
+  --green:#16a34a;--g50:#f0fdf4;--g100:#dcfce7;
+  --amber:#d97706;--a50:#fffbeb;--a100:#fef3c7;
+  --red:#dc2626;--r50:#fef2f2;--r100:#fee2e2;
+  --purple:#7c3aed;--p50:#f5f3ff;--p100:#ede9fe;
+  --teal:#0d9488;--t50:#f0fdfa;--t100:#ccfbf1;
+  --f:'DM Sans',sans-serif;--mono:'JetBrains Mono',monospace;
+  --sh:0 1px 3px rgba(0,0,0,.07),0 0 0 1px rgba(0,0,0,.04);
+  --sh2:0 6px 24px rgba(0,0,0,.09),0 0 0 1px rgba(0,0,0,.04);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--f);background:var(--bg);color:var(--txt);min-height:100vh}
+a{color:inherit;text-decoration:none}
+
+/* SIDEBAR (mirrors index) */
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:var(--card);border-right:1px solid var(--bdr);display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+.sb-top{display:flex;align-items:center;gap:12px;padding:20px 18px 16px;border-bottom:1px solid var(--bdr)}
+.sb-logo{width:40px;height:40px;border-radius:12px;flex-shrink:0;background:linear-gradient(135deg,#3b5fe2,#6366f1);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;letter-spacing:-.5px;color:#fff;box-shadow:0 4px 12px rgba(59,95,226,.3)}
+.sb-name{font-weight:800;font-size:14px;letter-spacing:-.2px}
+.sb-badge{display:inline-flex;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;margin-top:3px;background:var(--b50);color:var(--blue)}
+.sb-nav{flex:1;padding:10px}
+.sb-sec{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;padding:14px 8px 6px}
+.nav-link{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;font-size:13px;font-weight:500;color:var(--mu);transition:background .12s,color .12s}
+.nav-link:hover{background:var(--bg);color:var(--txt)}
+.nav-link.active{background:var(--b50);color:var(--blue);font-weight:700}
+.nav-link .ic{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+.sb-foot{padding:14px 12px;border-top:1px solid var(--bdr)}
+.sb-out{width:100%;padding:7px 10px;font-size:11px;font-weight:600;background:transparent;border:1px solid var(--bdr);border-radius:8px;color:var(--mu);cursor:pointer;font-family:var(--f);transition:all .12s}
+.sb-out:hover{color:var(--red);border-color:var(--red);background:var(--r50)}
+
+.content{margin-left:240px;min-height:100vh}
+.topbar{background:var(--card);border-bottom:1px solid var(--bdr);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.tb-l .tb-hi{font-size:20px;font-weight:800;letter-spacing:-.4px}
+.tb-l .tb-date{font-size:12px;color:var(--mu);margin-top:2px}
+.body{padding:24px 28px 80px}
+
+/* TABS */
+.tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--bdr);border-radius:12px;padding:4px;margin-bottom:18px;width:fit-content;box-shadow:var(--sh)}
+.tab{padding:8px 18px;font-size:13px;font-weight:600;border:none;background:transparent;color:var(--mu);border-radius:8px;cursor:pointer;font-family:var(--f);transition:all .12s}
+.tab:hover{color:var(--txt)}
+.tab.on{background:var(--blue);color:#fff;font-weight:700;box-shadow:0 2px 6px rgba(59,95,226,.25)}
+.panel{display:none}
+.panel.on{display:block}
+
+.section-h{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px;gap:8px;flex-wrap:wrap}
+.section-t{font-size:15px;font-weight:800;letter-spacing:-.1px}
+.section-s{font-size:12px;color:var(--mu);margin-top:3px;max-width:560px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;font-size:13px;font-weight:600;border:none;border-radius:9px;cursor:pointer;font-family:var(--f);transition:all .12s;line-height:1.2}
+.btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:#2e4fc7}
+.btn-ghost{background:var(--card);border:1px solid var(--bdr);color:var(--mu)}.btn-ghost:hover{color:var(--txt);border-color:var(--blue)}
+.btn-red{background:var(--card);border:1px solid var(--bdr);color:var(--red)}.btn-red:hover{background:var(--r50);border-color:var(--red)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-icon{padding:6px 9px;font-size:14px}
+
+/* TABLE */
+.tw{overflow-x:auto;border-radius:12px;border:1px solid var(--bdr);background:var(--card);box-shadow:var(--sh)}
+table{width:100%;border-collapse:collapse}
+thead th{padding:11px 16px;font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;background:#f8fafc;border-bottom:1px solid var(--bdr);white-space:nowrap;text-align:left}
+tbody td{padding:13px 16px;font-size:13px;border-bottom:1px solid var(--bdr);color:var(--txt);vertical-align:middle}
+tbody tr:last-child td{border:none}
+tbody tr:hover{background:#f8fafc}
+.bdg{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700}
+.b-g{background:var(--g100);color:#15803d}.b-gray{background:#f1f5f9;color:var(--mu)}
+.b-b{background:var(--b100);color:#1e40af}
+.empty{text-align:center;padding:40px 20px;color:var(--dim);font-size:13px}
+.av{width:32px;height:32px;border-radius:9px;color:#fff;font-weight:800;font-size:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:10px;vertical-align:middle}
+
+/* ROLE CARDS */
+.role-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.role-card{background:var(--card);border-radius:14px;border:1px solid var(--bdr);box-shadow:var(--sh);overflow:hidden}
+.role-head{display:flex;align-items:center;gap:14px;padding:16px 20px;cursor:pointer;background:var(--card);transition:background .12s}
+.role-head:hover{background:#f8fafc}
+.role-icon{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;color:#fff;background:var(--blue)}
+.role-info{flex:1;min-width:0}
+.role-label{font-size:14px;font-weight:800;letter-spacing:-.1px}
+.role-key{font-size:11px;color:var(--mu);font-family:var(--mono);margin-top:2px}
+.role-actions{display:flex;gap:6px;flex-shrink:0}
+.role-perm{padding:0 20px 16px;display:none}
+.role-card.open .role-perm{display:block;border-top:1px solid var(--bdr);padding-top:14px}
+.role-card.open .role-head{background:#f8fafc}
+.perm-row{display:grid;grid-template-columns:1fr 280px;align-items:center;gap:12px;padding:8px 0;border-bottom:1px dashed var(--bdr)}
+.perm-row:last-child{border:none}
+.perm-page{font-size:13px;font-weight:600;color:var(--txt)}
+.perm-page-s{font-size:11px;color:var(--mu);font-weight:500;margin-top:2px}
+.perm-pills{display:flex;gap:4px;background:var(--bg);border-radius:9px;padding:3px}
+.perm-pill{flex:1;padding:6px 10px;font-size:11px;font-weight:700;border:none;background:transparent;color:var(--mu);border-radius:7px;cursor:pointer;font-family:var(--f);transition:all .12s;text-align:center}
+.perm-pill:hover{color:var(--txt)}
+.perm-pill.on[data-l="none"]{background:#f1f5f9;color:var(--mu);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.perm-pill.on[data-l="view"]{background:var(--amber);color:#fff;box-shadow:0 1px 3px rgba(217,119,6,.4)}
+.perm-pill.on[data-l="edit"]{background:var(--green);color:#fff;box-shadow:0 1px 3px rgba(22,163,74,.4)}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:200;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;backdrop-filter:blur(2px)}
+.modal-bg.on{display:flex}
+.modal{background:var(--card);border-radius:18px;box-shadow:var(--sh2);width:100%;max-width:560px;padding:28px}
+.m-h{font-size:18px;font-weight:800;letter-spacing:-.3px;margin-bottom:6px}
+.m-s{font-size:12px;color:var(--mu);margin-bottom:20px}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fg .full{grid-column:1/-1}
+.fl{font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px}
+.fi{width:100%;padding:9px 12px;border:1.5px solid var(--bdr);border-radius:9px;font-family:var(--f);font-size:13px;font-weight:500;background:var(--card);color:var(--txt);transition:border-color .12s,box-shadow .12s}
+.fi:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,95,226,.12)}
+textarea.fi{resize:vertical;min-height:60px}
+.fi[readonly]{background:#f8fafc;color:var(--mu)}
+.cb-row{display:flex;flex-wrap:wrap;gap:14px;padding:6px 0}
+.cb-row label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--txt);font-weight:600;cursor:pointer}
+.cb-row input{accent-color:var(--blue);width:14px;height:14px}
+.swatch{width:32px;height:32px;border-radius:8px;border:2px solid var(--bdr);cursor:pointer;flex-shrink:0}
+.m-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:22px;padding-top:18px;border-top:1px solid var(--bdr)}
+
+/* Notif */
+.notif{position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:10px;background:var(--card);box-shadow:var(--sh2);font-size:13px;font-weight:600;z-index:300;transform:translateY(120%);transition:transform .25s ease}
+.notif.on{transform:translateY(0)}
+.notif.ok{border-left:4px solid var(--green);color:var(--green)}
+.notif.err{border-left:4px solid var(--red);color:var(--red)}
+
+/* Form sections */
+.cfg-card{background:var(--card);border-radius:14px;border:1px solid var(--bdr);box-shadow:var(--sh);padding:22px;margin-bottom:14px}
+.cfg-h{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.cfg-h .ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.cfg-t{font-size:14px;font-weight:800;letter-spacing:-.1px}
+.cfg-s{font-size:12px;color:var(--mu);margin:0 0 14px 44px}
+
+.foot{position:fixed;bottom:0;left:240px;right:0;background:var(--card);border-top:1px solid var(--bdr);padding:6px 20px;display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--dim);z-index:99}
+
+@media (max-width:780px){
+  .sidebar{transform:translateX(-100%);transition:transform .2s}
+  .sidebar.open{transform:translateX(0);box-shadow:0 0 40px rgba(0,0,0,.2)}
+  .content{margin-left:0}
+  .foot{left:0}
+  .menu-btn{display:inline-flex !important}
+  .body{padding:16px 16px 72px}
+  .perm-row{grid-template-columns:1fr}
+  .fg{grid-template-columns:1fr}
+}
+.menu-btn{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:var(--card);border:1px solid var(--bdr);cursor:pointer;font-size:18px}
+</style>
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sb-top">
+    <div class="sb-logo">BH</div>
+    <div>
+      <div class="sb-name">Bassoul, Heneine Sal</div>
+      <div class="sb-badge">Operations</div>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-sec">Overview</div>
+    <a class="nav-link" href="index.html"><span class="ic">🏠</span>Dashboard</a>
+
+    <div class="sb-sec">Modules</div>
+    <a class="nav-link" href="customer_feedback.html"><span class="ic">📣</span>Customer Feedback</a>
+    <a class="nav-link" href="warranty.html"><span class="ic">🚗</span>Renault Warranty</a>
+
+    <div class="sb-sec">Admin</div>
+    <a class="nav-link active" href="settings.html"><span class="ic">⚙️</span>Settings</a>
+  </nav>
+  <div class="sb-foot">
+    <button class="sb-out" id="signOutBtn">Sign out</button>
+  </div>
+</aside>
+
+<div class="content">
+  <div class="topbar">
+    <div style="display:flex;gap:12px;align-items:center">
+      <button class="menu-btn" id="menuBtn">☰</button>
+      <div class="tb-l">
+        <div class="tb-hi">⚙️ Settings</div>
+        <div class="tb-date">Manage employees, roles, page access &amp; system config</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <div class="tabs" role="tablist">
+      <button class="tab on" data-tab="emp">👥 Employees</button>
+      <button class="tab"    data-tab="rol">🎭 Roles &amp; Access</button>
+      <button class="tab"    data-tab="sys">📡 System</button>
+    </div>
+
+    <!-- ════ EMPLOYEES TAB ═════════════════════════════════════ -->
+    <div class="panel on" id="P_emp">
+      <div class="section-h">
+        <div>
+          <div class="section-t">Employees</div>
+          <div class="section-s">Each employee is a person who logs in. Set their role here; this controls which pages they can open and edit. To create the matching login, add the user in Supabase → Authentication → Users, then paste the resulting User UUID into the "Auth User ID" field below.</div>
+        </div>
+        <button class="btn btn-blue editor-only" id="addEmpBtn">+ Add employee</button>
+      </div>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th class="editor-only" style="text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="empBody">
+            <tr><td colspan="7" class="empty">⏳ Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════ ROLES & ACCESS TAB ════════════════════════════════ -->
+    <div class="panel" id="P_rol">
+      <div class="section-h">
+        <div>
+          <div class="section-t">Roles &amp; page access</div>
+          <div class="section-s">Each role has a permission level on every page: <strong>Edit</strong> (full access), <strong>View</strong> (read-only — buttons disabled, forms locked), or <strong>None</strong> (page is blocked). Click a role to expand the matrix. The built-in <strong>Manager</strong> role always has Edit on everything, regardless of what's set here.</div>
+        </div>
+        <button class="btn btn-blue editor-only" id="addRoleBtn">+ Add role</button>
+      </div>
+      <div class="role-grid" id="roleGrid">
+        <div class="empty">⏳ Loading…</div>
+      </div>
+    </div>
+
+    <!-- ════ SYSTEM TAB ════════════════════════════════════════ -->
+    <div class="panel" id="P_sys">
+      <div class="section-h">
+        <div>
+          <div class="section-t">System configuration</div>
+          <div class="section-s">Stored in <code style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:4px">public.system_settings</code>. The Customer Feedback module reads these to send email / WhatsApp / SMS notifications when records are created or reassigned.</div>
+        </div>
+      </div>
+
+      <div class="cfg-card">
+        <div class="cfg-h">
+          <div class="ic" style="background:var(--b50);color:var(--blue)">📧</div>
+          <div>
+            <div class="cfg-t">Brevo (email + WhatsApp)</div>
+          </div>
+        </div>
+        <div class="cfg-s">Used for outbound emails and WhatsApp messages. Get your API key from Brevo → SMTP &amp; API.</div>
+        <div class="fg">
+          <div class="full">
+            <label class="fl" for="brevo_api_key">Brevo API key</label>
+            <input class="fi" type="password" id="brevo_api_key" placeholder="xkeysib-…" autocomplete="off"/>
+          </div>
+          <div>
+            <label class="fl" for="brevo_sender_name">Sender name</label>
+            <input class="fi" type="text" id="brevo_sender_name" placeholder="Bassoul, Heneine Sal"/>
+          </div>
+          <div>
+            <label class="fl" for="brevo_sender_email">Sender email</label>
+            <input class="fi" type="email" id="brevo_sender_email" placeholder="noreply@bashen.com"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="cfg-card">
+        <div class="cfg-h">
+          <div class="ic" style="background:var(--p50);color:var(--purple)">📱</div>
+          <div>
+            <div class="cfg-t">Twilio (SMS)</div>
+          </div>
+        </div>
+        <div class="cfg-s">Optional — only needed if you want SMS in addition to (or instead of) WhatsApp. The phone number must be in E.164 format including the country code.</div>
+        <div class="fg">
+          <div>
+            <label class="fl" for="twilio_account_sid">Account SID</label>
+            <input class="fi" type="text" id="twilio_account_sid" placeholder="AC…"/>
+          </div>
+          <div>
+            <label class="fl" for="twilio_from">From number (E.164)</label>
+            <input class="fi" type="text" id="twilio_from" placeholder="+96112345678"/>
+          </div>
+          <div class="full">
+            <label class="fl" for="twilio_auth_token">Auth token</label>
+            <input class="fi" type="password" id="twilio_auth_token" autocomplete="off"/>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px" class="editor-only">
+        <button class="btn btn-blue" id="saveSysBtn">💾 Save system settings</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="foot">
+    <span>© 2026 <strong style="color:var(--mu)">IanTradingSAL</strong> · All rights reserved</span>
+    <span>Bassoul, Heneine Sal · Settings v1.0</span>
+  </div>
+</div>
+
+<!-- ════ EMPLOYEE MODAL ════════════════════════════════════════ -->
+<div class="modal-bg" id="empModal">
+  <div class="modal">
+    <div class="m-h" id="empModalTitle">Add employee</div>
+    <div class="m-s">Fill in the profile, then create the matching login user in Supabase Authentication and paste their UUID below.</div>
+    <input type="hidden" id="empId"/>
+    <div class="fg">
+      <div>
+        <label class="fl">Full name *</label>
+        <input class="fi" type="text" id="empName" required/>
+      </div>
+      <div>
+        <label class="fl">Username</label>
+        <input class="fi" type="text" id="empUsername" placeholder="imad" autocomplete="off"/>
+      </div>
+      <div>
+        <label class="fl">Email</label>
+        <input class="fi" type="email" id="empEmail" placeholder="imad@bashen.com"/>
+      </div>
+      <div>
+        <label class="fl">Phone</label>
+        <input class="fi" type="text" id="empPhone" placeholder="+961 …"/>
+      </div>
+      <div>
+        <label class="fl">WhatsApp phone</label>
+        <input class="fi" type="text" id="empWhats" placeholder="+961 …"/>
+      </div>
+      <div>
+        <label class="fl">Role *</label>
+        <select class="fi" id="empRole">
+          <option value="manager">👔 Manager (full access)</option>
+          <option value="employee" selected>👤 Employee</option>
+        </select>
+      </div>
+      <div class="full">
+        <label class="fl">Custom role (optional — must match a role created in Roles tab)</label>
+        <select class="fi" id="empCustomRole"><option value="">— None —</option></select>
+      </div>
+      <div class="full">
+        <label class="fl">Auth User ID (from Supabase → Authentication → Users)</label>
+        <input class="fi" type="text" id="empAuthUid" placeholder="00000000-0000-0000-0000-000000000000" autocomplete="off"/>
+      </div>
+      <div class="full">
+        <label class="fl">Notification channels</label>
+        <div class="cb-row">
+          <label><input type="checkbox" id="empPrefEmail" checked/>Email</label>
+          <label><input type="checkbox" id="empPrefWa" checked/>WhatsApp</label>
+          <label><input type="checkbox" id="empPrefSms" checked/>SMS</label>
+        </div>
+      </div>
+      <div class="full">
+        <div class="cb-row">
+          <label><input type="checkbox" id="empActive" checked/>Active (can sign in)</label>
+        </div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-red" id="empDeleteBtn" style="display:none;margin-right:auto">🗑️ Delete</button>
+      <button class="btn btn-ghost" data-close>Cancel</button>
+      <button class="btn btn-blue" id="empSaveBtn">💾 Save employee</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ ROLE MODAL ════════════════════════════════════════════ -->
+<div class="modal-bg" id="roleModal">
+  <div class="modal" style="max-width:480px">
+    <div class="m-h" id="roleModalTitle">Add role</div>
+    <div class="m-s">Roles group page permissions. Once saved, expand the role on the page to set per-page access.</div>
+    <input type="hidden" id="roleOrigName"/>
+    <div class="fg">
+      <div>
+        <label class="fl">Machine key *</label>
+        <input class="fi" type="text" id="roleName" placeholder="service_advisor" pattern="[a-z0-9_]+" required/>
+      </div>
+      <div>
+        <label class="fl">Display label *</label>
+        <input class="fi" type="text" id="roleLabel" placeholder="Service Advisor" required/>
+      </div>
+      <div>
+        <label class="fl">Icon (single emoji)</label>
+        <input class="fi" type="text" id="roleIcon" placeholder="🛠️" maxlength="3"/>
+      </div>
+      <div>
+        <label class="fl">Color (hex)</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="fi" type="text" id="roleColor" placeholder="#3b5fe2" style="flex:1"/>
+          <div class="swatch" id="roleColorPreview" style="background:#3b5fe2"></div>
+        </div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-red" id="roleDeleteBtn" style="display:none;margin-right:auto">🗑️ Delete</button>
+      <button class="btn btn-ghost" data-close>Cancel</button>
+      <button class="btn btn-blue" id="roleSaveBtn">💾 Save role</button>
+    </div>
+  </div>
+</div>
+
+<div class="notif" id="notif"></div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { SUPABASE_CONFIG } from './config.js'
+const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
+
+// ─── helpers ────────────────────────────────────────────────────
+const $ = id => document.getElementById(id)
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+function ntf(msg, kind){
+  const el = $('notif'); el.textContent = msg
+  el.className = 'notif on ' + (kind === 'err' ? 'err' : 'ok')
+  setTimeout(() => { el.className = 'notif' }, 3500)
+}
+function initials(name){
+  if (!name) return '—'
+  return name.trim().split(/\s+/).slice(0,2).map(p=>p[0]||'').join('').toUpperCase()||'—'
+}
+function avatarColor(name){
+  const palette = ['var(--blue)','var(--green)','var(--amber)','var(--purple)','var(--teal)','var(--red)']
+  let h = 0; for (const c of (name||'')) h = (h*31 + c.charCodeAt(0)) >>> 0
+  return palette[h % palette.length]
+}
+// Default permission for any page not in the role's map
+function defaultLevel(roleName, pageId){
+  if (roleName === 'manager') return 'edit'
+  if (pageId === 'dashboard') return 'view'
+  return 'none'
+}
+
+// ─── pages list (the matrix columns) ────────────────────────────
+const PAGES = [
+  { id: 'dashboard',         label: 'Dashboard',         desc: 'Always accessible to authenticated users (no None option)' },
+  { id: 'customer_feedback', label: 'Customer Feedback', desc: 'The feedback / complaints register' },
+  { id: 'warranty',          label: 'Renault Warranty',  desc: 'GCM claims, INCADEA reconciliation' },
+  { id: 'settings',          label: 'Settings',          desc: 'This page — employees, roles, system config' }
+]
+
+// ─── tab switching ──────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'))
+    document.querySelectorAll('.panel').forEach(x => x.classList.remove('on'))
+    t.classList.add('on')
+    $('P_' + t.dataset.tab).classList.add('on')
+  })
+})
+
+// ─── modal open/close helpers ───────────────────────────────────
+function openModal(id) { $(id).classList.add('on') }
+function closeModal(id){ $(id).classList.remove('on') }
+document.querySelectorAll('[data-close]').forEach(b => {
+  b.addEventListener('click', e => e.target.closest('.modal-bg').classList.remove('on'))
+})
+document.querySelectorAll('.modal-bg').forEach(bg => {
+  bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('on') })
+})
+
+// ─── sign out ───────────────────────────────────────────────────
+$('signOutBtn').addEventListener('click', async () => {
+  try { await sb.auth.signOut() } catch {}
+  sessionStorage.clear()
+  location.replace('index.html')
+})
+$('menuBtn').addEventListener('click', () => $('sidebar').classList.toggle('open'))
+
+// ════════════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════════════
+let employees = []
+let roles     = []
+let settings  = {}    // system_settings key→value
+
+// ════════════════════════════════════════════════════════════════
+//  EMPLOYEES
+// ════════════════════════════════════════════════════════════════
+async function loadEmployees(){
+  const { data, error } = await sb.from('employees')
+    .select('id,name,username,email,phone,whatsapp_phone,role,custom_role,extra_roles,is_active,auth_user_id,notification_prefs')
+    .order('name')
+  if (error) { ntf('Could not load employees: ' + error.message, 'err'); return }
+  employees = data || []
+  renderEmployees()
+}
+
+function renderEmployees(){
+  const tbody = $('empBody')
+  if (!employees.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">📭 No employees yet — click "Add employee" to start.</td></tr>`
+    return
+  }
+  tbody.innerHTML = employees.map(e => {
+    const role = e.custom_role
+      ? `<span class="bdg b-b">${esc(roleLabelFor(e.custom_role))}</span>`
+      : (e.role === 'manager' ? `<span class="bdg b-b">👔 Manager</span>` : `<span class="bdg b-gray">👤 Employee</span>`)
+    return `<tr>
+      <td>
+        <span class="av" style="background:${avatarColor(e.name)}">${initials(e.name)}</span>
+        <strong>${esc(e.name)}</strong>
+      </td>
+      <td>${esc(e.username || '—')}</td>
+      <td style="color:var(--mu)">${esc(e.email || '—')}</td>
+      <td style="color:var(--mu)">${esc(e.phone || '—')}</td>
+      <td>${role}</td>
+      <td>${e.is_active ? '<span class="bdg b-g">Active</span>' : '<span class="bdg b-gray">Inactive</span>'}</td>
+      <td class="editor-only" style="text-align:right">
+        <button class="btn btn-ghost btn-sm" data-edit-emp="${e.id}">✏️ Edit</button>
+      </td>
+    </tr>`
+  }).join('')
+  tbody.querySelectorAll('[data-edit-emp]').forEach(b => {
+    b.addEventListener('click', () => editEmployee(b.dataset.editEmp))
+  })
+}
+
+function roleLabelFor(name){
+  const r = roles.find(x => x.name === name)
+  return r ? `${r.icon || '👥'} ${r.label}` : name
+}
+
+function fillEmpModal(e){
+  $('empId').value         = e?.id || ''
+  $('empName').value       = e?.name || ''
+  $('empUsername').value   = e?.username || ''
+  $('empEmail').value      = e?.email || ''
+  $('empPhone').value      = e?.phone || ''
+  $('empWhats').value      = e?.whatsapp_phone || ''
+  $('empRole').value       = e?.role || 'employee'
+  $('empCustomRole').value = e?.custom_role || ''
+  $('empAuthUid').value    = e?.auth_user_id || ''
+  $('empActive').checked   = e?.is_active !== false
+  const prefs = e?.notification_prefs || { email:true, whatsapp:true, sms:true }
+  $('empPrefEmail').checked = prefs.email !== false
+  $('empPrefWa').checked    = prefs.whatsapp !== false
+  $('empPrefSms').checked   = prefs.sms !== false
+  // Custom role dropdown — populate from current roles list (excl. built-ins)
+  const sel = $('empCustomRole')
+  sel.innerHTML = '<option value="">— None —</option>' + roles
+    .filter(r => r.name !== 'manager' && r.name !== 'employee')
+    .map(r => `<option value="${esc(r.name)}">${esc(r.icon||'👥')} ${esc(r.label)}</option>`).join('')
+  if (e?.custom_role) sel.value = e.custom_role
+  $('empDeleteBtn').style.display = e?.id ? '' : 'none'
+  $('empModalTitle').textContent  = e?.id ? 'Edit employee' : 'Add employee'
+}
+
+$('addEmpBtn').addEventListener('click', () => { fillEmpModal(null); openModal('empModal') })
+function editEmployee(id){
+  const e = employees.find(x => x.id === id); if (!e) return
+  fillEmpModal(e); openModal('empModal')
+}
+
+$('empSaveBtn').addEventListener('click', async () => {
+  const name = $('empName').value.trim()
+  if (!name) { ntf('Name is required', 'err'); return }
+  const id   = $('empId').value
+  const rec  = {
+    name,
+    username:        $('empUsername').value.trim() || null,
+    email:           $('empEmail').value.trim() || null,
+    phone:           $('empPhone').value.trim() || null,
+    whatsapp_phone:  $('empWhats').value.trim() || null,
+    role:            $('empRole').value,
+    custom_role:     $('empCustomRole').value || null,
+    auth_user_id:    $('empAuthUid').value.trim() || null,
+    is_active:       $('empActive').checked,
+    notification_prefs: {
+      email:    $('empPrefEmail').checked,
+      whatsapp: $('empPrefWa').checked,
+      sms:      $('empPrefSms').checked
+    }
+  }
+  let res
+  if (id) res = await sb.from('employees').update(rec).eq('id', id)
+  else    res = await sb.from('employees').insert([rec])
+  if (res.error) { ntf('Save failed: ' + res.error.message, 'err'); return }
+  ntf(id ? 'Employee updated' : 'Employee created', 'ok')
+  closeModal('empModal')
+  loadEmployees()
+})
+
+$('empDeleteBtn').addEventListener('click', async () => {
+  const id = $('empId').value; if (!id) return
+  if (!confirm('Delete this employee permanently?\n\nThis removes their profile but does NOT delete their Supabase auth user. Do that separately in Supabase → Authentication → Users.')) return
+  const { error } = await sb.from('employees').delete().eq('id', id)
+  if (error) { ntf('Delete failed: ' + error.message, 'err'); return }
+  ntf('Employee deleted', 'ok')
+  closeModal('empModal'); loadEmployees()
+})
+
+// ════════════════════════════════════════════════════════════════
+//  ROLES & PERMISSIONS
+// ════════════════════════════════════════════════════════════════
+async function loadRoles(){
+  const { data, error } = await sb.from('role_templates')
+    .select('name,label,icon,color,permissions')
+    .order('label', { ascending: true })
+  if (error) { ntf('Could not load roles: ' + error.message, 'err'); return }
+  roles = (data || []).map(r => ({ ...r, permissions: r.permissions || {} }))
+  renderRoles()
+}
+
+function renderRoles(){
+  const grid = $('roleGrid')
+  if (!roles.length) {
+    grid.innerHTML = `<div class="empty">📭 No roles defined yet.</div>`
+    return
+  }
+  grid.innerHTML = roles.map(r => `
+    <div class="role-card" data-role="${esc(r.name)}">
+      <div class="role-head" data-toggle>
+        <div class="role-icon" style="background:${esc(r.color || 'var(--blue)')}">${esc(r.icon || '👥')}</div>
+        <div class="role-info">
+          <div class="role-label">${esc(r.label || r.name)}</div>
+          <div class="role-key">${esc(r.name)}${r.name==='manager'?' · built-in (always full access)':''}</div>
+        </div>
+        <div class="role-actions editor-only">
+          <button class="btn btn-ghost btn-icon" data-edit-role="${esc(r.name)}" title="Edit role">✏️</button>
+        </div>
+        <div style="font-size:11px;color:var(--mu);margin-left:8px" class="ts-arrow">▾</div>
+      </div>
+      <div class="role-perm">
+        ${PAGES.map(p => permRow(r, p)).join('')}
+      </div>
+    </div>
+  `).join('')
+
+  // Toggle expand
+  grid.querySelectorAll('[data-toggle]').forEach(h => {
+    h.addEventListener('click', e => {
+      if (e.target.closest('[data-edit-role]')) return
+      h.parentElement.classList.toggle('open')
+    })
+  })
+  // Edit
+  grid.querySelectorAll('[data-edit-role]').forEach(b => {
+    b.addEventListener('click', e => { e.stopPropagation(); editRole(b.dataset.editRole) })
+  })
+  // Permission pills
+  grid.querySelectorAll('.perm-pill').forEach(p => {
+    p.addEventListener('click', () => updatePerm(p))
+  })
+}
+
+function permRow(role, page){
+  const isManager = role.name === 'manager'
+  const cur = isManager ? 'edit' : (role.permissions?.[page.id] || defaultLevel(role.name, page.id))
+  const noOption = page.id === 'dashboard'   // can't deny dashboard
+  return `<div class="perm-row" data-role="${esc(role.name)}" data-page="${esc(page.id)}">
+    <div>
+      <div class="perm-page">${esc(page.label)}</div>
+      <div class="perm-page-s">${esc(page.desc)}</div>
+    </div>
+    <div class="perm-pills">
+      ${noOption ? '' : `<button type="button" class="perm-pill ${cur==='none'?'on':''}" data-l="none" ${isManager?'disabled':''}>None</button>`}
+      <button type="button" class="perm-pill ${cur==='view'?'on':''}" data-l="view" ${isManager?'disabled':''}>View</button>
+      <button type="button" class="perm-pill ${cur==='edit'?'on':''}" data-l="edit" ${isManager?'disabled':''}>Edit</button>
+    </div>
+  </div>`
+}
+
+async function updatePerm(pill){
+  const row      = pill.closest('.perm-row')
+  const roleName = row.dataset.role
+  const pageId   = row.dataset.page
+  const level    = pill.dataset.l
+  if (roleName === 'manager') { ntf('Manager always has full access — cannot change.', 'err'); return }
+  const role = roles.find(r => r.name === roleName); if (!role) return
+
+  // Optimistic UI
+  row.querySelectorAll('.perm-pill').forEach(p => p.classList.remove('on'))
+  pill.classList.add('on')
+
+  const newPerms = { ...(role.permissions || {}), [pageId]: level }
+  const { error } = await sb.from('role_templates').update({ permissions: newPerms }).eq('name', roleName)
+  if (error) { ntf('Save failed: ' + error.message, 'err'); loadRoles(); return }
+  role.permissions = newPerms
+  ntf(`${role.label || role.name} → ${pageId.replace(/_/g,' ')}: ${level}`, 'ok')
+}
+
+$('addRoleBtn').addEventListener('click', () => fillRoleModal(null))
+function fillRoleModal(r){
+  $('roleOrigName').value = r?.name || ''
+  $('roleName').value     = r?.name || ''
+  $('roleLabel').value    = r?.label || ''
+  $('roleIcon').value     = r?.icon || ''
+  $('roleColor').value    = r?.color || '#3b5fe2'
+  $('roleColorPreview').style.background = r?.color || '#3b5fe2'
+  $('roleName').disabled  = !!r
+  $('roleDeleteBtn').style.display = (r && r.name !== 'manager' && r.name !== 'employee') ? '' : 'none'
+  $('roleModalTitle').textContent  = r ? `Edit role · ${r.label || r.name}` : 'Add role'
+  openModal('roleModal')
+}
+function editRole(name){
+  const r = roles.find(x => x.name === name); if (r) fillRoleModal(r)
+}
+$('roleColor').addEventListener('input', e => {
+  const v = e.target.value.trim()
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) $('roleColorPreview').style.background = v
+})
+$('roleSaveBtn').addEventListener('click', async () => {
+  const orig  = $('roleOrigName').value
+  const name  = $('roleName').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'_')
+  const label = $('roleLabel').value.trim()
+  const icon  = $('roleIcon').value.trim() || '👥'
+  const color = $('roleColor').value.trim() || '#3b5fe2'
+  if (!name || !label) { ntf('Machine key and label are required', 'err'); return }
+  const rec = { name, label, icon, color }
+  let res
+  if (orig) res = await sb.from('role_templates').update(rec).eq('name', orig)
+  else      res = await sb.from('role_templates').insert([{ ...rec, permissions: {} }])
+  if (res.error) { ntf('Save failed: ' + res.error.message, 'err'); return }
+  ntf(orig ? 'Role updated' : 'Role created', 'ok')
+  closeModal('roleModal'); await loadRoles()
+})
+$('roleDeleteBtn').addEventListener('click', async () => {
+  const name = $('roleOrigName').value
+  if (!name || name === 'manager' || name === 'employee') return
+  if (!confirm(`Delete role "${name}" permanently?\n\nEmployees currently assigned to it will need to be reassigned manually.`)) return
+  const { error } = await sb.from('role_templates').delete().eq('name', name)
+  if (error) { ntf('Delete failed: ' + error.message, 'err'); return }
+  ntf('Role deleted', 'ok')
+  closeModal('roleModal'); await loadRoles(); await loadEmployees()
+})
+
+// ════════════════════════════════════════════════════════════════
+//  SYSTEM SETTINGS
+// ════════════════════════════════════════════════════════════════
+const SYS_KEYS = [
+  'brevo_api_key','brevo_sender_name','brevo_sender_email',
+  'twilio_account_sid','twilio_auth_token','twilio_from'
+]
+async function loadSystem(){
+  const { data, error } = await sb.from('system_settings').select('key,value').in('key', SYS_KEYS)
+  if (error) { ntf('Could not load system settings: ' + error.message, 'err'); return }
+  settings = {}
+  ;(data || []).forEach(r => settings[r.key] = r.value)
+  SYS_KEYS.forEach(k => { const el = $(k); if (el) el.value = settings[k] || '' })
+}
+$('saveSysBtn').addEventListener('click', async () => {
+  const rows = SYS_KEYS.map(k => ({ key: k, value: $(k).value || null, updated_at: new Date().toISOString() }))
+  const { error } = await sb.from('system_settings').upsert(rows, { onConflict: 'key' })
+  if (error) { ntf('Save failed: ' + error.message, 'err'); return }
+  ntf('System settings saved', 'ok')
+})
+
+// ════════════════════════════════════════════════════════════════
+//  INITIAL LOAD
+// ════════════════════════════════════════════════════════════════
+;(async () => {
+  // Roles must load before employees so the role labels resolve in the table.
+  await loadRoles()
+  await loadEmployees()
+  await loadSystem()
+})()
+</script>
+</body>
+</html>
