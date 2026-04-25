@@ -18,4 +18,3 @@ export const SUPABASE_CONFIG = {
 // Bridge to make these readable from non-module scripts (access.js).
 // access.js cannot `import` from this module, but can read globals.
 try { window.__SUPA__ = SUPABASE_CONFIG } catch (e) {}
-
