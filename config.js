@@ -1,20 +1,10 @@
 // ─────────────────────────────────────────────────────────────────
-// Cedarwings/Bassoul-Heneine — Supabase configuration
-// ─────────────────────────────────────────────────────────────────
-// Replace the two values below with your Supabase project credentials.
-// Find them in Supabase dashboard → Settings → API:
-//   • url:     "Project URL"
-//   • anonKey: "anon public" key (NOT the service_role key)
-//
-// The anon key is safe to ship to the browser; Row Level Security
-// in your database is what actually protects the data. Make sure
-// RLS is enabled on every table.
+// Bassoul, Heneine Sal — Supabase configuration
 // ─────────────────────────────────────────────────────────────────
 export const SUPABASE_CONFIG = {
-  url:     "https://YOUR-PROJECT-REF.supabase.co",
-  anonKey: "YOUR-ANON-PUBLIC-KEY"
+  url:     "https://egcbbfiqzaccsquaytvz.supabase.co",
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnY2JiZmlxemFjY3NxdWF5dHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMDE1MzgsImV4cCI6MjA5MjY3NzUzOH0.2qLR3uLTE8C2tKSQUEV-9q2DF8Hrfad08UQoLv5Q72c"
 }
 
 // Bridge to make these readable from non-module scripts (access.js).
-// access.js cannot `import` from this module, but can read globals.
 try { window.__SUPA__ = SUPABASE_CONFIG } catch (e) {}
