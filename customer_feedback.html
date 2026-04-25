@@ -170,6 +170,26 @@ textarea.fi{resize:vertical}
 .fb-section>summary::before{content:'\25B8';color:var(--mu);font-size:11px;transition:transform .15s;display:inline-block}
 .fb-section[open]>summary::before{transform:rotate(90deg)}
 .fb-section[open]>summary{border-bottom:1px solid var(--bdr);background:var(--b50);color:var(--blue)}
+
+/* CASE DISCUSSION TIMELINE */
+.disc-msg{display:flex;gap:7px;align-items:flex-end;max-width:78%}
+.disc-msg.me{flex-direction:row-reverse;margin-left:auto}
+.disc-msg.them{margin-right:auto}
+.disc-av{width:26px;height:26px;border-radius:7px;color:#fff;font-weight:800;font-size:10px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.disc-msg.me .disc-av{display:none}
+.disc-body{display:flex;flex-direction:column;min-width:0;max-width:100%}
+.disc-msg.me .disc-body{align-items:flex-end}
+.disc-meta{font-size:10px;color:var(--mu);margin:0 4px 2px;font-weight:600}
+.disc-meta strong{color:var(--txt);font-weight:700}
+.disc-bubble{padding:7px 11px;border-radius:11px;font-size:12.5px;line-height:1.45;word-wrap:break-word;overflow-wrap:break-word;white-space:pre-wrap;box-shadow:0 1px 1px rgba(0,0,0,.04)}
+.disc-msg.them .disc-bubble{background:var(--card);color:var(--txt);border:1px solid var(--bdr);border-bottom-left-radius:3px}
+.disc-msg.me   .disc-bubble{background:var(--blue);color:#fff;border-bottom-right-radius:3px}
+.disc-time{font-size:9px;color:var(--dim);margin:1px 5px 0;font-variant-numeric:tabular-nums}
+.disc-event{align-self:center;font-size:11px;color:var(--mu);background:#fff;border:1px dashed var(--bdr);padding:4px 11px;border-radius:14px;text-align:center;line-height:1.4;max-width:88%}
+.disc-event strong{color:var(--txt);font-weight:700}
+.disc-event .ev-icon{margin-right:5px}
+.disc-day{align-self:center;font-size:9px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.6px;background:#e2e8f0;padding:3px 10px;border-radius:10px;margin-top:4px}
+.disc-empty{text-align:center;color:var(--mu);font-size:12px;padding:24px;font-style:italic}
 .fb-section-body{padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .fb-section-body .fw{grid-column:1/-1}
 /* PRIORITY PILLS */
@@ -387,6 +407,20 @@ tbody tr:last-child td{border:none}tbody tr:hover{background:#f8fafc}
         </div>
         <div class="fw"><label class="form-label">Follow-up Note (what to do)</label>
           <input type="text" class="fi" id="fFollowNote" placeholder="e.g. Call customer for confirmation, schedule follow-up service, send replacement parts…"/>
+        </div>
+      </div>
+    </details>
+
+    <!-- COLLAPSIBLE: Case Discussion (only for existing cases) -->
+    <details class="fb-section" id="fbCommSection" style="display:none" open>
+      <summary>💬 Case Discussion <span id="fbCommCount" style="margin-left:auto;font-size:11px;color:var(--mu);font-weight:600"></span></summary>
+      <div class="fb-section-body" style="grid-template-columns:1fr">
+        <div class="fw" id="fbCommTimeline" style="max-height:340px;overflow-y:auto;padding:10px;background:#f8fafc;border-radius:9px;border:1px solid var(--bdr);display:flex;flex-direction:column;gap:8px">
+          <div style="text-align:center;color:var(--mu);font-size:12px;padding:24px">⏳ Loading discussion…</div>
+        </div>
+        <div class="fw" style="display:flex;gap:8px;align-items:flex-end">
+          <textarea id="fbCommInput" class="fi" rows="2" placeholder="Reply, leave a note, ask the assignee a question — Enter to send, Shift+Enter for new line" style="flex:1;resize:vertical;min-height:40px;line-height:1.4"></textarea>
+          <button class="btn bb" id="fbCommSendBtn" type="button" style="padding:10px 18px;flex-shrink:0">➤ Send</button>
         </div>
       </div>
     </details>
@@ -693,8 +727,10 @@ window.openNew=()=>{
   onTypeChange()
   window.onCategoryChange && window.onCategoryChange()
   document.getElementById('modal').classList.add('on')
+  // No discussion thread for unsaved cases — hide the section
+  fbDiscClose()
 }
-window.closeModal=()=>{document.getElementById('modal').classList.remove('on');editId=null}
+window.closeModal=()=>{document.getElementById('modal').classList.remove('on');editId=null;fbDiscClose()}
 window.closeView=()=>document.getElementById('viewModal').classList.remove('on')
 
 window.editRec=(id)=>{
@@ -731,6 +767,8 @@ window.editRec=(id)=>{
   window.onCategoryChange && window.onCategoryChange()
   _fbAutoExpandSections()
   document.getElementById('modal').classList.add('on')
+  // Show + load the per-case discussion timeline
+  fbDiscOpen(id)
 }
 
 window.viewRec=async(id)=>{
@@ -1130,6 +1168,232 @@ window.exportFilteredCsv = () => {
     }
   }
 })()
+
+// ════════════════════════════════════════════════════════════════
+//  CASE DISCUSSION — per-case timeline of human messages + system events
+// ════════════════════════════════════════════════════════════════
+let _fbDiscFeedbackId = null
+let _fbDiscMyEmployee = null   // the signed-in user's employees row
+let _fbDiscEmpById    = new Map()
+let _fbDiscChannel    = null
+let _fbDiscMessages   = []
+
+function _fbDiscEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
+function _fbDiscInitials(n){ if(!n) return '—'; return n.trim().split(/\s+/).slice(0,2).map(p=>p[0]||'').join('').toUpperCase()||'—' }
+function _fbDiscColor(s){
+  const palette = ['#3b5fe2','#16a34a','#d97706','#7c3aed','#0d9488','#dc2626','#0891b2','#db2777']
+  let h = 0; for (const c of (s||'')) h = (h*31 + c.charCodeAt(0)) >>> 0
+  return palette[h % palette.length]
+}
+function _fbDiscFmtTime(d){ return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+function _fbDiscFmtDay(d){
+  const t = new Date(); t.setHours(0,0,0,0)
+  const y = new Date(t); y.setDate(y.getDate()-1)
+  const x = new Date(d); x.setHours(0,0,0,0)
+  if (x.getTime() === t.getTime()) return 'Today'
+  if (x.getTime() === y.getTime()) return 'Yesterday'
+  return d.toLocaleDateString([], { day:'2-digit', month:'short', year: x.getFullYear()===t.getFullYear() ? undefined : 'numeric' })
+}
+function _fbDiscSameDay(a,b){ return a.toDateString() === b.toDateString() }
+
+async function _fbDiscEnsureMe(){
+  if (_fbDiscMyEmployee) return _fbDiscMyEmployee
+  const { data: { user } } = await sb.auth.getUser()
+  if (!user) return null
+  const { data: meRow } = await sb.from('employees')
+    .select('id,name,email').eq('auth_user_id', user.id).maybeSingle()
+  _fbDiscMyEmployee = meRow || null
+  if (meRow) _fbDiscEmpById.set(meRow.id, meRow)
+  return _fbDiscMyEmployee
+}
+
+async function _fbDiscLoadEmployees(){
+  if (_fbDiscEmpById.size > 1) return  // already loaded a few
+  const { data } = await sb.from('employees').select('id,name,email')
+  ;(data || []).forEach(e => _fbDiscEmpById.set(e.id, e))
+}
+
+function _fbDiscDescribeAssignee(v){
+  // assignment values can be: NULL, an employee name, or 'role:xxx'
+  if (!v) return '<em>Unassigned</em>'
+  if (typeof v === 'string' && v.startsWith('role:')) return `role <strong>${_fbDiscEsc(v.slice(5).replace(/_/g,' '))}</strong>`
+  return `<strong>${_fbDiscEsc(v)}</strong>`
+}
+
+function _fbDiscEventHtml(m){
+  const d  = new Date(m.created_at)
+  const ts = _fbDiscFmtTime(d)
+  const who = m.sender_name ? `<strong>${_fbDiscEsc(m.sender_name)}</strong>` : '<em>System</em>'
+  const data = m.event_data || {}
+  let icon = '📝', text = ''
+  switch (m.event_type) {
+    case 'created':
+      icon = '🆕'
+      text = `${who} opened this case`
+      if (data.priority === 'critical' || data.priority === 'high') text += ` · priority <strong>${_fbDiscEsc(data.priority)}</strong>`
+      break
+    case 'status_change':
+      icon = '🔄'
+      text = `${who} changed status: <strong>${_fbDiscEsc((data.from||'').replace(/_/g,' '))}</strong> → <strong>${_fbDiscEsc((data.to||'').replace(/_/g,' '))}</strong>`
+      break
+    case 'resolved':
+      icon = '✅'
+      text = `${who} marked the case <strong>${_fbDiscEsc((data.to||'resolved').replace(/_/g,' '))}</strong>`
+      break
+    case 'reopened':
+      icon = '🔁'
+      text = `${who} reopened the case`
+      break
+    case 'assignment':
+      icon = '👤'
+      text = `${who} reassigned: ${_fbDiscDescribeAssignee(data.from)} → ${_fbDiscDescribeAssignee(data.to)}`
+      break
+    case 'priority_change':
+      icon = '⚡'
+      text = `${who} changed priority: <strong>${_fbDiscEsc(data.from||'—')}</strong> → <strong>${_fbDiscEsc(data.to||'—')}</strong>`
+      break
+    case 'category_change':
+      icon = '🗂️'
+      text = `${who} re-categorised: <strong>${_fbDiscEsc((data.from||'—').replace(/_/g,' '))}</strong> → <strong>${_fbDiscEsc((data.to||'—').replace(/_/g,' '))}</strong>`
+      break
+    default:
+      icon = '📝'
+      text = `${who} updated this case`
+  }
+  return `<div class="disc-event"><span class="ev-icon">${icon}</span>${text} <span style="color:var(--dim)">· ${ts}</span></div>`
+}
+
+function _fbDiscMsgHtml(m, sameAuthor){
+  const d  = new Date(m.created_at)
+  const ts = _fbDiscFmtTime(d)
+  const isMe = _fbDiscMyEmployee && m.sender_id === _fbDiscMyEmployee.id
+  const senderEmp = m.sender_id ? _fbDiscEmpById.get(m.sender_id) : null
+  const sName = senderEmp?.name || m.sender_name || 'Unknown'
+  const meta = isMe || sameAuthor ? '' : `<div class="disc-meta"><strong>${_fbDiscEsc(sName)}</strong> · ${_fbDiscEsc(ts)}</div>`
+  const myTime = isMe ? `<div class="disc-time">${_fbDiscEsc(ts)}</div>` : ''
+  const avHtml = isMe ? '' : `<div class="disc-av"${sameAuthor?' style="visibility:hidden"':''} style="background:${_fbDiscColor(sName)}">${_fbDiscEsc(_fbDiscInitials(sName))}</div>`
+  return `<div class="disc-msg ${isMe?'me':'them'}" data-msg-id="${_fbDiscEsc(m.id)}">
+    ${avHtml}
+    <div class="disc-body">
+      ${meta}
+      <div class="disc-bubble">${_fbDiscEsc(m.body || '')}</div>
+      ${myTime}
+    </div>
+  </div>`
+}
+
+function _fbDiscRender(){
+  const box = document.getElementById('fbCommTimeline')
+  const cnt = document.getElementById('fbCommCount')
+  if (cnt) cnt.textContent = _fbDiscMessages.length ? `${_fbDiscMessages.length} entr${_fbDiscMessages.length===1?'y':'ies'}` : ''
+  if (!_fbDiscMessages.length) {
+    box.innerHTML = `<div class="disc-empty">No discussion yet — be the first to leave a note for the team about this case.</div>`
+    return
+  }
+  let html = '', lastDay = null, lastSender = null, lastEvent = false
+  for (const m of _fbDiscMessages) {
+    const d = new Date(m.created_at)
+    if (!lastDay || !_fbDiscSameDay(d, lastDay)) {
+      html += `<div class="disc-day">${_fbDiscEsc(_fbDiscFmtDay(d))}</div>`
+      lastDay = d; lastSender = null; lastEvent = false
+    }
+    if (m.event_type && m.event_type !== 'message') {
+      html += _fbDiscEventHtml(m)
+      lastSender = null; lastEvent = true
+    } else {
+      const sameAuthor = (m.sender_id === lastSender) && !lastEvent
+      html += _fbDiscMsgHtml(m, sameAuthor)
+      lastSender = m.sender_id; lastEvent = false
+    }
+  }
+  box.innerHTML = html
+  box.scrollTop = box.scrollHeight
+}
+
+async function fbDiscOpen(feedbackId){
+  fbDiscClose()                                  // clean up any previous case's subscription
+  if (!feedbackId) return
+  _fbDiscFeedbackId = feedbackId
+  document.getElementById('fbCommSection').style.display = ''
+  await _fbDiscEnsureMe()
+  await _fbDiscLoadEmployees()
+  // Initial load
+  const { data, error } = await sb.from('feedback_messages')
+    .select('id,feedback_id,sender_id,sender_name,body,event_type,event_data,created_at')
+    .eq('feedback_id', feedbackId)
+    .order('created_at', { ascending: true })
+  if (error) {
+    document.getElementById('fbCommTimeline').innerHTML = `<div class="disc-empty">Could not load discussion: ${_fbDiscEsc(error.message)}</div>`
+    return
+  }
+  _fbDiscMessages = data || []
+  _fbDiscRender()
+  // Subscribe to live updates for this case
+  _fbDiscChannel = sb.channel(`feedback-discussion-${feedbackId}`)
+    .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'feedback_messages', filter: `feedback_id=eq.${feedbackId}` },
+        payload => {
+          const m = payload.new; if (!m) return
+          if (document.querySelector(`[data-msg-id="${m.id}"]`)) return
+          _fbDiscMessages.push(m)
+          _fbDiscRender()
+        })
+    .subscribe()
+}
+
+function fbDiscClose(){
+  if (_fbDiscChannel) { try { sb.removeChannel(_fbDiscChannel) } catch {} ; _fbDiscChannel = null }
+  _fbDiscFeedbackId = null
+  _fbDiscMessages = []
+  const sec = document.getElementById('fbCommSection')
+  if (sec) sec.style.display = 'none'
+  const inp = document.getElementById('fbCommInput'); if (inp) inp.value = ''
+}
+
+async function fbDiscSend(){
+  const input = document.getElementById('fbCommInput')
+  const body  = input.value.trim()
+  if (!body || !_fbDiscFeedbackId) return
+  if (body.length > 4000) { ntf('Message too long (max 4000 chars)', 'err'); return }
+  const me = await _fbDiscEnsureMe()
+  if (!me) { ntf('Could not identify your employee profile', 'err'); return }
+  const btn = document.getElementById('fbCommSendBtn')
+  btn.disabled = true
+  const original = input.value
+  input.value = ''
+  const rec = {
+    feedback_id: _fbDiscFeedbackId,
+    sender_id:   me.id,
+    sender_name: me.name,
+    body,
+    event_type:  'message'
+  }
+  const { data, error } = await sb.from('feedback_messages').insert([rec]).select().single()
+  btn.disabled = false
+  if (error) {
+    ntf('Send failed: ' + error.message, 'err')
+    input.value = original
+    return
+  }
+  // Append immediately (realtime will dedup)
+  if (!document.querySelector(`[data-msg-id="${data.id}"]`)) {
+    _fbDiscMessages.push(data)
+    _fbDiscRender()
+  }
+  input.focus()
+}
+
+// Wire up the composer once the DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  const sendBtn = document.getElementById('fbCommSendBtn')
+  const input   = document.getElementById('fbCommInput')
+  if (sendBtn) sendBtn.addEventListener('click', fbDiscSend)
+  if (input) {
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); fbDiscSend() }
+    })
+  }
+})
 </script>
 
 
