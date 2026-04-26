@@ -1020,8 +1020,8 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
           <label class="flb" style="font-size:9px">New Claim Submission # <span style="color:var(--rose)">*</span></label>
-          <input class="fi" id="M_NEWCLAIM" placeholder="e.g. CLM-2025-00123" style="font-family:'JetBrains Mono',monospace"/>
-          <div style="font-size:9px;color:var(--muted);margin-top:4px;font-weight:500">The new GCM claim # after resubmission. This links to the original rejected claim.</div>
+          <input class="fi" id="M_NEWCLAIM" placeholder="e.g. CLM-2025-00123" style="font-family:'JetBrains Mono',monospace" oninput="checkAutoMatchPreview()"/>
+          <div style="font-size:9px;color:var(--muted);margin-top:4px;font-weight:500">The new GCM claim # after resubmission. This links to the original rejected claim. <strong>If this # already exists in your loaded GCM data as paid, it will auto-credit on save.</strong></div>
         </div>
         <div>
           <label class="flb" style="font-size:9px">Resubmission Invoice #</label>
@@ -1033,6 +1033,8 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
         <label class="flb" style="font-size:9px">Resubmission Date</label>
         <input class="fi" id="M_RESUBDATE" type="date" style="font-family:'JetBrains Mono',monospace"/>
       </div>
+      <!-- Live auto-match preview — populated by checkAutoMatchPreview() as the user types -->
+      <div id="M_AUTOMATCH_PREVIEW" style="display:none;margin-top:10px;padding:10px 12px;border-radius:9px;font-size:11px;line-height:1.5"></div>
     </div>
 
     <!-- STEP 4: CATEGORY + NOTES -->
@@ -1753,12 +1755,18 @@ function procF(file, type){
         updTime(); updPills();
         stat('ST_GCM', '✅ ' + valid.length + ' claims loaded · ' + S.gcm.filter(r=>r._d).length + ' duplicates flagged', true);
         // ── AUTO-MATCH: check if any tracked newClaim # now appears as a paid GCM claim ──
+        // Match is case-insensitive + trimmed so the user can type
+        // "B79837" or " b79837 " and it still finds GCM's "B79837".
         let autoMatched = 0;
-        const gcmByInv = {};
-        S.gcm.filter(r=>true).forEach(r=>{ gcmByInv[r.inv]=r; });
+        const gcmByInvNorm = {};
+        S.gcm.filter(r=>true).forEach(r=>{
+          const norm = String(r.inv||'').trim().toLowerCase();
+          if (norm) gcmByInvNorm[norm] = r;
+        });
         Object.entries(S.rej).forEach(([origInv, d]) => {
           if(!d.newClaim || d.status==='credited' || d.status==='resolved') return;
-          const newClaimRow = gcmByInv[d.newClaim];
+          const lookupKey = String(d.newClaim).trim().toLowerCase();
+          const newClaimRow = gcmByInvNorm[lookupKey];
           if(newClaimRow && newClaimRow.st===0){
             // Renault paid the resubmission — auto-credit it
             S.rej[origInv] = Object.assign({}, d, {
@@ -2085,6 +2093,7 @@ function openModal(inv,vin){
   if(d.creditedAmt) calcCreditRecovery();
 
   document.getElementById('MBGR').classList.add('open');
+  checkAutoMatchPreview();   // re-run preview in case a newClaim was already saved
 }
 
 function closeModal(){document.getElementById('MBGR').classList.remove('open');_mk=null;_mkClaim=null;}
@@ -2096,19 +2105,45 @@ function saveRej(){
   const tp=claim?claim.tp:0;
   const rejAmt=_rejType==='full'?ta:Math.max(ta-tp,0);
   const acceptedAmt=_rejType==='full'?0:tp;
-  const creditedAmt=parseFloat(document.getElementById('M_CREDITED_AMT')?.value||0)||0;
-  const creditDate=document.getElementById('M_CREDIT_DATE')?.value||'';
+  let creditedAmt=parseFloat(document.getElementById('M_CREDITED_AMT')?.value||0)||0;
+  let creditDate=document.getElementById('M_CREDIT_DATE')?.value||'';
+  let userStatus=gv('M_STATUS');
+  const newClaimRaw=gv('M_NEWCLAIM');
+  const newClaim=String(newClaimRaw||'').trim();   // trim once, store trimmed
+
+  // ── AUTO-MATCH: if user typed a New Claim # and that invoice
+  //    already exists in the loaded GCM data as PAID, auto-fill
+  //    creditedAmt + creditDate + flip status to "credited".
+  //    Comparison is case-insensitive and trimmed so trailing
+  //    whitespace / capitalization don't break the match.
+  let autoMatchedNow = false;
+  if (newClaim && S.gcm && S.gcm.length){
+    const target = newClaim.toLowerCase();
+    const match = S.gcm.find(r => String(r.inv||'').trim().toLowerCase() === target && r.st === 0);
+    if (match){
+      // User entered an invoice that's already paid in GCM data —
+      // auto-credit it. If the user manually typed a different
+      // creditedAmt we respect their value; otherwise use GCM's tp.
+      if (!creditedAmt){
+        creditedAmt = match.tp || 0;
+        creditDate  = creditDate || match.date || new Date().toISOString().substr(0,10);
+      }
+      userStatus = 'credited';
+      autoMatchedNow = true;
+    }
+  }
+
   const shortfall=rejAmt-creditedAmt;
   const recoveryRate=rejAmt>0?(creditedAmt/rejAmt*100):0;
 
   S.rej[_mk]={
     rejType:_rejType,
     reason:gv('M_REASON'),
-    newClaim:gv('M_NEWCLAIM'),
+    newClaim:newClaim||null,
     reInv:gv('M_REINV'),
     resubDate:gv('M_RESUBDATE'),
     cat:gv('M_CAT'),
-    status:gv('M_STATUS'),
+    status:userStatus,
     notes:gv('M_NOTES'),
     // Credit/payment details
     creditedAmt:creditedAmt||null,
@@ -2120,16 +2155,102 @@ function saveRej(){
     origPaid:tp,
     rejectedAmt:rejAmt,
     acceptedAmt:acceptedAmt,
+    autoMatched:autoMatchedNow || (S.rej[_mk]?.autoMatched ?? false),
     ts:new Date().toISOString()
   };
 
-  closeModal(); rRej(); rGCM();
+  closeModal();
+  // Refresh EVERY page that depends on rejection data so totals/charts
+  // update immediately — not just the Rejections list.
+  ;[ 'rRej', 'rGCM', 'rOverview', 'rExpense', 'rCompare', 'rAvP',
+     'rBonus', 'rShortfall', 'rAge', 'rRecovery', 'rTrends' ].forEach(fnName => {
+    if (typeof window[fnName] === 'function') {
+      try { window[fnName]() } catch (e) { /* ignore page-not-rendered errors */ }
+    }
+  });
   document.getElementById('B_REJ').textContent=S.gcm.filter(r=>r.st===4).length;
   lsSave(LS_REJ,S.rej);
   // Push to Supabase so the team sees the update on their devices
   cwResubUpsert(_mk, claim).catch(()=>{});
   updLsStatus();
-  showToast('✅ Rejection protocol saved!');
+  if (autoMatchedNow){
+    showToast('💚 Auto-matched! '+newClaim+' was paid €'+f(creditedAmt)+' — status set to Credited.');
+  } else if (newClaim){
+    showToast('✅ Saved. New Claim '+newClaim+' not yet seen in GCM data — will auto-match when next file is uploaded.');
+  } else {
+    showToast('✅ Rejection protocol saved!');
+  }
+}
+
+// ── Live preview as user types the new claim # in the modal ─────
+// Looks up the typed value in S.gcm and shows what will happen
+// when the form is saved (auto-match found, found-but-pending,
+// or not found yet).
+function checkAutoMatchPreview(){
+  const box = document.getElementById('M_AUTOMATCH_PREVIEW');
+  if (!box) return;
+  const input = document.getElementById('M_NEWCLAIM');
+  const typed = String(input?.value||'').trim();
+  if (!typed){ box.style.display='none'; return; }
+  // local HTML-safe escape (the file's existing esc() escapes JS quotes only)
+  const h = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  if (!_mk || !S.gcm || !S.gcm.length){
+    box.style.display = 'block';
+    box.style.background = '#FEF3C7';
+    box.style.border = '1px solid #FDE68A';
+    box.style.color = '#92400E';
+    box.innerHTML = '⚠️ No GCM data loaded — auto-match will run when next file is uploaded.';
+    return;
+  }
+  const orig = _mkClaim || S.gcm.find(r=>r.inv===_mk) || null;
+  const askedAmt = orig ? orig.ta : 0;
+  const target = typed.toLowerCase();
+  const match = S.gcm.find(r => String(r.inv||'').trim().toLowerCase() === target);
+  if (!match){
+    box.style.display = 'block';
+    box.style.background = '#FEF3C7';
+    box.style.border = '1px solid #FDE68A';
+    box.style.color = '#92400E';
+    box.innerHTML = `🔎 <strong>${h(typed)}</strong> not yet seen in your loaded GCM data. The system will auto-link it the next time you upload a GCM file containing this invoice.`;
+    return;
+  }
+  if (match.st === 0){
+    // Paid — show the difference
+    const paid = match.tp || 0;
+    const shortfall = askedAmt - paid;
+    const recRate = askedAmt > 0 ? (paid/askedAmt*100) : 100;
+    const diffColor = shortfall > 0.01 ? '#DC2626' : (shortfall < -0.01 ? '#0EA5E9' : '#16A34A');
+    const diffSign  = shortfall > 0.01 ? 'shortfall' : (shortfall < -0.01 ? 'overpayment' : 'fully recovered');
+    box.style.display = 'block';
+    box.style.background = '#D1FAE5';
+    box.style.border = '1px solid #6EE7B7';
+    box.style.color = '#065F46';
+    box.innerHTML = `
+      💚 <strong>Match found — will be auto-credited on save</strong><br>
+      <div style="margin-top:6px;font-size:11px">
+        <strong>${h(match.inv)}</strong> · status PAID · paid €${f(paid)}
+      </div>
+      <div style="margin-top:4px;display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px">
+        <span><span style="color:#6B6A66">Originally asked:</span> <strong>€${f(askedAmt)}</strong></span>
+        <span><span style="color:#6B6A66">Now credited:</span> <strong>€${f(paid)}</strong></span>
+        <span style="color:${diffColor}"><span style="color:#6B6A66">${diffSign[0].toUpperCase()+diffSign.slice(1)}:</span> <strong>€${f(Math.abs(shortfall))}</strong></span>
+        <span><span style="color:#6B6A66">Recovery:</span> <strong>${recRate.toFixed(1)}%</strong></span>
+      </div>`;
+    return;
+  }
+  if (match.st === 4){
+    box.style.display = 'block';
+    box.style.background = '#FEE2E2';
+    box.style.border = '1px solid #FECACA';
+    box.style.color = '#991B1B';
+    box.innerHTML = `⚠️ <strong>${h(match.inv)}</strong> exists in GCM but was <strong>also rejected</strong>. You may need to resubmit again with another claim #.`;
+    return;
+  }
+  box.style.display = 'block';
+  box.style.background = '#DBEAFE';
+  box.style.border = '1px solid #93C5FD';
+  box.style.color = '#1E40AF';
+  box.innerHTML = `🔵 <strong>${h(match.inv)}</strong> exists in GCM (status not yet PAID). Will auto-credit once Renault marks it paid in a future GCM file.`;
 }
 
 // ══ GLOBAL SEARCH ═════════════════════════════════════════════
