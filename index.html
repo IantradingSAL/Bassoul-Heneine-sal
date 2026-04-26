@@ -542,6 +542,41 @@ import { SUPABASE_CONFIG } from './config.js'
 
 const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
 
+// ════════════════════════════════════════════════════════════════
+//  Confirmation-email token recovery
+// ────────────────────────────────────────────────────────────────
+//  When users click "Confirm your email" in the Supabase signup
+//  email, they're sent to Site URL with a hash like
+//  "#access_token=...&refresh_token=...&type=signup".
+//  Pick those up automatically — call setSession so the user is
+//  signed in instantly, clean the URL so the tokens don't sit in
+//  the address bar, and show a friendly "welcome" toast.
+// ════════════════════════════════════════════════════════════════
+;(async function pickUpEmailTokens(){
+  if (!location.hash || !location.hash.includes('access_token')) return
+  try {
+    const params = new URLSearchParams(location.hash.replace(/^#/, ''))
+    const access_token  = params.get('access_token')
+    const refresh_token = params.get('refresh_token')
+    const type          = params.get('type') || 'signup'
+    if (!access_token || !refresh_token) return
+    // Activate the session
+    const { data, error } = await sb.auth.setSession({ access_token, refresh_token })
+    if (error) {
+      console.warn('Token pickup failed:', error.message)
+      return
+    }
+    // Clean the URL so the tokens don't stay visible
+    history.replaceState(null, '', location.pathname + location.search)
+    // Show a friendly message — user lands as fully authenticated
+    setTimeout(() => {
+      try { ntf(type === 'recovery' ? 'Password reset confirmed — please set a new password.' : '✅ Email confirmed. Welcome aboard!', 'ok') } catch {}
+    }, 600)
+  } catch (e) {
+    console.warn('Token pickup error:', e)
+  }
+})()
+
 // ─── helpers ────────────────────────────────────────────────────
 const $ = id => document.getElementById(id)
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
