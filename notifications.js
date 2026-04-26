@@ -57,22 +57,69 @@ function isVisible(){
 }
 
 // ── chime — synthesized via WebAudio so we ship no audio file ──
-let _audioCtx = null
-function playChime(){
+// Browsers block AudioContext until a user gesture occurs. We
+// pre-create the context and register a one-time global listener
+// that resumes it on the very first click / touch / keypress.
+// After that, every chime plays immediately even when triggered
+// by a realtime event (which is not a user gesture).
+let _audioCtx     = null
+let _audioUnlocked = false
+
+function _ensureAudioCtx(){
+  if (_audioCtx) return _audioCtx
   try {
-    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-    const ctx  = _audioCtx
-    const now  = ctx.currentTime
-    // Two-tone "ding" — A5 then C#6
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (!Ctx) return null
+    _audioCtx = new Ctx()
+  } catch { return null }
+  return _audioCtx
+}
+
+function _unlockAudio(){
+  // Idempotent — runs at most once per session
+  if (_audioUnlocked) return
+  const ctx = _ensureAudioCtx()
+  if (!ctx) return
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(() => { _audioUnlocked = true }).catch(() => {})
+  } else {
+    _audioUnlocked = true
+  }
+  // Play a near-silent ping to fully unlock on stricter browsers (Safari)
+  try {
+    const o = ctx.createOscillator()
+    const g = ctx.createGain()
+    o.frequency.value = 440
+    g.gain.value = 0.0001
+    o.connect(g); g.connect(ctx.destination)
+    o.start(); o.stop(ctx.currentTime + 0.01)
+  } catch {}
+}
+
+// Listen for the FIRST user gesture and unlock audio immediately
+;['click','touchstart','keydown','pointerdown'].forEach(evt => {
+  document.addEventListener(evt, _unlockAudio, { once: false, capture: true, passive: true })
+})
+
+function playChime(){
+  const ctx = _ensureAudioCtx()
+  if (!ctx) return
+  // If still suspended, try to resume — silently fails if browser blocks
+  if (ctx.state === 'suspended') {
+    ctx.resume().catch(() => {})
+  }
+  try {
+    const now = ctx.currentTime
+    // Two-tone "ding" — A5 then C#6 — slightly louder + longer
     ;[
-      { f: 880,    t: now,        d: 0.18 },
-      { f: 1108.7, t: now + 0.14, d: 0.22 }
+      { f: 880,    t: now,        d: 0.20 },
+      { f: 1108.7, t: now + 0.13, d: 0.28 }
     ].forEach(({ f, t, d }) => {
       const o = ctx.createOscillator()
       const g = ctx.createGain()
       o.type = 'sine'; o.frequency.setValueAtTime(f, t)
       g.gain.setValueAtTime(0.0001, t)
-      g.gain.exponentialRampToValueAtTime(0.18, t + 0.02)
+      g.gain.exponentialRampToValueAtTime(0.32, t + 0.02)  // louder than before (was 0.18)
       g.gain.exponentialRampToValueAtTime(0.0001, t + d)
       o.connect(g); g.connect(ctx.destination)
       o.start(t); o.stop(t + d + 0.02)
@@ -89,8 +136,23 @@ function injectStyles(){
 .cw-bell-wrap{position:relative;display:inline-flex;align-items:center;flex-shrink:0;margin-left:auto}
 .cw-bell{width:38px;height:38px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;font-size:18px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:background .12s,border-color .12s,transform .12s;font-family:inherit}
 .cw-bell:hover{background:#f8fafc;border-color:#3b5fe2}
-.cw-bell.shake{animation:cwBellShake .55s ease-in-out}
-@keyframes cwBellShake{0%,100%{transform:rotate(0)}15%{transform:rotate(-18deg)}30%{transform:rotate(14deg)}45%{transform:rotate(-10deg)}60%{transform:rotate(7deg)}75%{transform:rotate(-3deg)}}
+.cw-bell.shake{animation:cwBellShake .85s ease-in-out;transform-origin:50% 14%}
+@keyframes cwBellShake{
+  0%,100%{transform:rotate(0)}
+  10%{transform:rotate(-22deg)}
+  20%{transform:rotate(20deg)}
+  32%{transform:rotate(-16deg)}
+  44%{transform:rotate(13deg)}
+  56%{transform:rotate(-9deg)}
+  68%{transform:rotate(6deg)}
+  80%{transform:rotate(-3deg)}
+}
+.cw-bell.glow{box-shadow:0 0 0 0 rgba(220,38,38,.55);animation:cwBellGlow 1.1s ease-out}
+@keyframes cwBellGlow{
+  0%{box-shadow:0 0 0 0 rgba(220,38,38,.6); border-color:#dc2626}
+  60%{box-shadow:0 0 0 14px rgba(220,38,38,0); border-color:#dc2626}
+  100%{box-shadow:0 0 0 0 rgba(220,38,38,0); border-color:#e2e8f0}
+}
 .cw-bell-badge{position:absolute;top:-4px;right:-4px;background:#dc2626;color:#fff;font-size:10px;font-weight:800;border-radius:999px;min-width:18px;height:18px;padding:0 5px;display:none;align-items:center;justify-content:center;border:2px solid #fff;line-height:1;animation:cwPulse 2s infinite}
 .cw-bell-badge.on{display:inline-flex}
 @keyframes cwPulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.6)}50%{box-shadow:0 0 0 6px rgba(220,38,38,0)}}
@@ -375,7 +437,11 @@ function showToast(n){
 function shakeBell(){
   if (!bellWrap) return
   const b = bellWrap.querySelector('.cw-bell')
-  b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake')
+  if (!b) return
+  b.classList.remove('shake','glow'); void b.offsetWidth   // restart animation
+  b.classList.add('shake','glow')
+  // Clear classes after animations finish, so future shakes can replay
+  setTimeout(() => { b.classList.remove('shake','glow') }, 1200)
 }
 
 function subscribe(){
@@ -386,13 +452,13 @@ function subscribe(){
         payload => {
           const n = payload.new; if (!n) return
           if (notifications.find(x => x.id === n.id)) return
-          notifications.unshift(n)
-          updateBadge(); renderPanel()
-          // Always: ring chime + shake bell
+          // INSTANT feedback first — sound + bell shake — before any heavier work
           playChime()
           shakeBell()
-          // If tab is hidden → show OS notification
-          // If tab is visible → show in-app toast
+          // Then update the data model + UI
+          notifications.unshift(n)
+          updateBadge(); renderPanel()
+          // Then surface the message via toast (visible) or OS popup (hidden)
           if (!isVisible() && Notification.permission === 'granted') {
             showOSNotification(n)
           } else {
@@ -555,9 +621,7 @@ function mount(){
 
   bellWrap.querySelector('.cw-bell').addEventListener('click', e => {
     e.stopPropagation()
-    // First click is a perfect time to "warm up" the audio context
-    // because of browsers' autoplay policy
-    if (!_audioCtx) try { _audioCtx = new (window.AudioContext||window.webkitAudioContext)() } catch {}
+    _unlockAudio()  // extra-safe: any bell click is a strong gesture for autoplay
     togglePanel()
   })
   bellWrap.querySelector('.cw-panel-act').addEventListener('click', markAllRead)
@@ -573,19 +637,25 @@ async function boot(){
   myEmployeeId = meRow.id
   myName       = meRow.name || ''
 
+  // Mount the bell + start the realtime subscription IMMEDIATELY so
+  // notifications fire the instant they arrive. Service worker
+  // registration and notification loading happen in parallel — they
+  // don't block the realtime pipeline.
   mount()
-  swReg = await registerServiceWorker()
-  await loadNotifications()
-  subscribe()
+  subscribe()                                          // ← early, no await
+
+  // Service worker is best-effort, fire-and-forget
+  registerServiceWorker().then(reg => { swReg = reg })
+
+  await loadNotifications()                            // populates the bell badge
 
   // On the dashboard, show a friendly welcome modal that aggregates
   // every still-unread notification (chat DMs, case replies, case
   // assignments) into one tidy popup. The bell + footer badge stay
   // independently — pressing "Later" leaves the red badge in place
-  // so the user can't lose track. Same design language as the
-  // customer-feedback "complaints waiting" greeting.
+  // so the user can't lose track.
   if (document.body.dataset.cwPage === 'dashboard' && unreadCount() > 0) {
-    setTimeout(showWelcomeModal, 700)
+    setTimeout(showWelcomeModal, 350)                  // ← halved from 700ms
   }
 
   // Refresh "X minutes ago" labels every 30 s while the panel is open
