@@ -2280,6 +2280,95 @@ function jumpTo(page,q){
   else if(page==='incadea'){document.getElementById('F_IQ').value=q;rInc();}
 }
 
+// ══ RESUBMISSION STATUS HELPERS ══════════════════════════════
+// Used by row renderers (GCM Claims, Asked vs Paid, Recovery, etc.)
+// to show — discreetly — whether a rejected claim has already
+// been resubmitted, and what state that resubmission is in.
+//
+// Five states: untracked, recovered, rejected-again, pending-payment,
+// awaiting-gcm. Each returns a tiny coloured badge + a one-line
+// gray annotation that goes underneath the invoice number.
+//
+// Reads from S.rej (local) + S.gcm (loaded GCM data) — same as
+// the modal preview.
+function _resubStatus(claim){
+  // claim = a GCM row with at least .inv and .st
+  if (!claim || claim.st !== 4) return null;          // not rejected → no badge
+  const rd = S.rej[claim.inv];
+  if (!rd || !rd.newClaim) return { kind: 'untracked' };
+
+  const target = String(rd.newClaim).trim().toLowerCase();
+  const newRow = (S.gcm || []).find(r => String(r.inv||'').trim().toLowerCase() === target);
+
+  if (!newRow) return { kind: 'awaiting_gcm', newClaim: rd.newClaim, resubDate: rd.resubDate };
+  if (newRow.st === 0) {
+    return {
+      kind: 'recovered',
+      newClaim: newRow.inv,
+      paidAmt:  newRow.tp || 0,
+      askedAmt: rd.origAsked || claim.ta || 0,
+      paidDate: newRow.date || rd.creditDate || '',
+      resubDate: rd.resubDate || ''
+    };
+  }
+  if (newRow.st === 4) {
+    return { kind: 'rejected_again', newClaim: newRow.inv, resubDate: rd.resubDate };
+  }
+  return { kind: 'pending', newClaim: newRow.inv, resubDate: rd.resubDate };
+}
+
+// Small inline status badge — rendered next to the existing
+// "❌ Rejected" badge in the Status column. Compact, low visual
+// weight; hover for the full story.
+function resubChainBadge(claim){
+  const s = _resubStatus(claim);
+  if (!s || s.kind === 'untracked') return '';
+  // Build hover tooltip
+  const tip = (() => {
+    switch (s.kind) {
+      case 'recovered':
+        const recRate = s.askedAmt > 0 ? (s.paidAmt/s.askedAmt*100).toFixed(0) : '100';
+        return `Resubmitted as ${s.newClaim}${s.resubDate?' on '+s.resubDate:''} — paid €${f(s.paidAmt)}${s.paidDate?' on '+s.paidDate:''} (recovery ${recRate}%)`;
+      case 'rejected_again':
+        return `Resubmitted as ${s.newClaim}${s.resubDate?' on '+s.resubDate:''} — also rejected by Renault. May need another resubmission.`;
+      case 'pending':
+        return `Resubmitted as ${s.newClaim}${s.resubDate?' on '+s.resubDate:''} — exists in GCM but status not yet PAID. Awaiting Renault payment.`;
+      case 'awaiting_gcm':
+        return `Resubmitted as ${s.newClaim}${s.resubDate?' on '+s.resubDate:''} — not yet present in loaded GCM data. Will auto-link on next GCM upload.`;
+    }
+    return '';
+  })();
+  // Build the badge — same colour vocabulary as the modal preview
+  switch (s.kind) {
+    case 'recovered':       return ` <span class="badge" style="background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;font-size:8px;margin-left:2px" title="${_he(tip)}">🟢 Recovered</span>`;
+    case 'rejected_again':  return ` <span class="badge" style="background:#FEE2E2;color:#991B1B;border:1px solid #FECACA;font-size:8px;margin-left:2px" title="${_he(tip)}">🔴 Rejected again</span>`;
+    case 'pending':         return ` <span class="badge" style="background:#DBEAFE;color:#1E40AF;border:1px solid #93C5FD;font-size:8px;margin-left:2px" title="${_he(tip)}">🔵 Awaiting payment</span>`;
+    case 'awaiting_gcm':    return ` <span class="badge" style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;font-size:8px;margin-left:2px" title="${_he(tip)}">🟡 Resubmitted</span>`;
+  }
+  return '';
+}
+
+// One-line muted annotation — rendered under the invoice number
+// in a smaller font. Shows the resubmission target + outcome.
+function resubChainNote(claim){
+  const s = _resubStatus(claim);
+  if (!s || s.kind === 'untracked') return '';
+  switch (s.kind) {
+    case 'recovered':
+      return `<div style="font-size:9px;color:#16A34A;margin-top:1px;font-weight:500">→ ${_he(s.newClaim)} <span style="opacity:.85">✓ paid €${f(s.paidAmt)}</span></div>`;
+    case 'rejected_again':
+      return `<div style="font-size:9px;color:#DC2626;margin-top:1px;font-weight:500">→ ${_he(s.newClaim)} <span style="opacity:.85">✗ rejected again</span></div>`;
+    case 'pending':
+      return `<div style="font-size:9px;color:#1E40AF;margin-top:1px;font-weight:500">→ ${_he(s.newClaim)} <span style="opacity:.85">⏳ pending</span></div>`;
+    case 'awaiting_gcm':
+      return `<div style="font-size:9px;color:#92400E;margin-top:1px;font-weight:500">→ ${_he(s.newClaim)} <span style="opacity:.85">(not in GCM yet)</span></div>`;
+  }
+  return '';
+}
+
+// HTML-safe escape for tooltip / inline use
+function _he(s){return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
 // ══ RENDER GCM ════════════════════════════════════════════════
 function rGCM(){
   const E=document.getElementById('GCM_E'),K=document.getElementById('GCM_K'),T=document.getElementById('GCM_T');
@@ -2313,7 +2402,7 @@ function rGCM(){
     const isP=r.st===0,isR=r.st===4;
     h+=`<tr class="${r._d?'tr-dup':''}">
       <td class="mono">${r.vin}${r._d?' <span class="badge b-dup">DUP</span>':''}</td>
-      <td class="mono">${r.invBase||r.inv}</td>
+      <td class="mono">${r.invBase||r.inv}${resubChainNote(r)}</td>
       <td style="text-align:center">${r.intLetter?`<span class="badge b-sky" style="font-size:9px">${r.intLetter}</span>`:'<span style="color:var(--faint);font-size:9px">—</span>'}</td>
       <td class="mono" style="color:var(--muted);font-size:9px">${r.ro||'–'}</td>
       <td style="white-space:nowrap;font-size:11px;font-weight:600">${fmM(r.month)}</td>
@@ -2324,7 +2413,7 @@ function rGCM(){
       <td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td>
       <td class="num">${f(r.ta)}</td>
       <td class="num" style="font-weight:700">${f(r.tp)}</td>
-      <td><span class="badge ${isP?'b-mint':isR?'b-rose':'b-n'}">${isP?'✅ Paid':isR?'❌ Rejected':'Stat '+r.st}</span>${isR&&rd?.rejType?` <span class="badge ${rd.rejType==='full'?'b-rose':'b-lem'}" style="margin-left:2px">${rd.rejType==='full'?'Full':'Partial'}</span>`:''}</td>
+      <td><span class="badge ${isP?'b-mint':isR?'b-rose':'b-n'}">${isP?'✅ Paid':isR?'❌ Rejected':'Stat '+r.st}</span>${isR&&rd?.rejType?` <span class="badge ${rd.rejType==='full'?'b-rose':'b-lem'}" style="margin-left:2px">${rd.rejType==='full'?'Full':'Partial'}</span>`:''}${resubChainBadge(r)}</td>
       <td>${isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="openModal('${esc(r.inv)}','${r.vin}')">${rd?'✏️ Edit':'+ Track'}</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'}</td>
     </tr>`;
   });
@@ -2501,13 +2590,18 @@ function rComp(){
   deepRows.slice(0,600).forEach(r=>{
     const rowStyle=r.source==='inc_only'?'background:rgba(14,165,233,.05)':!r.hasMatch?'background:rgba(244,63,94,.05)':'';
     const dCell=r.delta!==null?`<span class="${dc(r.delta)}" style="font-weight:700">${f(r.delta)}</span>`:r.source==='inc_only'?'<span class="badge b-sky" style="font-size:8px">INC only</span>':'<span class="badge b-rose" style="font-size:8px">No INC match</span>';
+    // For rejected GCM rows, look up the underlying claim to get
+    // resubmission status (recovered / rejected-again / pending / awaiting-gcm)
+    const gcmRow = r.gcmInv ? S.gcm.find(x=>x.inv===r.gcmInv) : null;
+    const resubBadge = gcmRow ? resubChainBadge(gcmRow) : '';
+    const resubNote  = gcmRow ? resubChainNote(gcmRow)  : '';
     h2+=`<tr style="${rowStyle}">
       <td class="mono" style="font-size:10px">${r.vin}</td>
-      <td class="mono">${r.gcmInv||'—'}</td>
+      <td class="mono">${r.gcmInv||'—'}${resubNote}</td>
       <td class="mono" style="font-size:9px;color:var(--muted)">${r.gcmRo||'—'}</td>
       <td style="font-size:11px;font-weight:600;white-space:nowrap">${r.gcmMonth?fmM(r.gcmMonth):'—'}</td>
       <td>${r.gcmExp?`<span class="badge b-sun">${r.gcmExp}</span>`:'—'}</td>
-      <td>${r.gcmSt!==null?stBadge(r.gcmSt):'—'}</td>
+      <td>${r.gcmSt!==null?stBadge(r.gcmSt)+resubBadge:'—'}</td>
       <td class="num">${r.gcmAsked!==null?f(r.gcmAsked):'—'}</td>
       <td class="num" style="font-weight:700">${r.gcmPaid!==null?f(r.gcmPaid):'—'}</td>
       <td class="mono">${r.incNo||'<span style="color:var(--faint)">—</span>'}</td>
@@ -2854,10 +2948,10 @@ function rRec(){
   <thead><tr><th>VIN</th><th>Invoice #</th><th>Month</th><th class="num">Asked (€)</th><th class="num">Paid (€)</th><th class="num">Rejected (€)</th><th>Type</th><th>New Claim #</th><th>Status</th></tr></thead><tbody>`;
   allRej.forEach(r=>{
     const d=S.rej[r.inv]||{};const rejAmt=d.rejType==='partial'?Math.max(r.ta-r.tp,0):r.ta;
-    h+=`<tr><td class="mono" style="font-size:10px">${r.vin}</td><td class="mono">${r.inv}</td><td style="font-size:11px;font-weight:600">${fmM(r.month)}</td><td class="num">${f(r.ta)}</td><td class="num">${f(r.tp)}</td><td class="num" style="font-weight:700;color:var(--rose)">${f(rejAmt)}</td>
+    h+=`<tr><td class="mono" style="font-size:10px">${r.vin}</td><td class="mono">${r.inv}${resubChainNote(r)}</td><td style="font-size:11px;font-weight:600">${fmM(r.month)}</td><td class="num">${f(r.ta)}</td><td class="num">${f(r.tp)}</td><td class="num" style="font-weight:700;color:var(--rose)">${f(rejAmt)}</td>
       <td>${d.rejType?`<span class="badge ${d.rejType==='full'?'b-rose':'b-lem'}">${d.rejType==='full'?'❌ Full':'⚠️ Partial'}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
       <td class="mono">${d.newClaim?`<span class="badge b-mint">✅ ${d.newClaim}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
-      <td>${sBadge(d.status||'untracked')}</td></tr>`;
+      <td>${sBadge(d.status||'untracked')}${resubChainBadge(r)}</td></tr>`;
   });
   h+=`</tbody></table></div></div>`;T.innerHTML=h;
 }
