@@ -9,6 +9,8 @@
 <script type="module" src="auth_guard.js"></script>
 <script type="module" src="notifications.js"></script>
 <script src="access.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.7.1/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
 
 // ══ HELP CONTENT ══════════════════════════════════════════════
@@ -334,7 +336,7 @@ function setLang(l){
   });
   // re-render current page if data loaded
   const active = document.querySelector('.si.active');
-  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus})[active.dataset.page]?.();
+  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,monthly_report:rRptInit})[active.dataset.page]?.();
 }
 
 // ══ HELP CONTENT ══════════════════════════════════════════════
@@ -917,11 +919,30 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
   .content{margin-left:0 !important;padding:8px}
   .page{padding:14px 12px !important}
   .up-stats{grid-template-columns:1fr 1fr !important;gap:8px !important}
+  /* Upload page: stack the two dropzone cards vertically */
+  .g2{grid-template-columns:1fr !important;gap:10px}
+  .feat-grid{grid-template-columns:1fr !important}
+  /* Dropzone: bigger tap target + clear visual feedback */
+  .dzb{padding:24px 16px;min-height:140px}
+  .dzb:active{background:linear-gradient(135deg,var(--blue4),var(--surf2))}
+  .dz-emoji{font-size:32px}
+  .dz-title{font-size:13px}
+  .dz-sub{font-size:10px;margin-bottom:12px}
+  .dzb .btn{padding:10px 20px;font-size:13px;min-height:40px}
   table{font-size:11px}
   .scroll{overflow-x:auto}
 }
 .bh-mobile-warranty-menu{display:none;width:36px;height:36px;border-radius:9px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:#fff;cursor:pointer;font-size:18px;align-items:center;justify-content:center;font-family:inherit;flex-shrink:0}
 .bh-mobile-warranty-menu:hover{background:rgba(255,255,255,.18)}
+
+/* iOS Safari: display:none on file inputs sometimes blocks the picker.
+   These rules keep the input visually hidden but interactable via
+   <label for=...> and also via JS click(). */
+input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
+  position:absolute !important;
+  width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0,0,0,0);border:0;opacity:0;
+}
 </style>
 </head>
 <body>
@@ -1202,6 +1223,8 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
   <div class="si" data-page="ageing" onclick="go(this)"><span class="si-emoji">⏰</span>Rejection Ageing<span class="sbadge sb-rose" id="B_AGE">–</span></div>
   <div class="si" data-page="recovery" onclick="go(this)"><span class="si-emoji">🔄</span>Recovery Rate</div>
   <div class="si" data-page="trends" onclick="go(this)"><span class="si-emoji">📉</span>Rejection Trends</div>
+  <div class="ss">📤 Reports</div>
+  <div class="si" data-page="monthly_report" onclick="go(this)"><span class="si-emoji">📄</span>Monthly Report</div>
   <div class="s-foot">
     <div class="s-foot-text">📁 GCM + INCADEA monthly<br/>🔑 Dedup: exact VIN + Invoice #<br/>🔤 a/b/c = separate operations, not dups</div>
     <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:9px;color:var(--faint);line-height:1.8">
@@ -1277,13 +1300,13 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
         <div style="font-size:10px;color:var(--muted);margin-bottom:12px;font-weight:500">Claims_detail_MM_YYYY_LB.xlsx · from GCM portal</div>
       </div>
       <div style="padding:0 16px 16px">
-        <div class="dzb" id="DZ_GCM" onclick="document.getElementById('FI_GCM').click()" ondragover="dzO(event,'DZ_GCM')" ondragleave="dzL('DZ_GCM')" ondrop="dzD(event,'gcm')">
+        <div class="dzb" id="DZ_GCM" ondragover="dzO(event,'DZ_GCM')" ondragleave="dzL('DZ_GCM')" ondrop="dzD(event,'gcm')" onclick="if(!event.target.closest('label')){document.getElementById('FI_GCM').click()}">
           <span class="dz-emoji">📂</span>
           <div class="dz-title">Drop your GCM file here</div>
           <div class="dz-sub">Supports .xlsx · Multi-op rows kept · true dups flagged<br/>(same VIN + Invoice #). a/b/c = separate operations</div>
-          <button class="btn btn-sun btn-sm">Choose File</button>
+          <label for="FI_GCM" class="btn btn-sun btn-sm" style="cursor:pointer;display:inline-block">Choose File</label>
         </div>
-        <input type="file" id="FI_GCM" accept=".xlsx,.xls" style="display:none" onchange="loadF(event,'gcm')"/>
+        <input type="file" id="FI_GCM" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onchange="loadF(event,'gcm')"/>
         <div id="ST_GCM"></div>
       </div>
     </div>
@@ -1293,13 +1316,13 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
         <div style="font-size:10px;color:var(--muted);margin-bottom:12px;font-weight:500">Warranty invoice export from INCADEA DMS · sheet: INCADEA</div>
       </div>
       <div style="padding:0 16px 16px">
-        <div class="dzb" id="DZ_INC" onclick="document.getElementById('FI_INC').click()" ondragover="dzO(event,'DZ_INC')" ondragleave="dzL('DZ_INC')" ondrop="dzD(event,'inc')">
+        <div class="dzb" id="DZ_INC" ondragover="dzO(event,'DZ_INC')" ondragleave="dzL('DZ_INC')" ondrop="dzD(event,'inc')" onclick="if(!event.target.closest('label')){document.getElementById('FI_INC').click()}">
           <span class="dz-emoji" style="animation-delay:.4s">🗂️</span>
           <div class="dz-title">Drop your INCADEA file here</div>
           <div class="dz-sub">Supports .xlsx · Matched to GCM by VIN<br/>for reconciliation and comparison</div>
-          <button class="btn btn-sky btn-sm">Choose File</button>
+          <label for="FI_INC" class="btn btn-sky btn-sm" style="cursor:pointer;display:inline-block">Choose File</label>
         </div>
-        <input type="file" id="FI_INC" accept=".xlsx,.xls" style="display:none" onchange="loadF(event,'inc')"/>
+        <input type="file" id="FI_INC" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onchange="loadF(event,'inc')"/>
         <div id="ST_INC"></div>
       </div>
     </div>
@@ -1479,6 +1502,70 @@ body.lang-fr .fr-b{display:block}body.lang-fr .en-b{display:none}
     <div id="TRD_K" class="krow k4" style="display:none"></div>
     <div id="TRD_C" class="card" style="display:none"><div class="ct">📉 Rejection Rate % by Month</div><canvas id="TRD_CANVAS" height="80"></canvas></div>
     <div id="TRD_T"></div>
+  </div></div>
+</div>
+
+
+<!-- ══ MONTHLY REPORT (PDF) PAGE ════════════════════════════ -->
+<div class="page-area" id="P_monthly_report" style="display:none">
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--blue4);color:var(--blue)">📄</div><div><div class="ph-title">Monthly Report</div><div class="ph-sub">Pick a period &amp; filters, generate a branded PDF, share via WhatsApp / email</div></div></div>
+
+    <div id="RPT_E" class="al al-i" style="display:none">⬆️ Upload GCM data first to generate a report.</div>
+
+    <!-- CONFIG CARD -->
+    <div class="card" id="RPT_CFG" style="margin-bottom:14px">
+      <div class="ct">⚙️ Report Configuration</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;padding:14px 16px">
+        <div>
+          <label class="flb" style="font-size:9px">Month</label>
+          <select class="fi" id="RPT_MONTH" onchange="rRptPreview()">
+            <option value="">All months</option>
+          </select>
+        </div>
+        <div>
+          <label class="flb" style="font-size:9px">Status filter</label>
+          <select class="fi" id="RPT_STATUS" onchange="rRptPreview()">
+            <option value="">All statuses</option>
+            <option value="0">✅ Paid only</option>
+            <option value="4">❌ Rejected only</option>
+            <option value="other">Other / pending</option>
+          </select>
+        </div>
+        <div>
+          <label class="flb" style="font-size:9px">Expense code</label>
+          <select class="fi" id="RPT_EXP" onchange="rRptPreview()">
+            <option value="">All expense codes</option>
+          </select>
+        </div>
+        <div>
+          <label class="flb" style="font-size:9px">Include sections</label>
+          <div style="display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="RPT_INC_KPI" checked/> KPI summary</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="RPT_INC_REJ" checked/> Rejection list</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="RPT_INC_REC" checked/> Recovery / shortfall</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="RPT_INC_DET" checked/> Detailed claims (full table)</label>
+          </div>
+        </div>
+        <div>
+          <label class="flb" style="font-size:9px">Note (optional, top of report)</label>
+          <input class="fi" id="RPT_NOTE" placeholder="e.g. For management review" maxlength="120"/>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;padding:0 16px 16px">
+        <button class="btn btn-sun btn-sm" onclick="rRptGeneratePDF('download')">📥 Download PDF</button>
+        <button class="btn btn-sky btn-sm" onclick="rRptGeneratePDF('share')">📤 Share / WhatsApp</button>
+        <button class="btn btn-ghost btn-sm" onclick="rRptGeneratePDF('print')">🖨️ Print preview</button>
+        <button class="btn btn-ghost btn-sm" onclick="rRptExportCSV()">📊 CSV instead</button>
+      </div>
+    </div>
+
+    <!-- PREVIEW CARD -->
+    <div class="card" id="RPT_PREVIEW">
+      <div class="ct">📊 Preview — what's in the report</div>
+      <div id="RPT_PREVIEW_BODY" style="padding:14px 16px"></div>
+    </div>
+
   </div></div>
 </div>
 
@@ -1722,14 +1809,21 @@ function go(el){
   document.querySelectorAll('.page-area').forEach(p=>p.style.display='none');
   const pg = el.dataset.page;
   document.getElementById('P_'+pg).style.display = 'flex';
-  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf})[pg]?.();
+  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,monthly_report:rRptInit})[pg]?.();
 }
 
 // ══ DRAG & DROP ══════════════════════════════════════════════
 function dzO(e,id){e.preventDefault();document.getElementById(id).classList.add('over')}
 function dzL(id){document.getElementById(id).classList.remove('over')}
 function dzD(e,t){e.preventDefault();dzL('DZ_'+t.toUpperCase());const f=e.dataTransfer.files[0];if(f)procF(f,t)}
-function loadF(e,t){const f=e.target.files[0];if(f)procF(f,t)}
+function loadF(e,t){
+  const f=e.target.files[0];
+  if(f){
+    procF(f,t);
+    // Reset the input so picking the same file twice in a row still triggers onchange
+    try { e.target.value=''; } catch(_) {}
+  }
+}
 
 // ══ FILE PROCESSING ══════════════════════════════════════════
 function procF(file, type){
@@ -3167,6 +3261,440 @@ function exportGCM(){
 }
 
 
+// ══ MONTHLY PDF REPORT ════════════════════════════════════════
+// Filtered, branded, sharable. Uses jsPDF + autoTable.
+// 4 entry points wired to the buttons on the Monthly Report page:
+//   rRptInit()             — populates dropdowns + first preview render
+//   rRptPreview()          — recalc preview block when filters change
+//   rRptGeneratePDF(mode)  — 'download' | 'share' | 'print'
+//   rRptExportCSV()        — filtered CSV instead of PDF
+
+// Helper — applies the current filter selections to S.gcm, returns matching rows
+function _rptFiltered(){
+  const mf = document.getElementById('RPT_MONTH')?.value || '';
+  const sf = document.getElementById('RPT_STATUS')?.value || '';
+  const ef = document.getElementById('RPT_EXP')?.value || '';
+  return S.gcm.filter(r => {
+    if (mf && r.month !== mf) return false;
+    if (sf === '0'   && r.st !== 0) return false;
+    if (sf === '4'   && r.st !== 4) return false;
+    if (sf === 'other' && (r.st === 0 || r.st === 4)) return false;
+    if (ef && r.exp !== ef) return false;
+    return true;
+  });
+}
+
+// Returns aggregate KPIs over the filtered rows
+function _rptKPIs(rows){
+  const total       = rows.length;
+  const paid        = rows.filter(r => r.st === 0);
+  const rejected    = rows.filter(r => r.st === 4);
+  const totalAsked  = rows.reduce((s,r) => s + r.ta, 0);
+  const totalPaid   = rows.reduce((s,r) => s + r.tp, 0);
+  const totalRejAmt = rejected.reduce((s,r) => s + r.ta, 0);
+  // Recovery: sum of creditedAmt across rejection records
+  let totalCredited = 0;
+  let totalShortfall = 0;
+  let credCount = 0;
+  rows.filter(r => r.st === 4).forEach(r => {
+    const d = S.rej[r.inv]; if (!d) return;
+    if (d.creditedAmt != null) {
+      totalCredited += d.creditedAmt;
+      credCount++;
+      if (d.shortfall != null) totalShortfall += d.shortfall;
+    }
+  });
+  const rejRate     = total > 0 ? (rejected.length / total * 100) : 0;
+  const recRate     = totalRejAmt > 0 ? (totalCredited / totalRejAmt * 100) : 0;
+  return {
+    total, paidCount: paid.length, rejectedCount: rejected.length,
+    totalAsked, totalPaid, totalRejAmt, totalCredited, totalShortfall, credCount,
+    rejRate, recRate
+  };
+}
+
+function rRptInit(){
+  if (!S.gcm || !S.gcm.length){
+    document.getElementById('RPT_E').style.display = 'block';
+    document.getElementById('RPT_CFG').style.display = 'none';
+    document.getElementById('RPT_PREVIEW').style.display = 'none';
+    return;
+  }
+  document.getElementById('RPT_E').style.display = 'none';
+  document.getElementById('RPT_CFG').style.display = '';
+  document.getElementById('RPT_PREVIEW').style.display = '';
+
+  // Populate Month dropdown
+  const months = [...new Set(S.gcm.map(r => r.month).filter(Boolean))].sort().reverse();
+  const monthSel = document.getElementById('RPT_MONTH');
+  if (monthSel.options.length <= 1){
+    months.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m; o.textContent = fmM(m);
+      monthSel.appendChild(o);
+    });
+    // Default to most recent month
+    if (months.length) monthSel.value = months[0];
+  }
+
+  // Populate Expense code dropdown
+  const exps = [...new Set(S.gcm.map(r => r.exp).filter(Boolean))].sort();
+  const expSel = document.getElementById('RPT_EXP');
+  if (expSel.options.length <= 1){
+    exps.forEach(e => {
+      const o = document.createElement('option');
+      o.value = e; o.textContent = e;
+      expSel.appendChild(o);
+    });
+  }
+
+  rRptPreview();
+}
+
+function rRptPreview(){
+  const body = document.getElementById('RPT_PREVIEW_BODY');
+  if (!body) return;
+  const rows = _rptFiltered();
+  const k    = _rptKPIs(rows);
+  const mf   = document.getElementById('RPT_MONTH').value;
+  const sf   = document.getElementById('RPT_STATUS').value;
+  const ef   = document.getElementById('RPT_EXP').value;
+
+  const filterChips = [
+    mf ? '<span class="badge b-sky">'+fmM(mf)+'</span>' : '<span class="badge b-n">All months</span>',
+    sf ? `<span class="badge b-${sf==='0'?'mint':sf==='4'?'rose':'n'}">${sf==='0'?'✅ Paid':sf==='4'?'❌ Rejected':'Other'}</span>` : '<span class="badge b-n">All statuses</span>',
+    ef ? '<span class="badge b-sun">Code '+ef+'</span>' : ''
+  ].filter(Boolean).join(' ');
+
+  body.innerHTML = `
+    <div style="margin-bottom:14px;font-size:11px;color:var(--muted)">Filters: ${filterChips}</div>
+    <div class="krow k4" style="margin-bottom:12px">
+      <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📋 Claims in scope</div><div class="kv sky">${k.total.toLocaleString()}</div><div class="ks">${k.paidCount} paid · ${k.rejectedCount} rejected</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Total Paid (€)</div><div class="kv mint">${f(k.totalPaid)}</div><div class="ks">of €${f(k.totalAsked)} asked</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Rejected (€)</div><div class="kv rose">${f(k.totalRejAmt)}</div><div class="ks">${k.rejRate.toFixed(1)}% rejection rate</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:#10B981"></div><div class="kl">💚 Recovered (€)</div><div class="kv" style="color:#065F46">${f(k.totalCredited)}</div><div class="ks">${k.credCount} claim${k.credCount===1?'':'s'} · ${k.recRate.toFixed(1)}% recovery</div></div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);font-weight:500">The PDF will include the sections you've ticked above. Tap <strong>Download PDF</strong> to save it, <strong>Share</strong> to send via WhatsApp / email (mobile), or <strong>Print preview</strong> for a paper copy.</div>
+  `;
+}
+
+// Generate the PDF and either download / share / open print preview
+function rRptGeneratePDF(mode){
+  if (!S.gcm || !S.gcm.length) { showToast('⚠️ Upload GCM data first'); return; }
+  if (!window.jspdf || !window.jspdf.jsPDF){
+    showToast('⚠️ PDF library not loaded — please reload the page'); return;
+  }
+  const { jsPDF } = window.jspdf;
+  const rows = _rptFiltered();
+  if (!rows.length) { showToast('⚠️ No claims match the filters'); return; }
+
+  const k    = _rptKPIs(rows);
+  const mf   = document.getElementById('RPT_MONTH').value;
+  const sf   = document.getElementById('RPT_STATUS').value;
+  const ef   = document.getElementById('RPT_EXP').value;
+  const note = (document.getElementById('RPT_NOTE').value || '').trim();
+  const incKPI = document.getElementById('RPT_INC_KPI').checked;
+  const incRej = document.getElementById('RPT_INC_REJ').checked;
+  const incRec = document.getElementById('RPT_INC_REC').checked;
+  const incDet = document.getElementById('RPT_INC_DET').checked;
+
+  showLoad('Generating PDF…');
+
+  // Defer the heavy work so the spinner has time to render
+  setTimeout(() => {
+    try {
+      const pdf = new jsPDF({ orientation:'p', unit:'mm', format:'a4' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      let y = margin;
+
+      // ── HEADER ───────────────────────────────────────────────
+      pdf.setFillColor(59,95,226);
+      pdf.rect(0, 0, pageW, 28, 'F');
+      // BH circle logo
+      pdf.setFillColor(255,255,255);
+      pdf.circle(margin + 7, 14, 7, 'F');
+      pdf.setTextColor(59,95,226);
+      pdf.setFont('helvetica','bold');
+      pdf.setFontSize(11);
+      pdf.text('BH', margin + 7, 17, { align:'center' });
+      // Brand
+      pdf.setTextColor(255,255,255);
+      pdf.setFontSize(16);
+      pdf.text('Bassoul, Heneine Sal', margin + 18, 13);
+      pdf.setFont('helvetica','normal');
+      pdf.setFontSize(9);
+      pdf.text('Renault Warranty — Monthly Report', margin + 18, 19);
+      pdf.setFontSize(8);
+      pdf.setTextColor(220,225,255);
+      pdf.text('Generated ' + new Date().toLocaleDateString('en-GB') + ' · IanTradingSAL', pageW - margin, 13, { align:'right' });
+      const monthLabel = mf ? fmM(mf) : 'All months';
+      pdf.text(monthLabel, pageW - margin, 19, { align:'right' });
+
+      y = 36;
+      pdf.setTextColor(15,23,42);
+
+      // ── REPORT META BAR ──────────────────────────────────────
+      pdf.setFillColor(243,244,246);
+      pdf.rect(margin, y, pageW - margin*2, 14, 'F');
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica','bold');
+      pdf.setTextColor(100,116,139);
+      pdf.text('PERIOD', margin + 3, y + 5);
+      pdf.text('STATUS', margin + 50, y + 5);
+      pdf.text('EXPENSE CODE', margin + 95, y + 5);
+      pdf.text('CLAIMS IN SCOPE', margin + 145, y + 5);
+      pdf.setFont('helvetica','normal');
+      pdf.setTextColor(15,23,42);
+      pdf.setFontSize(10);
+      pdf.text(monthLabel, margin + 3, y + 11);
+      pdf.text(sf === '0' ? 'Paid only' : sf === '4' ? 'Rejected only' : sf === 'other' ? 'Other / pending' : 'All statuses', margin + 50, y + 11);
+      pdf.text(ef || 'All codes', margin + 95, y + 11);
+      pdf.text(String(k.total), margin + 145, y + 11);
+      y += 18;
+
+      // ── OPTIONAL USER NOTE ───────────────────────────────────
+      if (note){
+        pdf.setFillColor(254,243,199);
+        pdf.setDrawColor(253,224,71);
+        pdf.roundedRect(margin, y, pageW - margin*2, 10, 1.5, 1.5, 'FD');
+        pdf.setFontSize(9);
+        pdf.setTextColor(120,53,15);
+        pdf.text('Note: ' + note, margin + 3, y + 6.5);
+        y += 14;
+      }
+
+      // ── KPI SUMMARY CARDS ────────────────────────────────────
+      if (incKPI){
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica','bold');
+        pdf.setTextColor(15,23,42);
+        pdf.text('Summary', margin, y);
+        y += 4;
+        const cardW = (pageW - margin*2 - 6) / 4;
+        const cardH = 22;
+        const cards = [
+          { label:'Total Paid',     value:'€' + f(k.totalPaid),    sub: 'of €' + f(k.totalAsked) + ' asked',   color:[16,185,129] },
+          { label:'Rejected',       value:String(k.rejectedCount), sub: '€' + f(k.totalRejAmt) + ' / ' + k.rejRate.toFixed(1) + '%', color:[220,38,38] },
+          { label:'Recovered',      value:'€' + f(k.totalCredited),sub: k.credCount + ' claims · ' + k.recRate.toFixed(1) + '%',     color:[5,150,105] },
+          { label:'Net Position',   value:'€' + f(k.totalPaid + k.totalCredited), sub:'paid + recovered', color:[59,95,226] }
+        ];
+        cards.forEach((c, i) => {
+          const x = margin + i*(cardW + 2);
+          pdf.setFillColor(255,255,255);
+          pdf.setDrawColor(226,232,240);
+          pdf.roundedRect(x, y, cardW, cardH, 2, 2, 'FD');
+          pdf.setFillColor(c.color[0], c.color[1], c.color[2]);
+          pdf.rect(x, y, 1.5, cardH, 'F');
+          pdf.setFontSize(7);
+          pdf.setFont('helvetica','bold');
+          pdf.setTextColor(100,116,139);
+          pdf.text(c.label.toUpperCase(), x + 4, y + 5);
+          pdf.setFontSize(13);
+          pdf.setTextColor(c.color[0], c.color[1], c.color[2]);
+          pdf.text(c.value, x + 4, y + 13);
+          pdf.setFontSize(7);
+          pdf.setFont('helvetica','normal');
+          pdf.setTextColor(100,116,139);
+          pdf.text(c.sub, x + 4, y + 19);
+        });
+        y += cardH + 8;
+      }
+
+      // ── REJECTIONS TABLE ─────────────────────────────────────
+      if (incRej){
+        const rej = rows.filter(r => r.st === 4);
+        if (rej.length){
+          if (y > pageH - 50) { pdf.addPage(); y = margin; }
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica','bold');
+          pdf.setTextColor(220,38,38);
+          pdf.text('Rejected Claims (' + rej.length + ')', margin, y);
+          y += 2;
+          pdf.autoTable({
+            startY: y + 2,
+            head: [['VIN','Invoice','RO','Exp','Asked €','Rejected €','New Claim','Status','Credited €']],
+            body: rej.map(r => {
+              const d = S.rej[r.inv] || {};
+              const status = d.status === 'credited' ? '💚 Credited'
+                          : d.status === 'resubmitted' ? '🔄 Resubmitted'
+                          : d.status === 'pending' ? 'Pending'
+                          : d.status === 'resolved' ? '✓ Resolved'
+                          : d.status === 'written_off' ? 'Written off'
+                          : 'Untracked';
+              return [
+                r.vin, r.inv, r.ro || '-', r.exp || '-',
+                f(r.ta),
+                f(d.rejType === 'partial' ? Math.max(r.ta - r.tp, 0) : r.ta),
+                d.newClaim || '-',
+                status,
+                d.creditedAmt != null ? f(d.creditedAmt) : '-'
+              ];
+            }),
+            styles: { fontSize: 7, cellPadding: 1.5 },
+            headStyles: { fillColor: [220,38,38], textColor: 255, fontSize: 7, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [254,242,242] },
+            margin: { left: margin, right: margin },
+            theme: 'striped'
+          });
+          y = pdf.lastAutoTable.finalY + 6;
+        }
+      }
+
+      // ── RECOVERY / SHORTFALL TABLE ───────────────────────────
+      if (incRec){
+        const recovered = rows.filter(r => {
+          const d = S.rej[r.inv]; return d && d.creditedAmt != null;
+        });
+        if (recovered.length){
+          if (y > pageH - 50) { pdf.addPage(); y = margin; }
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica','bold');
+          pdf.setTextColor(5,150,105);
+          pdf.text('Recovery & Shortfall (' + recovered.length + ')', margin, y);
+          y += 2;
+          pdf.autoTable({
+            startY: y + 2,
+            head: [['VIN','Original Inv','New Claim','Asked €','Credited €','Shortfall €','Recovery %','Credit Date']],
+            body: recovered.map(r => {
+              const d = S.rej[r.inv];
+              return [
+                r.vin, r.inv, d.newClaim || '-',
+                f(d.origAsked || r.ta),
+                f(d.creditedAmt),
+                d.shortfall != null ? f(d.shortfall) : '-',
+                d.recoveryRate != null ? d.recoveryRate.toFixed(1) + '%' : '-',
+                d.creditDate || '-'
+              ];
+            }),
+            styles: { fontSize: 7, cellPadding: 1.5 },
+            headStyles: { fillColor: [5,150,105], textColor: 255, fontSize: 7, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [236,253,245] },
+            margin: { left: margin, right: margin },
+            theme: 'striped'
+          });
+          y = pdf.lastAutoTable.finalY + 6;
+        }
+      }
+
+      // ── DETAILED CLAIMS TABLE ────────────────────────────────
+      if (incDet){
+        if (y > pageH - 50) { pdf.addPage(); y = margin; }
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica','bold');
+        pdf.setTextColor(59,95,226);
+        pdf.text('All Claims in Scope (' + rows.length + ')', margin, y);
+        y += 2;
+        pdf.autoTable({
+          startY: y + 2,
+          head: [['VIN','Invoice','Op','RO','Date','Exp','Asked €','Paid €','Status']],
+          body: rows.map(r => [
+            r.vin, r.invBase || r.inv, r.intLetter || '-', r.ro || '-',
+            r.date || '-', r.exp || '-',
+            f(r.ta), f(r.tp),
+            r.st === 0 ? 'Paid' : r.st === 4 ? 'Rejected' : 'Other'
+          ]),
+          styles: { fontSize: 6.5, cellPadding: 1.2 },
+          headStyles: { fillColor: [59,95,226], textColor: 255, fontSize: 7, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [248,250,252] },
+          margin: { left: margin, right: margin },
+          theme: 'striped'
+        });
+      }
+
+      // ── FOOTER on every page ─────────────────────────────────
+      const totalPages = pdf.internal.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++){
+        pdf.setPage(p);
+        pdf.setFontSize(7);
+        pdf.setTextColor(148,163,184);
+        pdf.setFont('helvetica','normal');
+        pdf.text('Generated ' + new Date().toLocaleDateString('en-GB') + ' · Bassoul, Heneine Sal · IanTradingSAL', margin, pageH - 5);
+        pdf.text('Page ' + p + ' of ' + totalPages, pageW - margin, pageH - 5, { align:'right' });
+      }
+
+      // ── DELIVER ──────────────────────────────────────────────
+      const filename = 'BH_Warranty_Report_' + (mf || 'all') + '.pdf';
+      hideLoad();
+
+      if (mode === 'download'){
+        pdf.save(filename);
+        showToast('✅ PDF downloaded — ' + filename);
+        return;
+      }
+
+      if (mode === 'print'){
+        // Open in new window for native print preview
+        const blob = pdf.output('blob');
+        const url  = URL.createObjectURL(blob);
+        const w = window.open(url, '_blank');
+        if (w) { w.onload = () => { try { w.print(); } catch(e){} }; }
+        showToast('🖨️ Print preview opened');
+        return;
+      }
+
+      if (mode === 'share'){
+        const blob = pdf.output('blob');
+        const file = new File([blob], filename, { type:'application/pdf' });
+        if (navigator.canShare && navigator.canShare({ files:[file] })){
+          navigator.share({
+            files:[file],
+            title:'BH Warranty Report',
+            text:'Renault Warranty Monthly Report — Bassoul, Heneine Sal'
+          }).then(() => showToast('📤 Report shared'))
+            .catch(err => {
+              if (String(err).includes('AbortError')) return;
+              // Fallback to download
+              pdf.save(filename);
+              showToast('📤 Native share unavailable — file downloaded instead. Attach manually.');
+            });
+        } else {
+          // Desktop / unsupported: download with hint
+          pdf.save(filename);
+          showToast('📤 File downloaded. Attach it to a WhatsApp message or email.');
+        }
+        return;
+      }
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      hideLoad();
+      showToast('❌ PDF generation failed: ' + err.message);
+    }
+  }, 50);
+}
+
+function rRptExportCSV(){
+  const rows = _rptFiltered();
+  if (!rows.length) { showToast('⚠️ No claims match the filters'); return; }
+  const mf = document.getElementById('RPT_MONTH').value;
+  const headers = ['VIN','Invoice #','Op','RO','Month','Date','Exp Code','NITG',
+    'Total Asked','Total Paid','Status','New Claim #','Credited (€)','Credit Date','Recovery %','Notes'];
+  const data = rows.map(r => {
+    const d = S.rej[r.inv] || {};
+    return [
+      r.vin, r.inv, r.intLetter || '', r.ro || '', fmM(r.month), r.date || '',
+      r.exp || '', r.nitg || '',
+      r.ta.toFixed(2), r.tp.toFixed(2),
+      r.st === 0 ? 'Paid' : r.st === 4 ? 'Rejected' : 'Other',
+      d.newClaim || '',
+      d.creditedAmt != null ? d.creditedAmt.toFixed(2) : '',
+      d.creditDate || '',
+      d.recoveryRate != null ? d.recoveryRate.toFixed(1) + '%' : '',
+      (d.notes || '').replace(/"/g, "'")
+    ];
+  });
+  const csv = [headers, ...data].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type:'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'BH_Warranty_Report_' + (mf || 'all') + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('📊 CSV downloaded');
+}
+
+
 // ══ LANGUAGE ═════════════════════════════════════════════════
 let _lang = 'en';
 function setLang(l){
@@ -3212,7 +3740,7 @@ function setLang(l){
     else el.appendChild(txt);
   });
   const active = document.querySelector('.si.active');
-  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf})[active.dataset.page]?.();
+  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,monthly_report:rRptInit})[active.dataset.page]?.();
 }
 
 // ══ HELP CONTENT — ALL PAGES ════════════════════════════════
