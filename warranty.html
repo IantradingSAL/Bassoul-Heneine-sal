@@ -1768,11 +1768,17 @@ function procF(file, type){
           const lookupKey = String(d.newClaim).trim().toLowerCase();
           const newClaimRow = gcmByInvNorm[lookupKey];
           if(newClaimRow && newClaimRow.st===0){
-            // Renault paid the resubmission — auto-credit it
+            // Renault paid the resubmission — auto-credit it.
+            // Credit date precedence:
+            //   1. The new claim's actual paidDate from GCM (best)
+            //   2. The new claim's opening date (date_ouv_or) as fallback
+            //   3. Whatever was already saved (don't overwrite a real date)
+            //   — Never use "today" as a fallback (would be misleading).
+            const credDate = newClaimRow.paidDate || newClaimRow.date || d.creditDate || '';
             S.rej[origInv] = Object.assign({}, d, {
               status: 'credited',
               creditedAmt: newClaimRow.tp,
-              creditDate: newClaimRow.date || new Date().toISOString().substr(0,10),
+              creditDate: credDate,
               shortfall: (d.rejectedAmt||d.origAsked||0) - newClaimRow.tp,
               recoveryRate: (d.rejectedAmt||d.origAsked||0) > 0 ? (newClaimRow.tp/(d.rejectedAmt||d.origAsked||0)*100) : 100,
               autoMatched: true,
@@ -1923,6 +1929,26 @@ function parseGCM(raw){
       seen.set('LOOSE:' + looseKey, true);
     }
 
+    // Detect the actual PAYMENT date (when Renault settled the claim).
+    // Different GCM exports use different column names — try the common
+    // ones in order, take the first that has a value.
+    const dateOpened = String(r.date_ouv_or||'').substr(0,10);
+    const paymentDateCandidates = [
+      r.invoice_settlement_date, r.settlement_date, r.payment_date, r.date_paiement,
+      r.payment_settlement_date, r.definitive_settlement_date, r.payment_dt,
+      r.date_payment, r.flag_state_date, r.invoice_flag_state_date,
+      r.date_definitive, r.definitive_date, r.date_credit, r.credit_date,
+      r.PAYMENT_DATE, r.SETTLEMENT_DATE,
+      r.last_status_date, r.status_date
+    ];
+    let paidDate = '';
+    for (const v of paymentDateCandidates) {
+      if (v !== undefined && v !== null && String(v).trim() !== '') {
+        paidDate = String(v).substr(0,10);
+        break;
+      }
+    }
+
     return {
       // _d is preserved for the summary banner / "duplicates excluded"
       // counter, but it's now only true for true-dup rows. Multi-op
@@ -1936,7 +1962,8 @@ function parseGCM(raw){
       opMarker,          // raw operation marker if present (for display)
       ro: String(r.DEALER_REPAIT_ORDER_NUMBER||'').trim(),
       month: String(r.yearmonth_topage||'').trim(),
-      date: String(r.date_ouv_or||'').substr(0,10),
+      date: dateOpened,           // when the claim was opened (date_ouv_or)
+      paidDate,                   // when Renault settled / paid it (best-available column)
       exp: String(r.expense_nature_code||'').trim(),
       expD: String(r.expense_nature_level_2_description_en||'').trim(),
       st: parseInt(r.invoice_flag_state??-1),
@@ -2123,10 +2150,14 @@ function saveRej(){
     if (match){
       // User entered an invoice that's already paid in GCM data —
       // auto-credit it. If the user manually typed a different
-      // creditedAmt we respect their value; otherwise use GCM's tp.
+      // creditedAmt or creditDate we respect their values; otherwise
+      // pull from the GCM row using paidDate (real settlement date)
+      // first, then the opening date as fallback. Never default to today.
       if (!creditedAmt){
         creditedAmt = match.tp || 0;
-        creditDate  = creditDate || match.date || new Date().toISOString().substr(0,10);
+      }
+      if (!creditDate){
+        creditDate = match.paidDate || match.date || '';
       }
       userStatus = 'credited';
       autoMatchedNow = true;
@@ -2174,7 +2205,7 @@ function saveRej(){
   cwResubUpsert(_mk, claim).catch(()=>{});
   updLsStatus();
   if (autoMatchedNow){
-    showToast('💚 Auto-matched! '+newClaim+' was paid €'+f(creditedAmt)+' — status set to Credited.');
+    showToast('💚 Auto-matched! '+newClaim+' paid €'+f(creditedAmt)+(creditDate?' on '+creditDate:'')+' — status set to Credited.');
   } else if (newClaim){
     showToast('✅ Saved. New Claim '+newClaim+' not yet seen in GCM data — will auto-match when next file is uploaded.');
   } else {
@@ -2228,14 +2259,14 @@ function checkAutoMatchPreview(){
     box.innerHTML = `
       💚 <strong>Match found — will be auto-credited on save</strong><br>
       <div style="margin-top:6px;font-size:11px">
-        <strong>${h(match.inv)}</strong> · status PAID · paid €${f(paid)}
+        <strong>${h(match.inv)}</strong> · status PAID · paid €${f(paid)}${match.paidDate?' on '+h(match.paidDate):(match.date?' (opened '+h(match.date)+')':'')}
       </div>
       <div style="margin-top:4px;display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px">
         <span><span style="color:#6B6A66">Originally asked:</span> <strong>€${f(askedAmt)}</strong></span>
         <span><span style="color:#6B6A66">Now credited:</span> <strong>€${f(paid)}</strong></span>
         <span style="color:${diffColor}"><span style="color:#6B6A66">${diffSign[0].toUpperCase()+diffSign.slice(1)}:</span> <strong>€${f(Math.abs(shortfall))}</strong></span>
         <span><span style="color:#6B6A66">Recovery:</span> <strong>${recRate.toFixed(1)}%</strong></span>
-      </div>`;
+      </div>${(!match.paidDate)?'<div style="margin-top:6px;font-size:10px;color:#92400E;font-style:italic">⚠️ GCM file did not include a settlement date column. Credit date will use the opening date as a fallback — adjust manually if needed.</div>':''}`;
     return;
   }
   if (match.st === 4){
@@ -2307,7 +2338,7 @@ function _resubStatus(claim){
       newClaim: newRow.inv,
       paidAmt:  newRow.tp || 0,
       askedAmt: rd.origAsked || claim.ta || 0,
-      paidDate: newRow.date || rd.creditDate || '',
+      paidDate: newRow.paidDate || rd.creditDate || newRow.date || '',
       resubDate: rd.resubDate || ''
     };
   }
