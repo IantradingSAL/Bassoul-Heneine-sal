@@ -128,12 +128,43 @@
       '</div>'
   }
 
+  // ─── Auto-register the page if missing ───────────────────────
+  // This makes Settings → Roles & Access "self-discovering": just
+  // create a new HTML file with <meta name="cw-page" content="…">,
+  // visit it once, and it appears in the role matrix automatically.
+  // Errors are swallowed — never blocks page load.
+  async function registerPage (page) {
+    var url, anon
+    try { if (window.__SUPA__) { url = window.__SUPA__.url; anon = window.__SUPA__.anonKey } } catch (e) {}
+    if (!url) return
+    var ref = new URL(url).hostname.split('.')[0]
+    var raw = localStorage.getItem('sb-' + ref + '-auth-token')
+    if (!raw) return
+    var jwt; try { jwt = JSON.parse(raw).access_token } catch (e) { return }
+    if (!jwt) return
+    // Derive a friendly default label from the page id ("warranty_claims" → "Warranty Claims")
+    var defaultLabel = page.replace(/_/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase() })
+    try {
+      await fetch(url + '/rest/v1/rpc/register_page_if_missing', {
+        method:  'POST',
+        headers: {
+          'apikey':        anon,
+          'authorization': 'Bearer ' + jwt,
+          'content-type':  'application/json'
+        },
+        body: JSON.stringify({ p_id: page, p_label: defaultLabel })
+      })
+    } catch (e) { /* swallow */ }
+  }
+
   // ─── 4. Run after parse ──────────────────────────────────────
   async function run () {
     var page = currentPageId()
-    if (page === 'dashboard') return    // dashboard is always reachable
     // Give config.js (a module) a moment to set window.__SUPA__.
     await new Promise(function (r) { setTimeout(r, 50) })
+    // Fire-and-forget auto-registration on every page (incl. dashboard)
+    registerPage(page)
+    if (page === 'dashboard') return    // dashboard is always reachable
     var level = await fetchPermissionLevel(page)
     window.CW_PERMISSION = level
     if (level === 'none') { blockNoAccess(page); return }

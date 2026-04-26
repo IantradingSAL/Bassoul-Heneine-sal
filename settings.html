@@ -8,6 +8,7 @@
 <script type="module" src="config.js"></script>
 <script type="module" src="auth_guard.js"></script>
 <script type="module" src="notifications.js"></script>
+<script src="access.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
 <style>
 :root{
@@ -282,13 +283,26 @@ tbody tr:hover{background:#f8fafc}
       <div class="section-h">
         <div>
           <div class="section-t">Roles &amp; page access</div>
-          <div class="section-s">Each role grants a level on every page: <strong>Edit</strong> (full access), <strong>View</strong> (read-only — buttons disabled, forms locked), or <strong>None</strong> (page is blocked). Click a role to expand its matrix, click any pill to change. Saves immediately. The <strong>Manager (system)</strong> role always has Edit on everything.</div>
+          <div class="section-s">Each role grants a level on every page: <strong>Edit</strong> (full access), <strong>View</strong> (read-only — buttons disabled, forms locked), or <strong>None</strong> (page is blocked). Click a role to expand its matrix, click any pill to change. Saves immediately. The <strong>Manager (system)</strong> role always has Edit on everything. <strong>New pages</strong> are detected automatically the first time anyone visits them.</div>
         </div>
         <button class="btn btn-blue editor-only" id="addRoleBtn">+ Add role</button>
       </div>
       <div class="role-grid" id="roleGrid">
         <div class="empty">⏳ Loading…</div>
       </div>
+
+      <details class="pages-fold" style="margin-top:24px;background:var(--card);border:1px solid var(--bdr);border-radius:12px;box-shadow:var(--sh)">
+        <summary style="padding:14px 18px;cursor:pointer;font-size:13px;font-weight:700;list-style:none;display:flex;align-items:center;gap:10px">
+          <span style="font-size:14px">🗂️</span>
+          <span>Page registry</span>
+          <span id="pageCountBadge" style="font-size:11px;color:var(--mu);font-weight:600">—</span>
+          <span style="margin-left:auto;font-size:11px;color:var(--mu);font-weight:500">Pages auto-register when visited · click to manage</span>
+        </summary>
+        <div style="padding:0 18px 18px">
+          <div class="section-s" style="margin-bottom:14px">When a new HTML page with a <code style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:4px">&lt;meta name=&quot;cw-page&quot;&gt;</code> tag is opened by anyone, it appears in the matrix above automatically. You can edit labels, hide pages, or delete custom pages here.</div>
+          <div id="pageList" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+      </details>
     </div>
 
     <!-- ════ CATEGORIES TAB ════════════════════════════════════ -->
@@ -519,6 +533,49 @@ tbody tr:hover{background:#f8fafc}
   </div>
 </div>
 
+<!-- ════ PAGE MODAL ═══════════════════════════════════════════ -->
+<div class="modal-bg" id="pageModal">
+  <div class="modal" style="max-width:480px">
+    <div class="m-h" id="pageModalTitle">Edit page</div>
+    <div class="m-s">Page IDs come from the <code style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:4px">&lt;meta name="cw-page"&gt;</code> tag in the HTML file and cannot be changed here.</div>
+    <input type="hidden" id="pageId"/>
+    <div class="fg">
+      <div>
+        <label class="fl">Page ID</label>
+        <input class="fi" type="text" id="pageIdView" readonly/>
+      </div>
+      <div>
+        <label class="fl">Sort order</label>
+        <input class="fi" type="number" id="pageSort" step="10"/>
+      </div>
+      <div class="full">
+        <label class="fl">Display label *</label>
+        <input class="fi" type="text" id="pageLabel" required/>
+      </div>
+      <div>
+        <label class="fl">Icon (single emoji)</label>
+        <input class="fi" type="text" id="pageIcon" maxlength="3" placeholder="📄"/>
+      </div>
+      <div>
+        <label class="fl">Behaviour</label>
+        <div class="cb-row" style="padding:10px 0 0">
+          <label><input type="checkbox" id="pageActive" checked/>Active</label>
+          <label><input type="checkbox" id="pageAlwaysView"/>Always reachable<br><span style="font-size:10px;color:var(--mu);font-weight:500;margin-left:20px">(no "None" option)</span></label>
+        </div>
+      </div>
+      <div class="full">
+        <label class="fl">Description</label>
+        <input class="fi" type="text" id="pageDesc" placeholder="Helper text shown under each role's matrix row"/>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-red" id="pageDeleteBtn" style="display:none;margin-right:auto">🗑️ Delete</button>
+      <button class="btn btn-ghost" data-close>Cancel</button>
+      <button class="btn btn-blue" id="pageSaveBtn">💾 Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="notif" id="notif"></div>
 
 <script type="module">
@@ -548,12 +605,8 @@ function defaultLevel(roleName, pageId){
   return 'none'
 }
 
-const PAGES = [
-  { id: 'dashboard',         label: 'Dashboard',         desc: 'Always accessible (no None option)' },
-  { id: 'customer_feedback', label: 'Customer Feedback', desc: 'The feedback / complaints register' },
-  { id: 'warranty',          label: 'Renault Warranty',  desc: 'GCM claims, INCADEA reconciliation' },
-  { id: 'settings',          label: 'Settings',          desc: 'This page — employees, roles, categories, system' }
-]
+// PAGES is now loaded dynamically from public.system_pages
+let PAGES = []
 
 // Tabs
 document.querySelectorAll('.tab').forEach(t => {
@@ -861,6 +914,24 @@ $('empDeleteBtn').addEventListener('click', async () => {
 // ════════════════════════════════════════════════════════════════
 //  ROLES & PERMISSIONS  (more polished layout)
 // ════════════════════════════════════════════════════════════════
+async function loadPages(){
+  const { data, error } = await sb.from('system_pages')
+    .select('id,label,description,icon,sort_order,is_active,is_system,always_view')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+  if (error) {
+    // Fallback to a minimal hardcoded list so the matrix isn't empty
+    PAGES = [
+      { id:'dashboard', label:'Dashboard', description:'Always accessible', icon:'🏠', is_system:true, always_view:true },
+      { id:'customer_feedback', label:'Customer Feedback', description:'The feedback / complaints register', icon:'📣', is_system:true },
+      { id:'settings', label:'Settings', description:'This page', icon:'⚙️', is_system:true }
+    ]
+    return
+  }
+  // Map DB shape → UI shape (`desc` is what permRow used to read)
+  PAGES = (data || []).map(p => ({ ...p, desc: p.description }))
+}
+
 async function loadRoles(){
   const [rRes, cRes] = await Promise.all([
     sb.from('role_templates').select('name,label,icon,color,permissions').order('label', { ascending: true }),
@@ -871,6 +942,7 @@ async function loadRoles(){
   employeeCounts = {}
   ;(cRes.data || []).forEach(r => { employeeCounts[r.role_name] = Number(r.employee_count) || 0 })
   renderRoles()
+  renderPages()  // re-render Pages tab too
 }
 
 function renderRoles(){
@@ -921,12 +993,12 @@ function renderRoles(){
 function permRow(role, page){
   const isManager = role.name === 'manager'
   const cur = isManager ? 'edit' : (role.permissions?.[page.id] || defaultLevel(role.name, page.id))
-  const noOption = page.id === 'dashboard'
+  const noOption = page.always_view === true || page.id === 'dashboard'
   const lock = isManager ? 'disabled' : ''
   return `<div class="perm-row" data-role="${esc(role.name)}" data-page="${esc(page.id)}">
     <div>
-      <div class="perm-page">${esc(page.label)}</div>
-      <div class="perm-page-s">${esc(page.desc)}</div>
+      <div class="perm-page">${esc(page.icon || '📄')} ${esc(page.label)}${page.is_system ? '' : ' <span style="font-size:10px;color:var(--blue);background:var(--b50);padding:1px 6px;border-radius:4px;font-weight:700;letter-spacing:.3px">AUTO</span>'}</div>
+      <div class="perm-page-s">${esc(page.desc || page.description || '')}</div>
     </div>
     <div class="perm-pills">
       ${noOption ? '' : `<button type="button" class="perm-pill ${cur==='none'?'on':''}" data-l="none" ${lock}>None</button>`}
@@ -1092,10 +1164,88 @@ $('saveSysBtn').addEventListener('click', async () => {
 })
 
 // ════════════════════════════════════════════════════════════════
+//  PAGES — registry CRUD (drives the role matrix)
+// ════════════════════════════════════════════════════════════════
+function renderPages(){
+  const list = $('pageList'); if (!list) return
+  $('pageCountBadge').textContent = `${PAGES.length} page${PAGES.length === 1 ? '' : 's'}`
+  if (!PAGES.length) {
+    list.innerHTML = `<div class="empty">No pages yet — visit any page in the system and it will appear here.</div>`
+    return
+  }
+  list.innerHTML = PAGES.map(p => {
+    const sysTag = p.is_system ? '<span style="background:var(--b50);color:var(--blue);padding:2px 7px;border-radius:5px;font-size:9px;font-weight:700;letter-spacing:.3px;text-transform:uppercase">System</span>' : '<span style="background:var(--g50);color:var(--green);padding:2px 7px;border-radius:5px;font-size:9px;font-weight:700;letter-spacing:.3px;text-transform:uppercase">Auto-registered</span>'
+    return `<div class="cat-card" data-page-edit="${esc(p.id)}" style="padding:12px 14px">
+      <div class="cat-ic" style="font-size:18px">${esc(p.icon || '📄')}</div>
+      <div class="cat-info">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div class="cat-label">${esc(p.label)}</div>
+          ${sysTag}
+          ${p.is_active === false ? '<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:5px;font-size:9px;font-weight:700">Hidden</span>' : ''}
+        </div>
+        <div class="cat-key">${esc(p.id)}${p.description ? ' · ' + esc(p.description) : ''}</div>
+      </div>
+      <div class="cat-edit">✏️</div>
+    </div>`
+  }).join('')
+  list.querySelectorAll('[data-page-edit]').forEach(c => {
+    c.addEventListener('click', () => editPage(c.dataset.pageEdit))
+  })
+}
+
+function fillPageModal(p){
+  $('pageId').value         = p.id
+  $('pageIdView').value     = p.id
+  $('pageLabel').value      = p.label || ''
+  $('pageIcon').value       = p.icon || ''
+  $('pageSort').value       = p.sort_order ?? 100
+  $('pageDesc').value       = p.description || ''
+  $('pageActive').checked   = p.is_active !== false
+  $('pageAlwaysView').checked = !!p.always_view
+  $('pageDeleteBtn').style.display = p.is_system ? 'none' : ''
+  $('pageModalTitle').textContent  = `Edit page · ${p.label}`
+  openModal('pageModal')
+}
+function editPage(id){ const p = PAGES.find(x => x.id === id); if (p) fillPageModal(p) }
+
+$('pageSaveBtn').addEventListener('click', async () => {
+  const id = $('pageId').value
+  const rec = {
+    label:        $('pageLabel').value.trim(),
+    icon:         $('pageIcon').value.trim() || null,
+    sort_order:   parseInt($('pageSort').value, 10) || 100,
+    description:  $('pageDesc').value.trim() || null,
+    is_active:    $('pageActive').checked,
+    always_view:  $('pageAlwaysView').checked
+  }
+  if (!rec.label) { ntf('Label is required', 'err'); return }
+  const { error } = await sb.from('system_pages').update(rec).eq('id', id)
+  if (error) { ntf('Save failed: ' + error.message, 'err'); return }
+  ntf('Page updated', 'ok')
+  closeModal('pageModal')
+  await loadPages()
+  renderPages(); renderRoles()  // matrix needs rebuild
+})
+
+$('pageDeleteBtn').addEventListener('click', async () => {
+  const id = $('pageId').value
+  const p  = PAGES.find(x => x.id === id)
+  if (!p || p.is_system) { ntf('System pages can\'t be deleted', 'err'); return }
+  if (!confirm(`Delete page "${p.label}"?\n\nThis removes it from the role matrix. The HTML file will still exist and will re-register itself if visited again.`)) return
+  const { error } = await sb.from('system_pages').delete().eq('id', id)
+  if (error) { ntf('Delete failed: ' + error.message, 'err'); return }
+  ntf('Page deleted', 'ok')
+  closeModal('pageModal')
+  await loadPages()
+  renderPages(); renderRoles()
+})
+
+// ════════════════════════════════════════════════════════════════
 //  INITIAL LOAD
 // ════════════════════════════════════════════════════════════════
 ;(async () => {
-  await loadRoles()       // roles must come first — employees table renders role badges
+  await loadPages()       // pages drive the Roles & Access matrix
+  await loadRoles()       // roles must come second — employees table renders role badges
   await loadEmployees()
   await loadCategories()
   await loadSystem()
