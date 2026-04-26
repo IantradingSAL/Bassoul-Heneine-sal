@@ -264,17 +264,32 @@ tbody tr:hover{background:#f8fafc}
   .mod-grid{grid-template-columns:repeat(2,1fr)}
 }
 @media (max-width:780px){
-  .sidebar{transform:translateX(-100%);transition:transform .2s}
+  .sidebar{transform:translateX(-100%);transition:transform .22s ease;width:84vw;max-width:280px}
   .sidebar.open{transform:translateX(0);box-shadow:0 0 40px rgba(0,0,0,.2)}
+  .cw-mobile-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:99;opacity:0;pointer-events:none;transition:opacity .2s}
+  .cw-mobile-backdrop.on{opacity:1;pointer-events:auto}
   .content{margin-left:0}
-  .foot{left:0}
+  .foot{left:0;font-size:9px;padding:6px 12px;flex-direction:column;gap:2px;text-align:center}
   .menu-btn{display:inline-flex !important}
-  .hero{padding:22px 22px}
-  .hero-h{font-size:24px}
-  .body{padding:16px 16px 72px}
+  .topbar{padding:12px 14px;flex-wrap:nowrap}
+  .topbar .tb-l .tb-hi{font-size:16px}
+  .topbar .tb-l .tb-date{font-size:10px}
+  .hero{padding:20px 18px}
+  .hero-h{font-size:22px;line-height:1.2}
+  .hero-s{font-size:13px;margin-top:6px}
+  .body{padding:14px 14px 80px}
   .kpi-grid{grid-template-columns:repeat(2,1fr);gap:10px}
-  .mod-grid{grid-template-columns:1fr}
-  .kpi-v{font-size:24px}
+  .kpi-card{padding:14px}
+  .kpi-v{font-size:22px}
+  .kpi-l{font-size:10px}
+  .mod-grid{grid-template-columns:1fr;gap:10px}
+  .mod{padding:18px}
+  /* Login card on small screens */
+  .login-card{padding:28px 22px;margin:0 12px}
+  /* Recent activity: scroll horizontally if dense */
+  .activity-table-wrap{overflow-x:auto}
+  /* Bell stays visible */
+  .cw-bell-wrap{margin-left:0 !important}
 }
 .menu-btn{
   display:none;align-items:center;justify-content:center;
@@ -698,15 +713,22 @@ $('signOutBtn').addEventListener('click', async () => {
 })
 
 // ─── mobile menu ──────────────────────────────────────────────
-$('menuBtn').addEventListener('click', () => {
-  $('sidebar').classList.toggle('open')
-})
-document.addEventListener('click', (e) => {
-  const sb = $('sidebar'), btn = $('menuBtn')
-  if (sb.classList.contains('open') && !sb.contains(e.target) && e.target !== btn) {
-    sb.classList.remove('open')
+;(function(){
+  let backdrop = document.querySelector('.cw-mobile-backdrop')
+  if (!backdrop) {
+    backdrop = document.createElement('div')
+    backdrop.className = 'cw-mobile-backdrop'
+    document.body.appendChild(backdrop)
   }
-})
+  function open(){ $('sidebar').classList.add('open'); backdrop.classList.add('on') }
+  function close(){ $('sidebar').classList.remove('open'); backdrop.classList.remove('on') }
+  $('menuBtn').addEventListener('click', e => {
+    e.stopPropagation()
+    $('sidebar').classList.contains('open') ? close() : open()
+  })
+  backdrop.addEventListener('click', close)
+  document.querySelectorAll('#sidebar a').forEach(a => a.addEventListener('click', close))
+})()
 
 // ─── live data load ───────────────────────────────────────────
 async function loadData(){

@@ -115,16 +115,33 @@ a{color:inherit;text-decoration:none}
 
 /* MOBILE — hide convo list when a conversation is open ──────── */
 @media (max-width:780px){
-  .sidebar{transform:translateX(-100%);transition:transform .2s}
+  .sidebar{transform:translateX(-100%);transition:transform .22s ease;width:84vw;max-width:280px}
   .sidebar.open{transform:translateX(0);box-shadow:0 0 40px rgba(0,0,0,.2)}
+  .cw-mobile-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:99;opacity:0;pointer-events:none;transition:opacity .2s}
+  .cw-mobile-backdrop.on{opacity:1;pointer-events:auto}
   .content{margin-left:0}
   .menu-btn{display:inline-flex !important}
-  .convo-rail{width:100%;position:absolute;left:0;top:0;bottom:0;z-index:5}
+  .topbar{padding:10px 14px}
+  .topbar .tb-hi{font-size:16px}
+  .topbar .tb-sub{font-size:10px}
+  /* Convo list takes the full width when no convo selected;
+     conversation pane takes full width when one is open */
+  .convo-rail{width:100%;position:absolute;left:0;top:0;bottom:0;z-index:5;background:var(--card)}
   .chat-shell.viewing .convo-rail{display:none}
   .chat-shell:not(.viewing) .chat-main{display:none}
   .back-btn{display:inline-flex !important}
+  .chat-header{padding:10px 14px}
+  .chat-h-name{font-size:13px}
+  .chat-h-sub{font-size:10px}
+  .msg-scroll{padding:14px 12px;gap:5px}
+  .msg{max-width:88%}
+  .msg-bubble{font-size:13px;padding:7px 10px}
+  .composer{padding:10px 12px;gap:6px}
+  .composer textarea{font-size:13.5px;padding:9px 12px;min-height:40px}
+  .composer button{width:40px;height:40px;font-size:16px}
+  .cw-bell-wrap{margin-left:0 !important}
 }
-.menu-btn,.back-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:9px;background:var(--card);border:1px solid var(--bdr);cursor:pointer;font-size:16px;flex-shrink:0}
+.menu-btn,.back-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:9px;background:var(--card);border:1px solid var(--bdr);cursor:pointer;font-size:16px;flex-shrink:0;font-family:inherit}
 </style>
 </head>
 <body>
@@ -238,7 +255,22 @@ $('signOutBtn').addEventListener('click', async () => {
   sessionStorage.clear()
   location.replace('index.html')
 })
-$('menuBtn').addEventListener('click', () => $('sidebar').classList.toggle('open'))
+$('menuBtn').addEventListener('click', e => {
+  e.stopPropagation()
+  let backdrop = document.querySelector('.cw-mobile-backdrop')
+  if (!backdrop) {
+    backdrop = document.createElement('div')
+    backdrop.className = 'cw-mobile-backdrop'
+    document.body.appendChild(backdrop)
+    backdrop.addEventListener('click', () => {
+      $('sidebar').classList.remove('open')
+      backdrop.classList.remove('on')
+    })
+  }
+  const open = !$('sidebar').classList.contains('open')
+  $('sidebar').classList.toggle('open', open)
+  backdrop.classList.toggle('on', open)
+})
 $('backBtn').addEventListener('click', () => $('chatShell').classList.remove('viewing'))
 
 // ════════════════════════════════════════════════════════════════

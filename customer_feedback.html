@@ -144,7 +144,48 @@ tbody tr:hover{background:#f8fafc}
 .req-name{font-size:13px;font-weight:700}
 .req-meta{font-size:11px;color:var(--mu);margin-top:3px}
 @media(max-width:1400px){.kpi-grid{grid-template-columns:repeat(4,1fr)}}@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:768px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.g2,.g3{grid-template-columns:1fr}.sidebar{display:none}.content{margin-left:0}}
+@media(max-width:768px){
+  /* Sidebar slides in instead of disappearing */
+  .sidebar{transform:translateX(-100%);transition:transform .22s ease;width:84vw;max-width:280px;box-shadow:0 0 40px rgba(0,0,0,.2)}
+  .sidebar.cw-open{transform:translateX(0)}
+  .main{margin-left:0}
+  .topbar{padding:10px 14px}
+  .topbar > div:first-child > div > div:first-child{font-size:14px}
+  .topbar > div:first-child > div > div:nth-child(2){font-size:10px;line-height:1.3}
+  /* All right-side topbar controls flow to a second row, full-width */
+  .topbar > div:last-child{width:100%;gap:6px}
+  .topbar > div:last-child select,.topbar > div:last-child input,.topbar > div:last-child .fi{flex:1 1 calc(50% - 4px);width:auto !important;min-width:0;font-size:13px}
+  .topbar .btn{flex:1 1 auto;font-size:12px;padding:7px 10px}
+  /* Backdrop when sidebar is open */
+  .cw-mobile-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:99;opacity:0;pointer-events:none;transition:opacity .2s}
+  .cw-mobile-backdrop.on{opacity:1;pointer-events:auto}
+  /* Grids collapse */
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .g2,.g3,.g2e{grid-template-columns:1fr !important}
+  /* Body padding tighter */
+  .content,#content,.main > .body,main{padding:14px !important}
+  /* Tables scroll horizontally if too wide */
+  table{font-size:12px}
+  .tw,.table-wrap,div[style*="overflow"]{overflow-x:auto}
+  /* MODAL: full-height bottom sheet on mobile */
+  #modal,.modal-bg{padding:0 !important;align-items:flex-end !important}
+  #modal .modal,.modal-bg .modal{width:100% !important;max-width:100% !important;max-height:95vh;border-radius:16px 16px 0 0 !important;padding:18px 16px 80px !important;overflow-y:auto}
+  /* Form sections: stack everything */
+  .fb-section-body{grid-template-columns:1fr !important;gap:10px !important}
+  .fw{grid-column:1 !important}
+  /* Form fields a bit larger for touch */
+  .fi,input.fi,select.fi,textarea.fi{font-size:14px;padding:10px 12px}
+  /* Bell + topbar fit */
+  .cw-bell-wrap{margin-left:0 !important}
+  .cw-mobile-menu{display:inline-flex !important}
+  /* Modal save bar sticks to bottom */
+  #modal .modal > div[style*="justify-content:flex-end"]:last-child,
+  .modal-bg .modal > div[style*="justify-content:flex-end"]:last-child,
+  #modal .modal > div[style*="justify-content: flex-end"]:last-child{
+    position:sticky;bottom:0;background:var(--card);padding:10px 0;margin:0 -16px -80px;padding:10px 16px 16px;border-top:1px solid var(--bdr);z-index:5;flex-wrap:wrap;gap:6px
+  }
+}
+.cw-mobile-menu{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:9px;background:var(--card);border:1px solid var(--bdr);cursor:pointer;font-size:18px;flex-shrink:0;font-family:inherit}
 @media(max-width:640px){.kpi-grid{grid-template-columns:1fr 1fr}.g2e{grid-template-columns:1fr}}
 
 
@@ -253,9 +294,12 @@ tbody tr:last-child td{border:none}tbody tr:hover{background:#f8fafc}
 <div class="main">
   <div class="topbar">
   
-    <div>
-      <div style="font-size:16px;font-weight:800">💬 Customer Feedback</div>
-      <div style="font-size:11px;color:var(--mu)">ISO 13485 Clause 8.2.1 — Customer Complaints & Feedback Register</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="cw-mobile-menu" id="cwMobileMenuBtn" type="button" aria-label="Open menu">☰</button>
+      <div>
+        <div style="font-size:16px;font-weight:800">💬 Customer Feedback</div>
+        <div style="font-size:11px;color:var(--mu)">ISO 13485 Clause 8.2.1 — Customer Complaints & Feedback Register</div>
+      </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <select class="fi" id="typeFilter" style="width:150px">
@@ -1179,6 +1223,27 @@ window.exportFilteredCsv = () => {
       if(typeof editRec==='function')editRec(caseId)
     }
   }
+})()
+
+// ════════════════════════════════════════════════════════════════
+//  MOBILE MENU — slide-in sidebar for narrow viewports
+// ════════════════════════════════════════════════════════════════
+;(function(){
+  const btn = document.getElementById('cwMobileMenuBtn')
+  const sb  = document.querySelector('.sidebar')
+  if (!btn || !sb) return
+  let backdrop = document.querySelector('.cw-mobile-backdrop')
+  if (!backdrop) {
+    backdrop = document.createElement('div')
+    backdrop.className = 'cw-mobile-backdrop'
+    document.body.appendChild(backdrop)
+  }
+  function open(){ sb.classList.add('cw-open'); backdrop.classList.add('on') }
+  function close(){ sb.classList.remove('cw-open'); backdrop.classList.remove('on') }
+  btn.addEventListener('click', e => { e.stopPropagation(); sb.classList.contains('cw-open') ? close() : open() })
+  backdrop.addEventListener('click', close)
+  // Close on nav link tap
+  sb.querySelectorAll('a').forEach(a => a.addEventListener('click', close))
 })()
 
 // ════════════════════════════════════════════════════════════════

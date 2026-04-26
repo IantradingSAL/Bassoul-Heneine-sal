@@ -157,16 +157,50 @@ tbody tr:hover{background:#f8fafc}
 .foot{position:fixed;bottom:0;left:240px;right:0;background:var(--card);border-top:1px solid var(--bdr);padding:6px 20px;display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--dim);z-index:99}
 
 @media (max-width:780px){
-  .sidebar{transform:translateX(-100%);transition:transform .2s}
+  .sidebar{transform:translateX(-100%);transition:transform .22s ease;width:84vw;max-width:280px}
   .sidebar.open{transform:translateX(0);box-shadow:0 0 40px rgba(0,0,0,.2)}
+  .cw-mobile-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:99;opacity:0;pointer-events:none;transition:opacity .2s}
+  .cw-mobile-backdrop.on{opacity:1;pointer-events:auto}
   .content{margin-left:0}
-  .foot{left:0}
+  .foot{left:0;font-size:9px;padding:6px 10px;flex-direction:column;gap:2px;text-align:center}
   .menu-btn{display:inline-flex !important}
-  .body{padding:16px 16px 72px}
-  .perm-row{grid-template-columns:1fr}
-  .fg{grid-template-columns:1fr}
+  .topbar{padding:10px 14px}
+  .topbar .tb-l .tb-hi{font-size:16px}
+  .topbar .tb-l .tb-date{font-size:10px;line-height:1.3}
+  .body{padding:14px 14px 90px}
+  /* Section headers stack title + button */
+  .section-h{flex-direction:column;align-items:stretch;gap:10px}
+  .section-h .btn{width:100%;justify-content:center;padding:10px}
+  /* Tabs scroll horizontally if many */
+  .tabs{width:100%;overflow-x:auto;flex-wrap:nowrap}
+  .tab{flex:0 0 auto;padding:8px 14px;font-size:12px}
+  /* Tables — show in horizontal scroll */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{font-size:12px}
+  thead th,tbody td{padding:9px 10px;white-space:nowrap}
+  /* Hide email + phone columns on tiny screens — keep name/role/status visible */
+  thead th:nth-child(3),tbody td:nth-child(3),
+  thead th:nth-child(4),tbody td:nth-child(4){display:none}
+  /* Permission rows stack */
+  .perm-row{grid-template-columns:1fr;padding:10px 14px;gap:8px}
+  .perm-pills{width:100%}
+  /* Form grid stacks */
+  .fg{grid-template-columns:1fr;gap:10px}
+  .fi{font-size:14px;padding:10px 12px}
+  /* Modal becomes bottom sheet */
+  .modal-bg{padding:0 !important;align-items:flex-end !important}
+  .modal-bg .modal{width:100% !important;max-width:100% !important;max-height:92vh;overflow-y:auto;border-radius:16px 16px 0 0 !important;padding:20px 16px}
+  .m-foot{flex-wrap:wrap;gap:6px}
+  .m-foot .btn{flex:1;justify-content:center}
+  .m-foot .btn-red{flex:1 0 100%;order:99}
+  /* Role grid stacks */
+  .role-grid{grid-template-columns:1fr;gap:10px}
+  /* Categories grid stacks */
+  .cat-grid{grid-template-columns:1fr;gap:8px}
+  /* Bell stays right-aligned */
+  .cw-bell-wrap{margin-left:0 !important}
 }
-.menu-btn{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:var(--card);border:1px solid var(--bdr);cursor:pointer;font-size:18px}
+.menu-btn{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:var(--card);border:1px solid var(--bdr);cursor:pointer;font-size:18px;font-family:inherit;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -546,7 +580,22 @@ $('signOutBtn').addEventListener('click', async () => {
   sessionStorage.clear()
   location.replace('index.html')
 })
-$('menuBtn').addEventListener('click', () => $('sidebar').classList.toggle('open'))
+$('menuBtn').addEventListener('click', e => {
+  e.stopPropagation()
+  let backdrop = document.querySelector('.cw-mobile-backdrop')
+  if (!backdrop) {
+    backdrop = document.createElement('div')
+    backdrop.className = 'cw-mobile-backdrop'
+    document.body.appendChild(backdrop)
+    backdrop.addEventListener('click', () => {
+      $('sidebar').classList.remove('open')
+      backdrop.classList.remove('on')
+    })
+  }
+  const open = !$('sidebar').classList.contains('open')
+  $('sidebar').classList.toggle('open', open)
+  backdrop.classList.toggle('on', open)
+})
 
 // State
 let employees   = []
