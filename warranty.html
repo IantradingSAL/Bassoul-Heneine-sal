@@ -1544,6 +1544,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="RPT_INC_KPI" checked/> KPI summary</label>
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="RPT_INC_REJ" checked/> Rejection list</label>
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="RPT_INC_REC" checked/> Recovery / shortfall</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="RPT_INC_BONUS" checked/> ⭐ Warranty bonus (1%)</label>
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="RPT_INC_DET" checked/> Detailed claims (full table)</label>
           </div>
         </div>
@@ -3304,12 +3305,28 @@ function _rptKPIs(rows){
       if (d.shortfall != null) totalShortfall += d.shortfall;
     }
   });
+  // Warranty bonus: 1% × labour_definitive on PAID claims only.
+  // Group by month so the PDF can render a per-month breakdown.
+  const bonusByMonth = {};
+  paid.forEach(r => {
+    const m = r.month || '?';
+    if (!bonusByMonth[m]) bonusByMonth[m] = { month:m, claims:0, paidLabour:0 };
+    bonusByMonth[m].claims++;
+    bonusByMonth[m].paidLabour += r.lp;
+  });
+  const bonusRows = Object.keys(bonusByMonth).sort().map(k => ({
+    ...bonusByMonth[k],
+    bonus: bonusByMonth[k].paidLabour * 0.01
+  }));
+  const totalLabour = bonusRows.reduce((s,r) => s + r.paidLabour, 0);
+  const totalBonus  = bonusRows.reduce((s,r) => s + r.bonus, 0);
   const rejRate     = total > 0 ? (rejected.length / total * 100) : 0;
   const recRate     = totalRejAmt > 0 ? (totalCredited / totalRejAmt * 100) : 0;
   return {
     total, paidCount: paid.length, rejectedCount: rejected.length,
     totalAsked, totalPaid, totalRejAmt, totalCredited, totalShortfall, credCount,
-    rejRate, recRate
+    rejRate, recRate,
+    bonusRows, totalLabour, totalBonus
   };
 }
 
@@ -3368,11 +3385,20 @@ function rRptPreview(){
 
   body.innerHTML = `
     <div style="margin-bottom:14px;font-size:11px;color:var(--muted)">Filters: ${filterChips}</div>
-    <div class="krow k4" style="margin-bottom:12px">
+    <div class="krow k4" style="margin-bottom:8px">
       <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📋 Claims in scope</div><div class="kv sky">${k.total.toLocaleString()}</div><div class="ks">${k.paidCount} paid · ${k.rejectedCount} rejected</div></div>
       <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Total Paid (€)</div><div class="kv mint">${f(k.totalPaid)}</div><div class="ks">of €${f(k.totalAsked)} asked</div></div>
       <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Rejected (€)</div><div class="kv rose">${f(k.totalRejAmt)}</div><div class="ks">${k.rejRate.toFixed(1)}% rejection rate</div></div>
       <div class="kpi"><div class="kpi-accent" style="background:#10B981"></div><div class="kl">💚 Recovered (€)</div><div class="kv" style="color:#065F46">${f(k.totalCredited)}</div><div class="ks">${k.credCount} claim${k.credCount===1?'':'s'} · ${k.recRate.toFixed(1)}% recovery</div></div>
+    </div>
+    <div class="krow k2" style="margin-bottom:12px">
+      <div class="kpi" style="background:linear-gradient(135deg,var(--lemon3,#FEF3C7),#FFF8E7);border-color:var(--lemon2,#FDE68A)">
+        <div class="kpi-accent" style="background:var(--sun,#D97706)"></div>
+        <div class="kl">⭐ Warranty Bonus 1% (€)</div>
+        <div class="kv" style="color:var(--sun,#D97706)">${f(k.totalBonus)}</div>
+        <div class="ks">on €${f(k.totalLabour)} paid labour</div>
+      </div>
+      <div class="kpi"><div class="kpi-accent" style="background:#3B5FE2"></div><div class="kl">📅 Months covered</div><div class="kv" style="color:#3B5FE2">${k.bonusRows.length}</div><div class="ks">in selected period</div></div>
     </div>
     <div style="font-size:11px;color:var(--muted);font-weight:500">The PDF will include the sections you've ticked above. Tap <strong>Download PDF</strong> to save it, <strong>Share</strong> to send via WhatsApp / email (mobile), or <strong>Print preview</strong> for a paper copy.</div>
   `;
@@ -3396,6 +3422,7 @@ function rRptGeneratePDF(mode){
   const incKPI = document.getElementById('RPT_INC_KPI').checked;
   const incRej = document.getElementById('RPT_INC_REJ').checked;
   const incRec = document.getElementById('RPT_INC_REC').checked;
+  const incBonus = document.getElementById('RPT_INC_BONUS').checked;
   const incDet = document.getElementById('RPT_INC_DET').checked;
 
   showLoad('Generating PDF…');
@@ -3575,6 +3602,86 @@ function rRptGeneratePDF(mode){
             theme: 'striped'
           });
           y = pdf.lastAutoTable.finalY + 6;
+        }
+      }
+
+      // ── WARRANTY BONUS (1%) ──────────────────────────────────
+      if (incBonus){
+        if (k.bonusRows.length){
+          if (y > pageH - 60) { pdf.addPage(); y = margin; }
+
+          // Section title
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica','bold');
+          pdf.setTextColor(217,119,6);   // amber
+          pdf.text('Warranty Bonus — 1% on Paid Labour', margin, y);
+          pdf.setFontSize(8);
+          pdf.setFont('helvetica','normal');
+          pdf.setTextColor(120,53,15);
+          pdf.text('Formula: 1% × labour_definitive_amount_without_pco_eur · Paid claims only (status = 0)', margin, y + 4);
+          y += 8;
+
+          // Highlight box with the headline number
+          pdf.setFillColor(254, 243, 199);    // amber-100
+          pdf.setDrawColor(253, 224, 71);     // amber-300
+          pdf.roundedRect(margin, y, pageW - margin*2, 18, 2, 2, 'FD');
+          pdf.setFontSize(8);
+          pdf.setFont('helvetica','bold');
+          pdf.setTextColor(120, 53, 15);
+          pdf.text('TOTAL BONUS DUE', margin + 4, y + 6);
+          pdf.text('PAID LABOUR (BASE)', margin + 70, y + 6);
+          pdf.text('MONTHS', margin + 130, y + 6);
+          pdf.text('PAID CLAIMS', margin + 160, y + 6);
+          pdf.setFontSize(15);
+          pdf.setTextColor(217, 119, 6);
+          pdf.text('EUR ' + f(k.totalBonus), margin + 4, y + 14);
+          pdf.setFontSize(11);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text('EUR ' + f(k.totalLabour), margin + 70, y + 14);
+          pdf.text(String(k.bonusRows.length), margin + 130, y + 14);
+          pdf.text(String(k.bonusRows.reduce((s,r) => s + r.claims, 0)), margin + 160, y + 14);
+          y += 22;
+
+          // Per-month breakdown table
+          pdf.autoTable({
+            startY: y,
+            head: [['Month', 'Paid Claims', 'Paid Labour (EUR)', 'Bonus 1% (EUR)']],
+            body: k.bonusRows.map(r => [
+              fmM(r.month),
+              String(r.claims),
+              f(r.paidLabour),
+              f(r.bonus)
+            ]),
+            foot: [['TOTAL',
+                    String(k.bonusRows.reduce((s,r) => s + r.claims, 0)),
+                    f(k.totalLabour),
+                    f(k.totalBonus)]],
+            styles: { fontSize: 8, cellPadding: 2 },
+            headStyles: { fillColor: [217, 119, 6], textColor: 255, fontSize: 8, fontStyle: 'bold' },
+            footStyles: { fillColor: [254, 243, 199], textColor: [120, 53, 15], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [255, 251, 235] },
+            columnStyles: {
+              1: { halign: 'right' },
+              2: { halign: 'right' },
+              3: { halign: 'right', fontStyle: 'bold', textColor: [217, 119, 6] }
+            },
+            margin: { left: margin, right: margin },
+            theme: 'striped'
+          });
+          y = pdf.lastAutoTable.finalY + 6;
+        } else {
+          // No paid claims in scope → tell the reader explicitly
+          if (y > pageH - 30) { pdf.addPage(); y = margin; }
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica','bold');
+          pdf.setTextColor(217,119,6);
+          pdf.text('Warranty Bonus — 1% on Paid Labour', margin, y);
+          y += 6;
+          pdf.setFontSize(9);
+          pdf.setFont('helvetica','italic');
+          pdf.setTextColor(120, 53, 15);
+          pdf.text('No paid claims in the selected period — bonus not applicable.', margin, y);
+          y += 8;
         }
       }
 
