@@ -1727,8 +1727,34 @@ async function cwResubLoad(){
 async function cwResubUpsert(origInvoice, claim){
   // claim = the GCM row for this invoice (provides VIN, RO, month, etc.)
   // origInvoice acts as the natural primary key (ON CONFLICT (orig_invoice))
-  const ctx = await cwResubGetSb(); if (!ctx) return
-  const d = S.rej[origInvoice]; if (!d) return
+  // Returns: true on success, false if no Supabase or no data, throws on real errors
+  const ctx = await cwResubGetSb();
+  if (!ctx) {
+    console.warn('[BH] cwResubUpsert: no Supabase context (offline?)')
+    return false
+  }
+  const d = S.rej[origInvoice];
+  if (!d) {
+    console.warn('[BH] cwResubUpsert: no rejection data for', origInvoice)
+    return false
+  }
+  // ── Date sanitiser ──────────────────────────────────────────────
+  // Postgres needs YYYY-MM-DD. Old localStorage records have human
+  // formats like "Wed Jan 21" — these need converting before upsert.
+  // If the value can't be parsed as a date, send null (rather than
+  // failing the whole save with a 400 error).
+  const _toIsoDate = v => {
+    if (!v) return null;
+    const s = String(v).trim();
+    if (!s) return null;
+    // Already YYYY-MM-DD or YYYY-MM-DDTHH... — pass through
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substr(0, 10);
+    // Otherwise try Date parsing
+    const d2 = new Date(s);
+    if (isNaN(d2.getTime())) return null;
+    return d2.toISOString().substr(0, 10);
+  };
+
   const payload = {
     orig_invoice:   origInvoice,
     orig_vin:       claim?.vin || null,
@@ -1741,11 +1767,11 @@ async function cwResubUpsert(origInvoice, claim){
     category:       d.cat      || null,
     new_claim:      d.newClaim || null,
     re_invoice:     d.reInv    || null,
-    resub_date:     d.resubDate|| null,
+    resub_date:     _toIsoDate(d.resubDate),
     rejected_amt:   d.rejectedAmt ?? null,
     accepted_amt:   d.acceptedAmt ?? null,
     credited_amt:   d.creditedAmt ?? null,
-    credit_date:    d.creditDate  || null,
+    credit_date:    _toIsoDate(d.creditDate),
     shortfall:      d.shortfall   ?? null,
     recovery_rate:  d.recoveryRate?? null,
     status:         d.status || 'pending',
@@ -1754,12 +1780,14 @@ async function cwResubUpsert(origInvoice, claim){
     updated_by:     ctx.me?.id   || null,
     updated_by_name:ctx.me?.name || null
   }
-  try {
-    const { error } = await ctx.sb
-      .from('warranty_resubmissions')
-      .upsert(payload, { onConflict: 'orig_invoice' })
-    if (error) console.warn('Resub upsert failed:', error.message)
-  } catch (e) { console.warn('Resub upsert error:', e) }
+  const { error } = await ctx.sb
+    .from('warranty_resubmissions')
+    .upsert(payload, { onConflict: 'orig_invoice' })
+  if (error) {
+    console.error('[BH] Resub upsert failed:', error.message, error)
+    throw error
+  }
+  return true
 }
 
 async function cwResubBulkUpsert(invoiceList){
@@ -1767,6 +1795,37 @@ async function cwResubBulkUpsert(invoiceList){
   for (const inv of invoiceList) {
     const claim = (S.gcm || []).find(r => r.inv === inv)
     await cwResubUpsert(inv, claim)
+  }
+}
+
+// Manual "Sync All to Cloud" button on the Rejections page.
+// Pushes every locally-tracked rejection to Supabase. Reports
+// success/failure per record + an aggregate summary.
+async function cwSyncAllRejectionsToCloud(){
+  const invoices = Object.keys(S.rej || {});
+  if (!invoices.length) {
+    showToast('⚠️ No rejection records to sync — nothing tracked locally yet.');
+    return;
+  }
+  showLoad('Pushing ' + invoices.length + ' record' + (invoices.length===1?'':'s') + ' to cloud …');
+  let ok = 0, failed = 0, lastErr = '';
+  for (const inv of invoices){
+    const claim = (S.gcm || []).find(r => r.inv === inv);
+    try {
+      const res = await cwResubUpsert(inv, claim);
+      if (res === true) ok++;
+      else { failed++; lastErr = 'No cloud connection or no data for ' + inv; }
+    } catch (err) {
+      failed++;
+      lastErr = (err?.message || String(err));
+      console.error('[BH] Sync failed for', inv, err);
+    }
+  }
+  hideLoad();
+  if (failed === 0){
+    showToast('✅ All ' + ok + ' rejection record' + (ok===1?'':'s') + ' synced to cloud — visible to all devices now.');
+  } else {
+    showToast('⚠️ Synced ' + ok + ' of ' + invoices.length + '. ' + failed + ' failed. Last error: ' + lastErr);
   }
 }
 
@@ -3164,8 +3223,20 @@ function saveRej(){
   });
   document.getElementById('B_REJ').textContent=S.gcm.filter(r=>r.st===4).length;
   lsSave(LS_REJ,S.rej);
-  // Push to Supabase so the team sees the update on their devices
-  cwResubUpsert(_mk, claim).catch(()=>{});
+  // Push to Supabase so the team sees the update on their devices.
+  // We capture cloud success/failure and SHOW it to the user — silent
+  // failure was hiding sync issues for hours.
+  cwResubUpsert(_mk, claim).then(result => {
+    if (result === false || result === null) {
+      console.warn('[BH] Cloud save returned no confirmation — data is local only on this device');
+      showToast('⚠️ Saved locally only — cloud sync failed. Other PCs will not see this. (Check console for details.)');
+    } else {
+      console.log('[BH] ✅ Saved to cloud — visible to all devices');
+    }
+  }).catch(err => {
+    console.error('[BH] Cloud save error:', err);
+    showToast('⚠️ Cloud save failed: ' + (err?.message || 'unknown error') + '. Saved locally only.');
+  });
   updLsStatus();
   if (autoMatchedNow){
     showToast('💚 Auto-matched! '+newClaim+' paid €'+f(creditedAmt)+(creditDate?' on '+creditDate:'')+' — status set to Credited.');
@@ -3746,7 +3817,10 @@ function rRej(){
   };
 
   let h=`<div class="card" style="padding:0;overflow:hidden">
-  <div class="ct" style="padding:14px 16px 0">❌ Rejected Claims — Full Tracking Protocol</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px 0;flex-wrap:wrap;gap:8px">
+    <div class="ct" style="padding:0">❌ Rejected Claims — Full Tracking Protocol</div>
+    <button class="btn btn-sm btn-sky" onclick="cwSyncAllRejectionsToCloud()" title="Push every locally-saved rejection record to the cloud database so other devices see them">☁️ Sync All to Cloud</button>
+  </div>
   <div class="tw"><table class="t">
   <thead><tr>
     <th>VIN</th><th>Invoice #</th><th>RO</th><th>Month</th><th>Exp</th>
