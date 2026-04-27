@@ -2361,7 +2361,72 @@ async function procF(file, type){
   const r = new FileReader();
   r.onload = async e => {
     try {
-      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      // ── ROBUST READ — file might be:
+      //   • A real .xlsx (zipped XML)            → XLSX.read(arrayBuffer, {type:'array'})
+      //   • An old .xls BIFF file                → same call still works
+      //   • An HTML table wrapped with .xlsx     → portal exports do this
+      //   • A CSV file mislabeled as .xlsx
+      //   • A corrupted download
+      //
+      // Strategy: try array, fall back to binary, then sniff for HTML/CSV.
+      let wb = null;
+      let readError = null;
+      const buf = e.target.result;
+      // First attempt: standard xlsx/xls binary
+      try {
+        wb = XLSX.read(buf, {type:'array', cellDates:true});
+      } catch (err1) {
+        readError = err1;
+        // Second attempt: read as binary string (some older xls files need this)
+        try {
+          const bytes = new Uint8Array(buf);
+          let bin = '';
+          for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+          wb = XLSX.read(bin, {type:'binary', cellDates:true});
+          readError = null;
+        } catch (err2) {
+          // Third attempt: maybe it's HTML or CSV with .xlsx extension
+          const head = new TextDecoder('utf-8', {fatal: false}).decode(new Uint8Array(buf).slice(0, 200)).toLowerCase();
+          if (head.includes('<html') || head.includes('<table') || head.includes('<!doctype html') || head.includes('<?xml')){
+            // HTML-wrapped export — XLSX.read can parse HTML if told
+            try {
+              const fullText = new TextDecoder('utf-8', {fatal: false}).decode(new Uint8Array(buf));
+              wb = XLSX.read(fullText, {type:'string', cellDates:true});
+              readError = null;
+            } catch (err3) {
+              readError = err3;
+            }
+          } else if (head.includes(',') && !head.includes('\x00') && /[a-z]/i.test(head)){
+            // Plain CSV
+            try {
+              const csvText = new TextDecoder('utf-8', {fatal: false}).decode(new Uint8Array(buf));
+              wb = XLSX.read(csvText, {type:'string', cellDates:true, raw:false});
+              readError = null;
+            } catch (err4) {
+              readError = err4;
+            }
+          }
+        }
+      }
+      if (!wb || !wb.SheetNames || !wb.SheetNames.length){
+        hideLoad();
+        const msg = String(readError && readError.message || 'no readable sheet');
+        // Build a useful diagnostic for the user
+        let hint = '';
+        if (/workbook stream|biff|cfb/i.test(msg)) {
+          hint = 'The file is not a valid Excel file. Likely it was downloaded as HTML or saved in an unsupported format. Try: open in Excel → File → Save As → Excel Workbook (.xlsx) → re-upload that file.';
+        } else if (/corrupted|encrypted|password/i.test(msg)) {
+          hint = 'The file appears corrupted or password-protected. Re-download it from the Renault portal and make sure it has no password.';
+        } else {
+          hint = 'Try re-saving the file in Excel as .xlsx, or use a different export format from the source system.';
+        }
+        stat('ST_'+type.toUpperCase(), '❌ Cannot read file — ' + (readError?.message || 'unknown format'), false);
+        showToast('❌ ' + file.name + ' is not a valid Excel file. ' + hint);
+        console.error('[BH] xlsx read failed:', readError, 'first 200 bytes hex:',
+          Array.from(new Uint8Array(buf).slice(0, 32)).map(b => b.toString(16).padStart(2,'0')).join(' '));
+        return;
+      }
+
       let parsed = [];
       let parsedRaw = null;
       if(type==='gcm'){
@@ -2374,7 +2439,10 @@ async function procF(file, type){
         parsed = parseINC(parsedRaw);
       }
       if (!parsed.length){
-        hideLoad(); stat('ST_'+type.toUpperCase(), '⚠️ File appears empty or unrecognised', false); return;
+        hideLoad();
+        stat('ST_'+type.toUpperCase(), '⚠️ File parsed but no rows recognised — check column headers match the expected GCM/INCADEA format', false);
+        showToast('⚠️ ' + file.name + ' parsed but contained no recognisable rows. The column headers may not match the expected format.');
+        return;
       }
 
       // Step 2 — detect period
@@ -2620,7 +2688,67 @@ function updPills(){
 }
 
 // ══ PARSERS ══════════════════════════════════════════════════
+// ── Smart column finder — last-resort fallback for fields whose
+// exact column name varies across GCM exports. Scans every key of
+// the row and returns the value of the first key whose lower-cased
+// name contains ALL of the `must` substrings AND at least one of
+// the `any` substrings. Returns null if no match.
+function _scanRowFor(r, mustWords, anyWords){
+  if (!r) return null;
+  for (const key of Object.keys(r)){
+    const k = key.toLowerCase();
+    if (!mustWords.every(w => k.includes(w))) continue;
+    if (!anyWords.some(w => k.includes(w))) continue;
+    const v = r[key];
+    if (v !== undefined && v !== null && v !== '') return v;
+  }
+  return null;
+}
+
+// ── Read by Excel column letter (A=0, B=1, ... AN=39, AO=40, etc.)
+// Used as positional fallback when header-text matching fails.
+// Renault GCM exports have external-service amounts at columns AN/AO.
+function _colByLetter(r, letter){
+  if (!r) return null;
+  // Convert Excel column letter to zero-based index
+  let idx = 0;
+  for (let i = 0; i < letter.length; i++){
+    idx = idx * 26 + (letter.charCodeAt(i) - 64);
+  }
+  idx -= 1;   // make zero-based
+  const keys = Object.keys(r);
+  if (idx < 0 || idx >= keys.length) return null;
+  return r[keys[idx]];
+}
+
 function parseGCM(raw){
+  // ── ONE-TIME DIAGNOSTIC: log the column headers of the first row
+  // so we can see exactly what names this specific GCM export uses.
+  // Open DevTools (F12) → Console after upload to see them.
+  if (raw && raw.length && !window._cwGcmHeadersLogged) {
+    window._cwGcmHeadersLogged = true;
+    const hdrs = Object.keys(raw[0]);
+    console.log('[BH] GCM headers (' + hdrs.length + ' cols):', hdrs);
+    // Show columns AN-AR specifically (where external service usually sits)
+    console.log('[BH] === Columns AM-AR (positional) ===');
+    for (let i = 38; i <= 43; i++){
+      if (hdrs[i]) {
+        // Find first row with a non-zero non-empty value in this column
+        const sample = raw.find(r => r[hdrs[i]] !== '' && r[hdrs[i]] !== 0 && r[hdrs[i]] != null);
+        const letter = i < 26 ? String.fromCharCode(65+i) : 'A' + String.fromCharCode(65 + (i-26));
+        console.log('  Col ' + letter + ' (idx ' + i + '): "' + hdrs[i] + '" — sample value: ' + (sample ? sample[hdrs[i]] : '(all empty/zero)'));
+      }
+    }
+    // Spot-check anything that looks like external/sublet/other/charge
+    const candidates = hdrs.filter(h => /external|sublet|service|outwork|outsource|subcontract|other.charg|other_charg|charg.amount|local.currency|t_local/i.test(h));
+    if (candidates.length){
+      console.log('[BH] External-service candidate columns found:', candidates);
+      console.log('[BH] First-row values for those:', candidates.map(h => h + ' = ' + raw[0][h]));
+    } else {
+      console.warn('[BH] No external-service columns auto-detected by name. Will use AN/AO positional fallback.');
+    }
+  }
+
   // ─── DEDUP / FLAGGING LOGIC (new behavior) ────────────────────
   // In Renault GCM, an invoice can have multiple operations:
   //   INV-123a / INV-123b / INV-123c — separate billable repairs on
@@ -2736,8 +2864,10 @@ function parseGCM(raw){
       pp: n(r.part_definitive_amount_without_pco_eur),
       la: n(r.labour_received_amount_eur),
       lp: n(r.labour_definitive_amount_without_pco_eur),
-      // EXTERNAL SERVICE / SUBLET — auto-detect across common GCM
-      // export column names. If none found, ea/ep stay 0 (graceful).
+      // EXTERNAL SERVICE / SUBLET / OTHER CHARGES — auto-detect across
+      // every variant we've seen in the wild. If none found, ea/ep stay 0.
+      // Last-resort fallback: scan ALL row keys for anything that looks
+      // like it might be the right column (substring match on header text).
       ea: n(
         r.external_service_received_amount_eur ??
         r.external_received_amount_eur ??
@@ -2751,7 +2881,19 @@ function parseGCM(raw){
         r.outwork_received_amount ??
         r.outsource_received_amount_eur ??
         r.subcontract_received_amount_eur ??
-        r.AN ??                       // positional fallback (column AN)
+        // Renault-standard "other charges"
+        r.other_charges_received_amount_eur ??
+        r.other_charges_received_amount_local_eur ??
+        r.other_received_amount_eur ??
+        r.other_received_amount ??
+        r.oth_received_amount_eur ??
+        r.OTHER_CHARGES_RECEIVED_AMOUNT_EUR ??
+        r.OTHER_CHARGES_RECEIVED_AMOUNT_LOCAL_EUR ??
+        // Substring-based fallback
+        _scanRowFor(r, ['received','asked'], ['external','sublet','service','outwork','outsource','subcontract','other','charge']) ??
+        // FINAL fallback: Excel column AN (the 40th column).
+        // Renault GCM exports place external-service "asked" here.
+        _colByLetter(r, 'AN') ??
         0
       ),
       ep: n(
@@ -2769,7 +2911,19 @@ function parseGCM(raw){
         r.outwork_definitive_amount_eur ??
         r.outsource_definitive_amount_without_pco_eur ??
         r.subcontract_definitive_amount_without_pco_eur ??
-        r.AO ??                       // positional fallback (column AO)
+        // Renault-standard "other charges"
+        r.other_charges_definitive_amount_without_pco_eur ??
+        r.other_charges_definitive_amount_eur ??
+        r.other_definitive_amount_without_pco_eur ??
+        r.other_definitive_amount_eur ??
+        r.oth_definitive_amount_without_pco_eur ??
+        r.OTHER_CHARGES_DEFINITIVE_AMOUNT_WITHOUT_PCO_EUR ??
+        r.OTHER_CHARGES_DEFINITIVE_AMOUNT_EUR ??
+        // Substring-based fallback
+        _scanRowFor(r, ['definitive','paid'], ['external','sublet','service','outwork','outsource','subcontract','other','charge']) ??
+        // FINAL fallback: Excel column AO (the 41st column).
+        // Renault GCM exports place external-service "paid" here.
+        _colByLetter(r, 'AO') ??
         0
       ),
       ta: n(r.received_amount_eur),
