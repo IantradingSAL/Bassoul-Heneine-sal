@@ -1301,7 +1301,12 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
         <div style="font-size:10px;color:var(--muted);margin-bottom:12px;font-weight:500">Claims_detail_MM_YYYY_LB.xlsx · from GCM portal</div>
       </div>
       <div style="padding:0 16px 16px">
-        <div class="dzb" id="DZ_GCM" ondragover="dzO(event,'DZ_GCM')" ondragleave="dzL('DZ_GCM')" ondrop="dzD(event,'gcm')" onclick="if(!event.target.closest('label')){document.getElementById('FI_GCM').click()}">
+        <div class="dzb" id="DZ_GCM"
+             ondragenter="dzE(event,'DZ_GCM')"
+             ondragover="dzO(event,'DZ_GCM')"
+             ondragleave="dzL('DZ_GCM',event)"
+             ondrop="dzD(event,'gcm')"
+             onclick="if(_dzActive)return; if(!event.target.closest('label')){document.getElementById('FI_GCM').click()}">
           <span class="dz-emoji">📂</span>
           <div class="dz-title">Drop your GCM file here</div>
           <div class="dz-sub">Supports .xlsx · Multi-op rows kept · true dups flagged<br/>(same VIN + Invoice #). a/b/c = separate operations</div>
@@ -1317,7 +1322,12 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
         <div style="font-size:10px;color:var(--muted);margin-bottom:12px;font-weight:500">Warranty invoice export from INCADEA DMS · sheet: INCADEA</div>
       </div>
       <div style="padding:0 16px 16px">
-        <div class="dzb" id="DZ_INC" ondragover="dzO(event,'DZ_INC')" ondragleave="dzL('DZ_INC')" ondrop="dzD(event,'inc')" onclick="if(!event.target.closest('label')){document.getElementById('FI_INC').click()}">
+        <div class="dzb" id="DZ_INC"
+             ondragenter="dzE(event,'DZ_INC')"
+             ondragover="dzO(event,'DZ_INC')"
+             ondragleave="dzL('DZ_INC',event)"
+             ondrop="dzD(event,'inc')"
+             onclick="if(_dzActive)return; if(!event.target.closest('label')){document.getElementById('FI_INC').click()}">
           <span class="dz-emoji" style="animation-delay:.4s">🗂️</span>
           <div class="dz-title">Drop your INCADEA file here</div>
           <div class="dz-sub">Supports .xlsx · Matched to GCM by VIN<br/>for reconciliation and comparison</div>
@@ -2218,9 +2228,64 @@ function go(el){
 }
 
 // ══ DRAG & DROP ══════════════════════════════════════════════
-function dzO(e,id){e.preventDefault();document.getElementById(id).classList.add('over')}
-function dzL(id){document.getElementById(id).classList.remove('over')}
-function dzD(e,t){e.preventDefault();dzL('DZ_'+t.toUpperCase());const f=e.dataTransfer.files[0];if(f)procF(f,t)}
+// ── DRAG-DROP HANDLERS ──────────────────────────────────────────
+// Without preventDefault on BOTH dragenter and dragover, the browser
+// keeps its default behavior (opens the file in a new tab). We also
+// stopPropagation on drop so the event doesn't bubble to the document
+// where the browser may intercept it as a "file-load" gesture.
+let _dzActive = false;   // tracks active drag so onclick doesn't double-fire after a drop
+
+function dzE(e, id){            // dragenter
+  e.preventDefault(); e.stopPropagation();
+  document.getElementById(id).classList.add('over');
+  _dzActive = true;
+}
+function dzO(e, id){            // dragover (must keep firing to be a valid drop target)
+  e.preventDefault(); e.stopPropagation();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  document.getElementById(id).classList.add('over');
+}
+function dzL(id, e){            // dragleave
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  document.getElementById(id).classList.remove('over');
+}
+function dzD(e, t){             // drop
+  e.preventDefault();
+  e.stopPropagation();
+  const id = 'DZ_' + t.toUpperCase();
+  document.getElementById(id).classList.remove('over');
+  let f = null;
+  // Modern browsers expose .files; fallback to .items for some edge cases
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length){
+    f = e.dataTransfer.files[0];
+  } else if (e.dataTransfer && e.dataTransfer.items && e.dataTransfer.items.length){
+    for (let i = 0; i < e.dataTransfer.items.length; i++){
+      if (e.dataTransfer.items[i].kind === 'file'){
+        f = e.dataTransfer.items[i].getAsFile();
+        break;
+      }
+    }
+  }
+  if (f) {
+    procF(f, t);
+  } else {
+    showToast('⚠️ No file detected — try drag-drop again or use Choose File');
+  }
+  // Suppress the spurious click that some browsers fire on drop completion
+  setTimeout(() => { _dzActive = false; }, 250);
+  _dzActive = true;
+}
+
+// Fail-safe: if a file is dropped ANYWHERE outside the dropzones,
+// prevent the browser from opening it in a new tab (which destroys
+// the user's session). This is a global safety net.
+window.addEventListener('dragover', e => { e.preventDefault(); }, false);
+window.addEventListener('drop',     e => {
+  // Only swallow if it wasn't already handled by a dropzone
+  if (!e.target.closest || !e.target.closest('.dzb')){
+    e.preventDefault();
+  }
+}, false);
 function loadF(e,t){
   const f=e.target.files[0];
   if(f){
