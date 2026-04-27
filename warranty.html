@@ -2900,15 +2900,21 @@ function parseGCM(raw){
         0
       ),
       ta: n(r.received_amount_eur),
-      tp: n(r.definitive_amount_without_pco_eur),
+      // CRITICAL: Renault's "definitive_amount_without_pco_eur" excludes the
+      // PCO amount, but the PCO is also money paid to the dealer. So the
+      // TRUE Total Paid = definitive_amount_without_pco_eur + pco_amount_eur.
+      // Same idea for the local-currency variant.
+      tp: n(r.definitive_amount_without_pco_eur) + n(r.pco_amount_eur),
     };
   }).map(row => {
-    // Reconcile totals: parts + labour + external must equal the
-    // grand total. If Renault's exported "total" columns are missing
-    // (or appear to be parts+labour only), recompute. We use a small
-    // 0.01 tolerance for floating-point rounding.
-    const computedAsked = (row.pa || 0) + (row.la || 0) + (row.ea || 0);
-    const computedPaid  = (row.pp || 0) + (row.lp || 0) + (row.ep || 0);
+    // Reconcile totals: parts + labour + lubricant + pack should equal
+    // the asked total. If Renault's exported total is missing,
+    // recompute. We use a small 0.01 tolerance for floating-point rounding.
+    const computedAsked = (row.pa || 0) + (row.la || 0) + (row.lua || 0) + (row.pka || 0) + (row.ea || 0);
+    // Total Paid = parts paid + labour paid + lubricant paid + pack paid + PCO
+    // (PCO is included because the field name means "without PCO" — i.e. PCO
+    // was excluded from those subtotals but still a real cash payment.)
+    const computedPaid  = (row.pp || 0) + (row.lp || 0) + (row.lup || 0) + (row.pkp || 0) + (row.ep || 0) + (row.pco || 0);
     if (!row.ta || Math.abs(row.ta - computedAsked) > 0.01) {
       row._taSource = row.ta ? 'recomputed' : 'computed';
       row.ta = computedAsked;
@@ -3392,7 +3398,7 @@ function rGCM(){
     <th>Exp Code</th><th>NITG</th>
     <th class="num">Parts Asked</th><th class="num">Parts Paid</th>
     <th class="num">Labour Asked</th><th class="num">Labour Paid</th>
-    <th class="num" title="PCO = Renault's standard production deduction. Comes off your parts paid amount.">PCO Deducted</th>
+    <th class="num" title="PCO = Programme Constructeur Origine. Renault pays this amount in addition to parts/labour for certain claims (often €150 for major repairs). It's part of your total payment.">PCO Paid</th>
     <th class="num">Total Asked</th><th class="num">Total Paid</th>
     <th>Status</th><th>Action</th>
   </tr></thead><tbody>`;
@@ -3411,7 +3417,7 @@ function rGCM(){
       <td class="mono" style="font-size:9px;color:var(--muted)">${r.nitg||'–'}</td>
       <td class="num">${f(r.pa)}</td><td class="num">${f(r.pp)}</td>
       <td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td>
-      <td class="num" style="${(r.pco||0)>0.01?'color:var(--rose);font-weight:600':'color:var(--faint)'}">${(r.pco||0)>0.01?f(r.pco):'—'}</td>
+      <td class="num" style="${(r.pco||0)>0.01?'color:var(--mint);font-weight:600':'color:var(--faint)'}">${(r.pco||0)>0.01?f(r.pco):'—'}</td>
       <td class="num">${f(r.ta)}</td>
       <td class="num" style="font-weight:700">${f(r.tp)}</td>
       <td><span class="badge ${isP?'b-mint':isR?'b-rose':'b-n'}">${isP?'✅ Paid':isR?'❌ Rejected':'Stat '+r.st}</span>${isR&&rd?.rejType?` <span class="badge ${rd.rejType==='full'?'b-rose':'b-lem'}" style="margin-left:2px">${rd.rejType==='full'?'Full':'Partial'}</span>`:''}${resubChainBadge(r)}</td>
@@ -4131,7 +4137,7 @@ function exportGCM(){
   const headers=['VIN','Invoice #','Op','RO','Month','Date','Exp Code','Exp Description','NITG',
     'Parts Asked','Parts Paid','Labour Asked','Labour Paid',
     'Lubricant Asked','Lubricant Paid','Pack Asked','Pack Paid',
-    'PCO Deducted',
+    'PCO Paid',
     'Total Asked','Total Paid','Status'];
   const data=rows.map(r=>[r.vin,r.inv,r.intLetter||'',r.ro||'',fmM(r.month),r.date||'',
     r.exp||'',r.expD||'',r.nitg||'',r.pa.toFixed(2),r.pp.toFixed(2),r.la.toFixed(2),r.lp.toFixed(2),
