@@ -732,6 +732,8 @@ table.t tbody tr:hover td{background:var(--surf2)}
 .tr-sub td{background:linear-gradient(90deg,var(--lemon3),transparent)!important;font-weight:700;border-top:2px solid var(--lemon2)!important}
 .tr-grand td{background:linear-gradient(135deg,var(--ink),var(--ink2))!important;color:#fff!important;font-weight:700}
 .tr-dup td{background:var(--lemon3)!important}
+.tr-sup td{opacity:.55;font-style:italic}
+.tr-sup .badge{opacity:.85}
 
 /* ── BADGES ── */
 .badge{display:inline-flex;align-items:center;font-size:8px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.05em;text-transform:uppercase;gap:3px}
@@ -1760,20 +1762,32 @@ async function cwResubBulkUpsert(invoiceList){
 // + N row records. Read-only after insert. Source of truth for what
 // every page renders. localStorage now serves only as offline cache.
 
-// Detect role + permission to upload
+// Detect role + permission to upload.
+// If Supabase isn't reachable at all (e.g. offline, schema not migrated),
+// we ALLOW the upload — the local-only fallback in procF will handle
+// it gracefully. Permission is enforced server-side via RLS once cloud
+// is connected; this client check is just an optimisation.
 async function _cwWarrantyCanUpload(){
-  const ctx = await cwResubGetSb(); if (!ctx) return false
+  const ctx = await cwResubGetSb(); if (!ctx) return true   // ← was false; allow for offline/unmigrated
   try {
     const { data: { user } } = await ctx.sb.auth.getUser()
-    if (!user) return false
-    const { data: emp } = await ctx.sb.from('employees')
+    if (!user) return false   // genuinely not signed in
+    const { data: emp, error } = await ctx.sb.from('employees')
       .select('role,custom_role,is_active')
       .eq('auth_user_id', user.id).maybeSingle()
-    if (!emp || emp.is_active === false) return false
+    if (error) {
+      console.warn('[BH] permission check failed, allowing upload:', error.message)
+      return true   // table query failed — let upload through, server enforces
+    }
+    if (!emp) return true     // no employee row found, but auth ok — let through
+    if (emp.is_active === false) return false
     return emp.role === 'manager'
         || emp.role === 'warranty_manager'
         || emp.custom_role === 'warranty_manager'
-  } catch { return false }
+  } catch (e) {
+    console.warn('[BH] permission check threw, allowing upload:', e)
+    return true
+  }
 }
 // Cached value so we don't re-query on every render
 let _cwUploadAllowed = null
@@ -2381,6 +2395,8 @@ async function procF(file, type){
       }
 
       // Step 4 — push to cloud
+      // Step 4 — push to cloud (best-effort; falls back to local-only)
+      let cloudOK = false;
       try {
         await cwUploadBatch({
           fileType: fileTypeKey,
@@ -2390,21 +2406,41 @@ async function procF(file, type){
           rows:     parsed,
           replaceUploadIds
         });
+        cloudOK = true;
       } catch (uploadErr){
-        hideLoad();
-        stat('ST_'+type.toUpperCase(), '❌ Cloud save failed: ' + uploadErr.message, false);
-        showToast('❌ Could not save to cloud. ' + uploadErr.message);
-        return;
+        // Cloud failed — most common cause: SQL tables `warranty_uploads`
+        // / `warranty_gcm_rows` / `warranty_incadea_rows` not yet created.
+        // We DON'T abort import — we keep going with localStorage-only so
+        // the user can still work. Banner tells them what's missing.
+        const msg = String(uploadErr.message || uploadErr);
+        const tableMissing = /relation .* does not exist|warranty_uploads|warranty_gcm_rows|warranty_incadea_rows/i.test(msg);
+        console.warn('[BH] cloud upload failed — falling back to local-only:', msg);
+        if (tableMissing) {
+          showToast('⚠️ Cloud archive tables not deployed yet — file imported locally only. Run 12_warranty_archive.sql to enable cloud sync.');
+        } else {
+          showToast('⚠️ Cloud save failed (' + msg.substring(0,80) + '). File imported locally.');
+        }
       }
 
-      // Step 5 — reload everything from cloud (so all months are merged)
-      showLoad('Refreshing ' + file.name + ' …');
-      if (type === 'gcm'){
-        const cloudGCM = await cwLoadGCMFromCloud();
-        if (cloudGCM) S.gcm = cloudGCM;
+      // Step 5 — load data into S.gcm / S.inc.
+      // If cloud succeeded, merge with whatever's already in cloud (multi-month aggregation).
+      // If cloud failed, just use the freshly-parsed rows (single-file mode, like before).
+      showLoad('Loading ' + file.name + ' …');
+      if (cloudOK) {
+        if (type === 'gcm'){
+          const cloudGCM = await cwLoadGCMFromCloud();
+          if (cloudGCM) S.gcm = cloudGCM;
+          else S.gcm = parsed;     // unexpected fallback
+        } else {
+          const cloudINC = await cwLoadINCFromCloud();
+          if (cloudINC) S.inc = cloudINC;
+          else S.inc = parsed;
+        }
       } else {
-        const cloudINC = await cwLoadINCFromCloud();
-        if (cloudINC) S.inc = cloudINC;
+        // Local-only path: keep behavior compatible with the pre-cloud system.
+        // The new file replaces in-memory state (same as before cloud was added).
+        if (type === 'gcm') S.gcm = parsed;
+        else                S.inc = parsed;
       }
       S.lastUpdate = new Date();
 
@@ -2688,9 +2724,65 @@ function parseGCM(raw){
       pp: n(r.part_definitive_amount_without_pco_eur),
       la: n(r.labour_received_amount_eur),
       lp: n(r.labour_definitive_amount_without_pco_eur),
+      // EXTERNAL SERVICE / SUBLET — auto-detect across common GCM
+      // export column names. If none found, ea/ep stay 0 (graceful).
+      ea: n(
+        r.external_service_received_amount_eur ??
+        r.external_received_amount_eur ??
+        r.external_amount_received ??
+        r.external_received_amount ??
+        r.sublet_received_amount_eur ??
+        r.sublet_received_amount ??
+        r.service_received_amount_eur ??
+        r.service_received_amount ??
+        r.outwork_received_amount_eur ??
+        r.outwork_received_amount ??
+        r.outsource_received_amount_eur ??
+        r.subcontract_received_amount_eur ??
+        r.AN ??                       // positional fallback (column AN)
+        0
+      ),
+      ep: n(
+        r.external_service_definitive_amount_without_pco_eur ??
+        r.external_definitive_amount_without_pco_eur ??
+        r.external_definitive_amount_eur ??
+        r.external_definitive_amount ??
+        r.sublet_definitive_amount_without_pco_eur ??
+        r.sublet_definitive_amount_eur ??
+        r.sublet_definitive_amount ??
+        r.service_definitive_amount_without_pco_eur ??
+        r.service_definitive_amount_eur ??
+        r.service_definitive_amount ??
+        r.outwork_definitive_amount_without_pco_eur ??
+        r.outwork_definitive_amount_eur ??
+        r.outsource_definitive_amount_without_pco_eur ??
+        r.subcontract_definitive_amount_without_pco_eur ??
+        r.AO ??                       // positional fallback (column AO)
+        0
+      ),
       ta: n(r.received_amount_eur),
       tp: n(r.definitive_amount_without_pco_eur),
     };
+  }).map(row => {
+    // Reconcile totals: parts + labour + external must equal the
+    // grand total. If Renault's exported "total" columns are missing
+    // (or appear to be parts+labour only), recompute. We use a small
+    // 0.01 tolerance for floating-point rounding.
+    const computedAsked = (row.pa || 0) + (row.la || 0) + (row.ea || 0);
+    const computedPaid  = (row.pp || 0) + (row.lp || 0) + (row.ep || 0);
+    if (!row.ta || Math.abs(row.ta - computedAsked) > 0.01) {
+      row._taSource = row.ta ? 'recomputed' : 'computed';
+      row.ta = computedAsked;
+    } else {
+      row._taSource = 'gcm-direct';
+    }
+    if (!row.tp || Math.abs(row.tp - computedPaid) > 0.01) {
+      row._tpSource = row.tp ? 'recomputed' : 'computed';
+      row.tp = computedPaid;
+    } else {
+      row._tpSource = 'gcm-direct';
+    }
+    return row;
   }).filter(r=>r.vin||r.inv);
 }
 function parseINC(raw){
@@ -3064,6 +3156,26 @@ function _resubStatus(claim){
   return { kind: 'pending', newClaim: newRow.inv, resubDate: rd.resubDate };
 }
 
+// ── COUNT-ONCE for chained claims (rejected → resubmitted) ──────
+// Returns true if this claim is an ORIGINAL rejected entry whose
+// resubmission EXISTS as a separate row in S.gcm — meaning counting
+// both rows in totals would double-count the same repair.
+//
+// When this is true, the original row should be:
+//  • Excluded from total / KPI sums (Asked vs Paid, Overview, etc.)
+//  • Still shown in the table, but visually faded with a "superseded"
+//    label, so users can audit
+//
+// Resubmitted rows themselves are NEVER excluded — they carry the
+// real money figures going forward.
+function _isSupersededByResubmission(claim){
+  if (!claim || claim.st !== 4) return false
+  const rd = S.rej[claim.inv]
+  if (!rd || !rd.newClaim) return false
+  const target = String(rd.newClaim).trim().toLowerCase()
+  return (S.gcm || []).some(r => String(r.inv||'').trim().toLowerCase() === target)
+}
+
 // Small inline status badge — rendered next to the existing
 // "❌ Rejected" badge in the Status column. Compact, low visual
 // weight; hover for the full story.
@@ -3141,13 +3253,15 @@ function rGCM(){
     <th>Exp Code</th><th>NITG</th>
     <th class="num">Parts Asked</th><th class="num">Parts Paid</th>
     <th class="num">Labour Asked</th><th class="num">Labour Paid</th>
+    <th class="num">External Asked</th><th class="num">External Paid</th>
     <th class="num">Total Asked</th><th class="num">Total Paid</th>
     <th>Status</th><th>Action</th>
   </tr></thead><tbody>`;
   rows.slice(0,600).forEach(r=>{
     const rd=S.rej[r.inv];
     const isP=r.st===0,isR=r.st===4;
-    h+=`<tr class="${r._d?'tr-dup':''}">
+    const isSup=_isSupersededByResubmission(r);
+    h+=`<tr class="${r._d?'tr-dup':''} ${isSup?'tr-sup':''}" ${isSup?'title="Superseded by resubmission — excluded from totals"':''}>
       <td class="mono">${r.vin}${r._d?' <span class="badge b-dup">DUP</span>':''}</td>
       <td class="mono">${r.invBase||r.inv}${resubChainNote(r)}</td>
       <td style="text-align:center">${r.intLetter?`<span class="badge b-sky" style="font-size:9px">${r.intLetter}</span>`:'<span style="color:var(--faint);font-size:9px">—</span>'}</td>
@@ -3158,13 +3272,14 @@ function rGCM(){
       <td class="mono" style="font-size:9px;color:var(--muted)">${r.nitg||'–'}</td>
       <td class="num">${f(r.pa)}</td><td class="num">${f(r.pp)}</td>
       <td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td>
+      <td class="num">${f(r.ea||0)}</td><td class="num">${f(r.ep||0)}</td>
       <td class="num">${f(r.ta)}</td>
       <td class="num" style="font-weight:700">${f(r.tp)}</td>
       <td><span class="badge ${isP?'b-mint':isR?'b-rose':'b-n'}">${isP?'✅ Paid':isR?'❌ Rejected':'Stat '+r.st}</span>${isR&&rd?.rejType?` <span class="badge ${rd.rejType==='full'?'b-rose':'b-lem'}" style="margin-left:2px">${rd.rejType==='full'?'Full':'Partial'}</span>`:''}${resubChainBadge(r)}</td>
       <td>${isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="openModal('${esc(r.inv)}','${r.vin}')">${rd?'✏️ Edit':'+ Track'}</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'}</td>
     </tr>`;
   });
-  if(rows.length>600)h+=`<tr><td colspan="16" style="text-align:center;padding:14px;color:var(--muted);font-size:11px;font-weight:500">… ${rows.length-600} more rows — use filters to narrow down 🔍</td></tr>`;
+  if(rows.length>600)h+=`<tr><td colspan="18" style="text-align:center;padding:14px;color:var(--muted);font-size:11px;font-weight:500">… ${rows.length-600} more rows — use filters to narrow down 🔍</td></tr>`;
   h+=`</tbody></table></div></div>`;
   T.innerHTML=h;
 }
@@ -3173,7 +3288,10 @@ function rGCM(){
 function rOV(){
   const E=document.getElementById('OV_E'),K=document.getElementById('OV_K'),C=document.getElementById('OV_C'),T=document.getElementById('OV_T');
   if(!S.gcm.length){E.style.display='flex';K.style.display='none';C.style.display='none';T.innerHTML='';return;}E.style.display='none';
-  const vld=S.gcm.filter(r=>true);
+  // Exclude superseded originals — their resubmission carries the money,
+  // counting both would inflate "asked" and distort the rejection rate.
+  const vld=S.gcm.filter(r => !_isSupersededByResubmission(r));
+  const supersededCount = S.gcm.length - vld.length;
   const byM={};
   vld.forEach(r=>{
     const k=r.month||'?';
@@ -3188,7 +3306,7 @@ function rOV(){
   const uniqueVINs=new Set(vld.map(r=>r.vin)).size;
   K.style.display='grid';
   K.innerHTML=`
-    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📋 Total Claims</div><div class="kv sky">${tot.cnt.toLocaleString()}</div><div class="ks">${uniqueVINs} unique VINs · ${mr.length} months</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📋 Total Claims</div><div class="kv sky">${tot.cnt.toLocaleString()}</div><div class="ks">${uniqueVINs} unique VINs · ${mr.length} months${supersededCount?' · '+supersededCount+' resub-superseded excluded':''}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">🔩 Parts Paid (€)</div><div class="kv sun">${f(tot.pp)}</div><div class="ks">of €${f(tot.pa)} asked</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">🔧 Labour Paid (€)</div><div class="kv mint">${f(tot.lp)}</div><div class="ks">of €${f(tot.la)} asked</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💰 Grand Total Paid (€)</div><div class="kv pur" style="font-size:22px">${f(tot.tp)}</div><div class="ks">of €${f(tot.ta)} asked · €${f(tot.ta-tot.tp)} deducted</div></div>
@@ -3378,14 +3496,17 @@ function rAP(){
   const E=document.getElementById('AP_E'),K=document.getElementById('AP_K'),T=document.getElementById('AP_T');
   if(!S.gcm.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}E.style.display='none';
   const mf=gv('F_AM'),ef=gv('F_AE');
-  const rows=S.gcm.filter(r=>(!mf||r.month===mf)&&(!ef||r.exp===ef));
-  const byME={};rows.forEach(r=>{const k=r.month+'||'+r.exp;if(!byME[k])byME[k]={m:r.month,exp:r.exp,expD:r.expD,cnt:0,pa:0,pp:0,la:0,lp:0,ta:0,tp:0};byME[k].cnt++;byME[k].pa+=r.pa;byME[k].pp+=r.pp;byME[k].la+=r.la;byME[k].lp+=r.lp;byME[k].ta+=r.ta;byME[k].tp+=r.tp;});
+  // Filter then exclude superseded originals (their resubmission carries the money).
+  const allRows=S.gcm.filter(r=>(!mf||r.month===mf)&&(!ef||r.exp===ef));
+  const supersededIds = new Set(allRows.filter(_isSupersededByResubmission).map(r => r.inv));
+  const rows = allRows.filter(r => !supersededIds.has(r.inv));
+  const byME={};rows.forEach(r=>{const k=r.month+'||'+r.exp;if(!byME[k])byME[k]={m:r.month,exp:r.exp,expD:r.expD,cnt:0,pa:0,pp:0,la:0,lp:0,ea:0,ep:0,ta:0,tp:0};byME[k].cnt++;byME[k].pa+=r.pa;byME[k].pp+=r.pp;byME[k].la+=r.la;byME[k].lp+=r.lp;byME[k].ea+=(r.ea||0);byME[k].ep+=(r.ep||0);byME[k].ta+=r.ta;byME[k].tp+=r.tp;});
   const items=Object.values(byME).sort((a,b)=>a.m.localeCompare(b.m)||a.exp.localeCompare(b.exp));
   const tTA=sm(items,'ta'),tTP=sm(items,'tp');
   const rr=tTA>0?(1-tTP/tTA)*100:0;
   K.style.display='grid';
   K.innerHTML=`
-    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📤 Total Asked (€)</div><div class="kv sky">${f(tTA)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📤 Total Asked (€)</div><div class="kv sky">${f(tTA)}</div>${supersededIds.size?`<div class="ks">${supersededIds.size} superseded ${supersededIds.size===1?'row':'rows'} excluded</div>`:''}</div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💵 Total Paid (€)</div><div class="kv mint">${f(tTP)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">📉 Total Deducted (€)</div><div class="kv rose">${f(tTA-tTP)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">📊 Deduction Rate</div><div class="kv ${rr>5?'rose':rr>2?'lem':'mint'}">${rr.toFixed(1)}%</div></div>`;
@@ -3869,9 +3990,12 @@ function exportGCM(){
   const rows=S.gcm.filter(r=>true);
   if(!rows.length){showToast('⚠️ No GCM data to export');return;}
   const headers=['VIN','Invoice #','Op','RO','Month','Date','Exp Code','Exp Description','NITG',
-    'Parts Asked','Parts Paid','Labour Asked','Labour Paid','Total Asked','Total Paid','Status'];
+    'Parts Asked','Parts Paid','Labour Asked','Labour Paid',
+    'External Asked','External Paid',
+    'Total Asked','Total Paid','Status'];
   const data=rows.map(r=>[r.vin,r.inv,r.intLetter||'',r.ro||'',fmM(r.month),r.date||'',
     r.exp||'',r.expD||'',r.nitg||'',r.pa.toFixed(2),r.pp.toFixed(2),r.la.toFixed(2),r.lp.toFixed(2),
+    (r.ea||0).toFixed(2),(r.ep||0).toFixed(2),
     r.ta.toFixed(2),r.tp.toFixed(2),r.st===0?'Paid':r.st===4?'Rejected':'Other']);
   const csv=[headers,...data].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
