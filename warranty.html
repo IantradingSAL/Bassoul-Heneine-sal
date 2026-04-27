@@ -336,7 +336,7 @@ function setLang(l){
   });
   // re-render current page if data loaded
   const active = document.querySelector('.si.active');
-  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,monthly_report:rRptInit})[active.dataset.page]?.();
+  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,monthly_report:rRptInit,uploads_history:rUploadHistory})[active.dataset.page]?.();
 }
 
 // ══ HELP CONTENT ══════════════════════════════════════════════
@@ -1225,6 +1225,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
   <div class="si" data-page="trends" onclick="go(this)"><span class="si-emoji">📉</span>Rejection Trends</div>
   <div class="ss">📤 Reports</div>
   <div class="si" data-page="monthly_report" onclick="go(this)"><span class="si-emoji">📄</span>Monthly Report</div>
+  <div class="si" data-page="uploads_history" onclick="go(this)"><span class="si-emoji">📦</span>Uploads History</div>
   <div class="s-foot">
     <div class="s-foot-text">📁 GCM + INCADEA monthly<br/>🔑 Dedup: exact VIN + Invoice #<br/>🔤 a/b/c = separate operations, not dups</div>
     <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:9px;color:var(--faint);line-height:1.8">
@@ -1571,6 +1572,31 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
 </div>
 
 
+<!-- ══ UPLOADS HISTORY PAGE ════════════════════════════════ -->
+<div class="page-area" id="P_uploads_history" style="display:none">
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--blue4);color:var(--blue)">📦</div><div><div class="ph-title">Uploads History</div><div class="ph-sub">Every GCM &amp; INCADEA file ever uploaded — provenance for every claim</div></div></div>
+
+    <div class="card" style="margin-bottom:14px">
+      <div class="ct">📋 All uploads</div>
+      <div class="tw" style="overflow-x:auto">
+        <table style="min-width:760px">
+          <thead><tr>
+            <th>Date</th><th>Type</th><th>Period</th><th>File name</th><th>Rows</th><th>Uploaded by</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="UH_BODY"><tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">⏳ Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:var(--muted);font-weight:500;padding:0 4px">
+      🔒 Once uploaded, files are <strong>read-only</strong>. The xlsx itself is the record of truth — no row-level edits are allowed.
+      To remove an upload (e.g. wrong file), use the 🗑️ button. Only the system manager can delete uploads.
+    </div>
+  </div></div>
+</div>
+
+
 <!-- ══ SHORTFALL REPORT PAGE ══════════════════════════════ -->
 <div class="page-area" id="P_shortfall" style="display:none">
   <div class="filterbar">
@@ -1726,6 +1752,312 @@ async function cwResubBulkUpsert(invoiceList){
 }
 
 
+// ══ WARRANTY CLOUD ARCHIVE — GCM + INCADEA persistence ═══════════
+// Each xlsx upload is preserved forever as a separate "upload" record
+// + N row records. Read-only after insert. Source of truth for what
+// every page renders. localStorage now serves only as offline cache.
+
+// Detect role + permission to upload
+async function _cwWarrantyCanUpload(){
+  const ctx = await cwResubGetSb(); if (!ctx) return false
+  try {
+    const { data: { user } } = await ctx.sb.auth.getUser()
+    if (!user) return false
+    const { data: emp } = await ctx.sb.from('employees')
+      .select('role,custom_role,is_active')
+      .eq('auth_user_id', user.id).maybeSingle()
+    if (!emp || emp.is_active === false) return false
+    return emp.role === 'manager'
+        || emp.role === 'warranty_manager'
+        || emp.custom_role === 'warranty_manager'
+  } catch { return false }
+}
+// Cached value so we don't re-query on every render
+let _cwUploadAllowed = null
+async function cwUploadAllowed(){
+  if (_cwUploadAllowed !== null) return _cwUploadAllowed
+  _cwUploadAllowed = await _cwWarrantyCanUpload()
+  return _cwUploadAllowed
+}
+
+// Heuristic — extract a YYYY-MM period label from a filename or
+// fall back to the most common month found in the parsed rows.
+function _cwDetectPeriod(fileName, rows){
+  if (fileName){
+    // Try common patterns: 2026-03 / 2026_03 / 03-2026 / Mar2026 / mar 2026 / 032026
+    const f = fileName.toLowerCase().replace(/\.[^.]+$/, '')
+    let m = f.match(/(20\d{2})[-_\.\s]?(0[1-9]|1[0-2])/)
+    if (m) return m[1] + '-' + m[2]
+    m = f.match(/(0[1-9]|1[0-2])[-_\.\s]?(20\d{2})/)
+    if (m) return m[2] + '-' + m[1]
+    const months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+    for (let i = 0; i < 12; i++){
+      // Allow the month abbrev to appear after any separator or at the start
+      const r = new RegExp('(?:^|[^a-z])' + months[i] + '[a-z]*[\\s_\\-]*?(20\\d{2})')
+      const mm = f.match(r)
+      if (mm) return mm[1] + '-' + String(i+1).padStart(2,'0')
+    }
+  }
+  // Fall back: most common `month` field (which is yearmonth_topage)
+  if (rows && rows.length){
+    const counts = {}
+    rows.forEach(r => { if (r.month) counts[r.month] = (counts[r.month]||0)+1 })
+    const top = Object.entries(counts).sort((a,b) => b[1]-a[1])[0]
+    if (top){
+      const m = String(top[0]).match(/(20\d{2})[-_\.]?(0[1-9]|1[0-2])/)
+      if (m) return m[1] + '-' + m[2]
+    }
+  }
+  return null
+}
+
+// Look up any prior upload for the same period+type
+async function cwFindUploadsForPeriod(fileType, period){
+  if (!period) return []
+  const ctx = await cwResubGetSb(); if (!ctx) return []
+  const { data, error } = await ctx.sb
+    .from('warranty_uploads')
+    .select('id, file_name, uploaded_at, uploaded_by_name, row_count')
+    .eq('file_type', fileType)
+    .eq('period_label', period)
+    .order('uploaded_at', { ascending: false })
+  if (error){ console.warn('uploads lookup failed:', error.message); return [] }
+  return data || []
+}
+
+// Push a fully-parsed batch (parseGCM/parseINC output) to the cloud.
+// Creates one warranty_uploads row, then bulk-inserts rows into the
+// appropriate type table. Returns the upload_id on success.
+async function cwUploadBatch({fileType, fileName, fileSize, period, rows, replaceUploadIds}){
+  const ctx = await cwResubGetSb(); if (!ctx) throw new Error('Supabase not initialized')
+  if (!await cwUploadAllowed()) throw new Error('You do not have permission to upload warranty data')
+
+  // If user chose "Replace": delete the matching previous uploads first
+  // (CASCADE cleans up the row tables in one shot)
+  if (replaceUploadIds && replaceUploadIds.length){
+    const { error: delErr } = await ctx.sb
+      .from('warranty_uploads')
+      .delete()
+      .in('id', replaceUploadIds)
+    if (delErr) throw new Error('Replace failed: ' + delErr.message)
+  }
+
+  // 1. Insert the upload header
+  const uploadHdr = {
+    file_name:       fileName,
+    file_type:       fileType,
+    period_label:    period,
+    row_count:       rows.length,
+    file_size_bytes: fileSize || null,
+    uploaded_by:     ctx.me?.id   || null,
+    uploaded_by_name:ctx.me?.name || null
+  }
+  const { data: upRow, error: upErr } = await ctx.sb
+    .from('warranty_uploads').insert(uploadHdr).select('id').single()
+  if (upErr) throw new Error('Upload header insert failed: ' + upErr.message)
+  const uploadId = upRow.id
+
+  // 2. Bulk-insert rows in chunks of 500 (Postgres + Supabase tolerate this comfortably)
+  const chunkSize = 500
+  if (fileType === 'gcm'){
+    for (let i = 0; i < rows.length; i += chunkSize){
+      const chunk = rows.slice(i, i + chunkSize).map(r => ({
+        upload_id:    uploadId,
+        file_name:    fileName,
+        period_label: period,
+        vin:          r.vin || null,
+        inv:          r.inv || null,
+        inv_base:     r.invBase || null,
+        op_letter:    r.intLetter || null,
+        op_marker:    r.opMarker || null,
+        ro:           r.ro || null,
+        month:        r.month || null,
+        claim_date:   r.date || null,
+        paid_date:    r.paidDate || null,
+        exp_code:     r.exp || null,
+        exp_desc:     r.expD || null,
+        status:       (r.st === undefined || r.st === null || isNaN(r.st)) ? null : r.st,
+        nitg:         r.nitg || null,
+        pa: r.pa || 0, pp: r.pp || 0, la: r.la || 0, lp: r.lp || 0, ta: r.ta || 0, tp: r.tp || 0,
+        flag:         r._flag || (r._d ? 'true-dup' : 'unique'),
+        raw_json:     null   // skip raw to save space; full row recoverable from the parsed shape
+      }))
+      const { error } = await ctx.sb.from('warranty_gcm_rows').insert(chunk)
+      if (error) throw new Error('Row insert failed at chunk ' + (i/chunkSize) + ': ' + error.message)
+    }
+  } else if (fileType === 'incadea'){
+    for (let i = 0; i < rows.length; i += chunkSize){
+      const chunk = rows.slice(i, i + chunkSize).map(r => ({
+        upload_id:    uploadId,
+        file_name:    fileName,
+        period_label: period,
+        vin:          r.vin || null,
+        no:           r.no || null,
+        svc_ord:      r.svcOrd || null,
+        cust:         r.cust || null,
+        amount:       r.amt || r.amount || 0,
+        inc_date:     r.date || null,
+        raw_json:     null
+      }))
+      const { error } = await ctx.sb.from('warranty_inc_rows').insert(chunk)
+      if (error) throw new Error('INC row insert failed at chunk ' + (i/chunkSize) + ': ' + error.message)
+    }
+  }
+  return uploadId
+}
+
+// Pull every GCM row from the cloud and rebuild S.gcm. Done at page
+// load and after every successful upload. Re-applies the dup-flag
+// computation so `_d` / `_flag` are consistent with current logic.
+async function cwLoadGCMFromCloud(){
+  const ctx = await cwResubGetSb(); if (!ctx) return null
+  // Pull in chunks of 1000 to respect Supabase's default 1000-row response cap
+  let all = []
+  let from = 0; const step = 1000
+  while (true){
+    const { data, error } = await ctx.sb
+      .from('warranty_gcm_rows')
+      .select('vin,inv,inv_base,op_letter,op_marker,ro,month,claim_date,paid_date,exp_code,exp_desc,status,nitg,pa,pp,la,lp,ta,tp,flag,period_label,file_name')
+      .order('inserted_at', { ascending: true })
+      .range(from, from + step - 1)
+    if (error){ console.warn('GCM load failed:', error.message); break }
+    if (!data || !data.length) break
+    all = all.concat(data)
+    if (data.length < step) break
+    from += step
+  }
+  // Map back to the in-memory shape S.gcm expects
+  return all.map(r => ({
+    _d: r.flag === 'true-dup',
+    _flag: r.flag || 'unique',
+    _highlightYellow: r.flag === 'true-dup',
+    vin: r.vin || '',
+    inv: r.inv || '',
+    invBase: r.inv_base || r.inv || '',
+    intLetter: r.op_letter || '',
+    opMarker: r.op_marker || '',
+    ro: r.ro || '',
+    month: r.month || '',
+    date: r.claim_date || '',
+    paidDate: r.paid_date || '',
+    exp: r.exp_code || '',
+    expD: r.exp_desc || '',
+    st: r.status,
+    nitg: r.nitg || '',
+    pa: Number(r.pa) || 0, pp: Number(r.pp) || 0,
+    la: Number(r.la) || 0, lp: Number(r.lp) || 0,
+    ta: Number(r.ta) || 0, tp: Number(r.tp) || 0,
+    _period: r.period_label,
+    _file: r.file_name
+  }))
+}
+
+async function cwLoadINCFromCloud(){
+  const ctx = await cwResubGetSb(); if (!ctx) return null
+  let all = []
+  let from = 0; const step = 1000
+  while (true){
+    const { data, error } = await ctx.sb
+      .from('warranty_inc_rows')
+      .select('vin,no,svc_ord,cust,amount,inc_date,period_label,file_name')
+      .order('inserted_at', { ascending: true })
+      .range(from, from + step - 1)
+    if (error){ console.warn('INC load failed:', error.message); break }
+    if (!data || !data.length) break
+    all = all.concat(data)
+    if (data.length < step) break
+    from += step
+  }
+  return all.map(r => ({
+    vin: r.vin || '', no: r.no || '', svcOrd: r.svc_ord || '',
+    cust: r.cust || '', amt: Number(r.amount) || 0,
+    date: r.inc_date || '',
+    _period: r.period_label, _file: r.file_name
+  }))
+}
+
+// Fetch every upload row for the history page
+async function cwLoadUploadHistory(){
+  const ctx = await cwResubGetSb(); if (!ctx) return []
+  const { data, error } = await ctx.sb
+    .from('warranty_uploads')
+    .select('id,file_name,file_type,period_label,row_count,uploaded_at,uploaded_by_name,file_size_bytes')
+    .order('uploaded_at', { ascending: false })
+    .limit(500)
+  if (error){ console.warn('Upload history failed:', error.message); return [] }
+  return data || []
+}
+
+async function cwDeleteUpload(uploadId){
+  const ctx = await cwResubGetSb(); if (!ctx) throw new Error('Supabase not initialized')
+  const { error } = await ctx.sb.from('warranty_uploads').delete().eq('id', uploadId)
+  if (error) throw new Error('Delete failed: ' + error.message)
+}
+
+
+// Render the Uploads History page
+async function rUploadHistory(){
+  const tbody = document.getElementById('UH_BODY'); if (!tbody) return
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">⏳ Loading…</td></tr>';
+  const allowed = await cwUploadAllowed();
+  // We'll show the delete button only to system managers — check via is_manager()
+  let isMgr = false;
+  try {
+    const ctx = await cwResubGetSb();
+    if (ctx) {
+      const { data } = await ctx.sb.rpc('is_manager');
+      isMgr = !!data;
+    }
+  } catch {}
+  const rows = await cwLoadUploadHistory();
+  if (!rows.length){
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">No uploads yet. Upload a GCM or INCADEA file from the Upload Center to see it here.</td></tr>';
+    return;
+  }
+  const _esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  tbody.innerHTML = rows.map(u => {
+    const dt = new Date(u.uploaded_at).toLocaleString('en-GB', { day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit' });
+    const typeBadge = u.file_type === 'gcm'
+      ? '<span class="badge b-sun">GCM</span>'
+      : '<span class="badge b-sky">INCADEA</span>';
+    const period = u.period_label ? _cwHumanPeriod(u.period_label) : '<span style="color:var(--faint)">—</span>';
+    const sizeKB = u.file_size_bytes ? Math.round(u.file_size_bytes/1024) + ' KB' : '';
+    const delBtn = isMgr
+      ? `<button class="btn btn-sm" style="background:#FEE2E2;color:#991B1B;border:1px solid #FECACA;font-size:10px;padding:5px 10px" onclick="_cwConfirmDeleteUpload('${_esc(u.id)}','${_esc(u.file_name)}',${u.row_count})">🗑️ Delete</button>`
+      : '<span style="color:var(--faint);font-size:10px">—</span>';
+    return `<tr>
+      <td style="font-size:11px;white-space:nowrap">${_esc(dt)}</td>
+      <td>${typeBadge}</td>
+      <td style="font-weight:600">${period}</td>
+      <td class="mono" style="font-size:11px">${_esc(u.file_name)}${sizeKB?'<div style="font-size:9px;color:var(--muted)">'+sizeKB+'</div>':''}</td>
+      <td class="num" style="font-weight:700">${u.row_count.toLocaleString()}</td>
+      <td style="font-size:11px">${_esc(u.uploaded_by_name||'—')}</td>
+      <td>${delBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function _cwConfirmDeleteUpload(uploadId, fileName, rowCount){
+  if (!confirm(`Delete this upload?\n\nFile: ${fileName}\nRows that will be removed: ${rowCount}\n\nThis cannot be undone. The xlsx file itself is not affected — you can re-upload it later if needed.`)) return;
+  showLoad('Deleting…');
+  try {
+    await cwDeleteUpload(uploadId);
+    // Reload everything from cloud
+    const [gcm, inc] = await Promise.all([cwLoadGCMFromCloud(), cwLoadINCFromCloud()]);
+    if (gcm) S.gcm = gcm;
+    if (inc) S.inc = inc;
+    _cwRefreshUploadStats('gcm', '');
+    _cwRefreshUploadStats('inc', '');
+    rUploadHistory();
+    hideLoad();
+    showToast('🗑️ Upload deleted. ' + rowCount + ' rows removed.');
+  } catch (e){
+    hideLoad();
+    showToast('❌ Delete failed: ' + e.message);
+  }
+}
+
+
 function lsClear(){
   [LS_GCM,LS_INC,LS_REJ,LS_META].forEach(k=>localStorage.removeItem(k));
   S.gcm=[];S.inc=[];S.rej={};S.lastUpdate=null;
@@ -1793,14 +2125,86 @@ function lsRestore(){
 document.addEventListener('DOMContentLoaded',lsRestore);
 // After local cache restored, fetch latest cloud state (merge if newer)
 document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => {
+  setTimeout(async () => {
+    // 1. Sync rejection tracking
     cwResubLoad().then(merged => {
       if (merged && merged > 0) {
         showToast('☁️ ' + merged + ' resubmission' + (merged>1?'s':'') + ' synced from cloud');
       }
     }).catch(()=>{});
-  }, 800);  // delay so config.js + supabase init can complete
+
+    // 2. Load full GCM/INC archive from cloud — replaces local-only cache.
+    //    The cloud is now source of truth; localStorage is just a fast
+    //    starting point so the page renders before the network completes.
+    try {
+      const [cloudGCM, cloudINC] = await Promise.all([
+        cwLoadGCMFromCloud(),
+        cwLoadINCFromCloud()
+      ]);
+      let changed = false;
+      if (cloudGCM && cloudGCM.length){
+        S.gcm = cloudGCM;
+        document.getElementById('B_GCM').textContent = S.gcm.length;
+        document.getElementById('B_REJ').textContent = S.gcm.filter(r=>r.st===4).length;
+        document.getElementById('US_GCM_COUNT').textContent = S.gcm.length.toLocaleString();
+        document.getElementById('US_GCM_META').textContent = S.gcm.filter(r=>r._d).length + ' duplicates flagged · cloud-archived';
+        document.getElementById('US_REJ_COUNT').textContent = S.gcm.filter(r=>r.st===4).length;
+        const valid = S.gcm.length;
+        if (valid) document.getElementById('US_REJ_META').textContent = ((S.gcm.filter(r=>r.st===4).length/valid)*100).toFixed(1)+'% rejection rate';
+        fillGF();
+        changed = true;
+      }
+      if (cloudINC && cloudINC.length){
+        S.inc = cloudINC;
+        document.getElementById('B_INC').textContent = S.inc.length;
+        document.getElementById('US_INC_COUNT').textContent = S.inc.length.toLocaleString();
+        const makes = new Set(S.inc.map(r=>r.make).filter(Boolean));
+        document.getElementById('US_INC_META').textContent = makes.size + ' makes · cloud-archived';
+        fillIF();
+        changed = true;
+      }
+      if (changed){
+        S.lastUpdate = new Date();
+        updTime(); updPills();
+        // Refresh whatever page is currently showing
+        const active = document.querySelector('.si.active');
+        if (active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,monthly_report:rRptInit,uploads_history:rUploadHistory})[active.dataset.page]?.();
+      }
+    } catch (e){
+      console.warn('Cloud archive load failed:', e);
+    }
+
+    // 3. Hide the upload buttons / dropzones for non-managers
+    _cwApplyUploadGate();
+  }, 600);
 });
+
+// Hide upload UI for users who can't upload, and surface a small
+// read-only banner so they understand why
+async function _cwApplyUploadGate(){
+  const allowed = await cwUploadAllowed();
+  if (allowed) return;
+  // Hide both dropzones + replace with a friendly read-only banner
+  const dzGCM = document.getElementById('DZ_GCM');
+  const dzINC = document.getElementById('DZ_INC');
+  if (dzGCM) dzGCM.style.display = 'none';
+  if (dzINC) dzINC.style.display = 'none';
+  // Insert a banner if one isn't already there
+  const upPage = document.getElementById('P_upload');
+  if (upPage && !document.getElementById('CW_RO_BANNER')){
+    const banner = document.createElement('div');
+    banner.id = 'CW_RO_BANNER';
+    banner.style.cssText = 'background:#FEF3C7;border:1px solid #FDE68A;border-radius:12px;padding:18px 22px;margin:14px 0;display:flex;gap:14px;align-items:flex-start';
+    banner.innerHTML = `
+      <div style="font-size:24px">🔒</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:800;color:#92400E;letter-spacing:-.2px">Read-only access</div>
+        <div style="font-size:11.5px;color:#78350F;margin-top:5px;line-height:1.55">Only the system manager and the warranty manager can upload GCM / INCADEA files. You can still view all warranty data and analytics. Ask a manager if a new file needs to be uploaded.</div>
+      </div>`;
+    const scroll = upPage.querySelector('.scroll');
+    if (scroll) scroll.insertBefore(banner, scroll.firstChild?.nextSibling || null);
+  }
+}
 
 
 // ══ NAV ═════════════════════════════════════════════════════
@@ -1810,7 +2214,7 @@ function go(el){
   document.querySelectorAll('.page-area').forEach(p=>p.style.display='none');
   const pg = el.dataset.page;
   document.getElementById('P_'+pg).style.display = 'flex';
-  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,monthly_report:rRptInit})[pg]?.();
+  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,monthly_report:rRptInit,uploads_history:rUploadHistory})[pg]?.();
 }
 
 // ══ DRAG & DROP ══════════════════════════════════════════════
@@ -1827,94 +2231,221 @@ function loadF(e,t){
 }
 
 // ══ FILE PROCESSING ══════════════════════════════════════════
-function procF(file, type){
+async function procF(file, type){
+  // Step 1 — gate at the role level
+  if (!await cwUploadAllowed()){
+    showToast('🚫 Only managers and warranty managers can upload warranty data.');
+    stat('ST_'+type.toUpperCase(), '🚫 Permission denied — contact a manager', false);
+    return;
+  }
+
   showLoad('Reading ' + file.name + ' …');
   const r = new FileReader();
-  r.onload = e => {
+  r.onload = async e => {
     try {
       const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      let parsed = [];
+      let parsedRaw = null;
       if(type==='gcm'){
         const sn = wb.SheetNames.find(s=>/sheet1/i.test(s)) || wb.SheetNames[0];
-        S.gcm = parseGCM(XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:''}));
-        S.lastUpdate = new Date();
-        const valid = S.gcm.filter(r=>true);
-        const rejCount = valid.filter(r=>r.st===4).length;
-        document.getElementById('B_GCM').textContent = valid.length;
-        document.getElementById('B_REJ').textContent = rejCount;
-        fillGF();
-        // Update upload stats
-        document.getElementById('US_GCM_COUNT').textContent = valid.length.toLocaleString();
-        document.getElementById('US_GCM_META').textContent = S.gcm.filter(r=>r._d).length + ' duplicates flagged · ' + file.name;
-        document.getElementById('US_REJ_COUNT').textContent = rejCount;
-        document.getElementById('US_REJ_META').textContent = valid.length ? ((rejCount/valid.length)*100).toFixed(1)+'% rejection rate' : '';
-        updTime(); updPills();
-        stat('ST_GCM', '✅ ' + valid.length + ' claims loaded · ' + S.gcm.filter(r=>r._d).length + ' duplicates flagged', true);
-        // ── AUTO-MATCH: check if any tracked newClaim # now appears as a paid GCM claim ──
-        // Match is case-insensitive + trimmed so the user can type
-        // "B79837" or " b79837 " and it still finds GCM's "B79837".
-        let autoMatched = 0;
-        const gcmByInvNorm = {};
-        S.gcm.filter(r=>true).forEach(r=>{
-          const norm = String(r.inv||'').trim().toLowerCase();
-          if (norm) gcmByInvNorm[norm] = r;
-        });
-        Object.entries(S.rej).forEach(([origInv, d]) => {
-          if(!d.newClaim || d.status==='credited' || d.status==='resolved') return;
-          const lookupKey = String(d.newClaim).trim().toLowerCase();
-          const newClaimRow = gcmByInvNorm[lookupKey];
-          if(newClaimRow && newClaimRow.st===0){
-            // Renault paid the resubmission — auto-credit it.
-            // Credit date precedence:
-            //   1. The new claim's actual paidDate from GCM (best)
-            //   2. The new claim's opening date (date_ouv_or) as fallback
-            //   3. Whatever was already saved (don't overwrite a real date)
-            //   — Never use "today" as a fallback (would be misleading).
-            const credDate = newClaimRow.paidDate || newClaimRow.date || d.creditDate || '';
-            S.rej[origInv] = Object.assign({}, d, {
-              status: 'credited',
-              creditedAmt: newClaimRow.tp,
-              creditDate: credDate,
-              shortfall: (d.rejectedAmt||d.origAsked||0) - newClaimRow.tp,
-              recoveryRate: (d.rejectedAmt||d.origAsked||0) > 0 ? (newClaimRow.tp/(d.rejectedAmt||d.origAsked||0)*100) : 100,
-              autoMatched: true,
-              ts: d.ts // keep original timestamp
-            });
-            autoMatched++;
-          }
-        });
-        if(autoMatched > 0){
-          lsSave(LS_REJ, S.rej);
-          // Push the newly auto-matched rows to Supabase so other users see them
-          const matchedInvoices = Object.entries(S.rej)
-            .filter(([k,v]) => v.autoMatched && v.status === 'credited')
-            .map(([k]) => k);
-          cwResubBulkUpsert(matchedInvoices).catch(()=>{});
-          showToast('💚 ' + autoMatched + ' resubmission' + (autoMatched>1?'s':'')+' auto-matched as Credited!');
-        }
+        parsedRaw = XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:''});
+        parsed = parseGCM(parsedRaw);
       } else if(type==='inc'){
         const sn = wb.SheetNames.find(s=>/incadea/i.test(s)) || wb.SheetNames[0];
-        S.inc = parseINC(XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:''}));
-        S.lastUpdate = new Date();
-        document.getElementById('B_INC').textContent = S.inc.length;
-        fillIF();
-        document.getElementById('US_INC_COUNT').textContent = S.inc.length.toLocaleString();
-        document.getElementById('US_INC_META').textContent = new Set(S.inc.map(r=>r.make)).size + ' makes · ' + file.name;
-        updTime(); updPills();
-        stat('ST_INC', '✅ ' + S.inc.length + ' INCADEA records loaded', true);
+        parsedRaw = XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:''});
+        parsed = parseINC(parsedRaw);
       }
-      lsSave(LS_GCM, S.gcm);
-      lsSave(LS_INC, S.inc);
+      if (!parsed.length){
+        hideLoad(); stat('ST_'+type.toUpperCase(), '⚠️ File appears empty or unrecognised', false); return;
+      }
+
+      // Step 2 — detect period
+      const period = _cwDetectPeriod(file.name, parsed);
+
+      // Step 3 — duplicate-period check
+      const fileTypeKey = (type === 'gcm' ? 'gcm' : 'incadea');
+      const existing = await cwFindUploadsForPeriod(fileTypeKey, period);
+      let replaceUploadIds = null;
+      if (existing.length){
+        hideLoad();
+        // Build the replace-or-keep dialog
+        const lines = existing.map(u =>
+          `• "${u.file_name}" (${u.row_count} rows) by ${u.uploaded_by_name||'—'} · ${new Date(u.uploaded_at).toLocaleString('en-GB')}`
+        ).join('\n');
+        const periodLabel = period ? _cwHumanPeriod(period) : '(no period)';
+        const choice = await _cwReplaceOrKeepDialog({
+          period: periodLabel,
+          existing: lines,
+          newName: file.name,
+          newRowCount: parsed.length
+        });
+        if (choice === 'cancel') {
+          stat('ST_'+type.toUpperCase(), 'Upload cancelled', false);
+          return;
+        }
+        if (choice === 'replace') {
+          replaceUploadIds = existing.map(u => u.id);
+        }
+        // 'keep' → just proceed, both will live side by side
+        showLoad('Uploading ' + file.name + ' …');
+      }
+
+      // Step 4 — push to cloud
+      try {
+        await cwUploadBatch({
+          fileType: fileTypeKey,
+          fileName: file.name,
+          fileSize: file.size,
+          period:   period,
+          rows:     parsed,
+          replaceUploadIds
+        });
+      } catch (uploadErr){
+        hideLoad();
+        stat('ST_'+type.toUpperCase(), '❌ Cloud save failed: ' + uploadErr.message, false);
+        showToast('❌ Could not save to cloud. ' + uploadErr.message);
+        return;
+      }
+
+      // Step 5 — reload everything from cloud (so all months are merged)
+      showLoad('Refreshing ' + file.name + ' …');
+      if (type === 'gcm'){
+        const cloudGCM = await cwLoadGCMFromCloud();
+        if (cloudGCM) S.gcm = cloudGCM;
+      } else {
+        const cloudINC = await cwLoadINCFromCloud();
+        if (cloudINC) S.inc = cloudINC;
+      }
+      S.lastUpdate = new Date();
+
+      // Step 6 — refresh UI counters + run auto-match
+      _cwRefreshUploadStats(type, file.name);
+      if (type === 'gcm'){
+        _cwAutoMatchOnUpload();
+      }
+
+      // Cache to localStorage too (offline fallback)
+      lsSave(LS_GCM, S.gcm); lsSave(LS_INC, S.inc);
       const meta = lsLoad(LS_META)||{};
       if(type==='gcm') meta.gcmFile = file.name;
       if(type==='inc') meta.incFile = file.name;
-      meta.ts = S.lastUpdate ? S.lastUpdate.toISOString() : new Date().toISOString();
+      meta.ts = S.lastUpdate.toISOString();
       lsSave(LS_META, meta);
       updLsStatus();
-      hideLoad(); showToast('🎉 File loaded successfully!');
-    } catch(err){ hideLoad(); stat('ST_'+type.toUpperCase(), '❌ Error: ' + err.message, false); }
+      hideLoad();
+      const periodHuman = period ? _cwHumanPeriod(period) : 'no period';
+      const action = replaceUploadIds ? 'replaced' : 'added';
+      showToast('🎉 ' + parsed.length + ' rows ' + action + ' for ' + periodHuman + '. Total in system: ' + (type==='gcm'?S.gcm.length:S.inc.length).toLocaleString());
+      stat('ST_'+type.toUpperCase(), '✅ ' + parsed.length + ' rows ' + action + ' · period ' + periodHuman, true);
+    } catch(err){
+      hideLoad();
+      stat('ST_'+type.toUpperCase(), '❌ Error: ' + err.message, false);
+    }
   };
   r.readAsArrayBuffer(file);
 }
+
+// Convert "2026-03" → "Mar 2026" for friendly display
+function _cwHumanPeriod(period){
+  if (!period) return '';
+  const m = period.match(/^(\d{4})-(\d{2})$/);
+  if (!m) return period;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[parseInt(m[2],10)-1] + ' ' + m[1];
+}
+
+// Refresh the visible upload-center stat tiles after a cloud reload
+function _cwRefreshUploadStats(type, lastFileName){
+  if (type === 'gcm'){
+    const valid = S.gcm.filter(r=>true);
+    const rejCount = valid.filter(r=>r.st===4).length;
+    const dupCount = S.gcm.filter(r=>r._d).length;
+    document.getElementById('B_GCM').textContent = valid.length;
+    document.getElementById('B_REJ').textContent = rejCount;
+    fillGF();
+    document.getElementById('US_GCM_COUNT').textContent = valid.length.toLocaleString();
+    document.getElementById('US_GCM_META').textContent = dupCount + ' duplicates flagged · cloud-archived';
+    document.getElementById('US_REJ_COUNT').textContent = rejCount;
+    document.getElementById('US_REJ_META').textContent = valid.length ? ((rejCount/valid.length)*100).toFixed(1)+'% rejection rate' : '';
+  } else {
+    document.getElementById('B_INC').textContent = S.inc.length;
+    fillIF();
+    document.getElementById('US_INC_COUNT').textContent = S.inc.length.toLocaleString();
+    document.getElementById('US_INC_META').textContent = new Set(S.inc.map(r=>r.make)).size + ' makes · cloud-archived';
+  }
+  updTime(); updPills();
+}
+
+// Auto-match resubmissions against newly-loaded GCM data
+function _cwAutoMatchOnUpload(){
+  let autoMatched = 0;
+  const gcmByInvNorm = {};
+  S.gcm.filter(r=>true).forEach(r=>{
+    const norm = String(r.inv||'').trim().toLowerCase();
+    if (norm) gcmByInvNorm[norm] = r;
+  });
+  Object.entries(S.rej).forEach(([origInv, d]) => {
+    if(!d.newClaim || d.status==='credited' || d.status==='resolved') return;
+    const lookupKey = String(d.newClaim).trim().toLowerCase();
+    const newClaimRow = gcmByInvNorm[lookupKey];
+    if(newClaimRow && newClaimRow.st===0){
+      const credDate = newClaimRow.paidDate || newClaimRow.date || d.creditDate || '';
+      S.rej[origInv] = Object.assign({}, d, {
+        status: 'credited',
+        creditedAmt: newClaimRow.tp,
+        creditDate: credDate,
+        shortfall: (d.rejectedAmt||d.origAsked||0) - newClaimRow.tp,
+        recoveryRate: (d.rejectedAmt||d.origAsked||0) > 0 ? (newClaimRow.tp/(d.rejectedAmt||d.origAsked||0)*100) : 100,
+        autoMatched: true,
+        ts: d.ts
+      });
+      autoMatched++;
+    }
+  });
+  if(autoMatched > 0){
+    lsSave(LS_REJ, S.rej);
+    const matchedInvoices = Object.entries(S.rej)
+      .filter(([k,v]) => v.autoMatched && v.status === 'credited')
+      .map(([k]) => k);
+    cwResubBulkUpsert(matchedInvoices).catch(()=>{});
+    showToast('💚 ' + autoMatched + ' resubmission' + (autoMatched>1?'s':'')+' auto-matched as Credited!');
+  }
+}
+
+// Custom dialog — user picks how to handle a duplicate-period upload.
+// Resolves to 'replace' | 'keep' | 'cancel'.
+function _cwReplaceOrKeepDialog({period, existing, newName, newRowCount}){
+  return new Promise(resolve => {
+    const bg = document.createElement('div');
+    bg.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);z-index:1100;display:flex;align-items:center;justify-content:center;padding:20px';
+    bg.innerHTML = `
+      <div style="background:#fff;border-radius:14px;max-width:520px;width:100%;padding:24px;box-shadow:0 24px 64px rgba(0,0,0,.28);font-family:'DM Sans',system-ui,sans-serif">
+        <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px">
+          <div style="font-size:28px">⚠️</div>
+          <div>
+            <div style="font-size:17px;font-weight:800;color:#0f172a;letter-spacing:-.3px">A file for ${esc(period)} already exists</div>
+            <div style="font-size:12.5px;color:#64748b;margin-top:6px;line-height:1.5">Replace the previous one (deletes its rows) or keep both side-by-side?</div>
+          </div>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;font-size:11.5px;color:#475569;line-height:1.6;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;margin-bottom:8px">${esc(existing)}</div>
+        <div style="font-size:11.5px;color:#94a3b8;margin-bottom:18px">New: <strong style="color:#0f172a">${esc(newName)}</strong> (${newRowCount} rows)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <button data-act="cancel" style="padding:9px 16px;border-radius:9px;border:1px solid #e2e8f0;background:#fff;color:#475569;font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit">Cancel</button>
+          <button data-act="keep" style="padding:9px 16px;border-radius:9px;border:1px solid #3b5fe2;background:#fff;color:#3b5fe2;font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit">Keep both</button>
+          <button data-act="replace" style="padding:9px 16px;border-radius:9px;border:1px solid #DC2626;background:#DC2626;color:#fff;font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit">Replace previous</button>
+        </div>
+      </div>`;
+    document.body.appendChild(bg);
+    bg.querySelectorAll('button[data-act]').forEach(b => b.addEventListener('click', () => {
+      const act = b.dataset.act;
+      bg.remove();
+      resolve(act);
+    }));
+  });
+}
+
+
+function lsClear(){
 
 function updTime(){
   if(!S.lastUpdate) return;
@@ -3847,7 +4378,7 @@ function setLang(l){
     else el.appendChild(txt);
   });
   const active = document.querySelector('.si.active');
-  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,monthly_report:rRptInit})[active.dataset.page]?.();
+  if(active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,monthly_report:rRptInit,uploads_history:rUploadHistory})[active.dataset.page]?.();
 }
 
 // ══ HELP CONTENT — ALL PAGES ════════════════════════════════
