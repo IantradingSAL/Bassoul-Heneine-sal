@@ -2729,24 +2729,15 @@ function parseGCM(raw){
     window._cwGcmHeadersLogged = true;
     const hdrs = Object.keys(raw[0]);
     console.log('[BH] GCM headers (' + hdrs.length + ' cols):', hdrs);
-    // Show columns AN-AR specifically (where external service usually sits)
-    console.log('[BH] === Columns AM-AR (positional) ===');
-    for (let i = 38; i <= 43; i++){
-      if (hdrs[i]) {
-        // Find first row with a non-zero non-empty value in this column
-        const sample = raw.find(r => r[hdrs[i]] !== '' && r[hdrs[i]] !== 0 && r[hdrs[i]] != null);
-        const letter = i < 26 ? String.fromCharCode(65+i) : 'A' + String.fromCharCode(65 + (i-26));
-        console.log('  Col ' + letter + ' (idx ' + i + '): "' + hdrs[i] + '" — sample value: ' + (sample ? sample[hdrs[i]] : '(all empty/zero)'));
-      }
-    }
-    // Spot-check anything that looks like external/sublet/other/charge
-    const candidates = hdrs.filter(h => /external|sublet|service|outwork|outsource|subcontract|other.charg|other_charg|charg.amount|local.currency|t_local/i.test(h));
-    if (candidates.length){
-      console.log('[BH] External-service candidate columns found:', candidates);
-      console.log('[BH] First-row values for those:', candidates.map(h => h + ' = ' + raw[0][h]));
-    } else {
-      console.warn('[BH] No external-service columns auto-detected by name. Will use AN/AO positional fallback.');
-    }
+    // Audit: count rows with PCO, lubricant, pack > 0 — informational only
+    let pco=0, lub=0, pack=0;
+    raw.forEach(r => {
+      if (Number(r.pco_amount_eur) > 0) pco++;
+      if (Number(r.lubricant_received_amount_eur) > 0) lub++;
+      if (Number(r.pack_received_amount_eur) > 0) pack++;
+    });
+    console.log('[BH] Component breakdown across ' + raw.length + ' claims:',
+      'PCO deductions=' + pco, '· Lubricant=' + lub, '· Pack=' + pack);
   }
 
   // ─── DEDUP / FLAGGING LOGIC (new behavior) ────────────────────
@@ -2860,70 +2851,52 @@ function parseGCM(raw){
       expD: String(r.expense_nature_level_2_description_en||'').trim(),
       st: parseInt(r.invoice_flag_state??-1),
       nitg: String(r.nitg||'').trim(),
+      // ── CLAIM AMOUNT BREAKDOWN ──────────────────────────────────
+      // Renault GCM files break a claim's value into 4 components,
+      // each with "received" (what dealer asked) and "definitive"
+      // (what Renault approved) amounts:
+      //   1. Parts        (pa/pp)
+      //   2. Labour       (la/lp)
+      //   3. Lubricant    (lua/lup) — usually 0 unless oil change
+      //   4. Pack         (pka/pkp) — usually 0 unless dealer package
+      //
+      // Plus a separate PCO (Programme Constructeur Origine) deduction:
+      //   pco — Renault's keep-share, automatically deducted by them.
+      //   This is NOT something you bill — it's the gap between what
+      //   you asked and what they paid.
+      //
+      // The "Total Asked" (ta) = parts + labour + lubricant + pack
+      // The "Total Paid"  (tp) = ta - pco - any rejection adjustments
       pa: n(r.part_received_amount_local_eur),
       pp: n(r.part_definitive_amount_without_pco_eur),
       la: n(r.labour_received_amount_eur),
       lp: n(r.labour_definitive_amount_without_pco_eur),
-      // EXTERNAL SERVICE / SUBLET / OTHER CHARGES — auto-detect across
-      // every variant we've seen in the wild. If none found, ea/ep stay 0.
-      // Last-resort fallback: scan ALL row keys for anything that looks
-      // like it might be the right column (substring match on header text).
+      lua: n(r.lubricant_received_amount_eur),
+      lup: n(r.lubricant_definitive_amount_eur),
+      pka: n(r.pack_received_amount_eur),
+      pkp: n(r.pack_definitive_amount_eur),
+      pco: n(r.pco_amount_eur),
+      // Backwards compatibility: ea/ep still set for any file that
+      // genuinely has external/sublet columns. For Renault GCM Lebanon
+      // exports these stay 0 — they don't have that breakdown.
       ea: n(
         r.external_service_received_amount_eur ??
         r.external_received_amount_eur ??
-        r.external_amount_received ??
-        r.external_received_amount ??
         r.sublet_received_amount_eur ??
-        r.sublet_received_amount ??
         r.service_received_amount_eur ??
-        r.service_received_amount ??
         r.outwork_received_amount_eur ??
-        r.outwork_received_amount ??
         r.outsource_received_amount_eur ??
         r.subcontract_received_amount_eur ??
-        // Renault-standard "other charges"
         r.other_charges_received_amount_eur ??
-        r.other_charges_received_amount_local_eur ??
-        r.other_received_amount_eur ??
-        r.other_received_amount ??
-        r.oth_received_amount_eur ??
-        r.OTHER_CHARGES_RECEIVED_AMOUNT_EUR ??
-        r.OTHER_CHARGES_RECEIVED_AMOUNT_LOCAL_EUR ??
-        // Substring-based fallback
-        _scanRowFor(r, ['received','asked'], ['external','sublet','service','outwork','outsource','subcontract','other','charge']) ??
-        // FINAL fallback: Excel column AN (the 40th column).
-        // Renault GCM exports place external-service "asked" here.
-        _colByLetter(r, 'AN') ??
         0
       ),
       ep: n(
         r.external_service_definitive_amount_without_pco_eur ??
         r.external_definitive_amount_without_pco_eur ??
-        r.external_definitive_amount_eur ??
-        r.external_definitive_amount ??
         r.sublet_definitive_amount_without_pco_eur ??
-        r.sublet_definitive_amount_eur ??
-        r.sublet_definitive_amount ??
         r.service_definitive_amount_without_pco_eur ??
-        r.service_definitive_amount_eur ??
-        r.service_definitive_amount ??
         r.outwork_definitive_amount_without_pco_eur ??
-        r.outwork_definitive_amount_eur ??
-        r.outsource_definitive_amount_without_pco_eur ??
-        r.subcontract_definitive_amount_without_pco_eur ??
-        // Renault-standard "other charges"
         r.other_charges_definitive_amount_without_pco_eur ??
-        r.other_charges_definitive_amount_eur ??
-        r.other_definitive_amount_without_pco_eur ??
-        r.other_definitive_amount_eur ??
-        r.oth_definitive_amount_without_pco_eur ??
-        r.OTHER_CHARGES_DEFINITIVE_AMOUNT_WITHOUT_PCO_EUR ??
-        r.OTHER_CHARGES_DEFINITIVE_AMOUNT_EUR ??
-        // Substring-based fallback
-        _scanRowFor(r, ['definitive','paid'], ['external','sublet','service','outwork','outsource','subcontract','other','charge']) ??
-        // FINAL fallback: Excel column AO (the 41st column).
-        // Renault GCM exports place external-service "paid" here.
-        _colByLetter(r, 'AO') ??
         0
       ),
       ta: n(r.received_amount_eur),
@@ -3419,7 +3392,7 @@ function rGCM(){
     <th>Exp Code</th><th>NITG</th>
     <th class="num">Parts Asked</th><th class="num">Parts Paid</th>
     <th class="num">Labour Asked</th><th class="num">Labour Paid</th>
-    <th class="num">External Asked</th><th class="num">External Paid</th>
+    <th class="num" title="PCO = Renault's standard production deduction. Comes off your parts paid amount.">PCO Deducted</th>
     <th class="num">Total Asked</th><th class="num">Total Paid</th>
     <th>Status</th><th>Action</th>
   </tr></thead><tbody>`;
@@ -3438,14 +3411,14 @@ function rGCM(){
       <td class="mono" style="font-size:9px;color:var(--muted)">${r.nitg||'–'}</td>
       <td class="num">${f(r.pa)}</td><td class="num">${f(r.pp)}</td>
       <td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td>
-      <td class="num">${f(r.ea||0)}</td><td class="num">${f(r.ep||0)}</td>
+      <td class="num" style="${(r.pco||0)>0.01?'color:var(--rose);font-weight:600':'color:var(--faint)'}">${(r.pco||0)>0.01?f(r.pco):'—'}</td>
       <td class="num">${f(r.ta)}</td>
       <td class="num" style="font-weight:700">${f(r.tp)}</td>
       <td><span class="badge ${isP?'b-mint':isR?'b-rose':'b-n'}">${isP?'✅ Paid':isR?'❌ Rejected':'Stat '+r.st}</span>${isR&&rd?.rejType?` <span class="badge ${rd.rejType==='full'?'b-rose':'b-lem'}" style="margin-left:2px">${rd.rejType==='full'?'Full':'Partial'}</span>`:''}${resubChainBadge(r)}</td>
       <td>${isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="openModal('${esc(r.inv)}','${r.vin}')">${rd?'✏️ Edit':'+ Track'}</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'}</td>
     </tr>`;
   });
-  if(rows.length>600)h+=`<tr><td colspan="18" style="text-align:center;padding:14px;color:var(--muted);font-size:11px;font-weight:500">… ${rows.length-600} more rows — use filters to narrow down 🔍</td></tr>`;
+  if(rows.length>600)h+=`<tr><td colspan="17" style="text-align:center;padding:14px;color:var(--muted);font-size:11px;font-weight:500">… ${rows.length-600} more rows — use filters to narrow down 🔍</td></tr>`;
   h+=`</tbody></table></div></div>`;
   T.innerHTML=h;
 }
@@ -4157,11 +4130,13 @@ function exportGCM(){
   if(!rows.length){showToast('⚠️ No GCM data to export');return;}
   const headers=['VIN','Invoice #','Op','RO','Month','Date','Exp Code','Exp Description','NITG',
     'Parts Asked','Parts Paid','Labour Asked','Labour Paid',
-    'External Asked','External Paid',
+    'Lubricant Asked','Lubricant Paid','Pack Asked','Pack Paid',
+    'PCO Deducted',
     'Total Asked','Total Paid','Status'];
   const data=rows.map(r=>[r.vin,r.inv,r.intLetter||'',r.ro||'',fmM(r.month),r.date||'',
     r.exp||'',r.expD||'',r.nitg||'',r.pa.toFixed(2),r.pp.toFixed(2),r.la.toFixed(2),r.lp.toFixed(2),
-    (r.ea||0).toFixed(2),(r.ep||0).toFixed(2),
+    (r.lua||0).toFixed(2),(r.lup||0).toFixed(2),(r.pka||0).toFixed(2),(r.pkp||0).toFixed(2),
+    (r.pco||0).toFixed(2),
     r.ta.toFixed(2),r.tp.toFixed(2),r.st===0?'Paid':r.st===4?'Rejected':'Other']);
   const csv=[headers,...data].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
