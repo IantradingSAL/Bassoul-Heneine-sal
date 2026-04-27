@@ -103,6 +103,20 @@
       // Filter / search controls stay enabled (they're not edits).
       var isFilter = el.id && /Filter|search|view$|searchInput/i.test(el.id)
       if (isFilter && el.tagName !== 'BUTTON') return
+      // Navigation must always work — sidebar items, tabs, page-toggles.
+      // These are NOT edits; blocking them locks the user inside the
+      // first sub-page they land on.
+      if (el.closest('.sidebar, .si, .nav-link, .nl, .tab, .tabs, .menu, ' +
+                      '.t-pills, .topbar, .page-tabs, [data-page], [data-tab], ' +
+                      '[data-nav], [role="tab"], [role="navigation"]')) return
+      // Refresh / reload / open / view / show / details / search / clear / filter
+      // buttons are read-only operations that the user MUST be able to use.
+      var label = (el.textContent || '').trim().toLowerCase()
+      var attrs = (el.id + ' ' + (el.className || '') + ' ' + (el.getAttribute('onclick')||'')).toLowerCase()
+      if (/^(refresh|reload|open|view|show|details?|search|filter|clear|reset|expand|collapse|next|prev|previous|back|cancel|close)/.test(label)) return
+      if (/refresh|reload|open|view|show|details?|filter|clear|expand|collapse|cancel|close|navigate|page-/.test(attrs)) return
+      // Read-only buttons inside data tables (sort, expand, etc.) stay active
+      if (el.closest('thead, .sort, .expand, .collapse')) return
       try { el.disabled = true } catch (e) {}
       el.setAttribute('aria-disabled', 'true')
     })
