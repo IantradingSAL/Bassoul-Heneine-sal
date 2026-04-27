@@ -1909,7 +1909,13 @@ async function cwUploadBatch({fileType, fileName, fileSize, period, rows, replac
         exp_desc:     r.expD || null,
         status:       (r.st === undefined || r.st === null || isNaN(r.st)) ? null : r.st,
         nitg:         r.nitg || null,
-        pa: r.pa || 0, pp: r.pp || 0, la: r.la || 0, lp: r.lp || 0, ta: r.ta || 0, tp: r.tp || 0,
+        pa: r.pa || 0, pp: r.pp || 0,
+        la: r.la || 0, lp: r.lp || 0,
+        lua: r.lua || 0, lup: r.lup || 0,
+        pka: r.pka || 0, pkp: r.pkp || 0,
+        ea: r.ea || 0, ep: r.ep || 0,
+        pco: r.pco || 0,
+        ta: r.ta || 0, tp: r.tp || 0,
         flag:         r._flag || (r._d ? 'true-dup' : 'unique'),
         raw_json:     null   // skip raw to save space; full row recoverable from the parsed shape
       }))
@@ -1948,7 +1954,7 @@ async function cwLoadGCMFromCloud(){
   while (true){
     const { data, error } = await ctx.sb
       .from('warranty_gcm_rows')
-      .select('vin,inv,inv_base,op_letter,op_marker,ro,month,claim_date,paid_date,exp_code,exp_desc,status,nitg,pa,pp,la,lp,ta,tp,flag,period_label,file_name')
+      .select('vin,inv,inv_base,op_letter,op_marker,ro,month,claim_date,paid_date,exp_code,exp_desc,status,nitg,pa,pp,la,lp,lua,lup,pka,pkp,ea,ep,pco,ta,tp,flag,period_label,file_name')
       .order('inserted_at', { ascending: true })
       .range(from, from + step - 1)
     if (error){ console.warn('GCM load failed:', error.message); break }
@@ -1977,6 +1983,10 @@ async function cwLoadGCMFromCloud(){
     nitg: r.nitg || '',
     pa: Number(r.pa) || 0, pp: Number(r.pp) || 0,
     la: Number(r.la) || 0, lp: Number(r.lp) || 0,
+    lua: Number(r.lua) || 0, lup: Number(r.lup) || 0,
+    pka: Number(r.pka) || 0, pkp: Number(r.pkp) || 0,
+    ea: Number(r.ea) || 0, ep: Number(r.ep) || 0,
+    pco: Number(r.pco) || 0,
     ta: Number(r.ta) || 0, tp: Number(r.tp) || 0,
     _period: r.period_label,
     _file: r.file_name
