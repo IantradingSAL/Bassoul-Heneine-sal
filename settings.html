@@ -580,7 +580,7 @@ tbody tr:hover{background:#f8fafc}
 <div class="notif" id="notif"></div>
 
 <script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 import { SUPABASE_CONFIG } from './config.js'
 const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
 

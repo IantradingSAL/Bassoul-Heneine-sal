@@ -1644,11 +1644,25 @@ async function cwResubGetSb(){
   // Lazy-init the supabase client and the current user's name
   if (window._cwResubSb) return window._cwResubSb
   try {
-    const [{ createClient }, cfg] = await Promise.all([
-      import('https://esm.sh/@supabase/supabase-js@2'),
-      import('./config.js')
-    ])
-    const sb = createClient(cfg.SUPABASE_CONFIG.url, cfg.SUPABASE_CONFIG.anonKey)
+    // Try multiple CDNs in order — jsdelivr is most reliable globally,
+    // unpkg is the npm fallback, esm.sh is the original. If all three
+    // are blocked the user is offline / behind a strict firewall.
+    const cdns = [
+      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
+      'https://cdn.skypack.dev/@supabase/supabase-js@2',
+      'https://esm.sh/@supabase/supabase-js@2',
+      'https://unpkg.com/@supabase/supabase-js@2/dist/module/index.js'
+    ]
+    let supaMod = null, lastErr = null
+    for (const url of cdns){
+      try { supaMod = await import(url); if (supaMod && supaMod.createClient) break }
+      catch(e){ lastErr = e; console.warn('[BH] CDN unreachable, trying next:', url) }
+    }
+    if (!supaMod || !supaMod.createClient){
+      throw new Error('All Supabase CDN mirrors blocked. Last error: ' + (lastErr?.message || 'unknown'))
+    }
+    const cfg = await import('./config.js')
+    const sb = supaMod.createClient(cfg.SUPABASE_CONFIG.url, cfg.SUPABASE_CONFIG.anonKey)
     let me = null
     try {
       const { data: { user } } = await sb.auth.getUser()
@@ -2570,8 +2584,6 @@ function _cwReplaceOrKeepDialog({period, existing, newName, newRowCount}){
   });
 }
 
-
-function lsClear(){
 
 function updTime(){
   if(!S.lastUpdate) return;

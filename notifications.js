@@ -18,7 +18,7 @@
 //   • The user is asked ONCE for browser notification permission.
 //     If they decline, in-app toasts still work.
 // ═════════════════════════════════════════════════════════════════
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 import { SUPABASE_CONFIG } from './config.js'
 
 const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
