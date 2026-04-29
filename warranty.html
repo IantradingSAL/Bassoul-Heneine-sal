@@ -2340,42 +2340,61 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Load full GCM/INC archive from cloud — replaces local-only cache.
     //    The cloud is now source of truth; localStorage is just a fast
     //    starting point so the page renders before the network completes.
-    try {
-      const [cloudGCM, cloudINC] = await Promise.all([
-        cwLoadGCMFromCloud(),
-        cwLoadINCFromCloud()
-      ]);
-      let changed = false;
-      if (cloudGCM && cloudGCM.length){
-        S.gcm = cloudGCM;
-        document.getElementById('B_GCM').textContent = S.gcm.length;
-        document.getElementById('B_REJ').textContent = S.gcm.filter(r=>r.st===4).length;
-        document.getElementById('US_GCM_COUNT').textContent = S.gcm.length.toLocaleString();
-        document.getElementById('US_GCM_META').textContent = S.gcm.filter(r=>r._d).length + ' duplicates flagged · cloud-archived';
-        document.getElementById('US_REJ_COUNT').textContent = S.gcm.filter(r=>r.st===4).length;
-        const valid = S.gcm.length;
-        if (valid) document.getElementById('US_REJ_META').textContent = ((S.gcm.filter(r=>r.st===4).length/valid)*100).toFixed(1)+'% rejection rate';
-        fillGF();
-        changed = true;
+    let cloudGCM = null, cloudINC = null;
+    let gcmErr = null, incErr = null;
+    try { cloudGCM = await cwLoadGCMFromCloud(); } catch (e) { gcmErr = e.message || String(e); }
+    try { cloudINC = await cwLoadINCFromCloud(); } catch (e) { incErr = e.message || String(e); }
+    // Always log what happened — surface silent failures
+    console.log('[BH cloud sync] GCM:', cloudGCM?.length ?? '(null/error)', gcmErr ? 'ERR: '+gcmErr : '');
+    console.log('[BH cloud sync] INC:', cloudINC?.length ?? '(null/error)', incErr ? 'ERR: '+incErr : '');
+
+    let changed = false;
+    // GCM: cloud is source of truth. Empty cloud = empty local (in sync).
+    // We only keep localStorage if the cloud read itself errored (network).
+    if (cloudGCM !== null) {
+      if (S.gcm.length !== cloudGCM.length) {
+        console.log('[BH cloud sync] Replacing S.gcm: local=' + S.gcm.length + ' → cloud=' + cloudGCM.length);
       }
-      if (cloudINC && cloudINC.length){
-        S.inc = cloudINC;
-        document.getElementById('B_INC').textContent = S.inc.length;
-        document.getElementById('US_INC_COUNT').textContent = S.inc.length.toLocaleString();
-        const makes = new Set(S.inc.map(r=>r.make).filter(Boolean));
-        document.getElementById('US_INC_META').textContent = makes.size + ' makes · cloud-archived';
-        fillIF();
-        changed = true;
+      S.gcm = cloudGCM;
+      lsSave(LS_GCM, S.gcm);
+      document.getElementById('B_GCM').textContent = S.gcm.length;
+      document.getElementById('B_REJ').textContent = S.gcm.filter(r=>r.st===4).length;
+      document.getElementById('US_GCM_COUNT').textContent = S.gcm.length.toLocaleString();
+      document.getElementById('US_GCM_META').textContent = S.gcm.filter(r=>r._d).length + ' duplicates flagged · cloud-archived';
+      document.getElementById('US_REJ_COUNT').textContent = S.gcm.filter(r=>r.st===4).length;
+      const valid = S.gcm.length;
+      if (valid) document.getElementById('US_REJ_META').textContent = ((S.gcm.filter(r=>r.st===4).length/valid)*100).toFixed(1)+'% rejection rate';
+      fillGF();
+      changed = true;
+    } else if (gcmErr) {
+      showToast('⚠️ Could not load GCM from cloud: ' + gcmErr.slice(0, 80) + '. Using local cache.');
+    }
+    if (cloudINC !== null) {
+      if (S.inc.length !== cloudINC.length) {
+        console.log('[BH cloud sync] Replacing S.inc: local=' + S.inc.length + ' → cloud=' + cloudINC.length);
       }
-      if (changed){
-        S.lastUpdate = new Date();
-        updTime(); updPills();
-        // Refresh whatever page is currently showing
-        const active = document.querySelector('.si.active');
-        if (active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,monthly_report:rRptInit,uploads_history:rUploadHistory})[active.dataset.page]?.();
+      S.inc = cloudINC;
+      lsSave(LS_INC, S.inc);
+      document.getElementById('B_INC').textContent = S.inc.length;
+      document.getElementById('US_INC_COUNT').textContent = S.inc.length.toLocaleString();
+      const makes = new Set(S.inc.map(r=>r.make).filter(Boolean));
+      document.getElementById('US_INC_META').textContent = makes.size + ' makes · cloud-archived';
+      fillIF();
+      changed = true;
+    } else if (incErr) {
+      showToast('⚠️ Could not load INCADEA from cloud: ' + incErr.slice(0, 80) + '. Using local cache.');
+    }
+    if (changed){
+      S.lastUpdate = new Date();
+      updTime(); updPills();
+      // Refresh whatever page is currently showing
+      const active = document.querySelector('.si.active');
+      if (active) ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,monthly_report:rRptInit,uploads_history:rUploadHistory})[active.dataset.page]?.();
+      // Quick status line so you can SEE the cloud sync happened.
+      // Only shows when there's actually data — no toast if both are 0.
+      if (S.gcm.length || S.inc.length) {
+        showToast('☁️ Synced from cloud: ' + S.gcm.length + ' GCM rows, ' + S.inc.length + ' INCADEA rows', 4000);
       }
-    } catch (e){
-      console.warn('Cloud archive load failed:', e);
     }
 
     // 3. Hide the upload buttons / dropzones for non-managers
