@@ -735,6 +735,57 @@ table.t tbody tr:hover td{background:var(--surf2)}
 .tr-sup td{opacity:.55;font-style:italic}
 .tr-sup .badge{opacity:.85}
 
+/* Clickable rows + clickable VINs (single-click anywhere on the row
+   fires the smart action; click on VIN fires VIN history) */
+.t tbody tr.tr-clickable{cursor:pointer;transition:background .12s}
+.t tbody tr.tr-clickable:hover td{background:var(--blue4) !important}
+.t tbody tr.tr-clickable:hover .vin-cell{color:var(--blue);text-decoration:underline}
+.vin-cell{cursor:pointer;transition:color .12s}
+.vin-cell:hover{color:var(--blue) !important;text-decoration:underline}
+
+/* Sortable column headers */
+.t thead th.sortable{cursor:pointer;user-select:none;position:relative;padding-right:18px}
+.t thead th.sortable:hover{background:var(--surf2)}
+.t thead th.sortable::after{content:"↕";position:absolute;right:5px;top:50%;transform:translateY(-50%);opacity:.3;font-size:10px}
+.t thead th.sort-asc::after{content:"↑";opacity:1;color:var(--blue)}
+.t thead th.sort-desc::after{content:"↓";opacity:1;color:var(--blue)}
+
+/* VIN History modal */
+.vin-modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:600;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .25s}
+.vin-modal-bg.on{opacity:1;pointer-events:auto}
+.vin-modal{width:900px;max-width:100%;max-height:calc(100vh - 48px);background:#fff;border-radius:18px;box-shadow:0 24px 64px rgba(0,0,0,.28);display:flex;flex-direction:column;transform:scale(.96) translateY(10px);transition:transform .25s cubic-bezier(.16,1,.3,1);overflow:hidden}
+.vin-modal-bg.on .vin-modal{transform:scale(1) translateY(0)}
+.vin-modal-h{padding:18px 22px;border-bottom:1px solid #e2e8f0;display:flex;align-items:flex-start;gap:14px;background:linear-gradient(135deg,#eef2ff,#fff)}
+.vin-modal-icon{font-size:30px;line-height:1}
+.vin-modal-title{flex:1}
+.vin-modal-title h3{margin:0;font-size:16px;font-weight:800;letter-spacing:-.3px;color:#0f172a}
+.vin-modal-title p{margin:3px 0 0;font-size:12px;color:#64748b;font-family:var(--mono,'SF Mono',monospace);font-weight:600}
+.vin-modal-x{background:none;border:1px solid #e2e8f0;border-radius:9px;width:32px;height:32px;cursor:pointer;font-size:16px;color:#64748b;font-family:inherit}
+.vin-modal-x:hover{background:#f8fafc;border-color:#cbd5e1;color:#0f172a}
+.vin-modal-body{flex:1;overflow-y:auto;padding:14px 22px}
+.vin-section{margin-bottom:18px}
+.vin-section-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;color:#64748b;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e2e8f0}
+.vin-section-h .ct{background:#3b5fe2;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:0;text-transform:none}
+.vin-mini{font-size:11px;width:100%;border-collapse:collapse}
+.vin-mini th{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:6px 8px;background:#f8fafc;white-space:nowrap}
+.vin-mini th.num{text-align:right}
+.vin-mini td{padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:11px}
+.vin-mini td.num{text-align:right;font-variant-numeric:tabular-nums}
+.vin-mini tbody tr:hover{background:#fafbff}
+.vin-mini tbody tr.clickable{cursor:pointer}
+.vin-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.vin-stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px}
+.vin-stat-l{font-size:9px;font-weight:700;color:#64748b;letter-spacing:.04em;text-transform:uppercase}
+.vin-stat-v{font-size:16px;font-weight:800;color:#0f172a;margin-top:2px;font-variant-numeric:tabular-nums}
+.vin-stat-s{font-size:10px;color:#94a3b8;margin-top:1px}
+.vin-empty{padding:14px;text-align:center;font-size:11px;color:#94a3b8;font-style:italic;background:#f8fafc;border-radius:10px}
+@media (max-width:780px){
+  .vin-modal-bg{padding:0;align-items:flex-end}
+  .vin-modal{max-width:100%;border-radius:18px 18px 0 0;max-height:88vh}
+  .vin-modal-body{padding:12px 14px}
+  .vin-mini th, .vin-mini td{padding:6px 5px;font-size:10px}
+}
+
 /* ── BADGES ── */
 .badge{display:inline-flex;align-items:center;font-size:8px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.05em;text-transform:uppercase;gap:3px}
 .b-sun{background:var(--sun3);color:var(--sun)}.b-mint{background:var(--mint3);color:var(--mint)}.b-rose{background:var(--rose3);color:var(--rose)}.b-sky{background:var(--sky3);color:var(--sky)}.b-lem{background:var(--lemon3);color:var(--lemon)}.b-pur{background:var(--pur3);color:var(--pur)}.b-n{background:var(--surf2);color:var(--muted)}.b-dup{background:#FEF9C3;color:#92400E}
@@ -3440,6 +3491,267 @@ function jumpTo(page,q){
 //
 // Reads from S.rej (local) + S.gcm (loaded GCM data) — same as
 // the modal preview.
+// ══ VIN HISTORY + ROW CLICK + SORTABLE COLUMNS ════════════════
+// Helpers powering whole-warranty interactivity:
+//  • openVinHistory(vin)  — modal showing all GCM/INC/rejection
+//                            records for that VIN, across all months
+//  • openClaimDetails(inv)— read-only details popup for paid claims
+//  • _rowClick(inv,vin,e) — smart row dispatcher: rejected → modal,
+//                            paid → details, INC → VIN history
+//  • _sortTable(tableId, col, type) — column-sort helper
+
+// Open VIN history popup
+function openVinHistory(vin){
+  if (!vin) return;
+  vin = String(vin).toUpperCase().trim();
+  const gcmRows = (S.gcm || []).filter(r => r.vin === vin);
+  const incRows = (S.inc || []).filter(r => r.vin === vin);
+
+  // Aggregate stats
+  const totalAsked = gcmRows.reduce((s,r) => s + r.ta, 0);
+  const totalPaid  = gcmRows.reduce((s,r) => s + r.tp, 0);
+  const totalRejected = gcmRows.filter(r => r.st === 4).length;
+  const months = new Set(gcmRows.map(r => r.month).filter(Boolean));
+
+  let bg = document.querySelector('.vin-modal-bg');
+  if (bg) bg.remove();
+  bg = document.createElement('div');
+  bg.className = 'vin-modal-bg';
+
+  // Build GCM section
+  let gcmH = '';
+  if (gcmRows.length){
+    gcmRows.sort((a,b) => (b.month||'').localeCompare(a.month||'') || (b.date||'').localeCompare(a.date||''));
+    gcmH = `<table class="vin-mini">
+      <thead><tr><th>Month</th><th>Invoice #</th><th>Op</th><th>Exp</th>
+        <th class="num">Asked €</th><th class="num">Paid €</th><th>Status</th></tr></thead>
+      <tbody>${gcmRows.map(r => {
+        const isP = r.st === 0, isR = r.st === 4;
+        const supChip = _isSupersededByResubmission(r) ? ' <span class="badge b-n" style="font-size:8px">superseded</span>' : '';
+        return `<tr class="clickable" onclick="closeVinHistory();_rowClickByInv('${esc(r.inv)}')">
+          <td style="font-weight:600">${fmM(r.month)}</td>
+          <td class="mono">${esc(r.invBase || r.inv)}${r.intLetter?` <span class="badge b-sky" style="font-size:8px">${r.intLetter}</span>`:''}${supChip}</td>
+          <td style="text-align:center;font-size:9px;color:var(--muted)">${r.intLetter || '—'}</td>
+          <td><span class="badge b-sun" style="font-size:9px">${r.exp || '–'}</span></td>
+          <td class="num">${f(r.ta)}</td>
+          <td class="num" style="font-weight:700">${f(r.tp)}</td>
+          <td><span class="badge ${isP?'b-mint':isR?'b-rose':'b-n'}" style="font-size:9px">${isP?'✅ Paid':isR?'❌ Rejected':'Stat '+r.st}</span>${resubChainBadge(r)}</td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+  } else {
+    gcmH = '<div class="vin-empty">No GCM records found for this VIN.</div>';
+  }
+
+  // Build INCADEA section
+  let incH = '';
+  if (incRows.length){
+    incRows.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+    incH = `<table class="vin-mini">
+      <thead><tr><th>Posting Date</th><th>Invoice No.</th><th>Service Order</th><th>Customer</th>
+        <th class="num">Parts €</th><th class="num">Labour €</th><th class="num">Amount €</th></tr></thead>
+      <tbody>${incRows.map(r => `<tr>
+        <td style="white-space:nowrap">${esc(r.date || '–')}</td>
+        <td class="mono" style="font-weight:600">${esc(r.no)}</td>
+        <td class="mono" style="color:var(--muted)">${esc(r.svcOrd || '–')}</td>
+        <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.cust)}">${esc(r.cust)}</td>
+        <td class="num">${f(r.parts)}</td>
+        <td class="num">${f(r.lab)}</td>
+        <td class="num" style="font-weight:700">${f(r.amt)}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } else {
+    incH = '<div class="vin-empty">No INCADEA records found for this VIN.</div>';
+  }
+
+  // Vehicle info from any source
+  const vehicle = incRows[0] || gcmRows[0] || {};
+  const make = vehicle.make || '';
+  const model = vehicle.model || '';
+  const customer = vehicle.cust || '';
+
+  bg.innerHTML = `
+    <div class="vin-modal" role="dialog" aria-label="VIN history">
+      <div class="vin-modal-h">
+        <div class="vin-modal-icon">🚗</div>
+        <div class="vin-modal-title">
+          <h3>${esc(make)} ${esc(model)}${customer?' — '+esc(customer):''}</h3>
+          <p>${esc(vin)}</p>
+        </div>
+        <button class="vin-modal-x" onclick="closeVinHistory()" title="Close">✕</button>
+      </div>
+      <div class="vin-modal-body">
+        <div class="vin-summary">
+          <div class="vin-stat"><div class="vin-stat-l">📋 Claims</div><div class="vin-stat-v" style="color:var(--sky)">${gcmRows.length}</div><div class="vin-stat-s">across ${months.size} month${months.size===1?'':'s'}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">💰 Total Paid</div><div class="vin-stat-v" style="color:var(--mint)">€${f(totalPaid)}</div><div class="vin-stat-s">of €${f(totalAsked)} asked</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">❌ Rejected</div><div class="vin-stat-v" style="color:var(--rose)">${totalRejected}</div><div class="vin-stat-s">${totalRejected===0?'none':totalRejected===1?'1 claim':'claims'}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">📄 INCADEA</div><div class="vin-stat-v" style="color:#0EA5E9">${incRows.length}</div><div class="vin-stat-s">posted invoice${incRows.length===1?'':'s'}</div></div>
+        </div>
+        <div class="vin-section">
+          <div class="vin-section-h"><span>📋 GCM Claims</span><span class="ct">${gcmRows.length}</span></div>
+          ${gcmH}
+        </div>
+        <div class="vin-section">
+          <div class="vin-section-h" style="color:#0EA5E9"><span>📄 INCADEA Posted Invoices</span><span class="ct" style="background:#0EA5E9">${incRows.length}</span></div>
+          ${incH}
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+  requestAnimationFrame(() => bg.classList.add('on'));
+  // Close on backdrop click
+  bg.addEventListener('click', e => { if (e.target === bg) closeVinHistory(); });
+  // Close on Esc
+  const onEsc = e => { if (e.key === 'Escape') { closeVinHistory(); document.removeEventListener('keydown', onEsc); } };
+  document.addEventListener('keydown', onEsc);
+}
+
+function closeVinHistory(){
+  const bg = document.querySelector('.vin-modal-bg');
+  if (!bg) return;
+  bg.classList.remove('on');
+  setTimeout(() => bg.remove(), 280);
+}
+
+// Read-only details popup for paid claims (or any claim, when no
+// edit action makes sense)
+function openClaimDetails(inv){
+  if (!inv) return;
+  const r = (S.gcm || []).find(x => x.inv === inv);
+  if (!r) { showToast('Claim not found in loaded data'); return; }
+  // Find any related INCADEA invoice (matched by VIN)
+  const incMatches = (S.inc || []).filter(x => x.vin === r.vin);
+
+  let bg = document.querySelector('.vin-modal-bg');
+  if (bg) bg.remove();
+  bg = document.createElement('div');
+  bg.className = 'vin-modal-bg';
+  const isP = r.st === 0, isR = r.st === 4;
+  const statusBadge = isP
+    ? '<span class="badge b-mint">✅ Paid</span>'
+    : isR ? '<span class="badge b-rose">❌ Rejected</span>'
+    : `<span class="badge b-n">Status ${r.st}</span>`;
+  bg.innerHTML = `
+    <div class="vin-modal" role="dialog">
+      <div class="vin-modal-h">
+        <div class="vin-modal-icon">📋</div>
+        <div class="vin-modal-title">
+          <h3>Claim ${esc(r.invBase || r.inv)}${r.intLetter?' · op '+r.intLetter:''}</h3>
+          <p>${esc(r.vin)} · ${fmM(r.month)} · ${esc(r.date || '')}</p>
+        </div>
+        <button class="vin-modal-x" onclick="closeVinHistory()">✕</button>
+      </div>
+      <div class="vin-modal-body">
+        <div class="vin-summary">
+          <div class="vin-stat"><div class="vin-stat-l">Status</div><div style="margin-top:4px">${statusBadge}${resubChainBadge(r)}</div><div class="vin-stat-s">${r.exp?'Code '+r.exp:''}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">Total Asked</div><div class="vin-stat-v" style="color:var(--sky)">€${f(r.ta)}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">Total Paid</div><div class="vin-stat-v" style="color:var(--mint)">€${f(r.tp)}</div><div class="vin-stat-s">${r.paidDate?'on '+esc(r.paidDate):''}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">Deducted</div><div class="vin-stat-v" style="color:var(--rose)">€${f(Math.max(r.ta - r.tp, 0))}</div></div>
+        </div>
+        <div class="vin-section">
+          <div class="vin-section-h"><span>💰 Amount breakdown</span></div>
+          <table class="vin-mini">
+            <thead><tr><th>Component</th><th class="num">Asked €</th><th class="num">Paid €</th></tr></thead>
+            <tbody>
+              <tr><td>Parts</td><td class="num">${f(r.pa)}</td><td class="num">${f(r.pp)}</td></tr>
+              <tr><td>Labour</td><td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td></tr>
+              ${(r.lua||r.lup)>0?`<tr><td>Lubricant</td><td class="num">${f(r.lua||0)}</td><td class="num">${f(r.lup||0)}</td></tr>`:''}
+              ${(r.pka||r.pkp)>0?`<tr><td>Pack</td><td class="num">${f(r.pka||0)}</td><td class="num">${f(r.pkp||0)}</td></tr>`:''}
+              ${(r.ea||r.ep)>0?`<tr><td>External Service</td><td class="num">${f(r.ea||0)}</td><td class="num">${f(r.ep||0)}</td></tr>`:''}
+              ${(r.pco||0)>0?`<tr><td>PCO Subsidy</td><td class="num">—</td><td class="num" style="color:var(--mint);font-weight:600">${f(r.pco)}</td></tr>`:''}
+              <tr style="border-top:2px solid #e2e8f0;font-weight:700"><td>TOTAL</td><td class="num">${f(r.ta)}</td><td class="num">${f(r.tp)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        ${incMatches.length?`
+        <div class="vin-section">
+          <div class="vin-section-h" style="color:#0EA5E9"><span>📄 Related INCADEA Invoices</span><span class="ct" style="background:#0EA5E9">${incMatches.length}</span></div>
+          <table class="vin-mini">
+            <thead><tr><th>No.</th><th>Posting Date</th><th>Service Order</th><th class="num">Amount €</th></tr></thead>
+            <tbody>${incMatches.map(inc => `<tr>
+              <td class="mono" style="font-weight:600">${esc(inc.no)}</td>
+              <td>${esc(inc.date || '–')}</td>
+              <td class="mono" style="color:var(--muted)">${esc(inc.svcOrd || '–')}</td>
+              <td class="num" style="font-weight:700">${f(inc.amt)}</td>
+            </tr>`).join('')}</tbody>
+          </table>
+        </div>`:''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn btn-sky btn-sm" onclick="closeVinHistory();openVinHistory('${esc(r.vin)}')">🚗 Full VIN history</button>
+          ${isR?`<button class="btn btn-sun btn-sm" onclick="closeVinHistory();openModal('${esc(r.inv)}','${esc(r.vin)}')">${S.rej[r.inv]?'✏️ Edit':'+ Track'} rejection</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+  requestAnimationFrame(() => bg.classList.add('on'));
+  bg.addEventListener('click', e => { if (e.target === bg) closeVinHistory(); });
+  const onEsc = e => { if (e.key === 'Escape') { closeVinHistory(); document.removeEventListener('keydown', onEsc); } };
+  document.addEventListener('keydown', onEsc);
+}
+
+// Smart row-click — picks the right action for the row.
+// Called as onclick on every row in every claim table.
+// Stops if the click landed on a button or the VIN cell (those have
+// their own handlers).
+function _rowClick(inv, vin, e){
+  if (!e) return;
+  // If user clicked an actual button or the VIN cell, let those handle
+  if (e.target.closest('button, .vin-cell, a, input, select, textarea')) return;
+  _rowClickByInv(inv, vin);
+}
+
+// Pure dispatcher (called by _rowClick AND by the VIN-history popup
+// when user clicks a row inside it)
+function _rowClickByInv(inv, vin){
+  if (!inv) {
+    if (vin) openVinHistory(vin);
+    return;
+  }
+  const r = (S.gcm || []).find(x => x.inv === inv);
+  if (!r) { showToast('Claim not found'); return; }
+  if (r.st === 4) {
+    // Rejected → open the rejection-tracking modal
+    if (typeof openModal === 'function') openModal(r.inv, r.vin);
+  } else {
+    // Paid / Other → read-only details popup
+    openClaimDetails(r.inv);
+  }
+}
+
+// ── Sortable column headers ──────────────────────────────────────
+// Single state-bag for all pages; persists within session.
+window._sortState = window._sortState || {};
+function _sortClick(tableKey, colIdx, type){
+  const cur = window._sortState[tableKey] || {col:-1, dir:'asc'};
+  let dir = 'asc';
+  if (cur.col === colIdx && cur.dir === 'asc') dir = 'desc';
+  window._sortState[tableKey] = {col: colIdx, dir, type};
+  // Re-render the relevant page
+  ({gcm:rGCM, ap:rAP, rej:rRej, rec:rRec, inc:rInc})[tableKey]?.();
+}
+
+function _applySort(rows, tableKey, accessors){
+  const st = window._sortState[tableKey];
+  if (!st || st.col < 0 || !accessors[st.col]) return rows;
+  const acc = accessors[st.col];
+  const dir = st.dir === 'desc' ? -1 : 1;
+  return [...rows].sort((a,b) => {
+    const va = acc(a), vb = acc(b);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+    return String(va).localeCompare(String(vb)) * dir;
+  });
+}
+
+function _th(label, tableKey, colIdx, opts){
+  opts = opts || {};
+  const st = window._sortState[tableKey] || {};
+  const cls = ['sortable'];
+  if (opts.num) cls.push('num');
+  if (st.col === colIdx) cls.push(st.dir === 'desc' ? 'sort-desc' : 'sort-asc');
+  return `<th class="${cls.join(' ')}" onclick="_sortClick('${tableKey}',${colIdx})">${label}</th>`;
+}
+
 function _resubStatus(claim){
   // claim = a GCM row with at least .inv and .st
   if (!claim || claim.st !== 4) return null;          // not rejected → no badge
@@ -3550,6 +3862,26 @@ function rGCM(){
     return true;
   });
   const vld=rows.filter(r=>true),dups=rows.filter(r=>r._d).length,rej=vld.filter(r=>r.st===4).length;
+  // Apply user-selected sort
+  rows = _applySort(rows, 'gcm', [
+    r => r.vin,                  // 0 VIN
+    r => r.invBase || r.inv,     // 1 Invoice
+    r => r.intLetter,            // 2 Op
+    r => r.ro,                   // 3 RO
+    r => r.month,                // 4 Month
+    r => r.date,                 // 5 Date
+    r => r.exp,                  // 6 Exp Code
+    r => r.nitg,                 // 7 NITG
+    r => r.pa,                   // 8 Parts asked
+    r => r.pp,                   // 9 Parts paid
+    r => r.la,                   //10 Labour asked
+    r => r.lp,                   //11 Labour paid
+    r => r.pco,                  //12 PCO
+    r => r.ta,                   //13 Total asked
+    r => r.tp,                   //14 Total paid
+    r => r.st,                   //15 Status
+    null                         //16 Action — not sortable
+  ]);
   K.style.display='grid';
   K.innerHTML=`
     <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📋 Claims</div><div class="kv sky">${vld.length.toLocaleString()}</div><div class="ks">${dups} duplicates flagged</div></div>
@@ -3559,20 +3891,23 @@ function rGCM(){
     <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">🚗 Unique VINs</div><div class="kv pur">${new Set(vld.map(r=>r.vin)).size.toLocaleString()}</div></div>`;
   let h=dups?`<div class="al al-w">⚠️ ${dups} duplicate row${dups===1?'':'s'} detected (identical VIN + Invoice # + operation) — highlighted yellow as a visual warning. <strong>Still counted in all totals.</strong> Note: a/b/c operation letters are distinct billable operations, never flagged.</div>`:'';
   h+=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
-    <th>VIN</th><th>Invoice #</th><th>Op</th><th>RO / Order</th><th>Month</th><th>Date</th>
-    <th>Exp Code</th><th>NITG</th>
-    <th class="num">Parts Asked</th><th class="num">Parts Paid</th>
-    <th class="num">Labour Asked</th><th class="num">Labour Paid</th>
-    <th class="num" title="PCO = Programme Constructeur Origine. Renault pays this amount in addition to parts/labour for certain claims (often €150 for major repairs). It's part of your total payment.">PCO Paid</th>
-    <th class="num">Total Asked</th><th class="num">Total Paid</th>
-    <th>Status</th><th>Action</th>
+    ${_th('VIN','gcm',0)}${_th('Invoice #','gcm',1)}${_th('Op','gcm',2)}${_th('RO / Order','gcm',3)}${_th('Month','gcm',4)}${_th('Date','gcm',5)}
+    ${_th('Exp Code','gcm',6)}${_th('NITG','gcm',7)}
+    ${_th('Parts Asked','gcm',8,{num:1})}${_th('Parts Paid','gcm',9,{num:1})}
+    ${_th('Labour Asked','gcm',10,{num:1})}${_th('Labour Paid','gcm',11,{num:1})}
+    <th class="num sortable" onclick="_sortClick('gcm',12)" title="PCO = Programme Constructeur Origine. Renault pays this amount in addition to parts/labour for certain claims (often €150 for major repairs).">PCO Paid${(window._sortState.gcm||{}).col===12?((window._sortState.gcm||{}).dir==='desc'?' ↓':' ↑'):''}</th>
+    ${_th('Total Asked','gcm',13,{num:1})}${_th('Total Paid','gcm',14,{num:1})}
+    ${_th('Status','gcm',15)}<th>Action</th>
   </tr></thead><tbody>`;
   rows.slice(0,600).forEach(r=>{
     const rd=S.rej[r.inv];
     const isP=r.st===0,isR=r.st===4;
     const isSup=_isSupersededByResubmission(r);
-    h+=`<tr class="${r._d?'tr-dup':''} ${isSup?'tr-sup':''}" ${isSup?'title="Superseded by resubmission — excluded from totals"':''}>
-      <td class="mono">${r.vin}${r._d?' <span class="badge b-dup">DUP</span>':''}</td>
+    const cls = ['tr-clickable'];
+    if (r._d) cls.push('tr-dup');
+    if (isSup) cls.push('tr-sup');
+    h+=`<tr class="${cls.join(' ')}" ${isSup?'title="Superseded by resubmission — excluded from totals"':''} onclick="_rowClick('${esc(r.inv)}','${esc(r.vin)}',event)">
+      <td class="mono vin-cell" onclick="event.stopPropagation();openVinHistory('${esc(r.vin)}')">${r.vin}${r._d?' <span class="badge b-dup">DUP</span>':''}</td>
       <td class="mono">${r.invBase||r.inv}${resubChainNote(r)}</td>
       <td style="text-align:center">${r.intLetter?`<span class="badge b-sky" style="font-size:9px">${r.intLetter}</span>`:'<span style="color:var(--faint);font-size:9px">—</span>'}</td>
       <td class="mono" style="color:var(--muted);font-size:9px">${r.ro||'–'}</td>
@@ -3586,7 +3921,7 @@ function rGCM(){
       <td class="num">${f(r.ta)}</td>
       <td class="num" style="font-weight:700">${f(r.tp)}</td>
       <td><span class="badge ${isP?'b-mint':isR?'b-rose':'b-n'}">${isP?'✅ Paid':isR?'❌ Rejected':'Stat '+r.st}</span>${isR&&rd?.rejType?` <span class="badge ${rd.rejType==='full'?'b-rose':'b-lem'}" style="margin-left:2px">${rd.rejType==='full'?'Full':'Partial'}</span>`:''}${resubChainBadge(r)}</td>
-      <td>${isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="openModal('${esc(r.inv)}','${r.vin}')">${rd?'✏️ Edit':'+ Track'}</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'}</td>
+      <td>${isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openModal('${esc(r.inv)}','${r.vin}')">${rd?'✏️ Edit':'+ Track'}</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'}</td>
     </tr>`;
   });
   if(rows.length>600)h+=`<tr><td colspan="17" style="text-align:center;padding:14px;color:var(--muted);font-size:11px;font-weight:500">… ${rows.length-600} more rows — use filters to narrow down 🔍</td></tr>`;
@@ -3850,6 +4185,20 @@ function rRej(){
     if(ff==='resolved'&&(!S.rej[r.inv]||S.rej[r.inv].status!=='resolved'))return false;
     return true;
   });
+  // Apply sort
+  rows = _applySort(rows, 'rej', [
+    r => r.vin, r => r.inv, r => r.ro, r => r.month, r => r.exp,
+    r => r.ta, r => r.tp,
+    r => { const d=S.rej[r.inv]||{}; return d.rejType==='partial'?Math.max(r.ta-r.tp,0):r.ta; },
+    r => (S.rej[r.inv]||{}).rejType,
+    r => (S.rej[r.inv]||{}).reason,
+    r => (S.rej[r.inv]||{}).newClaim,
+    r => (S.rej[r.inv]||{}).resubDate,
+    r => (S.rej[r.inv]||{}).creditDate,
+    r => (S.rej[r.inv]||{}).creditedAmt || 0,
+    r => (S.rej[r.inv]||{}).shortfall || 0,
+    r => (S.rej[r.inv]||{}).status || 'untracked'
+  ]);
 
   // KPI calculations
   const wA=allRej.filter(r=>S.rej[r.inv]).length;
@@ -3907,13 +4256,13 @@ function rRej(){
   </div>
   <div class="tw"><table class="t">
   <thead><tr>
-    <th>VIN</th><th>Invoice #</th><th>RO</th><th>Month</th><th>Exp</th>
-    <th class="num">Asked (€)</th><th class="num">Paid (€)</th><th class="num">Rejected (€)</th>
-    <th>Type</th><th>Reason</th>
-    <th>Resubmission Chain</th>
-    <th>Resub Date</th><th>Credit Date</th>
-    <th class="num">Credited (€)</th><th class="num">Shortfall (€)</th>
-    <th>Status</th><th>Notes</th><th>Action</th>
+    ${_th('VIN','rej',0)}${_th('Invoice #','rej',1)}${_th('RO','rej',2)}${_th('Month','rej',3)}${_th('Exp','rej',4)}
+    ${_th('Asked (€)','rej',5,{num:1})}${_th('Paid (€)','rej',6,{num:1})}${_th('Rejected (€)','rej',7,{num:1})}
+    ${_th('Type','rej',8)}${_th('Reason','rej',9)}
+    ${_th('Resubmission Chain','rej',10)}
+    ${_th('Resub Date','rej',11)}${_th('Credit Date','rej',12)}
+    ${_th('Credited (€)','rej',13,{num:1})}${_th('Shortfall (€)','rej',14,{num:1})}
+    ${_th('Status','rej',15)}<th>Notes</th><th>Action</th>
   </tr></thead><tbody>`;
 
   rows.forEach(r=>{
@@ -3921,8 +4270,8 @@ function rRej(){
     const rejAmt=d.rejType==='partial'?Math.max(r.ta-r.tp,0):(d.rejType==='full'?r.ta:r.ta);
     const isCredited=d.status==='credited';
     const rowBg=isCredited?'background:rgba(16,185,129,.04)':'';
-    h+=`<tr style="${rowBg}">
-      <td class="mono">${r.vin}</td>
+    h+=`<tr class="tr-clickable" style="${rowBg}" onclick="_rowClick('${esc(r.inv)}','${esc(r.vin)}',event)">
+      <td class="mono vin-cell" onclick="event.stopPropagation();openVinHistory('${esc(r.vin)}')">${r.vin}</td>
       <td class="mono">${r.inv}</td>
       <td class="mono" style="font-size:9px;color:var(--muted)">${r.ro||'–'}</td>
       <td style="font-size:11px;font-weight:600;white-space:nowrap">${fmM(r.month)}</td>
@@ -3939,7 +4288,7 @@ function rRej(){
       <td class="num">${(()=>{ if(d.creditedAmt==null||d.shortfall==null) return '<span style="color:var(--faint)">—</span>'; const sc=d.shortfall>0.01?'var(--rose)':d.shortfall<-0.01?'var(--sky)':'var(--mint)'; return '<span style="color:'+sc+';font-weight:700">€'+f(Math.abs(d.shortfall))+'</span>'; })()}</td>
       <td>${statusBadge(d.status,d)}</td>
       <td style="font-size:10px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)" title="${d.notes||''}">${d.notes||'—'}</td>
-      <td><button class="btn btn-sm ${d.reason?'btn-ghost':'btn-sun'}" onclick="openModal('${esc(r.inv)}','${r.vin}')">${d.reason?'✏️ Edit':'+ Track'}</button></td>
+      <td><button class="btn btn-sm ${d.reason?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openModal('${esc(r.inv)}','${r.vin}')">${d.reason?'✏️ Edit':'+ Track'}</button></td>
     </tr>`;
   });
   h+=`</tbody></table></div></div>`;
@@ -3957,6 +4306,24 @@ function rInc(){
     if(qf&&![r.vin,r.no,r.svcOrd,r.cust,r.extDoc,r.model].join('|').toLowerCase().includes(qf))return false;
     return true;
   });
+  // Apply sort
+  rows = _applySort(rows, 'inc', [
+    r => r.no,                    // 0 Invoice No.
+    r => r.vin,                   // 1 VIN
+    r => (r.make||'') + ' ' + (r.model||''),  // 2 Make/Model
+    r => r.cust,                  // 3 Customer
+    r => r.svcOrd,                // 4 Service Order
+    r => r.loc,                   // 5 Location
+    r => r.postGrp,               // 6 Post Group
+    r => r.date,                  // 7 Posting Date
+    r => r.initReg,               // 8 Init Reg
+    r => r.mileage,               // 9 Mileage
+    r => r.parts,                 //10 Parts
+    r => r.lab,                   //11 Labour
+    r => r.extServ,               //12 Ext Serv
+    r => r.amt,                   //13 Amount
+    r => r.payMethod              //14 Payment
+  ]);
   K.style.display='grid';
   K.innerHTML=`
     <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📄 Invoices</div><div class="kv sky">${rows.length.toLocaleString()}</div><div class="ks">${new Set(rows.map(r=>r.vin)).size} unique VINs</div></div>
@@ -3966,12 +4333,12 @@ function rInc(){
     <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💰 Total Amount (€)</div><div class="kv pur">${f(rows.reduce((s,r)=>s+r.amt,0))}</div><div class="ks">incl. VAT €${f(rows.reduce((s,r)=>s+(r.amtVat||0),0))}</div></div>`;
   let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t">
   <thead><tr>
-    <th>Invoice No.</th><th>VIN</th><th>Make / Model</th><th>Customer</th>
-    <th>Service Order</th><th>Location</th><th>Post Group</th>
-    <th>Posting Date</th><th>Init. Reg.</th><th class="num">Mileage</th>
-    <th class="num">Parts (€)</th><th class="num">Labour (€)</th>
-    <th class="num">Ext. Serv. (€)</th>
-    <th class="num">Amount (€)</th><th>Payment</th>
+    ${_th('Invoice No.','inc',0)}${_th('VIN','inc',1)}${_th('Make / Model','inc',2)}${_th('Customer','inc',3)}
+    ${_th('Service Order','inc',4)}${_th('Location','inc',5)}${_th('Post Group','inc',6)}
+    ${_th('Posting Date','inc',7)}${_th('Init. Reg.','inc',8)}${_th('Mileage','inc',9,{num:1})}
+    ${_th('Parts (€)','inc',10,{num:1})}${_th('Labour (€)','inc',11,{num:1})}
+    ${_th('Ext. Serv. (€)','inc',12,{num:1})}
+    ${_th('Amount (€)','inc',13,{num:1})}${_th('Payment','inc',14)}
   </tr></thead><tbody>`;
   rows.slice(0,500).forEach(r=>{
     const payBadge = r.payMethod==='CREDIT'
@@ -3980,9 +4347,9 @@ function rInc(){
     const pgBadge = r.postGrp
       ? `<span class="badge b-pur" style="font-size:8px;max-width:110px;overflow:hidden;text-overflow:ellipsis;display:inline-block;white-space:nowrap" title="${r.postGrp}">${r.postGrp}</span>`
       : '<span style="color:var(--faint)">—</span>';
-    h+=`<tr>
+    h+=`<tr class="tr-clickable" onclick="openVinHistory('${esc(r.vin)}')">
       <td class="mono" style="font-weight:600">${r.no}</td>
-      <td class="mono" style="font-size:9px">${r.vin||'–'}</td>
+      <td class="mono vin-cell" style="font-size:9px" onclick="event.stopPropagation();openVinHistory('${esc(r.vin)}')">${r.vin||'–'}</td>
       <td style="font-size:10px;font-weight:600">${r.make} ${r.model}</td>
       <td style="font-size:10px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500" title="${r.cust}">${r.cust}</td>
       <td class="mono" style="color:var(--muted)">${r.svcOrd||'–'}</td>
@@ -4130,10 +4497,24 @@ function rRec(){
   </div></div></div>`;
   const sBadge=s=>({pending:'<span class="badge b-rose">🔴 Pending</span>',resubmitted:'<span class="badge b-sky">🔄 Resubmitted</span>',escalated:'<span class="badge b-pur">⬆️ Escalated</span>',credited:'<span class="badge" style="background:#D1FAE5;color:#065F46;border:1.5px solid #6EE7B7">💚 Credited</span>',resolved:'<span class="badge b-mint">✅ Resolved</span>',written_off:'<span class="badge b-n">💀 Written Off</span>',untracked:'<span class="badge b-n">⚪ Not Tracked</span>'})[s]||'—';
   h+=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">🔄 Per-Claim Detail</div><div class="tw"><table class="t">
-  <thead><tr><th>VIN</th><th>Invoice #</th><th>Month</th><th class="num">Asked (€)</th><th class="num">Paid (€)</th><th class="num">Rejected (€)</th><th>Type</th><th>New Claim #</th><th>Status</th></tr></thead><tbody>`;
-  allRej.forEach(r=>{
+  <thead><tr>${_th('VIN','rec',0)}${_th('Invoice #','rec',1)}${_th('Month','rec',2)}${_th('Asked (€)','rec',3,{num:1})}${_th('Paid (€)','rec',4,{num:1})}${_th('Rejected (€)','rec',5,{num:1})}${_th('Type','rec',6)}${_th('New Claim #','rec',7)}${_th('Status','rec',8)}</tr></thead><tbody>`;
+  let _recRows = allRej.slice();
+  _recRows = _applySort(_recRows, 'rec', [
+    r => r.vin, r => r.inv, r => r.month,
+    r => r.ta, r => r.tp,
+    r => { const d=S.rej[r.inv]||{}; return d.rejType==='partial'?Math.max(r.ta-r.tp,0):r.ta; },
+    r => (S.rej[r.inv]||{}).rejType,
+    r => (S.rej[r.inv]||{}).newClaim,
+    r => (S.rej[r.inv]||{}).status || 'untracked'
+  ]);
+  _recRows.forEach(r=>{
     const d=S.rej[r.inv]||{};const rejAmt=d.rejType==='partial'?Math.max(r.ta-r.tp,0):r.ta;
-    h+=`<tr><td class="mono" style="font-size:10px">${r.vin}</td><td class="mono">${r.inv}${resubChainNote(r)}</td><td style="font-size:11px;font-weight:600">${fmM(r.month)}</td><td class="num">${f(r.ta)}</td><td class="num">${f(r.tp)}</td><td class="num" style="font-weight:700;color:var(--rose)">${f(rejAmt)}</td>
+    h+=`<tr class="tr-clickable" onclick="_rowClick('${esc(r.inv)}','${esc(r.vin)}',event)">
+      <td class="mono vin-cell" style="font-size:10px" onclick="event.stopPropagation();openVinHistory('${esc(r.vin)}')">${r.vin}</td>
+      <td class="mono">${r.inv}${resubChainNote(r)}</td>
+      <td style="font-size:11px;font-weight:600">${fmM(r.month)}</td>
+      <td class="num">${f(r.ta)}</td><td class="num">${f(r.tp)}</td>
+      <td class="num" style="font-weight:700;color:var(--rose)">${f(rejAmt)}</td>
       <td>${d.rejType?`<span class="badge ${d.rejType==='full'?'b-rose':'b-lem'}">${d.rejType==='full'?'❌ Full':'⚠️ Partial'}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
       <td class="mono">${d.newClaim?`<span class="badge b-mint">✅ ${d.newClaim}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
       <td>${sBadge(d.status||'untracked')}${resubChainBadge(r)}</td></tr>`;
