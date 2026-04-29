@@ -1971,6 +1971,63 @@ async function cwFindUploadsForPeriod(fileType, period){
 // appropriate type table. Returns the upload_id on success.
 async function cwUploadBatch({fileType, fileName, fileSize, period, rows, replaceUploadIds}){
   const ctx = await cwResubGetSb(); if (!ctx) throw new Error('Supabase not initialized')
+
+  // ── DEDUPLICATION — fetch what's already in cloud, filter rows
+  // so we only insert new ones. The natural unique key is:
+  //   • GCM     → inv (Renault's claim invoice number)
+  //   • INCADEA → no  (dealer's internal invoice number, GAR…)
+  // Re-uploading the same file is therefore safe — only new records
+  // get added. Already-stored records are skipped silently.
+  let existingKeys = new Set();
+  let dedupKeyField = null;
+  if (fileType === 'gcm'){
+    dedupKeyField = 'inv';
+    // Pull every existing inv from cloud (paginated)
+    let from = 0; const step = 1000;
+    while (true){
+      const { data, error } = await ctx.sb
+        .from('warranty_gcm_rows')
+        .select('inv')
+        .range(from, from + step - 1);
+      if (error) { console.warn('[BH] dedup-fetch GCM failed:', error.message); break; }
+      if (!data || !data.length) break;
+      data.forEach(d => { if (d.inv) existingKeys.add(d.inv); });
+      if (data.length < step) break;
+      from += step;
+    }
+  } else if (fileType === 'incadea'){
+    dedupKeyField = 'no';
+    let from = 0; const step = 1000;
+    while (true){
+      const { data, error } = await ctx.sb
+        .from('warranty_incadea_rows')
+        .select('no')
+        .range(from, from + step - 1);
+      if (error) { console.warn('[BH] dedup-fetch INC failed:', error.message); break; }
+      if (!data || !data.length) break;
+      data.forEach(d => { if (d.no) existingKeys.add(d.no); });
+      if (data.length < step) break;
+      from += step;
+    }
+  }
+  // Filter the incoming rows
+  const totalIncoming = rows.length;
+  let newRows = rows;
+  if (dedupKeyField === 'inv'){
+    newRows = rows.filter(r => !existingKeys.has(r.inv));
+  } else if (dedupKeyField === 'no'){
+    newRows = rows.filter(r => !existingKeys.has(r.no));
+  }
+  const skippedCount = totalIncoming - newRows.length;
+  console.log('[BH] dedup: incoming=' + totalIncoming + ' alreadyInCloud=' + existingKeys.size + ' new=' + newRows.length + ' skipped=' + skippedCount);
+
+  // If nothing new, skip the upload entirely (no empty header, no orphan)
+  if (newRows.length === 0){
+    return { uploadId: null, inserted: 0, skipped: skippedCount, totalIncoming };
+  }
+
+  // Use the deduplicated set for the rest of the upload
+  rows = newRows;
   if (!await cwUploadAllowed()) throw new Error('You do not have permission to upload warranty data')
 
   // If user chose "Replace": delete the matching previous uploads first
@@ -2084,7 +2141,7 @@ async function cwUploadBatch({fileType, fileName, fileSize, period, rows, replac
       if (error) throw new Error('INC row insert failed at chunk ' + (i/chunkSize) + ': ' + error.message)
     }
   }
-  return uploadId
+  return { uploadId, inserted: rows.length, skipped: skippedCount, totalIncoming }
 }
 
 // Pull every GCM row from the cloud and rebuild S.gcm. Done at page
@@ -2668,11 +2725,11 @@ async function procF(file, type){
         showLoad('Uploading ' + file.name + ' …');
       }
 
-      // Step 4 — push to cloud
       // Step 4 — push to cloud (best-effort; falls back to local-only)
       let cloudOK = false;
+      let uploadResult = null;
       try {
-        await cwUploadBatch({
+        uploadResult = await cwUploadBatch({
           fileType: fileTypeKey,
           fileName: file.name,
           fileSize: file.size,
@@ -2734,9 +2791,35 @@ async function procF(file, type){
       updLsStatus();
       hideLoad();
       const periodHuman = period ? _cwHumanPeriod(period) : 'no period';
-      const action = replaceUploadIds ? 'replaced' : 'added';
-      showToast('🎉 ' + parsed.length + ' rows ' + action + ' for ' + periodHuman + '. Total in system: ' + (type==='gcm'?S.gcm.length:S.inc.length).toLocaleString());
-      stat('ST_'+type.toUpperCase(), '✅ ' + parsed.length + ' rows ' + action + ' · period ' + periodHuman, true);
+      // Smart toast — shows precise dedup result so the user knows
+      // exactly what happened. The whole point of the file being a
+      // master copy is that re-uploading is safe AND visible.
+      if (cloudOK && uploadResult) {
+        const ins = uploadResult.inserted || 0;
+        const skip = uploadResult.skipped || 0;
+        const total = uploadResult.totalIncoming || parsed.length;
+        let msg, statMsg;
+        if (ins === 0 && skip > 0){
+          msg = '✅ All ' + skip + ' records already in cloud — no duplicates added';
+          statMsg = '✅ ' + total + ' rows in file · all already in cloud · no duplicates';
+        } else if (ins > 0 && skip > 0){
+          msg = '🎉 ' + ins + ' new record' + (ins===1?'':'s') + ' added · ' + skip + ' already in cloud (skipped)';
+          statMsg = '✅ ' + ins + ' new of ' + total + ' · ' + skip + ' duplicates skipped';
+        } else if (ins > 0 && skip === 0){
+          msg = '🎉 ' + ins + ' record' + (ins===1?'':'s') + ' added' + (periodHuman!=='no period'?' for '+periodHuman:'') + ' · all new';
+          statMsg = '✅ ' + ins + ' new rows added · period ' + periodHuman;
+        } else {
+          msg = '⚠️ No records found in file';
+          statMsg = '⚠️ Empty';
+        }
+        showToast(msg + '. Total in system: ' + (type==='gcm'?S.gcm.length:S.inc.length).toLocaleString());
+        stat('ST_'+type.toUpperCase(), statMsg, true);
+      } else {
+        // Local-only fallback (cloud failed)
+        const action = replaceUploadIds ? 'replaced' : 'added';
+        showToast('🎉 ' + parsed.length + ' rows ' + action + ' for ' + periodHuman + ' (local only). Total: ' + (type==='gcm'?S.gcm.length:S.inc.length).toLocaleString());
+        stat('ST_'+type.toUpperCase(), '⚠️ ' + parsed.length + ' rows ' + action + ' locally · cloud unavailable', false);
+      }
     } catch(err){
       hideLoad();
       stat('ST_'+type.toUpperCase(), '❌ Error: ' + err.message, false);
