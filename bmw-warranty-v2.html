@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>BMW Warranty v2 — Bassoul, Heneine SAL</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='10' fill='%231C69D4'/><text x='12' y='17' font-size='10' text-anchor='middle' fill='white' font-weight='800' font-family='Arial'>B2</text></svg>">
+
+<!-- Order matters: xlsx first (used by parser), then parser (uses xlsx +
+     attaches window.BMWParser), then supabase wrapper (uses BMWParser). -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="bmw-parser.js"></script>
+<script src="bmw-supabase.js"></script>
+<script type="module" src="./auth_guard.js"></script>
+<script type="module" src="./access.js"></script>
+<script type="module" src="./notifications.js"></script>
+
+<style>
+:root{
+  --bg:#fafbff; --surf:#fff; --surf2:#f1f5f9; --line:#e2e8f0;
+  --txt:#0f172a; --muted:#64748b; --faint:#94a3b8;
+  --blue:#3b5fe2; --blue4:#eef2ff;
+  --mono:'SF Mono','Roboto Mono','Menlo',monospace;
+  --mint:#10b981; --rose:#e11d48; --sun:#f59e0b;
+  --lemon:#facc15; --pur:#8b5cf6; --sky:#0EA5E9;
+  --bmw:#1C69D4; --bmw-d:#0F4FA8;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;font-size:13px;-webkit-font-smoothing:antialiased}
+.app{display:flex;min-height:100vh}
+
+/* ── Sidebar ── */
+.sidebar{width:240px;background:#fff;border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 10px 14px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.brand-logo{width:32px;height:32px;background:linear-gradient(135deg,var(--bmw),var(--bmw-d));border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px}
+.brand-name{font-size:12px;font-weight:800;color:var(--txt);letter-spacing:-.3px;line-height:1.1}
+.brand-sub{font-size:10px;color:var(--muted);font-weight:600}
+.si{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;font-size:12px;color:#475569;font-weight:600;cursor:pointer;transition:background .15s,color .15s;text-decoration:none}
+.si:hover{background:var(--surf2);color:var(--txt)}
+.si.active{background:var(--blue4);color:var(--blue)}
+.si-icon{font-size:14px;flex-shrink:0}
+.si-badge{margin-left:auto;background:var(--blue);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:999px;min-width:18px;text-align:center}
+.si-section{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:10px 11px 4px;margin-top:6px;border-top:1px solid var(--line)}
+
+/* ── Main / Topbar ── */
+.main{flex:1;padding:20px 28px;max-width:1700px;margin:0 auto;width:100%}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:14px;flex-wrap:wrap}
+.topbar h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.3px;display:flex;align-items:center;gap:10px}
+.topbar p{margin:2px 0 0;font-size:12px;color:var(--muted);font-weight:500}
+.us-badge{background:linear-gradient(135deg,var(--bmw),var(--bmw-d));color:#fff;padding:5px 11px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.04em}
+.last-sync{font-size:10px;color:var(--muted);font-weight:600;text-align:right}
+.menuBtn{display:none;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;background:#fff;border:1px solid var(--line);cursor:pointer;font-size:18px}
+
+/* ── KPIs ── */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;position:relative;overflow:hidden}
+.kpi-accent{position:absolute;top:0;left:0;width:3px;height:100%}
+.kl{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:5px}
+.kv{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-top:5px;font-variant-numeric:tabular-nums}
+.kv.bmw{color:var(--bmw)} .kv.mint{color:var(--mint)} .kv.rose{color:var(--rose)}
+.kv.sun{color:var(--sun)} .kv.lem{color:#a16207} .kv.pur{color:var(--pur)}
+.kv.sky{color:var(--sky)}
+.ks{font-size:10px;color:var(--faint);margin-top:2px;font-weight:500}
+
+/* ── Cards & tables ── */
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+.ct{font-size:13px;font-weight:800;letter-spacing:-.2px;margin:0 0 14px}
+.btn{padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:#475569;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+.btn:hover{background:var(--surf2)}
+.btn-bmw{background:var(--bmw);color:#fff;border-color:var(--bmw)}
+.btn-bmw:hover{background:var(--bmw-d)}
+.btn-sm{padding:5px 9px;font-size:10px}
+.btn-sun{background:var(--sun);color:#fff;border-color:var(--sun)}
+.btn-sun:hover{filter:brightness(.93)}
+.btn-mint{background:var(--mint);color:#fff;border-color:var(--mint)}
+.btn-rose{background:var(--rose);color:#fff;border-color:var(--rose)}
+.btn-ghost{background:#fff;color:var(--muted)}
+.tw{overflow-x:auto;border-radius:9px}
+.t{width:100%;border-collapse:collapse;font-size:11px}
+.t th{text-align:left;padding:9px 11px;font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:var(--surf2);white-space:nowrap;border-bottom:1px solid var(--line)}
+.t th.num{text-align:right}
+.t th.sortable{cursor:pointer;user-select:none;position:relative;padding-right:18px}
+.t th.sortable:hover{background:#e2e8f0}
+.t th.sortable::after{content:"↕";position:absolute;right:5px;top:50%;transform:translateY(-50%);opacity:.3;font-size:10px}
+.t th.sort-asc::after{content:"↑";opacity:1;color:var(--blue)}
+.t th.sort-desc::after{content:"↓";opacity:1;color:var(--blue)}
+.t td{padding:9px 11px;border-bottom:1px solid #f1f5f9;font-size:11px;vertical-align:middle}
+.t td.num{text-align:right;font-variant-numeric:tabular-nums}
+.t tbody tr:hover td{background:#fafbff}
+.t tbody tr.tr-clickable{cursor:pointer;transition:background .12s}
+.t tbody tr.tr-clickable:hover td{background:var(--blue4) !important}
+.t .mono{font-family:var(--mono);font-size:10px}
+.vin-cell{cursor:pointer;transition:color .12s}
+.vin-cell:hover{color:var(--blue);text-decoration:underline}
+
+/* ── Badges ── */
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.b-mint{background:rgba(16,185,129,.13);color:#047857}
+.b-rose{background:rgba(225,29,72,.13);color:#9f1239}
+.b-sun{background:rgba(245,158,11,.18);color:#a16207}
+.b-lem{background:#fef3c7;color:#92400e}
+.b-sky{background:rgba(14,165,233,.13);color:#075985}
+.b-pur{background:rgba(139,92,246,.15);color:#5b21b6}
+.b-bmw{background:rgba(28,105,212,.13);color:var(--bmw-d)}
+.b-n{background:#f1f5f9;color:#475569}
+.b-auto{background:rgba(59,95,226,.13);color:#1e40af;border:1px solid rgba(59,95,226,.3)}
+.b-manual{background:rgba(245,158,11,.18);color:#a16207;border:1px solid rgba(245,158,11,.4)}
+
+/* ── Drop zone (multi-file) ── */
+.dz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:14px}
+.dz{border:2px dashed var(--line);border-radius:14px;padding:24px 16px;text-align:center;background:#fff;display:flex;flex-direction:column;align-items:center;gap:8px;transition:all .2s;position:relative;min-height:180px;justify-content:center}
+.dz.dz-detected{border-color:var(--bmw);background:rgba(28,105,212,.04)}
+.dz.dz-warn{border-color:var(--sun);background:rgba(245,158,11,.05)}
+.dz-emoji{font-size:30px;line-height:1}
+.dz-title{font-size:12px;font-weight:700;color:var(--txt)}
+.dz-sub{font-size:10px;color:var(--muted);line-height:1.4}
+.dz-count{font-size:18px;font-weight:800;color:var(--bmw);margin-top:4px}
+.dz-clear{position:absolute;top:8px;right:8px;background:none;border:none;font-size:14px;cursor:pointer;color:var(--muted);padding:4px;line-height:1}
+.dz-clear:hover{color:var(--rose)}
+.master-dz{border:3px dashed var(--bmw);border-radius:16px;padding:34px 22px;text-align:center;background:rgba(28,105,212,.03);cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:14px}
+.master-dz>*{pointer-events:none}
+.master-dz label, .master-dz button{pointer-events:auto}
+.master-dz:hover, .master-dz.dz-active{background:rgba(28,105,212,.08);border-color:var(--bmw-d);transform:scale(1.005)}
+.master-dz-emoji{font-size:42px;line-height:1}
+.master-dz-title{font-size:14px;font-weight:800;color:var(--txt)}
+.master-dz-sub{font-size:11px;color:var(--muted)}
+.master-dz-pick{padding:8px 16px;background:var(--bmw);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.dz-input{display:none}
+.import-bar{background:linear-gradient(135deg,#fff,var(--blue4));border:1px solid rgba(59,95,226,.3);border-radius:14px;padding:14px 18px;display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.import-bar-l{flex:1;font-size:12px;font-weight:600}
+.import-bar-progress{height:6px;background:var(--surf2);border-radius:99px;overflow:hidden;margin-top:6px}
+.import-bar-progress > div{height:100%;background:linear-gradient(90deg,var(--bmw),var(--bmw-d));transition:width .25s}
+
+/* ── Alerts ── */
+.al{padding:11px 14px;border-radius:10px;font-size:11px;font-weight:500;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.al-w{background:#fef9c3;color:#854d0e;border:1px solid #fde047}
+.al-i{background:#dbeafe;color:#1e40af;border:1px solid #93c5fd}
+.al-s{background:rgba(16,185,129,.1);color:#047857;border:1px solid rgba(16,185,129,.3)}
+.al-e{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+
+/* ── Filters ── */
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.filters select, .filters input{padding:7px 11px;border:1px solid var(--line);border-radius:8px;font-size:11px;background:#fff;font-family:inherit}
+.filters input[type="text"], .filters input[type="search"]{flex:1;min-width:200px}
+.fl-l{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-right:3px}
+
+/* ── Modal ── */
+.bmw-modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:600;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .25s}
+.bmw-modal-bg.on{opacity:1;pointer-events:auto}
+.bmw-modal{width:980px;max-width:100%;max-height:calc(100vh - 48px);background:#fff;border-radius:18px;box-shadow:0 24px 64px rgba(0,0,0,.28);display:flex;flex-direction:column;transform:scale(.96) translateY(10px);transition:transform .25s cubic-bezier(.16,1,.3,1);overflow:hidden}
+.bmw-modal-bg.on .bmw-modal{transform:scale(1) translateY(0)}
+.bmw-modal-h{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:14px;background:linear-gradient(135deg,rgba(28,105,212,.06),#fff)}
+.bmw-modal-icon{font-size:30px;line-height:1}
+.bmw-modal-title h3{margin:0;font-size:16px;font-weight:800;letter-spacing:-.3px}
+.bmw-modal-title p{margin:3px 0 0;font-size:12px;color:var(--muted);font-family:var(--mono);font-weight:600}
+.bmw-modal-x{background:none;border:1px solid var(--line);border-radius:9px;width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--muted);font-family:inherit}
+.bmw-modal-x:hover{background:var(--surf2);color:var(--txt)}
+.bmw-modal-body{flex:1;overflow-y:auto;padding:14px 22px}
+.vin-section{margin-bottom:18px}
+.vin-section-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.vin-section-h .ct{background:var(--bmw);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:0;text-transform:none;margin:0}
+.vin-mini{font-size:11px;width:100%;border-collapse:collapse}
+.vin-mini th{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:6px 8px;background:var(--surf2);white-space:nowrap}
+.vin-mini th.num{text-align:right}
+.vin-mini td{padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:11px}
+.vin-mini td.num{text-align:right;font-variant-numeric:tabular-nums}
+.vin-mini tbody tr.clickable{cursor:pointer}
+.vin-mini tbody tr.clickable:hover{background:#fafbff}
+.vin-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.vin-stat{background:var(--surf2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.vin-stat-l{font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.vin-stat-v{font-size:16px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+.vin-empty{padding:14px;text-align:center;font-size:11px;color:var(--faint);font-style:italic;background:var(--surf2);border-radius:10px}
+
+/* ── Chain timeline (the centerpiece) ── */
+.chain-tl{padding:8px 0}
+.chain-tl-row{display:flex;gap:14px;padding:14px;border-radius:11px;margin-bottom:8px;background:var(--surf2);border-left:3px solid var(--line);position:relative}
+.chain-tl-row.is-root{border-left-color:var(--bmw);background:rgba(28,105,212,.04)}
+.chain-tl-row.is-latest{border-left-color:var(--mint);background:rgba(16,185,129,.05)}
+.chain-tl-row.is-superseded{opacity:.78}
+.chain-tl-no{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:48px}
+.chain-tl-num{width:30px;height:30px;border-radius:50%;background:var(--bmw);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px}
+.chain-tl-row.is-latest .chain-tl-num{background:var(--mint)}
+.chain-tl-body{flex:1;font-size:11px}
+.chain-tl-line1{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chain-tl-line2{margin-top:3px;color:var(--muted);font-size:11px}
+.chain-tl-line3{margin-top:6px;font-size:11px;color:var(--txt)}
+.chain-tl-arrow{text-align:center;color:var(--muted);font-size:14px;padding:2px 0}
+
+/* ── Manual notes form ── */
+.mn-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11px}
+.mn-field{display:flex;flex-direction:column;gap:3px}
+.mn-field.full{grid-column:1/-1}
+.mn-field label{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.mn-field input, .mn-field select, .mn-field textarea{padding:7px 9px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit;background:#fff}
+.mn-field textarea{resize:vertical;min-height:54px;font-family:inherit}
+
+/* ── Toast & loading ── */
+.toast{position:fixed;bottom:24px;right:24px;background:#0f172a;color:#fff;padding:11px 16px;border-radius:11px;font-size:12px;font-weight:600;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:900;opacity:0;transform:translateY(8px);transition:all .25s;max-width:420px}
+.toast.on{opacity:1;transform:translateY(0)}
+.lo{position:fixed;inset:0;background:rgba(255,255,255,.85);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:800}
+.lo.on{display:flex}
+.lo-spin{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--bmw);border-radius:50%;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lo-msg{font-size:12px;font-weight:700;color:var(--txt)}
+.lo-progress{font-size:10px;color:var(--muted);font-weight:500;font-family:var(--mono)}
+
+/* ── Pages ── */
+.page{display:none}
+.page.active{display:block}
+
+/* ── Mobile ── */
+@media (max-width:780px){
+  .app{flex-direction:column}
+  .sidebar{position:fixed;left:-260px;width:240px;height:100vh;z-index:500;transition:left .25s}
+  .sidebar.open{left:0}
+  .main{padding:14px 16px}
+  .menuBtn{display:flex}
+  .bmw-modal-bg{padding:0;align-items:flex-end}
+  .bmw-modal{max-width:100%;border-radius:18px 18px 0 0;max-height:88vh}
+  .bmw-modal-body{padding:12px 14px}
+  .vin-mini th, .vin-mini td{padding:6px 5px;font-size:10px}
+  .mn-form{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo">B2</div>
+      <div>
+        <div class="brand-name">BMW Warranty</div>
+        <div class="brand-sub">v2 · 3-file pipeline</div>
+      </div>
+    </div>
+    <a href="index.html" class="si"><span class="si-icon">🏠</span><span>Dashboard</span></a>
+    <a href="warranty.html" class="si"><span class="si-icon">🇫🇷</span><span>Renault Warranty</span></a>
+    <a href="bmw-warranty.html" class="si"><span class="si-icon">📋</span><span>BMW v1 (legacy)</span></a>
+
+    <div class="si-section">BMW v2</div>
+    <div class="si active" data-page="upload"><span class="si-icon">📤</span><span>Upload Center</span></div>
+    <div class="si" data-page="claims"><span class="si-icon">📋</span><span>Warranty Claims</span><span class="si-badge" id="B_claims">0</span></div>
+    <div class="si" data-page="bsi"><span class="si-icon">🔧</span><span>BSI Credits</span><span class="si-badge" id="B_bsi" style="background:var(--sky)">0</span></div>
+    <div class="si" data-page="vehicles"><span class="si-icon">🚗</span><span>Vehicles</span></div>
+    <div class="si" data-page="overview"><span class="si-icon">📊</span><span>Overview</span></div>
+
+    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v2.0</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="menuBtn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+      <div>
+        <h1>🇩🇪 BMW Warranty <span class="us-badge">V2 · NORMALIZED</span></h1>
+        <p>Invoices + claims + credit notes · auto-derived chains · BSI separation</p>
+      </div>
+      <div class="last-sync" id="lastSync">—</div>
+    </div>
+
+    <!-- ─────────── UPLOAD ─────────── -->
+    <div class="page active" id="P_upload">
+      <div class="al al-i">📤 Drop the three monthly Excel files together (or one at a time). The page detects each automatically. Already-imported rows are skipped on conflict.</div>
+
+      <div class="card">
+        <div class="ct">📦 Drop monthly files</div>
+
+        <div class="master-dz" id="masterDz">
+          <div class="master-dz-emoji">📂</div>
+          <div class="master-dz-title">Drop incadea + submission + credit notes here</div>
+          <div class="master-dz-sub">…or click to choose. Detects each file automatically. Drop 1, 2, or all 3.</div>
+          <label for="masterFileInput" class="master-dz-pick">Choose files</label>
+          <input type="file" id="masterFileInput" class="dz-input" accept=".xlsx,.xls" multiple>
+        </div>
+
+        <div class="dz-grid" id="dzGrid">
+          <div class="dz" id="dz_incadea" data-kind="incadea">
+            <div class="dz-emoji">🧾</div>
+            <div class="dz-title">incadea (invoices)</div>
+            <div class="dz-sub" id="dz_incadea_sub">incadea_*.xlsx — system-generated invoices</div>
+          </div>
+          <div class="dz" id="dz_submission" data-kind="submission">
+            <div class="dz-emoji">📨</div>
+            <div class="dz-title">submission (claims)</div>
+            <div class="dz-sub" id="dz_submission_sub">submission_warranty_*.xlsx — claim status</div>
+          </div>
+          <div class="dz" id="dz_credit_notes" data-kind="credit_notes">
+            <div class="dz-emoji">💰</div>
+            <div class="dz-title">credit notes (BMW response)</div>
+            <div class="dz-sub" id="dz_credit_notes_sub">Credit_Notes_*.xlsx — what BMW paid</div>
+          </div>
+        </div>
+
+        <div id="importBar" style="display:none"></div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+          <button class="btn btn-ghost btn-sm" id="btnReset" onclick="resetStaging()" disabled>Reset</button>
+          <button class="btn btn-bmw" id="btnImport" onclick="commitImport()" disabled>Import staged files</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="ct">📚 Recent imports</div>
+        <div id="importHistory" style="font-size:11px;color:var(--muted)">Loading…</div>
+      </div>
+    </div>
+
+    <!-- ─────────── CLAIMS ─────────── -->
+    <div class="page" id="P_claims">
+      <div class="kpis" id="K_claims"></div>
+      <div class="card">
+        <div class="filters">
+          <span class="fl-l">Make</span>
+          <select id="fl_make"><option value="">All</option><option value="BMW">BMW</option><option value="BMW-MINI">MINI</option><option value="BMW-MOT">Motorcycle</option></select>
+          <span class="fl-l">Status</span>
+          <select id="fl_status">
+            <option value="">All</option>
+            <option value="Cr. Memo Received">Recovered</option>
+            <option value="Refused">Rejected</option>
+            <option value="Sent">Awaiting</option>
+            <option value="Submitted Again">Resubmitted</option>
+            <option value="Completed">Closed/Completed</option>
+          </select>
+          <span class="fl-l">Show</span>
+          <select id="fl_only">
+            <option value="">All chains</option>
+            <option value="multi">Resubmissions only (multi-iteration)</option>
+            <option value="manual">With manual notes</option>
+            <option value="orphan">Stub claims (need follow-up)</option>
+          </select>
+          <input type="text" id="fl_search" placeholder="Search VIN, claim, doc, customer, model…">
+        </div>
+      </div>
+      <div id="T_claims"></div>
+    </div>
+
+    <!-- ─────────── BSI ─────────── -->
+    <div class="page" id="P_bsi">
+      <div class="kpis" id="K_bsi"></div>
+      <div class="card">
+        <div class="filters">
+          <span class="fl-l">Brand</span>
+          <select id="bsi_brand"><option value="">All</option></select>
+          <input type="text" id="bsi_search" placeholder="Search VIN, dealer claim, credit note, model…">
+        </div>
+      </div>
+      <div id="T_bsi"></div>
+    </div>
+
+    <!-- ─────────── VEHICLES ─────────── -->
+    <div class="page" id="P_vehicles">
+      <div class="card">
+        <div class="ct">🚗 Find a vehicle</div>
+        <div class="filters">
+          <input type="search" id="veh_search" placeholder="Type a VIN or licence (last 4 chars are enough)…" autocomplete="off">
+          <span class="fl-l" id="veh_count" style="margin-left:auto"></span>
+        </div>
+      </div>
+      <div id="T_vehicles"></div>
+    </div>
+
+    <!-- ─────────── OVERVIEW ─────────── -->
+    <div class="page" id="P_overview">
+      <div class="kpis" id="K_overview"></div>
+      <div id="T_overview"></div>
+    </div>
+  </main>
+</div>
+
+<div class="lo" id="lo">
+  <div class="lo-spin"></div>
+  <div class="lo-msg" id="loMsg">Loading…</div>
+  <div class="lo-progress" id="loProgress"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { SUPABASE_CONFIG } from './config.js'
+
+// ── Multi-CDN Supabase (matches v1's resilience pattern) ──
+let createClient = null
+const cdns = [
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
+  'https://cdn.skypack.dev/@supabase/supabase-js@2',
+  'https://esm.sh/@supabase/supabase-js@2',
+  'https://unpkg.com/@supabase/supabase-js@2/dist/module/index.js'
+]
+for (const url of cdns){
+  try { const m = await import(url); if (m && m.createClient) { createClient = m.createClient; break } }
+  catch { /* try next */ }
+}
+if (!createClient){ alert('Could not load Supabase library. Check your network.'); throw new Error('supabase load failed') }
+const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
+window._sb = sb
+
+// Wait for non-module scripts to attach BMWParser / BMWSupabase
+async function waitFor(name, timeoutMs=4000){
+  const t0 = Date.now()
+  while (!window[name]){
+    if (Date.now() - t0 > timeoutMs) throw new Error(name + ' did not load')
+    await new Promise(r => setTimeout(r, 30))
+  }
+  return window[name]
+}
+const BMWParser   = await waitFor('BMWParser')
+const BMWSupabase = await waitFor('BMWSupabase')
+
+// ── Page-wide state ──
+const S = {
+  me:        null,
+  staged:    { incadea:null, submission:null, credit_notes:null, errors:[] },
+  chains:    [],   // chain-root view rows (cached per filter run)
+  bsi:       [],   // bsi-credit view rows
+  notes:     {},   // claim_no -> bmw_chain_notes row
+  brands:    new Set(),
+  filters:   { claims:{}, bsi:{}, vehicles:{} },
+  sortState: {},
+  page:      'upload',
+  pendingSearchTimer: null
+}
+window.S = S
+
+// ── Identity (best-effort; same pattern as v1, with a console warning instead of silent swallow) ──
+async function whoami(){
+  try {
+    const { data:{ user } } = await sb.auth.getUser()
+    if (user){
+      const { data } = await sb.from('employees').select('id,name').eq('auth_user_id', user.id).maybeSingle()
+      if (data) S.me = data
+    }
+  } catch (e){ console.warn('[v2 whoami] auth check failed:', e.message) }
+}
+
+// ── Helpers ──
+const f  = v => (Number(v)||0).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})
+const f0 = v => (Number(v)||0).toLocaleString('en-GB')
+const esc = s => String(s==null?'':s).replace(/[<>"'&]/g, c=>({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'})[c])
+const fmM = m => { if(!m) return ''; const [y,mo]=String(m).split('-'); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)-1]+' '+y }
+const showToast = (msg, ms=3500) => {
+  const t = document.getElementById('toast')
+  t.textContent = msg
+  t.classList.add('on')
+  clearTimeout(showToast._t)
+  showToast._t = setTimeout(()=>t.classList.remove('on'), ms)
+}
+window.showToast = showToast
+const showLoad = (msg, progress) => {
+  document.getElementById('loMsg').textContent = msg||'Loading…'
+  document.getElementById('loProgress').textContent = progress||''
+  document.getElementById('lo').classList.add('on')
+}
+const hideLoad = () => document.getElementById('lo').classList.remove('on')
+
+// ── Page navigation ──
+document.querySelectorAll('.si[data-page]').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.si[data-page]').forEach(s=>s.classList.remove('active'))
+    el.classList.add('active')
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'))
+    document.getElementById('P_'+el.dataset.page).classList.add('active')
+    document.getElementById('sidebar').classList.remove('open')
+    S.page = el.dataset.page
+    renderCurrent()
+  })
+})
+function currentPage(){ return S.page }
+function renderCurrent(){
+  if (S.page === 'claims')   rClaims()
+  if (S.page === 'bsi')      rBsi()
+  if (S.page === 'vehicles') rVehicles()
+  if (S.page === 'overview') rOverview()
+  if (S.page === 'upload')   rImportHistory()
+}
+
+// ── Sort + th helpers (from v1) ──
+function sortClick(tableKey, colIdx){
+  const cur = S.sortState[tableKey] || {col:-1, dir:'asc'}
+  const dir = (cur.col === colIdx && cur.dir === 'asc') ? 'desc' : 'asc'
+  S.sortState[tableKey] = {col: colIdx, dir}
+  renderCurrent()
+}
+window.sortClick = sortClick
+function applySort(rows, tableKey, accessors){
+  const st = S.sortState[tableKey]
+  if (!st || st.col<0 || !accessors[st.col]) return rows
+  const acc = accessors[st.col], dir = st.dir==='desc'?-1:1
+  return [...rows].sort((a,b) => {
+    const va = acc(a), vb = acc(b)
+    if (va==null && vb==null) return 0
+    if (va==null) return 1; if (vb==null) return -1
+    if (typeof va==='number' && typeof vb==='number') return (va-vb)*dir
+    return String(va).localeCompare(String(vb))*dir
+  })
+}
+function th(label, tableKey, idx, opts){
+  opts = opts || {}; const st = S.sortState[tableKey] || {}
+  const cls = ['sortable']; if (opts.num) cls.push('num')
+  if (st.col === idx) cls.push(st.dir==='desc'?'sort-desc':'sort-asc')
+  return `<th class="${cls.join(' ')}" onclick="sortClick('${tableKey}',${idx})">${label}</th>`
+}
+
+// ════════════════════════════════════════════════════════════════════
+// UPLOAD CENTER
+// ════════════════════════════════════════════════════════════════════
+function setupDropzone(){
+  const master = document.getElementById('masterDz')
+  const inp = document.getElementById('masterFileInput')
+  let dzActive = false
+
+  ;['dragenter','dragover','dragleave','drop'].forEach(ev =>
+    master.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation() }))
+  master.addEventListener('dragenter', () => { master.classList.add('dz-active'); dzActive = true })
+  master.addEventListener('dragover',  () => master.classList.add('dz-active'))
+  master.addEventListener('dragleave', e => { if (e.target === master) master.classList.remove('dz-active') })
+  master.addEventListener('drop', async e => {
+    master.classList.remove('dz-active')
+    const files = [...e.dataTransfer.files]
+    if (files.length) await stageFiles(files)
+    setTimeout(()=>{ dzActive=false }, 250)
+  })
+  master.addEventListener('click', e => {
+    if (dzActive) return
+    if (e.target.tagName !== 'LABEL') inp.click()
+  })
+  inp.addEventListener('change', async e => {
+    if (e.target.files.length) await stageFiles([...e.target.files])
+    inp.value = ''
+  })
+  ;['dragover','drop'].forEach(ev => window.addEventListener(ev, e => e.preventDefault()))
+}
+
+async function stageFiles(files){
+  showLoad('Reading & detecting files…')
+  try {
+    const parsed = await BMWParser.parseFiles(files)
+    // Merge into S.staged (later drops override earlier)
+    if (parsed.incadea)      S.staged.incadea      = parsed.incadea
+    if (parsed.submission)   S.staged.submission   = parsed.submission
+    if (parsed.credit_notes) S.staged.credit_notes = parsed.credit_notes
+    S.staged.errors = (S.staged.errors||[]).concat(parsed.errors||[])
+
+    hideLoad()
+    refreshDzCards()
+    if (S.staged.errors.length){
+      showToast(`⚠️ ${S.staged.errors.length} file(s) could not be detected — check filenames`)
+    } else {
+      const found = ['incadea','submission','credit_notes'].filter(k => S.staged[k])
+      showToast(`✅ ${found.length} file${found.length>1?'s':''} staged · ready to import`)
+    }
+  } catch (e){
+    hideLoad()
+    showToast('❌ ' + e.message)
+    console.error('[stageFiles]', e)
+  }
+}
+
+function refreshDzCards(){
+  for (const kind of ['incadea','submission','credit_notes']){
+    const card = document.getElementById('dz_' + kind)
+    const slot = S.staged[kind]
+    if (!slot){
+      card.classList.remove('dz-detected','dz-warn')
+      card.querySelector('.dz-emoji').style.opacity = '.5'
+      const sub = document.getElementById('dz_'+kind+'_sub')
+      sub.innerHTML = card.dataset.kind === 'incadea'      ? 'incadea_*.xlsx — system-generated invoices'
+                   : card.dataset.kind === 'submission'    ? 'submission_warranty_*.xlsx — claim status'
+                                                           : 'Credit_Notes_*.xlsx — what BMW paid'
+      let clear = card.querySelector('.dz-clear'); if (clear) clear.remove()
+      let cnt   = card.querySelector('.dz-count'); if (cnt)   cnt.remove()
+    } else {
+      card.classList.add('dz-detected'); card.classList.remove('dz-warn')
+      card.querySelector('.dz-emoji').style.opacity = '1'
+      const sub = document.getElementById('dz_'+kind+'_sub')
+      sub.innerHTML = `<strong>${esc(slot.fileName||'(file)')}</strong><br>${slot.rowCount.toLocaleString()} rows · sheet "${esc(slot.sheetName)}"`
+      if (!card.querySelector('.dz-count')){
+        const c = document.createElement('div'); c.className = 'dz-count'; c.textContent = slot.rowCount.toLocaleString(); card.appendChild(c)
+      } else {
+        card.querySelector('.dz-count').textContent = slot.rowCount.toLocaleString()
+      }
+      if (!card.querySelector('.dz-clear')){
+        const x = document.createElement('button'); x.className = 'dz-clear'; x.title='Remove staged file'; x.textContent = '✕'
+        x.onclick = (e)=>{ e.stopPropagation(); S.staged[kind]=null; refreshDzCards(); refreshImportButton() }
+        card.appendChild(x)
+      }
+    }
+  }
+  refreshImportButton()
+}
+
+function refreshImportButton(){
+  const btn = document.getElementById('btnImport')
+  const reset = document.getElementById('btnReset')
+  const any = !!(S.staged.incadea || S.staged.submission || S.staged.credit_notes)
+  btn.disabled = !any
+  reset.disabled = !any
+  if (any){
+    const n = ['incadea','submission','credit_notes'].filter(k => S.staged[k]).length
+    btn.textContent = `Import ${n} staged file${n>1?'s':''}`
+  } else {
+    btn.textContent = 'Import staged files'
+  }
+}
+
+window.resetStaging = function(){
+  S.staged = { incadea:null, submission:null, credit_notes:null, errors:[] }
+  refreshDzCards()
+  document.getElementById('importBar').style.display = 'none'
+}
+
+window.commitImport = async function(){
+  const bar = document.getElementById('importBar')
+  bar.style.display = ''
+  bar.className = 'import-bar'
+  bar.innerHTML = `<div class="import-bar-l"><div id="impMsg">Starting…</div><div class="import-bar-progress"><div id="impFill" style="width:0%"></div></div></div>`
+
+  let progressMax = 1, progressDone = 0
+  const onProgress = ev => {
+    document.getElementById('impMsg').textContent = ev.message || ''
+    if (ev.total){
+      progressDone = ev.done; progressMax = Math.max(progressMax, ev.total)
+      const pct = Math.min(100, (progressDone / progressMax) * 100)
+      document.getElementById('impFill').style.width = pct.toFixed(1) + '%'
+    }
+  }
+
+  try {
+    const result = await BMWSupabase.importParsed(sb, S.staged, { chunkSize:500, onProgress })
+    bar.className = 'import-bar'
+    document.getElementById('impFill').style.width = '100%'
+
+    // Build a friendly summary
+    const lines = []
+    if (result.invoices.submitted)     lines.push(`📦 Invoices: ${result.invoices.succeeded} ok${result.invoices.deduped?', '+result.invoices.deduped+' dups removed':''}`)
+    if (result.claims.submitted)       lines.push(`📋 Claims:   ${result.claims.succeeded} ok`)
+    if (result.credit_items.submitted) lines.push(`💰 Credits:  ${result.credit_items.succeeded} ok${result.credit_items.deduped?', '+result.credit_items.deduped+' dups removed':''}`)
+    if (result.chains_recomputed)      lines.push(`🔗 Chains recomputed`)
+    if (result.bsi_linked)             lines.push(`🔧 BSI linked: ${result.bsi_linked}`)
+    if (result.errors.length)          lines.push(`⚠️ ${result.errors.length} error(s)`)
+
+    document.getElementById('impMsg').innerHTML = lines.map(l => `<div>${l}</div>`).join('')
+
+    // Log header to warranty_uploads (best-effort, non-fatal)
+    try {
+      const fileName = ['incadea','submission','credit_notes']
+        .map(k => S.staged[k]?.fileName).filter(Boolean).join(' + ')
+      const totalRows = result.invoices.submitted + result.claims.submitted + result.credit_items.submitted
+      await sb.from('warranty_uploads').insert({
+        file_name:    fileName.slice(0, 240),
+        file_type:    'bmw_v2',
+        period_label: '',
+        row_count:    totalRows,
+        uploaded_by:  S.me?.id || null,
+        uploaded_by_name: S.me?.name || null
+      })
+    } catch (e){ console.warn('[v2] upload-log failed:', e.message) }
+
+    showToast('🎉 Import complete · refreshing data')
+    resetStaging()
+    await refreshAll()
+    rImportHistory()
+
+    if (result.errors.length){
+      console.warn('[v2 import errors]', result.errors)
+      showToast(`⚠️ ${result.errors.length} error(s) — check console`, 6000)
+    }
+  } catch (e){
+    console.error('[v2 import]', e)
+    bar.className = 'import-bar'
+    document.getElementById('impMsg').innerHTML = '<strong style="color:var(--rose)">❌ Import failed:</strong> ' + esc(e.message)
+    showToast('❌ Import failed: ' + e.message.slice(0,80))
+  }
+}
+
+async function rImportHistory(){
+  try {
+    const { data, error } = await sb.from('warranty_uploads')
+      .select('*').in('file_type', ['bmw_v2','bmw'])
+      .order('uploaded_at', {ascending:false}).limit(30)
+    if (error) throw error
+    const tgt = document.getElementById('importHistory')
+    if (!data || !data.length){ tgt.innerHTML = '<div class="vin-empty">No imports yet — drop files above to begin.</div>'; return }
+    let h = `<div class="tw"><table class="t"><thead><tr><th>When</th><th>Files</th><th>Type</th><th class="num">Rows</th><th>By</th></tr></thead><tbody>`
+    for (const u of data){
+      h += `<tr><td>${new Date(u.uploaded_at).toLocaleString('en-GB')}</td>
+        <td class="mono" style="font-weight:600;max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(u.file_name)}">${esc(u.file_name||'—')}</td>
+        <td>${u.file_type==='bmw_v2'?'<span class="badge b-bmw">v2</span>':'<span class="badge b-n">v1</span>'}</td>
+        <td class="num">${f0(u.row_count)}</td><td>${esc(u.uploaded_by_name||'—')}</td></tr>`
+    }
+    h += `</tbody></table></div>`
+    tgt.innerHTML = h
+  } catch (e){
+    document.getElementById('importHistory').innerHTML = `<div class="al al-w">Could not load history: ${esc(e.message)}</div>`
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DATA REFRESH (cached)
+// ════════════════════════════════════════════════════════════════════
+async function refreshAll(){
+  showLoad('Refreshing…')
+  try {
+    // Fetch in parallel: chain roots, bsi credits, manual notes
+    const [chains, bsi, notes] = await Promise.all([
+      BMWSupabase.queryChainRoots(sb, { limit: 5000 }),
+      BMWSupabase.queryBsiCredits(sb, { limit: 5000 }),
+      sb.from('bmw_chain_notes').select('*').then(r => r.data || [])
+    ])
+    S.chains = chains
+    S.bsi    = bsi
+    S.notes  = {}
+    for (const n of notes) S.notes[n.claim_no] = n
+    S.brands = new Set(bsi.map(b => b.brand).filter(Boolean))
+    updateBadges()
+  } catch (e){
+    console.error('[refreshAll]', e)
+    showToast('⚠️ Refresh failed: ' + e.message.slice(0,80))
+  } finally {
+    hideLoad()
+  }
+}
+
+function updateBadges(){
+  document.getElementById('B_claims').textContent = f0(S.chains.length)
+  document.getElementById('B_bsi').textContent    = f0(S.bsi.length)
+  document.getElementById('lastSync').textContent =
+    `☁️ ${f0(S.chains.length)} chains · ${f0(S.bsi.length)} BSI · ` +
+    new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
+  // BSI brand filter
+  const bsel = document.getElementById('bsi_brand')
+  if (bsel){
+    const brands = [...S.brands].sort()
+    bsel.innerHTML = '<option value="">All</option>' + brands.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('')
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// CLAIMS PAGE
+// ════════════════════════════════════════════════════════════════════
+function rClaims(){
+  const fMake   = document.getElementById('fl_make').value
+  const fStatus = document.getElementById('fl_status').value
+  const fOnly   = document.getElementById('fl_only').value
+  const q       = document.getElementById('fl_search').value.trim().toLowerCase()
+
+  let rows = S.chains.filter(r => {
+    if (fMake   && r.make_code         !== fMake)   return false
+    if (fStatus && r.chain_latest_status !== fStatus) return false
+    if (fOnly === 'multi'  && r.chain_iteration_count <= 1) return false
+    if (fOnly === 'manual' && !S.notes[r.claim_no]) return false
+    if (fOnly === 'orphan' && (r.chain_latest_status || r.doc_no)) return false
+    if (q){
+      const blob = [r.claim_no, r.doc_no, r.vin, r.model, r.customer_name, r.service_order_no]
+        .filter(Boolean).join(' ').toLowerCase()
+      if (!blob.includes(q)) return false
+    }
+    return true
+  })
+  rows = applySort(rows, 'cl', [
+    r=>r.submission_date, r=>r.claim_no, r=>r.doc_no, r=>r.make_code,
+    r=>r.vin, r=>r.model, r=>r.amount, r=>r.chain_total_recovered,
+    r=>r.chain_iteration_count, r=>r.chain_latest_status
+  ])
+
+  // KPIs
+  const totalClaimed   = rows.reduce((s,r)=>s+(+r.amount||0), 0)
+  const totalRecovered = rows.reduce((s,r)=>s+(+r.chain_total_recovered||0), 0)
+  const recoveryRate   = totalClaimed > 0 ? (totalRecovered/totalClaimed*100) : 0
+  const multi          = rows.filter(r => r.chain_iteration_count > 1).length
+  const refused        = rows.filter(r => r.chain_latest_status === 'Refused').length
+  const stub           = rows.filter(r => !r.chain_latest_status).length
+
+  document.getElementById('K_claims').innerHTML = `
+    <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📋 Chains</div><div class="kv bmw">${f0(rows.length)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Recovered (€)</div><div class="kv mint">${f(totalRecovered)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">📊 Recovery rate</div><div class="kv sun">${recoveryRate.toFixed(1)}%</div><div class="ks">€${f(totalClaimed)} claimed</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">🔄 Resubmissions</div><div class="kv pur">${f0(multi)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Refused</div><div class="kv rose">${f0(refused)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Stub claims</div><div class="kv lem">${f0(stub)}</div><div class="ks">no submission yet</div></div>`
+
+  let h = `<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
+    ${th('Date','cl',0)}${th('Claim #','cl',1)}${th('Invoice (doc)','cl',2)}${th('Make','cl',3)}
+    ${th('VIN','cl',4)}${th('Model','cl',5)}
+    ${th('Claimed (€)','cl',6,{num:1})}${th('Recovered (€)','cl',7,{num:1})}
+    ${th('Iter','cl',8,{num:1})}${th('Status','cl',9)}<th>Notes</th><th>Action</th>
+  </tr></thead><tbody>`
+
+  rows.slice(0, 800).forEach(r => {
+    const note = S.notes[r.claim_no]
+    const badge = BMWSupabase.statusToBadge(r.chain_latest_status, r.amount, r.chain_total_recovered)
+    const badgeClass = badge==='Recovered' ? 'b-mint'
+                     : badge==='Partially Recovered' ? 'b-sun'
+                     : badge==='Rejected' ? 'b-rose'
+                     : badge==='Awaiting' ? 'b-sky'
+                     : badge==='Resubmitted' ? 'b-pur'
+                     : badge==='Closed' ? 'b-n' : 'b-n'
+    h += `<tr class="tr-clickable" onclick="if(!event.target.closest('button,.vin-cell'))openChainModal('${esc(r.claim_no)}')">
+      <td style="font-size:10px;color:var(--muted)">${esc(r.submission_date||'')}</td>
+      <td class="mono">${esc(r.claim_no)}</td>
+      <td class="mono">${esc(r.doc_no||'—')}</td>
+      <td>${r.make_code?`<span class="badge b-bmw">${esc(r.make_code)}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="mono vin-cell" onclick="event.stopPropagation();openVinHistory('${esc(r.vin)}')">${esc(r.vin||'—')}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.model||'')}">${esc(r.model||'—')}</td>
+      <td class="num">${r.amount?f(r.amount):'<span style="color:var(--faint)">—</span>'}</td>
+      <td class="num" style="font-weight:700">${f(r.chain_total_recovered)}</td>
+      <td class="num">${r.chain_iteration_count}${r.chain_iteration_count>1?' 🔄':''}</td>
+      <td><span class="badge ${badgeClass}">${esc(badge)}</span></td>
+      <td>${note?'<span class="badge b-manual">📝 manual</span>':'<span style="color:var(--faint)">—</span>'}</td>
+      <td><button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();openChainModal('${esc(r.claim_no)}')">Open</button></td>
+    </tr>`
+  })
+  if (rows.length > 800) h += `<tr><td colspan="12" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length - 800} more — narrow with filters 🔍</td></tr>`
+  h += `</tbody></table></div></div>`
+  document.getElementById('T_claims').innerHTML = h
+}
+
+// ════════════════════════════════════════════════════════════════════
+// BSI PAGE
+// ════════════════════════════════════════════════════════════════════
+function rBsi(){
+  const fBrand = document.getElementById('bsi_brand').value
+  const q = document.getElementById('bsi_search').value.trim().toLowerCase()
+
+  let rows = S.bsi.filter(r => {
+    if (fBrand && r.brand !== fBrand) return false
+    if (q){
+      const blob = [r.dealer_claim_number, r.vin, r.doc_no, r.model, r.credit_note_number, r.customer_name]
+        .filter(Boolean).join(' ').toLowerCase()
+      if (!blob.includes(q)) return false
+    }
+    return true
+  })
+  rows = applySort(rows, 'bsi', [
+    r=>r.credit_note_date, r=>r.dealer_claim_number, r=>r.brand,
+    r=>r.vin, r=>r.doc_no, r=>r.total_recovered, r=>r.item_count
+  ])
+
+  const totalRecovered = rows.reduce((s,r)=>s+(+r.total_recovered||0), 0)
+  const linked   = rows.filter(r => r.doc_no).length
+  const unlinked = rows.length - linked
+
+  document.getElementById('K_bsi').innerHTML = `
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">🔧 BSI Claims</div><div class="kv sky">${f0(rows.length)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Total Recovered (€)</div><div class="kv mint">${f(totalRecovered)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">🔗 Linked to invoice</div><div class="kv bmw">${f0(linked)}</div><div class="ks">${rows.length?((linked/rows.length)*100).toFixed(0)+'%':''}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Unlinked</div><div class="kv lem">${f0(unlinked)}</div><div class="ks">no incadea match yet</div></div>`
+
+  let h = `<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
+    ${th('CN Date','bsi',0)}${th('Dealer Claim','bsi',1)}${th('Brand','bsi',2)}
+    ${th('VIN','bsi',3)}${th('Invoice','bsi',4)}${th('Recovered (€)','bsi',5,{num:1})}${th('Items','bsi',6,{num:1})}<th>Action</th>
+  </tr></thead><tbody>`
+  rows.slice(0, 800).forEach(r => {
+    h += `<tr class="tr-clickable" onclick="if(!event.target.closest('button,.vin-cell'))openBsiModal('${esc(r.dealer_claim_number)}')">
+      <td style="font-size:10px;color:var(--muted)">${esc(r.credit_note_date||'')}</td>
+      <td class="mono" style="font-weight:600">${esc(r.dealer_claim_number)}</td>
+      <td><span class="badge b-bmw">${esc(r.brand||'—')}</span></td>
+      <td class="mono vin-cell" onclick="event.stopPropagation();openVinHistory('${esc(r.vin)}')">${esc(r.vin||'—')}</td>
+      <td class="mono">${r.doc_no?esc(r.doc_no):'<span style="color:var(--faint)">— unlinked</span>'}</td>
+      <td class="num" style="font-weight:700">${f(r.total_recovered)}</td>
+      <td class="num">${r.item_count}</td>
+      <td><button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();openBsiModal('${esc(r.dealer_claim_number)}')">Open</button></td>
+    </tr>`
+  })
+  if (rows.length > 800) h += `<tr><td colspan="8" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length - 800} more — narrow with filters 🔍</td></tr>`
+  h += `</tbody></table></div></div>`
+  document.getElementById('T_bsi').innerHTML = h
+}
+
+// ════════════════════════════════════════════════════════════════════
+// VEHICLES PAGE
+// ════════════════════════════════════════════════════════════════════
+function rVehicles(){
+  const q = document.getElementById('veh_search').value.trim().toUpperCase()
+  const tgt = document.getElementById('T_vehicles')
+  if (q.length < 3){
+    document.getElementById('veh_count').textContent = ''
+    tgt.innerHTML = '<div class="card vin-empty" style="padding:38px">Type at least 3 characters of a VIN or licence to search.</div>'
+    return
+  }
+  // Build a per-VIN index across both warranty chains and BSI
+  const byVin = {}
+  for (const r of S.chains){
+    if (!r.vin) continue
+    if (!byVin[r.vin]) byVin[r.vin] = { vin:r.vin, model:r.model, license:r.license_no, customer:r.customer_name, warranty:[], bsi:[], total_recovered:0, last_date:null }
+    const v = byVin[r.vin]
+    v.warranty.push(r); v.total_recovered += +(r.chain_total_recovered||0)
+    if (r.submission_date && (!v.last_date || r.submission_date > v.last_date)) v.last_date = r.submission_date
+  }
+  for (const r of S.bsi){
+    if (!r.vin) continue
+    if (!byVin[r.vin]) byVin[r.vin] = { vin:r.vin, model:r.model, license:'', customer:r.customer_name, warranty:[], bsi:[], total_recovered:0, last_date:null }
+    const v = byVin[r.vin]
+    v.bsi.push(r); v.total_recovered += +(r.total_recovered||0)
+    if (r.credit_note_date && (!v.last_date || r.credit_note_date > v.last_date)) v.last_date = r.credit_note_date
+  }
+  let vehicles = Object.values(byVin)
+  vehicles = vehicles.filter(v => v.vin.includes(q) || (v.license||'').toUpperCase().includes(q))
+  vehicles.sort((a,b) => (b.total_recovered||0) - (a.total_recovered||0))
+
+  document.getElementById('veh_count').textContent = `${vehicles.length} match${vehicles.length===1?'':'es'}`
+
+  let h = `<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
+    <th>VIN</th><th>Model</th><th>Customer</th><th class="num">Warranty chains</th><th class="num">BSI claims</th><th class="num">Total recovered (€)</th><th>Last activity</th><th>Action</th>
+  </tr></thead><tbody>`
+  vehicles.slice(0, 200).forEach(v => {
+    h += `<tr class="tr-clickable" onclick="openVinHistory('${esc(v.vin)}')">
+      <td class="mono" style="font-weight:600">${esc(v.vin)}</td>
+      <td>${esc(v.model||'—')}</td>
+      <td>${esc(v.customer||'—')}</td>
+      <td class="num">${v.warranty.length}</td>
+      <td class="num">${v.bsi.length}</td>
+      <td class="num" style="font-weight:700">${f(v.total_recovered)}</td>
+      <td>${esc(v.last_date||'—')}</td>
+      <td><button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();openVinHistory('${esc(v.vin)}')">History</button></td>
+    </tr>`
+  })
+  if (vehicles.length === 0){
+    h += `<tr><td colspan="8" style="padding:30px;text-align:center;color:var(--faint)">No vehicles match.</td></tr>`
+  } else if (vehicles.length > 200){
+    h += `<tr><td colspan="8" style="text-align:center;padding:12px;color:var(--muted)">… ${vehicles.length - 200} more — narrow your search.</td></tr>`
+  }
+  h += `</tbody></table></div></div>`
+  tgt.innerHTML = h
+}
+
+// ════════════════════════════════════════════════════════════════════
+// OVERVIEW PAGE
+// ════════════════════════════════════════════════════════════════════
+async function rOverview(){
+  const claimed   = S.chains.reduce((s,r)=>s+(+r.amount||0), 0)
+  const recovered = S.chains.reduce((s,r)=>s+(+r.chain_total_recovered||0), 0)
+  const bsiTotal  = S.bsi.reduce((s,r)=>s+(+r.total_recovered||0), 0)
+  const totalRec  = recovered + bsiTotal
+  const recRate   = claimed > 0 ? (recovered / claimed * 100) : 0
+  const multiChains = S.chains.filter(r => r.chain_iteration_count > 1).length
+
+  document.getElementById('K_overview').innerHTML = `
+    <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📋 Warranty chains</div><div class="kv bmw">${f0(S.chains.length)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">🔧 BSI claims</div><div class="kv sky">${f0(S.bsi.length)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Total recovered (€)</div><div class="kv mint">${f(totalRec)}</div><div class="ks">€${f(recovered)} warranty + €${f(bsiTotal)} BSI</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">📊 Warranty recovery rate</div><div class="kv sun">${recRate.toFixed(1)}%</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">🔄 Resubmissions</div><div class="kv pur">${f0(multiChains)}</div></div>`
+
+  // Monthly trend (warranty + BSI separately)
+  const months = {}
+  for (const r of S.chains){
+    const m = (r.submission_date||'').slice(0,7)
+    if (!m) continue
+    months[m] = months[m] || { month:m, warClaims:0, warRecovered:0, bsiClaims:0, bsiRecovered:0 }
+    months[m].warClaims++
+    months[m].warRecovered += +(r.chain_total_recovered||0)
+  }
+  for (const r of S.bsi){
+    const m = (r.credit_note_date||'').slice(0,7)
+    if (!m) continue
+    months[m] = months[m] || { month:m, warClaims:0, warRecovered:0, bsiClaims:0, bsiRecovered:0 }
+    months[m].bsiClaims++
+    months[m].bsiRecovered += +(r.total_recovered||0)
+  }
+  const sorted = Object.values(months).sort((a,b) => a.month.localeCompare(b.month))
+
+  // Per-make split (warranty only)
+  const byMake = {}
+  for (const r of S.chains){
+    const k = r.make_code || '(unknown)'
+    byMake[k] = byMake[k] || { make:k, chains:0, recovered:0, multi:0 }
+    byMake[k].chains++
+    byMake[k].recovered += +(r.chain_total_recovered||0)
+    if (r.chain_iteration_count > 1) byMake[k].multi++
+  }
+  const makes = Object.values(byMake).sort((a,b) => b.recovered - a.recovered)
+
+  let h = `<div class="card"><div class="ct">📅 Monthly recovery</div>`
+  if (sorted.length === 0){
+    h += '<div class="vin-empty">No data yet — import files to begin.</div>'
+  } else {
+    const max = Math.max(...sorted.map(m => m.warRecovered + m.bsiRecovered), 1)
+    h += `<div style="display:flex;align-items:flex-end;gap:8px;height:200px;padding:14px 0">`
+    sorted.forEach(m => {
+      const total = m.warRecovered + m.bsiRecovered
+      const ht = (total/max*100)
+      const warShare = total > 0 ? (m.warRecovered/total) : 1
+      h += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px" title="€${f(total)} total · ${m.warClaims+m.bsiClaims} claims">
+        <div style="font-size:9px;font-weight:700;color:var(--bmw)">€${f(total)}</div>
+        <div style="width:100%;height:${ht}%;min-height:3px;border-radius:8px 8px 0 0;display:flex;flex-direction:column;justify-content:flex-end;background:var(--surf2);overflow:hidden">
+          <div style="background:var(--sky);height:${(1-warShare)*100}%"></div>
+          <div style="background:linear-gradient(180deg,var(--bmw),var(--bmw-d));height:${warShare*100}%"></div>
+        </div>
+        <div style="font-size:9px;color:var(--muted);font-weight:600;writing-mode:vertical-rl;transform:rotate(180deg);margin-top:4px">${fmM(m.month)}</div>
+      </div>`
+    })
+    h += `</div><div style="font-size:10px;color:var(--muted);text-align:center;margin-top:6px">
+      <span style="display:inline-block;width:10px;height:10px;background:var(--bmw);border-radius:2px;margin-right:4px;vertical-align:middle"></span>Warranty
+      &nbsp;&nbsp;<span style="display:inline-block;width:10px;height:10px;background:var(--sky);border-radius:2px;margin-right:4px;vertical-align:middle"></span>BSI</div>`
+  }
+  h += `</div>`
+
+  h += `<div class="card"><div class="ct">🚗 Per-make breakdown</div><div class="tw"><table class="t">
+    <thead><tr><th>Make</th><th class="num">Chains</th><th class="num">Recovered (€)</th><th class="num">Avg / chain</th><th class="num">Multi-iteration</th></tr></thead><tbody>`
+  for (const m of makes){
+    h += `<tr><td><span class="badge b-bmw">${esc(m.make)}</span></td>
+      <td class="num">${f0(m.chains)}</td>
+      <td class="num" style="font-weight:700">${f(m.recovered)}</td>
+      <td class="num">${m.chains?f(m.recovered/m.chains):'—'}</td>
+      <td class="num">${m.multi}${m.multi?` <span class="badge b-pur">${((m.multi/m.chains)*100).toFixed(0)}%</span>`:''}</td>
+    </tr>`
+  }
+  if (makes.length === 0) h += `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--faint)">—</td></tr>`
+  h += `</tbody></table></div></div>`
+
+  document.getElementById('T_overview').innerHTML = h
+}
+
+// ════════════════════════════════════════════════════════════════════
+// MODAL: Chain detail (THE centerpiece — auto + manual together)
+// ════════════════════════════════════════════════════════════════════
+async function openChainModalImpl(rootClaimNo){
+  const root = S.chains.find(c => c.claim_no === rootClaimNo)
+  if (!root){ showToast('Chain not found'); return }
+
+  showLoad('Loading chain…')
+  let iterations = []
+  let itemsByClaim = {}
+  try {
+    iterations = await BMWSupabase.queryChainIterations(sb, root.doc_no, root.claim_group)
+    if (!iterations.length) iterations = [{
+      claim_no: root.claim_no, claim_group: root.claim_group, doc_no: root.doc_no,
+      submission_date: root.submission_date, status: root.chain_latest_status,
+      amount: root.amount, is_chain_root: true, is_superseded: false
+    }]
+    // Fetch line items in parallel for each iteration
+    await Promise.all(iterations.map(async it => {
+      itemsByClaim[it.claim_no] = await BMWSupabase.queryCreditItemsForClaim(sb, it.claim_no)
+    }))
+  } catch (e){
+    hideLoad(); showToast('Could not load chain: ' + e.message); return
+  }
+  hideLoad()
+
+  // Sort iterations by submission_date (oldest first)
+  iterations.sort((a,b) => String(a.submission_date||'').localeCompare(String(b.submission_date||'')))
+  const note = S.notes[rootClaimNo] || {}
+
+  let bg = document.querySelector('.bmw-modal-bg'); if (bg) bg.remove()
+  bg = document.createElement('div'); bg.className = 'bmw-modal-bg'
+
+  const totalRecovered = root.chain_total_recovered || 0
+  const totalClaimed = iterations.reduce((s,it)=>s+(+it.amount||0), 0)
+  const latest = iterations[iterations.length - 1] || iterations[0]
+  const latestBadge = BMWSupabase.statusToBadge(latest.status, latest.amount, totalRecovered)
+
+  bg.innerHTML = `
+    <div class="bmw-modal" role="dialog">
+      <div class="bmw-modal-h">
+        <div class="bmw-modal-icon">📋</div>
+        <div class="bmw-modal-title" style="flex:1">
+          <h3>Claim ${esc(root.claim_no)}${root.chain_iteration_count>1?` <span class="badge b-pur">${root.chain_iteration_count} iterations</span>`:''}</h3>
+          <p>${esc(root.make_code||'')} · ${esc(root.vin||'no VIN')} · ${esc(root.model||'—')}${root.doc_no?' · invoice '+esc(root.doc_no):''}</p>
+        </div>
+        <button class="bmw-modal-x" onclick="closeBmwModal()">✕</button>
+      </div>
+      <div class="bmw-modal-body">
+
+        <div class="vin-summary">
+          <div class="vin-stat"><div class="vin-stat-l">Latest status</div><div style="margin-top:4px"><span class="badge ${
+            latestBadge==='Recovered'?'b-mint':latestBadge==='Partially Recovered'?'b-sun':latestBadge==='Rejected'?'b-rose':latestBadge==='Awaiting'?'b-sky':latestBadge==='Resubmitted'?'b-pur':'b-n'
+          }">${esc(latestBadge)}</span></div></div>
+          <div class="vin-stat"><div class="vin-stat-l">Iterations</div><div class="vin-stat-v">${iterations.length}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">Claimed (€)</div><div class="vin-stat-v">${f(totalClaimed)}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">Recovered (€)</div><div class="vin-stat-v" style="color:var(--mint)">${f(totalRecovered)}</div></div>
+        </div>
+
+        <div class="vin-section">
+          <div class="vin-section-h"><span>🔗 Chain timeline</span><span class="ct">${iterations.length} ${iterations.length>1?'iterations':'iteration'}</span></div>
+          <div class="chain-tl">
+            ${iterations.map((it, i) => {
+              const isRoot   = it.is_chain_root || i === 0
+              const isLatest = i === iterations.length - 1
+              const items    = itemsByClaim[it.claim_no] || []
+              const recovered = items.reduce((s,x)=>s+(+x.accepted_price_incl_tax_hc||0), 0)
+              const itBadge   = BMWSupabase.statusToBadge(it.status, it.amount, recovered)
+              const itBadgeCl = itBadge==='Recovered'?'b-mint':itBadge==='Partially Recovered'?'b-sun':itBadge==='Rejected'?'b-rose':itBadge==='Awaiting'?'b-sky':itBadge==='Resubmitted'?'b-pur':'b-n'
+              const cls = ['chain-tl-row', isRoot?'is-root':'', isLatest?'is-latest':'', it.is_superseded?'is-superseded':''].filter(Boolean).join(' ')
+              const arrow = i < iterations.length - 1 ? '<div class="chain-tl-arrow">↓ resubmitted</div>' : ''
+              return `<div class="${cls}">
+                <div class="chain-tl-no"><div class="chain-tl-num">${i+1}</div><div style="font-size:9px;color:var(--muted);font-weight:700">${isRoot?'ROOT':isLatest?'LATEST':'ITER'}</div></div>
+                <div class="chain-tl-body">
+                  <div class="chain-tl-line1"><span>Claim ${esc(it.claim_no)}</span><span class="badge ${itBadgeCl}">${esc(itBadge)}</span>${it.is_superseded?'<span class="badge b-n">superseded</span>':''}</div>
+                  <div class="chain-tl-line2">${esc(it.submission_date||'unknown date')}${it.area?' · '+esc(it.area):''}${it.amount?' · claimed €'+f(it.amount):''}</div>
+                  <div class="chain-tl-line3">${items.length?`📑 ${items.length} line items · 💰 €${f(recovered)} recovered`:`<span style="color:var(--faint)">No credit-note items yet</span>`}</div>
+                </div>
+              </div>
+              ${arrow}`
+            }).join('')}
+          </div>
+        </div>
+
+        <div class="vin-section">
+          <div class="vin-section-h"><span>📝 Manual notes</span>${note.updated_by_name?`<span class="ct" style="background:var(--surf2);color:var(--muted)">last edit: ${esc(note.updated_by_name)} · ${esc(String(note.updated_at||'').slice(0,10))}</span>`:''}</div>
+          <form class="mn-form" onsubmit="return false">
+            <div class="mn-field">
+              <label>Reason / label</label>
+              <input id="mn_reason" type="text" value="${esc(note.reason||'')}" placeholder="e.g. Reduced flat-rate units">
+            </div>
+            <div class="mn-field">
+              <label>Manual status override</label>
+              <select id="mn_status">
+                <option value=""${!note.manual_status?' selected':''}>— none —</option>
+                <option value="pending"${note.manual_status==='pending'?' selected':''}>pending</option>
+                <option value="resubmitted"${note.manual_status==='resubmitted'?' selected':''}>resubmitted</option>
+                <option value="credited"${note.manual_status==='credited'?' selected':''}>credited</option>
+                <option value="resolved"${note.manual_status==='resolved'?' selected':''}>resolved</option>
+              </select>
+            </div>
+            <div class="mn-field">
+              <label>Manual new claim #</label>
+              <input id="mn_new" type="text" value="${esc(note.manual_new_claim||'')}" placeholder="If you resubmitted before file load">
+            </div>
+            <div class="mn-field">
+              <label>Manual resub date</label>
+              <input id="mn_resub" type="date" value="${esc(note.manual_resub_date||'')}">
+            </div>
+            <div class="mn-field">
+              <label>Manual credited (€)</label>
+              <input id="mn_amt" type="number" step="0.01" value="${note.manual_credited_amt!=null?note.manual_credited_amt:''}">
+            </div>
+            <div class="mn-field">
+              <label>Manual credit date</label>
+              <input id="mn_cdate" type="date" value="${esc(note.manual_credit_date||'')}">
+            </div>
+            <div class="mn-field full">
+              <label>Notes</label>
+              <textarea id="mn_notes" rows="2">${esc(note.notes||'')}</textarea>
+            </div>
+          </form>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+            ${note.claim_no ? `<button class="btn btn-rose btn-sm" onclick="deleteChainNote('${esc(rootClaimNo)}')">🗑️ Delete note</button>` : ''}
+            <button class="btn btn-bmw btn-sm" onclick="saveChainNote('${esc(rootClaimNo)}')">💾 Save note</button>
+          </div>
+        </div>
+
+        <div class="vin-section">
+          <div class="vin-section-h"><span>📑 All line items across iterations</span></div>
+          ${iterations.map(it => {
+            const items = itemsByClaim[it.claim_no] || []
+            if (!items.length) return `<details><summary style="cursor:pointer;font-size:11px;font-weight:700;padding:8px 0">Iteration ${esc(it.claim_no)} · 0 items</summary><div class="vin-empty">No credit-note items.</div></details>`
+            return `<details ${it.is_chain_root?'open':''}><summary style="cursor:pointer;font-size:11px;font-weight:700;padding:8px 0">Iteration ${esc(it.claim_no)} · ${items.length} items · €${f(items.reduce((s,x)=>s+(+x.accepted_price_incl_tax_hc||0),0))}</summary>
+              <table class="vin-mini"><thead><tr><th>Pos</th><th>Item #</th><th>Description</th><th>Defect</th><th>Type</th><th class="num">Qty</th><th class="num">Accepted (€)</th><th>Status</th></tr></thead>
+              <tbody>${items.map(x => `<tr>
+                <td>${esc(x.claim_item_position)}</td>
+                <td class="mono">${esc(x.claim_item_number)}</td>
+                <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.claim_item_description||'')}">${esc(x.claim_item_description||'')}</td>
+                <td class="mono" style="color:var(--muted)" title="${esc(x.defect_text||'')}">${esc(x.defect_code||'—')}</td>
+                <td>${esc(x.claim_item_type||'—')}</td>
+                <td class="num">${x.accepted_qty||0}</td>
+                <td class="num" style="font-weight:600">${f(x.accepted_price_incl_tax_hc||0)}</td>
+                <td>${x.crediting_item_status==='Success'?'<span class="badge b-mint">✓</span>':x.crediting_item_status==='Warning'?'<span class="badge b-lem">⚠</span>':x.crediting_item_status==='Error'?'<span class="badge b-rose">✗</span>':'<span class="badge b-n">—</span>'}</td>
+              </tr>`).join('')}</tbody></table>
+            </details>`
+          }).join('')}
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          ${root.vin?`<button class="btn btn-bmw btn-sm" onclick="closeBmwModal();openVinHistory('${esc(root.vin)}')">🚗 Full VIN history</button>`:''}
+        </div>
+      </div>
+    </div>`
+  document.body.appendChild(bg)
+  requestAnimationFrame(() => bg.classList.add('on'))
+  bg.addEventListener('click', e => { if (e.target === bg) closeBmwModal() })
+  document.addEventListener('keydown', escClose)
+}
+window.openChainModal = openChainModalImpl
+
+window.closeBmwModal = function(){
+  const bg = document.querySelector('.bmw-modal-bg'); if (!bg) return
+  bg.classList.remove('on')
+  setTimeout(() => { if (bg.parentElement) bg.remove() }, 280)
+  document.removeEventListener('keydown', escClose)
+}
+function escClose(e){ if (e.key === 'Escape') window.closeBmwModal() }
+
+window.saveChainNote = async function(claimNo){
+  const get = id => document.getElementById(id).value.trim()
+  const payload = {
+    claim_no:           claimNo,
+    reason:             get('mn_reason') || null,
+    manual_status:      get('mn_status') || null,
+    manual_new_claim:   get('mn_new') || null,
+    manual_resub_date:  get('mn_resub') || null,
+    manual_credited_amt:get('mn_amt') ? parseFloat(get('mn_amt')) : null,
+    manual_credit_date: get('mn_cdate') || null,
+    notes:              get('mn_notes') || null,
+    updated_by:         S.me?.id || null,
+    updated_by_name:    S.me?.name || null
+  }
+  showLoad('Saving note…')
+  const { data, error } = await sb.from('bmw_chain_notes').upsert(payload, { onConflict: 'claim_no' }).select().single()
+  hideLoad()
+  if (error){ showToast('❌ Save failed: ' + error.message); console.error(error); return }
+  S.notes[claimNo] = data
+  closeBmwModal()
+  showToast('✅ Note saved')
+  renderCurrent()
+}
+
+window.deleteChainNote = async function(claimNo){
+  if (!confirm('Delete this manual note? The auto-derived chain data is unaffected.')) return
+  showLoad('Deleting…')
+  const { error } = await sb.from('bmw_chain_notes').delete().eq('claim_no', claimNo)
+  hideLoad()
+  if (error){ showToast('❌ Delete failed: ' + error.message); return }
+  delete S.notes[claimNo]
+  closeBmwModal()
+  showToast('✅ Note deleted')
+  renderCurrent()
+}
+
+// ════════════════════════════════════════════════════════════════════
+// MODAL: BSI claim detail
+// ════════════════════════════════════════════════════════════════════
+window.openBsiModal = async function(dealerClaimNumber){
+  const claim = S.bsi.find(b => b.dealer_claim_number === dealerClaimNumber)
+  if (!claim){ showToast('Not found'); return }
+  showLoad('Loading items…')
+  const items = await BMWSupabase.queryBsiItemsFor(sb, dealerClaimNumber)
+  hideLoad()
+  let bg = document.querySelector('.bmw-modal-bg'); if (bg) bg.remove()
+  bg = document.createElement('div'); bg.className = 'bmw-modal-bg'
+  bg.innerHTML = `
+    <div class="bmw-modal">
+      <div class="bmw-modal-h">
+        <div class="bmw-modal-icon">🔧</div>
+        <div class="bmw-modal-title" style="flex:1">
+          <h3>BSI ${esc(claim.dealer_claim_number)} <span class="badge b-sky">scheduled service</span></h3>
+          <p>${esc(claim.brand||'')} · ${esc(claim.vin||'no VIN')} · ${esc(claim.model||'—')}${claim.doc_no?' · invoice '+esc(claim.doc_no):' · UNLINKED'}</p>
+        </div>
+        <button class="bmw-modal-x" onclick="closeBmwModal()">✕</button>
+      </div>
+      <div class="bmw-modal-body">
+        <div class="vin-summary">
+          <div class="vin-stat"><div class="vin-stat-l">Items</div><div class="vin-stat-v">${claim.item_count}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">Recovered (€)</div><div class="vin-stat-v" style="color:var(--mint)">${f(claim.total_recovered)}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">Credit note</div><div class="vin-stat-v" style="font-size:13px">${esc(claim.credit_note_number||'—')}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">Repair date</div><div class="vin-stat-v" style="font-size:13px">${esc(claim.repair_date||'—')}</div></div>
+        </div>
+        <div class="vin-section">
+          <div class="vin-section-h"><span>📑 Service items</span><span class="ct">${items.length}</span></div>
+          <table class="vin-mini">
+            <thead><tr><th>Pos</th><th>Item #</th><th>Description</th><th>Service code</th><th>Type</th><th class="num">Accepted (€)</th><th>Status</th></tr></thead>
+            <tbody>${items.map(x => `<tr>
+              <td>${esc(x.claim_item_position)}</td>
+              <td class="mono">${esc(x.claim_item_number)}</td>
+              <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.claim_item_description||'')}">${esc(x.claim_item_description||'')}</td>
+              <td class="mono" style="color:var(--muted)" title="${esc(x.defect_text||'')}">${esc(x.defect_code||'—')}</td>
+              <td>${esc(x.claim_item_type||'—')}</td>
+              <td class="num" style="font-weight:600">${f(x.accepted_price_incl_tax_hc||0)}</td>
+              <td>${x.crediting_item_status==='Success'?'<span class="badge b-mint">✓</span>':x.crediting_item_status==='Warning'?'<span class="badge b-lem">⚠</span>':'<span class="badge b-rose">✗</span>'}</td>
+            </tr>`).join('')}</tbody>
+          </table>
+        </div>
+        ${claim.vin?`<button class="btn btn-bmw btn-sm" onclick="closeBmwModal();openVinHistory('${esc(claim.vin)}')">🚗 Full VIN history</button>`:''}
+      </div>
+    </div>`
+  document.body.appendChild(bg)
+  requestAnimationFrame(() => bg.classList.add('on'))
+  bg.addEventListener('click', e => { if (e.target === bg) closeBmwModal() })
+  document.addEventListener('keydown', escClose)
+}
+
+// ════════════════════════════════════════════════════════════════════
+// MODAL: VIN history
+// ════════════════════════════════════════════════════════════════════
+window.openVinHistory = function(vin){
+  if (!vin) return
+  vin = String(vin).toUpperCase().trim()
+  const warranty = S.chains.filter(c => c.vin === vin)
+  const bsi      = S.bsi.filter(b => b.vin === vin)
+
+  let bg = document.querySelector('.bmw-modal-bg'); if (bg) bg.remove()
+  bg = document.createElement('div'); bg.className = 'bmw-modal-bg'
+
+  const totalWar = warranty.reduce((s,c)=>s+(+c.chain_total_recovered||0), 0)
+  const totalBsi = bsi.reduce((s,c)=>s+(+c.total_recovered||0), 0)
+  const sample   = warranty[0] || bsi[0] || {}
+
+  bg.innerHTML = `
+    <div class="bmw-modal">
+      <div class="bmw-modal-h">
+        <div class="bmw-modal-icon">🚗</div>
+        <div class="bmw-modal-title" style="flex:1">
+          <h3>${esc(sample.model || sample.make_code || 'Vehicle')}</h3>
+          <p>${esc(vin)}</p>
+        </div>
+        <button class="bmw-modal-x" onclick="closeBmwModal()">✕</button>
+      </div>
+      <div class="bmw-modal-body">
+        <div class="vin-summary">
+          <div class="vin-stat"><div class="vin-stat-l">Warranty chains</div><div class="vin-stat-v" style="color:var(--bmw)">${warranty.length}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">BSI claims</div><div class="vin-stat-v" style="color:var(--sky)">${bsi.length}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">Warranty recovered (€)</div><div class="vin-stat-v" style="color:var(--mint)">${f(totalWar)}</div></div>
+          <div class="vin-stat"><div class="vin-stat-l">BSI recovered (€)</div><div class="vin-stat-v" style="color:var(--mint)">${f(totalBsi)}</div></div>
+        </div>
+
+        <div class="vin-section">
+          <div class="vin-section-h"><span>📋 Warranty chains</span><span class="ct">${warranty.length}</span></div>
+          ${warranty.length ? `
+            <table class="vin-mini">
+              <thead><tr><th>Date</th><th>Claim #</th><th>Invoice</th><th class="num">Iter</th><th class="num">Recovered €</th><th>Status</th></tr></thead>
+              <tbody>${warranty.map(c => {
+                const b = BMWSupabase.statusToBadge(c.chain_latest_status, c.amount, c.chain_total_recovered)
+                const cl = b==='Recovered'?'b-mint':b==='Partially Recovered'?'b-sun':b==='Rejected'?'b-rose':b==='Awaiting'?'b-sky':b==='Resubmitted'?'b-pur':'b-n'
+                return `<tr class="clickable" onclick="closeBmwModal();openChainModal('${esc(c.claim_no)}')">
+                  <td>${esc(c.submission_date||'—')}</td>
+                  <td class="mono">${esc(c.claim_no)}</td>
+                  <td class="mono">${esc(c.doc_no||'—')}</td>
+                  <td class="num">${c.chain_iteration_count}${c.chain_iteration_count>1?' 🔄':''}</td>
+                  <td class="num" style="font-weight:700">${f(c.chain_total_recovered)}</td>
+                  <td><span class="badge ${cl}">${esc(b)}</span></td>
+                </tr>`
+              }).join('')}</tbody>
+            </table>` : '<div class="vin-empty">No warranty claims for this VIN.</div>'}
+        </div>
+
+        <div class="vin-section">
+          <div class="vin-section-h"><span>🔧 BSI service credits</span><span class="ct">${bsi.length}</span></div>
+          ${bsi.length ? `
+            <table class="vin-mini">
+              <thead><tr><th>CN Date</th><th>Dealer Claim</th><th>Credit Note</th><th class="num">Items</th><th class="num">Recovered €</th></tr></thead>
+              <tbody>${bsi.map(c => `<tr class="clickable" onclick="closeBmwModal();openBsiModal('${esc(c.dealer_claim_number)}')">
+                <td>${esc(c.credit_note_date||'—')}</td>
+                <td class="mono" style="font-weight:600">${esc(c.dealer_claim_number)}</td>
+                <td class="mono">${esc(c.credit_note_number||'—')}</td>
+                <td class="num">${c.item_count}</td>
+                <td class="num" style="font-weight:700">${f(c.total_recovered)}</td>
+              </tr>`).join('')}</tbody>
+            </table>` : '<div class="vin-empty">No BSI credits for this VIN.</div>'}
+        </div>
+      </div>
+    </div>`
+  document.body.appendChild(bg)
+  requestAnimationFrame(() => bg.classList.add('on'))
+  bg.addEventListener('click', e => { if (e.target === bg) closeBmwModal() })
+  document.addEventListener('keydown', escClose)
+}
+
+// ════════════════════════════════════════════════════════════════════
+// FILTER BINDINGS
+// ════════════════════════════════════════════════════════════════════
+;['fl_make','fl_status','fl_only'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => rClaims())
+})
+document.getElementById('fl_search').addEventListener('input', () => {
+  clearTimeout(S.pendingSearchTimer)
+  S.pendingSearchTimer = setTimeout(() => rClaims(), 180)
+})
+document.getElementById('bsi_brand').addEventListener('change', () => rBsi())
+document.getElementById('bsi_search').addEventListener('input', () => {
+  clearTimeout(S.pendingSearchTimer)
+  S.pendingSearchTimer = setTimeout(() => rBsi(), 180)
+})
+document.getElementById('veh_search').addEventListener('input', () => {
+  clearTimeout(S.pendingSearchTimer)
+  S.pendingSearchTimer = setTimeout(() => rVehicles(), 180)
+})
+
+// ════════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════════
+;(async () => {
+  await whoami()
+  setupDropzone()
+  await refreshAll()
+  rImportHistory()
+  if (S.chains.length || S.bsi.length){
+    showToast(`☁️ Synced · ${f0(S.chains.length)} chains · ${f0(S.bsi.length)} BSI`, 2400)
+  }
+})()
+</script>
+</body>
+</html>
