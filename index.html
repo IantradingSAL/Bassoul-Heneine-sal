@@ -106,6 +106,7 @@ a{color:inherit;text-decoration:none}
 .nav-link .ic{font-size:15px;width:18px;text-align:center;flex-shrink:0}
 .nav-link .ct{margin-left:auto;font-size:10px;font-weight:700;background:var(--bg);color:var(--mu);padding:2px 7px;border-radius:999px}
 .nav-link.active .ct{background:var(--card);color:var(--blue)}
+.nav-link .ct.new-pill{background:var(--t100);color:#0f766e}
 .sb-foot{padding:14px 12px;border-top:1px solid var(--bdr)}
 .sb-user{display:flex;align-items:center;gap:10px;padding:6px 4px}
 .sb-av{
@@ -143,7 +144,7 @@ a{color:inherit;text-decoration:none}
 
 /* ════ HERO ════════════════════════════════════════════════════ */
 .hero{
-  background:linear-gradient(135deg,#3b5fe2 0%,#6366f1 60%,#7c3aed 100%);
+  background:linear-gradient(135deg,#0d9488 0%,#0891b2 55%,#3b5fe2 100%);
   color:#fff;border-radius:18px;padding:28px 32px;margin-bottom:24px;
   position:relative;overflow:hidden;box-shadow:var(--sh2);
 }
@@ -167,7 +168,7 @@ a{color:inherit;text-decoration:none}
 .hero-sub{font-size:14px;opacity:.85;font-weight:500;line-height:1.55;margin-bottom:18px;max-width:520px}
 .hero-cta{
   display:inline-flex;align-items:center;gap:8px;padding:11px 20px;
-  background:#fff;color:var(--blue);border-radius:10px;font-weight:700;font-size:13px;
+  background:#fff;color:var(--teal);border-radius:10px;font-weight:700;font-size:13px;
   transition:transform .12s,box-shadow .15s;
 }
 .hero-cta:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(0,0,0,.18)}
@@ -217,6 +218,7 @@ a{color:inherit;text-decoration:none}
 }
 .mod-pill{font-size:10px;font-weight:800;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.5px}
 .mod-pill.live{background:var(--g100);color:#15803d}
+.mod-pill.new{background:var(--t100);color:#0f766e}
 .mod-pill.soon{background:#f1f5f9;color:var(--mu)}
 .mod-h{font-size:16px;font-weight:800;letter-spacing:-.3px;margin-bottom:5px}
 .mod-d{font-size:12px;color:var(--mu);line-height:1.55;min-height:36px}
@@ -349,12 +351,16 @@ tbody tr:hover{background:#f8fafc}
 
       <div class="sb-sec">Modules</div>
       <a class="nav-link" href="customer_feedback.html">
-        <span class="ic">📣</span>Customer Feedback
+        <span class="ic">📣</span>Customer Service
         <span class="ct" id="navOpen">—</span>
       </a>
       <a class="nav-link" href="warranty.html"><span class="ic">🚗</span>Renault Warranty</a>
-    <a class="nav-link" href="warranty_bmw.html"><span class="ic">🏁</span>BMW · MINI Warranty</a>
-    <a class="nav-link" href="chat.html"><span class="ic">💬</span>Team Chat</a>
+      <a class="nav-link" href="warranty_bmw.html"><span class="ic">🏁</span>BMW · MINI Warranty</a>
+      <a class="nav-link" href="service_inclusive.html">
+        <span class="ic">📦</span>Service Inclusive
+        <span class="ct new-pill">New</span>
+      </a>
+      <a class="nav-link" href="chat.html"><span class="ic">💬</span>Team Chat</a>
 
       <div class="sb-sec">Admin</div>
       <a class="nav-link" href="settings.html"><span class="ic">⚙️</span>Settings</a>
@@ -392,17 +398,17 @@ tbody tr:hover{background:#f8fafc}
       <!-- HERO -->
       <div class="hero">
         <div class="hero-content">
-          <div class="hero-eyebrow">📣 New module · Customer Feedback</div>
-          <div class="hero-h">Capture, route &amp; resolve every customer signal in one place.</div>
-          <div class="hero-sub">Complaints, suggestions, warranty &amp; service requests — logged, classified, and assigned to the right person or role with email + WhatsApp + SMS notifications. One register, full traceability.</div>
-          <a class="hero-cta" href="customer_feedback.html">Open the register →</a>
+          <div class="hero-eyebrow">📦 New module · Service Inclusive</div>
+          <div class="hero-h">Sell, track &amp; renew automotive service packages — all in one place.</div>
+          <div class="hero-sub">Service packages tied to time, mileage and amount. Automatic expiry alerts, 3-stage email reminders to customers, CRM follow-up with call logging, and detailed per-model analytics. Built for BMW, MINI &amp; Renault workflows.</div>
+          <a class="hero-cta" href="service_inclusive.html">Open Service Inclusive →</a>
         </div>
       </div>
 
       <!-- KPIs -->
       <div class="section-h">
         <div>
-          <div class="section-t">📊 Customer Feedback at a glance</div>
+          <div class="section-t">📊 Customer Service at a glance</div>
           <div class="section-s">Live data from your Supabase register · refreshed on load</div>
         </div>
         <a class="section-l" href="customer_feedback.html">View all →</a>
@@ -447,12 +453,25 @@ tbody tr:hover{background:#f8fafc}
       </div>
       <div class="mod-grid">
 
+        <a class="mod" href="service_inclusive.html">
+          <div class="mod-top">
+            <div class="mod-ic" style="background:var(--t50);color:var(--teal)">📦</div>
+            <span class="mod-pill new">New</span>
+          </div>
+          <div class="mod-h">Service Inclusive</div>
+          <div class="mod-d">Sell &amp; track automotive service packages tied to time, mileage and amount. Customer CRM, expiry alerts, 3-stage email reminders &amp; analytics by model.</div>
+          <div class="mod-foot">
+            <span class="mod-stat">Click to open</span>
+            <span class="mod-arrow">Open →</span>
+          </div>
+        </a>
+
         <a class="mod" href="customer_feedback.html">
           <div class="mod-top">
             <div class="mod-ic" style="background:var(--b50);color:var(--blue)">📣</div>
             <span class="mod-pill live">Live</span>
           </div>
-          <div class="mod-h">Customer Feedback</div>
+          <div class="mod-h">Customer Service</div>
           <div class="mod-d">Complaints, feedback, warranty &amp; service requests. Auto-routed to the right person with email + WhatsApp + SMS.</div>
           <div class="mod-foot">
             <span class="mod-stat" id="modCFStat">—</span>
@@ -492,7 +511,7 @@ tbody tr:hover{background:#f8fafc}
             <span class="mod-pill soon">Soon</span>
           </div>
           <div class="mod-h">Reports</div>
-          <div class="mod-d">Cross-module reporting — feedback trends, warranty recovery, monthly KPI exports.</div>
+          <div class="mod-d">Cross-module reporting — customer service trends, warranty recovery, monthly KPI exports.</div>
           <div class="mod-foot">
             <span class="mod-stat">—</span>
             <span class="mod-arrow">Coming soon</span>
@@ -517,7 +536,7 @@ tbody tr:hover{background:#f8fafc}
       <!-- RECENT ACTIVITY -->
       <div class="section-h" style="margin-top:8px">
         <div>
-          <div class="section-t">🕒 Recent feedback</div>
+          <div class="section-t">🕒 Recent customer service activity</div>
           <div class="section-s">Latest 8 records — click any row to open the full register</div>
         </div>
         <a class="section-l" href="customer_feedback.html">All records →</a>
@@ -784,7 +803,7 @@ $('signOutBtn').addEventListener('click', async () => {
 
 // ─── live data load ───────────────────────────────────────────
 async function loadData(){
-  // 1. Aggregate KPIs from customer_feedback
+  // 1. Aggregate KPIs from customer_feedback (table name kept as-is)
   const { data: rows, error } = await sb
     .from('customer_feedback')
     .select('id,received_date,type,customer_name,severity,status,assigned_to,resolved_at,created_at')
@@ -817,7 +836,7 @@ async function loadData(){
     : (open === 1 ? '1 record needs attention' : `${open} records need attention`)
   $('kResSub').textContent = now.toLocaleDateString('en-GB',{month:'long',year:'numeric'})
 
-  // sidebar badge for the customer feedback nav link
+  // sidebar badge for the customer service nav link
   $('navOpen').textContent = open > 0 ? open : ''
   if (open === 0) $('navOpen').style.display = 'none'
 
@@ -831,7 +850,7 @@ async function loadData(){
   if (!recent.length) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty">
       <div class="empty-ic">📭</div>
-      No feedback recorded yet — open the register to add the first one.
+      No customer service records yet — open the register to add the first one.
     </td></tr>`
     return
   }
