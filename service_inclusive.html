@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
 <style>
   :root {
     --bg:        #F8FAFC;
@@ -1561,6 +1561,19 @@
    ========================================================================= */
 const STORAGE_KEY = 'drivetrain.v1';
 
+// Safe wrapper around lucide.createIcons — never throws even if the icon library
+// failed to load (e.g. CDN blocked, offline, slow connection). Icons just don't
+// render in that case; the rest of the app keeps working.
+function safeCreateIcons() {
+  try {
+    if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
+  } catch (e) {
+    console.warn('Lucide icon render skipped:', e?.message || e);
+  }
+}
+
 const DEFAULT_PACKAGE_TYPES = [
   'Basic Maintenance',
   'Premium Maintenance',
@@ -1843,7 +1856,7 @@ function navigate(view, args) {
   // Scroll main content to top
   window.scrollTo({ top: 0, behavior: 'instant' });
 
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function toggleSidebar() {
@@ -1974,7 +1987,7 @@ function renderDashboard() {
 
   drawRevenueChart();
   drawMixChart();
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 const TOP_MODELS_META = {
@@ -2164,7 +2177,7 @@ function renderVehicles() {
       </tr>`;
     }).join('');
   }
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function openVehicleModal(id) {
@@ -2259,7 +2272,7 @@ function renderPackages() {
       listTbody.innerHTML = filtered.map(p => packageListRow(p)).join('');
     }
   }
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function packageListRow(p) {
@@ -2459,7 +2472,7 @@ function renderServices() {
       </tr>`;
     }).join('');
   }
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function openServiceModal(id, vehicleId, packageId) {
@@ -2901,7 +2914,7 @@ function renderFollowups() {
   renderEmailReminders();
   refreshBell();
   refreshFollowupsTabs();
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function renderFollowupsHistory() {
@@ -2951,7 +2964,7 @@ function renderFollowupsHistory() {
       <td><button class="btn btn-ghost" onclick="event.stopPropagation(); deleteFollowUp('${f.id}')"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></td>
     </tr>`;
   }).join('');
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function refreshFollowupsTabs() {
@@ -3112,7 +3125,7 @@ function renderBellPanel() {
 
   if (!actionable.length && !pendingEmails.length) {
     body.innerHTML = `<div class="empty-state" style="padding: 32px 16px;"><div class="empty-state-icon"><i data-lucide="check-circle-2" class="w-5 h-5" style="color: var(--success);"></i></div><div class="text-sm" style="color: var(--text-2);">All caught up — no follow-ups needed.</div></div>`;
-    lucide.createIcons();
+    safeCreateIcons();
     return;
   }
 
@@ -3165,7 +3178,7 @@ function renderBellPanel() {
   }
 
   body.innerHTML = html;
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function toggleBellPanel() {
@@ -3484,7 +3497,7 @@ function renderEmailReminders() {
       </tr>`;
     }).join('');
   }
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 /* =========================================================================
@@ -3496,7 +3509,7 @@ function renderLookup() {
   // recent VINs
   const recent = (state.ui.lookupRecent || []).slice(0, 6);
   document.getElementById('lookup-recent').innerHTML = recent.length ? `<span class="text-xs" style="color: var(--text-3);">Recent:</span>` + recent.map(vin => `<button class="chip" onclick="document.getElementById('lookup-input').value='${vin}'; runLookup()"><i data-lucide="history" class="w-3 h-3"></i>${vin.slice(-8)}</button>`).join('') : '';
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 function runLookup() {
@@ -3507,7 +3520,7 @@ function runLookup() {
                   state.vehicles.find(v => (v.plate||'').toUpperCase() === q || (v.plate||'').toUpperCase().includes(q));
   if (!vehicle) {
     document.getElementById('lookup-result').innerHTML = `<div class="card p-8"><div class="empty-state"><div class="empty-state-icon"><i data-lucide="search-x" class="w-5 h-5"></i></div><div class="text-sm" style="color: var(--text-2);">No vehicle found matching "<span class="font-mono">${q}</span>".</div></div></div>`;
-    lucide.createIcons();
+    safeCreateIcons();
     return;
   }
   // Update recent
@@ -3515,7 +3528,7 @@ function runLookup() {
   save();
   // Render full vehicle detail inline
   document.getElementById('lookup-result').innerHTML = vehicleDetailHTML(vehicle, true);
-  lucide.createIcons();
+  safeCreateIcons();
   // Render gauges for each package
   state.packages.filter(p => p.vehicleId === vehicle.id).forEach(p => drawPackageGauges(p));
 }
@@ -3527,7 +3540,7 @@ function renderVehicleDetail(id) {
   const v = state.vehicles.find(x => x.id === id);
   if (!v) { navigate('vehicles'); return; }
   document.getElementById('view-vehicle-detail').innerHTML = vehicleDetailHTML(v, false);
-  lucide.createIcons();
+  safeCreateIcons();
   state.packages.filter(p => p.vehicleId === v.id).forEach(p => drawPackageGauges(p));
 }
 
@@ -3747,7 +3760,7 @@ function renderPackageDetail(id) {
    ========================================================================= */
 function openModal(id) {
   document.getElementById(id).classList.add('open');
-  setTimeout(() => lucide.createIcons(), 50);
+  setTimeout(() => safeCreateIcons(), 50);
 }
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
@@ -3766,7 +3779,7 @@ function toast(msg, type='success') {
   el.className = 'toast';
   el.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4" style="color: ${color};"></i><span>${msg}</span>`;
   c.appendChild(el);
-  lucide.createIcons();
+  safeCreateIcons();
   setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(20px)'; setTimeout(() => el.remove(), 300); }, 2800);
 }
 
@@ -3938,7 +3951,7 @@ document.querySelectorAll('[data-models-metric]').forEach(el => {
     state.ui.topModelsMetric = el.dataset.modelsMetric;
     save();
     renderTopModels();
-    lucide.createIcons();
+    safeCreateIcons();
   });
 });
 
@@ -4152,7 +4165,7 @@ function init() {
     el.classList.toggle('active', el.dataset.modelsMetric === (state.ui.topModelsMetric || 'invoiced'));
   });
   navigate('dashboard');
-  lucide.createIcons();
+  safeCreateIcons();
 }
 
 init();
