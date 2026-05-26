@@ -1265,11 +1265,11 @@
 </div>
 
 <div class="modal-backdrop" id="modal-email-preview">
-  <div class="modal modal-lg p-6">
+  <div class="modal modal-lg p-6" style="max-width: 760px;">
     <div class="flex items-center justify-between mb-5">
       <div>
         <div class="font-display text-2xl">Email Reminder Preview</div>
-        <div class="text-xs mt-1" style="color: var(--text-3);">Review the message — clicking Send opens your email client with the message pre-filled</div>
+        <div class="text-xs mt-1" style="color: var(--text-3);">This is exactly how the customer will see the email. Edit content via Settings → company info.</div>
       </div>
       <button class="btn btn-ghost" onclick="closeModal('modal-email-preview')"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
@@ -1281,24 +1281,47 @@
         <div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3); min-width: 60px;">To:</div>
         <div class="text-sm font-mono" id="email-preview-to" style="color: var(--accent);">—</div>
       </div>
-      <div class="flex items-center gap-2 mb-2">
-        <div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3); min-width: 60px;">Subject:</div>
-        <div class="text-sm font-medium" id="email-preview-subject">—</div>
+      <div class="flex items-start gap-2">
+        <div class="text-[10px] uppercase tracking-widest font-semibold mt-1" style="color: var(--text-3); min-width: 60px;">Subject:</div>
+        <div class="text-sm font-medium flex-1" id="email-preview-subject">—</div>
       </div>
-    </div>
-    <div class="card p-4 mb-4" style="background: var(--surface);">
-      <pre id="email-preview-body" style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: var(--text-2); white-space: pre-wrap; word-wrap: break-word; margin: 0; line-height: 1.55;"></pre>
     </div>
 
-    <div class="flex items-center justify-between gap-2">
-      <div class="text-xs" style="color: var(--text-3);">
-        <i data-lucide="info" class="w-3 h-3 inline"></i>
-        After clicking Send, the reminder is logged as sent.
+    <!-- Preview tabs -->
+    <div class="tabs-bar" style="margin-bottom: 12px;">
+      <div class="tab-btn active" data-email-tab="rendered" onclick="switchEmailPreviewTab('rendered')"><i data-lucide="eye" class="w-4 h-4"></i>Rendered</div>
+      <div class="tab-btn" data-email-tab="text" onclick="switchEmailPreviewTab('text')"><i data-lucide="file-text" class="w-4 h-4"></i>Plain text</div>
+      <div class="tab-btn" data-email-tab="html" onclick="switchEmailPreviewTab('html')"><i data-lucide="code-2" class="w-4 h-4"></i>HTML source</div>
+    </div>
+
+    <!-- Rendered iframe (sandboxed so styles don't leak into the app) -->
+    <div id="email-preview-rendered" class="email-preview-pane" style="border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #F1F5F9;">
+      <iframe id="email-preview-iframe" sandbox="allow-same-origin" style="width: 100%; height: 540px; border: 0; display: block; background: #F1F5F9;"></iframe>
+    </div>
+
+    <!-- Plain text view -->
+    <div id="email-preview-text" class="email-preview-pane hidden card p-4" style="background: var(--surface-2); max-height: 540px; overflow-y: auto;">
+      <pre id="email-preview-body" style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: var(--text-2); white-space: pre-wrap; word-wrap: break-word; margin: 0; line-height: 1.6;"></pre>
+    </div>
+
+    <!-- HTML source view (for copy/paste into Brevo if needed) -->
+    <div id="email-preview-html" class="email-preview-pane hidden card p-4" style="background: var(--surface-2); max-height: 540px; overflow-y: auto;">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">HTML source — copy and paste into Brevo's HTML editor to test</div>
+        <button type="button" class="btn btn-ghost" style="padding: 5px 10px; font-size: 11px;" onclick="copyEmailHtmlSource()"><i data-lucide="copy" class="w-3 h-3"></i>Copy HTML</button>
       </div>
-      <div class="flex gap-2">
+      <pre id="email-preview-html-source" style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-2); white-space: pre-wrap; word-wrap: break-word; margin: 0; line-height: 1.5;"></pre>
+    </div>
+
+    <div class="flex items-center justify-between gap-2 mt-4 flex-wrap">
+      <div class="text-xs flex-1" style="color: var(--text-3); min-width: 200px;">
+        <i data-lucide="info" class="w-3 h-3 inline"></i>
+        Click "Mark sent" to log this reminder. Brevo sending wires up next (see HTML tab to test now by pasting into Brevo).
+      </div>
+      <div class="flex gap-2 flex-wrap">
         <button type="button" class="btn btn-ghost" onclick="closeModal('modal-email-preview')">Cancel</button>
-        <button type="button" class="btn btn-ghost" onclick="markEmailSentManual()"><i data-lucide="check" class="w-4 h-4"></i>Mark sent (no email client)</button>
-        <a id="email-preview-send" href="#" class="btn btn-primary" target="_blank"><i data-lucide="send" class="w-4 h-4"></i>Open in mail client</a>
+        <a id="email-preview-send" href="#" class="btn btn-ghost" target="_blank"><i data-lucide="external-link" class="w-4 h-4"></i>Open in mail client</a>
+        <button type="button" class="btn btn-primary" onclick="markEmailSentManual()"><i data-lucide="check" class="w-4 h-4"></i>Mark sent</button>
       </div>
     </div>
   </div>
@@ -3252,40 +3275,210 @@ function buildEmailContent(pkg, vehicle, stageKey) {
   const email = state.settings.companyEmail || '';
 
   const customerName = vehicle.customerName || 'Valued Customer';
-  const vehicleInfo = `${vehicle.year || ''} ${vehicle.make} ${vehicle.model}`.trim();
+  const vehicleInfo = `${vehicle.year || ''} ${vehicle.make} ${vehicle.model}`.trim() || '—';
   const plate = vehicle.plate || 'N/A';
   const vin = vehicle.vin || 'N/A';
+  const currentMileage = vehicle.currentMileage != null ? fmtKm(vehicle.currentMileage) : '—';
 
-  let urgencyLine = '';
-  let subject = '';
-  if (stageKey === '3m') {
-    urgencyLine = `Your service package will expire in approximately 3 months, on ${fmtDate(pkg.endDate)}.`;
-    subject = `Service Package Renewal — ${pkg.packageType} (3 months notice)`;
-  } else if (stageKey === '1m') {
-    urgencyLine = `Your service package will expire in approximately 1 month, on ${fmtDate(pkg.endDate)}.`;
-    subject = `Service Package Renewal — ${pkg.packageType} (1 month notice)`;
-  } else if (stageKey === '1d') {
-    urgencyLine = `Your service package will expire TOMORROW (${fmtDate(pkg.endDate)}). This is our final reminder.`;
-    subject = `URGENT — Service Package Expires Tomorrow (${pkg.packageType})`;
-  }
+  // Stage-specific copy + theme color (info / warning / danger)
+  const STAGE_THEMES = {
+    '3m': {
+      headerBg: 'linear-gradient(135deg,#0EA5E9 0%,#0284C7 100%)',
+      banner: { bg: '#E0F2FE', border: '#0EA5E9', text: '#075985' },
+      label: 'Friendly reminder',
+      urgency: `Your service package will expire in approximately 3 months, on ${fmtDate(pkg.endDate)}.`,
+      subject: `Service Package Renewal Reminder — ${pkg.packageType} (3 months notice)`
+    },
+    '1m': {
+      headerBg: 'linear-gradient(135deg,#F59E0B 0%,#D97706 100%)',
+      banner: { bg: '#FEF3C7', border: '#F59E0B', text: '#92400E' },
+      label: 'Renewal window opening',
+      urgency: `Your service package will expire in approximately 1 month, on ${fmtDate(pkg.endDate)}.`,
+      subject: `Service Package Renewal — ${pkg.packageType} (1 month notice)`
+    },
+    '1d': {
+      headerBg: 'linear-gradient(135deg,#DC2626 0%,#991B1B 100%)',
+      banner: { bg: '#FEE2E2', border: '#DC2626', text: '#7F1D1D' },
+      label: 'Final notice — urgent',
+      urgency: `Your service package will expire TOMORROW (${fmtDate(pkg.endDate)}). This is our final reminder.`,
+      subject: `URGENT — Service Package Expires Tomorrow (${pkg.packageType})`
+    }
+  };
+  const theme = STAGE_THEMES[stageKey] || STAGE_THEMES['3m'];
 
-  const body = `Dear ${customerName},
+  // Color the status pills based on how much is left for each axis
+  // (uses the same thresholds as the in-app gauges so the email matches the dashboard)
+  const pillColor = (pct) => {
+    if (pct >= state.settings.danger) return { bg: '#FEE2E2', border: '#FECACA', text: '#991B1B' };
+    if (pct >= state.settings.warning) return { bg: '#FEF3C7', border: '#FDE68A', text: '#92400E' };
+    return { bg: '#D1FAE5', border: '#A7F3D0', text: '#065F46' };
+  };
+  const timePill = pillColor(stats.timePct);
+  const kmPill = pillColor(stats.mileagePct);
+  const moneyPill = pillColor(stats.moneyPct);
+
+  // ─── HTML version (rich, branded, mobile-responsive) ──────────────
+  const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escHtml(theme.subject)}</title>
+</head>
+<body style="margin:0;padding:0;background:#F1F5F9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#0F172A;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F1F5F9;padding:24px 12px;">
+<tr><td align="center">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#FFFFFF;border-radius:14px;overflow:hidden;box-shadow:0 4px 14px rgba(15,23,42,0.08);">
+
+    <!-- Header -->
+    <tr><td style="background:${theme.headerBg};padding:24px 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr><td style="font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:rgba(255,255,255,0.9);font-weight:700;">${escHtml(theme.label)}</td></tr>
+        <tr><td style="font-size:24px;font-weight:700;color:#FFFFFF;padding-top:6px;letter-spacing:-0.02em;">${escHtml(company)}</td></tr>
+        <tr><td style="font-size:13px;color:rgba(255,255,255,0.92);padding-top:4px;">Service Package Renewal Notice</td></tr>
+      </table>
+    </td></tr>
+
+    <!-- Urgency banner -->
+    <tr><td style="background:${theme.banner.bg};border-top:1px solid ${theme.banner.border};padding:14px 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-size:14px;color:${theme.banner.text};font-weight:600;line-height:1.5;">⏳ ${escHtml(theme.urgency)}</td></tr></table>
+    </td></tr>
+
+    <!-- Greeting -->
+    <tr><td style="padding:28px 32px 0;font-size:15px;color:#0F172A;line-height:1.6;">
+      Dear <strong>${escHtml(customerName)}</strong>,<br><br>
+      We hope this message finds you well. This is a reminder regarding the service package you hold with <strong>${escHtml(company)}</strong> for your vehicle.
+    </td></tr>
+
+    <!-- Vehicle details -->
+    <tr><td style="padding:20px 32px 8px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+        <tr><td style="padding:16px 18px 8px;font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;">🚘 Vehicle Details</td></tr>
+        <tr><td style="padding:0 18px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td width="40%" style="color:#64748B;font-size:13px;padding:6px 0;">Year / Make / Model</td><td style="color:#0F172A;font-size:13px;font-weight:600;padding:6px 0;text-align:right;">${escHtml(vehicleInfo)}</td></tr>
+            <tr><td style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">VIN</td><td style="color:#0F172A;font-size:12px;font-family:'Courier New',Consolas,monospace;padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;letter-spacing:0.5px;">${escHtml(vin)}</td></tr>
+            <tr><td style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">License plate</td><td style="color:#0F172A;font-size:13px;font-weight:600;padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;">${escHtml(plate)}</td></tr>
+            <tr><td style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">Current odometer</td><td style="color:#0F172A;font-size:13px;font-family:'Courier New',Consolas,monospace;padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;">${escHtml(currentMileage)}</td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </td></tr>
+
+    <!-- Package coverage -->
+    <tr><td style="padding:8px 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+        <tr><td style="padding:16px 18px 8px;font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;">📦 Package Coverage</td></tr>
+        <tr><td style="padding:0 18px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td width="40%" style="color:#64748B;font-size:13px;padding:6px 0;">Package type</td><td style="color:#0F172A;font-size:13px;font-weight:600;padding:6px 0;text-align:right;">${escHtml(pkg.packageType)}</td></tr>
+            <tr><td style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">Start date</td><td style="color:#0F172A;font-size:13px;font-family:'Courier New',Consolas,monospace;padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;">${escHtml(fmtDate(pkg.startDate))}</td></tr>
+            <tr><td style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">Expiration date</td><td style="color:#DC2626;font-size:13px;font-weight:700;font-family:'Courier New',Consolas,monospace;padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;">${escHtml(fmtDate(pkg.endDate))}</td></tr>
+            <tr><td style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">Mileage coverage</td><td style="color:#0F172A;font-size:13px;font-family:'Courier New',Consolas,monospace;padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;">${escHtml(fmtKm(pkg.startMileage))} → ${escHtml(fmtKm(pkg.mileageCap))}</td></tr>
+            <tr><td style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">Invoiced amount</td><td style="color:#0F172A;font-size:13px;font-weight:600;font-family:'Courier New',Consolas,monospace;padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;">${escHtml(fmtMoneyFull(pkg.invoicedAmount))}</td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </td></tr>
+
+    <!-- Status pills -->
+    <tr><td style="padding:12px 32px 8px;font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;">⛽ Remaining Coverage</td></tr>
+    <tr><td style="padding:0 32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td width="33%" style="padding-right:4px;vertical-align:top;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${timePill.bg};border:1px solid ${timePill.border};border-radius:10px;">
+              <tr><td align="center" style="padding:14px 8px;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:${timePill.text};font-weight:700;">⏰ Time</div>
+                <div style="font-size:22px;font-weight:700;color:${timePill.text};font-family:'Courier New',Consolas,monospace;padding-top:4px;">${stats.remainingDays}</div>
+                <div style="font-size:10px;color:${timePill.text};opacity:0.8;padding-top:2px;">days left</div>
+              </td></tr>
+            </table>
+          </td>
+          <td width="33%" style="padding:0 2px;vertical-align:top;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${kmPill.bg};border:1px solid ${kmPill.border};border-radius:10px;">
+              <tr><td align="center" style="padding:14px 8px;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:${kmPill.text};font-weight:700;">🚗 Mileage</div>
+                <div style="font-size:18px;font-weight:700;color:${kmPill.text};font-family:'Courier New',Consolas,monospace;padding-top:4px;">${stats.remainingKm.toLocaleString()}</div>
+                <div style="font-size:10px;color:${kmPill.text};opacity:0.8;padding-top:2px;">km left</div>
+              </td></tr>
+            </table>
+          </td>
+          <td width="33%" style="padding-left:4px;vertical-align:top;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${moneyPill.bg};border:1px solid ${moneyPill.border};border-radius:10px;">
+              <tr><td align="center" style="padding:14px 8px;">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:${moneyPill.text};font-weight:700;">💰 Amount</div>
+                <div style="font-size:18px;font-weight:700;color:${moneyPill.text};font-family:'Courier New',Consolas,monospace;padding-top:4px;">${escHtml(fmtMoney(stats.remaining))}</div>
+                <div style="font-size:10px;color:${moneyPill.text};opacity:0.8;padding-top:2px;">remaining</div>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+
+    <!-- Renewal pitch -->
+    <tr><td style="padding:8px 32px 4px;font-size:14px;color:#475569;line-height:1.6;">
+      We invite you to contact us to discuss renewal options and ensure uninterrupted coverage for your vehicle. Renewing before expiration helps maintain continuous protection and may qualify you for loyalty benefits.
+    </td></tr>
+
+    <!-- CTA button -->
+    ${phone ? `<tr><td align="center" style="padding:20px 32px 8px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="background:#2563EB;border-radius:10px;box-shadow:0 2px 6px rgba(37,99,235,0.25);">
+          <a href="tel:${escHtml(phone.replace(/[^+\d]/g,''))}" style="display:inline-block;padding:12px 28px;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:14px;letter-spacing:0.01em;">📞 Call us to renew — ${escHtml(phone)}</a>
+        </td>
+      </tr></table>
+    </td></tr>` : ''}
+
+    <!-- Signature -->
+    <tr><td style="padding:16px 32px 24px;font-size:14px;color:#475569;line-height:1.6;border-top:1px solid #E2E8F0;margin-top:8px;">
+      Best regards,<br>
+      <strong style="color:#0F172A;font-weight:600;">${escHtml(sender)}</strong><br>
+      ${escHtml(company)}${phone ? `<br>📞 ${escHtml(phone)}` : ''}${email ? `<br>✉️ <a href="mailto:${escHtml(email)}" style="color:#2563EB;text-decoration:none;">${escHtml(email)}</a>` : ''}
+    </td></tr>
+
+    <!-- Footer reference info -->
+    <tr><td style="background:#F8FAFC;padding:14px 32px;font-size:11px;color:#94A3B8;text-align:center;border-top:1px solid #E2E8F0;line-height:1.5;">
+      This email refers to: <strong style="color:#64748B;">${escHtml(pkg.packageType)}</strong> · VIN <span style="font-family:'Courier New',monospace;color:#64748B;">${escHtml(vin)}</span><br>
+      ${escHtml(vehicleInfo)}${plate !== 'N/A' ? ' · ' + escHtml(plate) : ''}
+    </td></tr>
+
+  </table>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;padding-top:14px;">
+    <tr><td align="center" style="font-size:10px;color:#94A3B8;line-height:1.6;">
+      Powered by <strong style="color:#64748B;">Ian Trading SAL</strong> · © 2026 All rights reserved
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>`;
+
+  // ─── Plain text fallback (for clients that don't render HTML, mailto:, and search indexing) ───
+  const textContent = `Dear ${customerName},
 
 We hope this message finds you well. This is a reminder regarding the service package you hold with ${company} for your vehicle.
 
-${urgencyLine}
+${theme.urgency}
 
 VEHICLE DETAILS
 - Vehicle: ${vehicleInfo}
 - License plate: ${plate}
 - VIN: ${vin}
+- Current mileage: ${currentMileage}
 
 PACKAGE COVERAGE
 - Package type: ${pkg.packageType}
+- Start date: ${fmtDate(pkg.startDate)}
 - Expiration date: ${fmtDate(pkg.endDate)}
-- Time remaining: ${stats.remainingDays} day${stats.remainingDays === 1 ? '' : 's'}
-- Mileage remaining: ${fmtKm(stats.remainingKm)}
-- Amount remaining: ${fmtMoney(stats.remaining)}
+- Mileage range: ${fmtKm(pkg.startMileage)} → ${fmtKm(pkg.mileageCap)}
+- Invoiced amount: ${fmtMoneyFull(pkg.invoicedAmount)}
+
+REMAINING COVERAGE
+- Time: ${stats.remainingDays} day${stats.remainingDays === 1 ? '' : 's'} left
+- Mileage: ${fmtKm(stats.remainingKm)} left
+- Amount: ${fmtMoney(stats.remaining)} remaining
 
 We invite you to contact us to discuss renewal options and ensure uninterrupted coverage for your vehicle. Renewing before expiration helps maintain continuous protection and may qualify you for loyalty benefits.
 
@@ -3295,7 +3488,18 @@ Best regards,
 ${sender}
 ${company}${phone ? '\nPhone: ' + phone : ''}${email ? '\nEmail: ' + email : ''}`;
 
-  return { subject, body };
+  return { subject: theme.subject, body: textContent, textContent, htmlContent };
+}
+
+// Small HTML-escape helper for safely injecting user data into the email HTML
+function escHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function buildMailtoLink(toEmail, subject, body) {
@@ -3311,21 +3515,46 @@ function previewEmail(packageId, stageKey) {
   const pkg = state.packages.find(p => p.id === packageId);
   if (!pkg) return;
   const v = state.vehicles.find(x => x.id === pkg.vehicleId);
-  const { subject, body } = buildEmailContent(pkg, v, stageKey);
+  const { subject, textContent, htmlContent } = buildEmailContent(pkg, v, stageKey);
+
   document.getElementById('email-preview-to').textContent = v.customerEmail || '(no email on file)';
   document.getElementById('email-preview-subject').textContent = subject;
-  document.getElementById('email-preview-body').textContent = body;
   document.getElementById('email-preview-package-id').value = packageId;
   document.getElementById('email-preview-stage').value = stageKey;
+
+  // Populate the three preview panes
+  document.getElementById('email-preview-body').textContent = textContent;
+  document.getElementById('email-preview-html-source').textContent = htmlContent;
+  // Use srcdoc so the iframe renders the HTML in isolation (no parent CSS bleed-through)
+  const iframe = document.getElementById('email-preview-iframe');
+  iframe.srcdoc = htmlContent;
+
+  // Default back to the Rendered tab each time the modal opens
+  switchEmailPreviewTab('rendered');
+
+  // Wire the "Open in mail client" mailto link as a fallback for users without Brevo wired up yet
   const sendBtn = document.getElementById('email-preview-send');
   if (v.customerEmail) {
-    sendBtn.href = buildMailtoLink(v.customerEmail, subject, body);
+    sendBtn.href = buildMailtoLink(v.customerEmail, subject, textContent);
     sendBtn.style.display = 'inline-flex';
-    sendBtn.onclick = () => setTimeout(() => markEmailSent(packageId, stageKey, v.customerEmail), 500);
   } else {
     sendBtn.style.display = 'none';
   }
   openModal('modal-email-preview');
+}
+
+function switchEmailPreviewTab(tab) {
+  ['rendered', 'text', 'html'].forEach(t => {
+    document.getElementById('email-preview-' + t)?.classList.toggle('hidden', t !== tab);
+  });
+  document.querySelectorAll('[data-email-tab]').forEach(el => {
+    el.classList.toggle('active', el.dataset.emailTab === tab);
+  });
+}
+
+function copyEmailHtmlSource() {
+  const html = document.getElementById('email-preview-html-source').textContent;
+  copyToClipboard(html, 'HTML copied — paste into Brevo email editor (HTML mode) to test');
 }
 
 function markEmailSent(packageId, stageKey, recipientEmail) {
