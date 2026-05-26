@@ -30,7 +30,7 @@
   // for browser exposure; RLS policies enforce access.
   const SUPABASE_ANON =
     (typeof window !== 'undefined' && (window.SUPABASE_ANON_KEY || window.SB_ANON_KEY)) ||
-    /* PASTE_HERE → */ '';
+    /* PASTE_HERE → */ 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnY2JiZmlxemFjY3NxdWF5dHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMDE1MzgsImV4cCI6MjA5MjY3NzUzOH0.2qLR3uLTE8C2tKSQUEV-9q2DF8Hrfad08UQoLv5Q72c';
 
   if (!SUPABASE_ANON) {
     console.warn('[si-cloud] No anon key — set window.SUPABASE_ANON_KEY or paste into si-cloud.js. Cloud sync disabled.');
