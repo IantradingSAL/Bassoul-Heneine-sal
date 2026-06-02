@@ -4004,6 +4004,9 @@ function rGCM(){
   rows.slice(0,600).forEach(r=>{
     const rd=S.rej[r.inv];
     const isP=r.st===0,isR=r.st===4;
+    // Deduction = Renault accepted/paid the claim but paid LESS than asked.
+    const ded=r.ta-r.tp;
+    const isDed=isP&&ded>0.01;
     const isSup=_isSupersededByResubmission(r);
     const cls = ['tr-clickable'];
     if (r._d) cls.push('tr-dup');
@@ -4022,7 +4025,7 @@ function rGCM(){
       <td class="num" style="${(r.pco||0)>0.01?'color:var(--mint);font-weight:600':'color:var(--faint)'}">${(r.pco||0)>0.01?f(r.pco):'—'}</td>
       <td class="num">${f(r.ta)}</td>
       <td class="num" style="font-weight:700">${f(r.tp)}</td>
-      <td><span class="badge ${isP?'b-mint':isR?'b-rose':'b-n'}">${isP?'✅ Paid':isR?'❌ Rejected':'Stat '+r.st}</span>${isR&&rd?.rejType?` <span class="badge ${rd.rejType==='full'?'b-rose':'b-lem'}" style="margin-left:2px">${rd.rejType==='full'?'Full':'Partial'}</span>`:''}${resubChainBadge(r)}</td>
+      <td><span class="badge ${isDed?'b-sun':isP?'b-mint':isR?'b-rose':'b-n'}" ${isDed?`title="Paid with deduction — asked €${f(r.ta)}, paid €${f(r.tp)}"`:''}>${isP?(isDed?'⚠️ Paid −€'+f(ded):'✅ Paid'):isR?'❌ Rejected':'Stat '+r.st}</span>${isR&&rd?.rejType?` <span class="badge ${rd.rejType==='full'?'b-rose':'b-lem'}" style="margin-left:2px">${rd.rejType==='full'?'Full':'Partial'}</span>`:''}${resubChainBadge(r)}</td>
       <td>${isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openModal('${esc(r.inv)}','${r.vin}')">${rd?'✏️ Edit':'+ Track'}</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'}</td>
     </tr>`;
   });
