@@ -1882,6 +1882,13 @@ const VIEW_TITLES = {
 };
 function navigate(view, args) {
   state.ui.currentView = view;
+  // Preserve the record id for detail views, so a re-render without args
+  // (cloud sync, save, etc.) restores the same record instead of bouncing
+  // to the vehicles list.
+  if (view === 'vehicle-detail' || view === 'package-detail') {
+    if (args != null) state.ui.detailId = args;
+    else args = state.ui.detailId;
+  }
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + view).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n => {
@@ -4093,6 +4100,7 @@ function renderPackageDetail(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-vehicle-detail').classList.add('active');
   state.ui.currentView = 'vehicle-detail';
+  state.ui.detailId = p.vehicleId;
   document.getElementById('view-title').textContent = 'Vehicle Detail';
   document.getElementById('view-subtitle').textContent = '';
 }
