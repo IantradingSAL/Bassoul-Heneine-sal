@@ -1880,7 +1880,26 @@ const VIEW_TITLES = {
   'vehicle-detail': ['Vehicle Detail', ''],
   'package-detail': ['Package Detail', ''],
 };
+// Render coalescing: user clicks render instantly, but bursts of navigate()
+// calls (e.g. the cloud realtime sync firing on every synced row) collapse into
+// at most one repaint per ~120ms. Stops icons/buttons from "dancing" under load.
+let _navLast = 0, _navTimer = null, _navLatest = null;
 function navigate(view, args) {
+  _navLatest = { view, args };
+  const now = Date.now();
+  const sinceLast = now - _navLast;
+  if (sinceLast >= 120) {
+    _navLast = now;
+    _renderNavigate(_navLatest.view, _navLatest.args);
+  } else if (!_navTimer) {
+    _navTimer = setTimeout(() => {
+      _navTimer = null; _navLast = Date.now();
+      _renderNavigate(_navLatest.view, _navLatest.args);
+    }, 120 - sinceLast);
+  }
+}
+
+function _renderNavigate(view, args) {
   state.ui.currentView = view;
   // Preserve the record id for detail views, so a re-render without args
   // (cloud sync, save, etc.) restores the same record instead of bouncing
@@ -4513,9 +4532,9 @@ function refreshBranding() {
 
 function init() {
   load();
-  if (!state.vehicles.length && !state.packages.length) {
-    loadDemoData();
-  }
+  // Auto demo-seed removed — was re-seeding 10 fake vehicles into every
+  // empty browser (incognito / new device) and leaking them to the cloud.
+  // Use Settings → Data → "Load demo" to seed demo data manually when needed.
   populateDatalists();
   refreshBranding();
   refreshStorageInfo();
