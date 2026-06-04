@@ -197,13 +197,23 @@
     const out = {};
     for (const k of Object.keys(M)) {
       const m = M[k];
-      const { data, error } = await sb.from(m.table).select('*');
-      if (error) {
-        console.warn(`[si-cloud] pull ${m.table} failed:`, error.message);
+      // Paginated pull — a plain select() is capped at 1000 rows on Supabase
+      // cloud, so loop with .range() until a short page comes back.
+      let all = [], from = 0, page = 1000, perr = null;
+      for (;;) {
+        const { data, error } = await sb.from(m.table).select('*').range(from, from + page - 1);
+        if (error) { perr = error; break; }
+        all = all.concat(data || []);
+        if (!data || data.length < page) break;
+        from += page;
+      }
+      if (perr) {
+        console.warn(`[si-cloud] pull ${m.table} failed:`, perr.message);
         out[k] = null;
         continue;
       }
-      out[k] = data.map(m.fromDb);
+      console.log(`[si-cloud] pulled ${all.length} from ${m.table}`);
+      out[k] = all.map(m.fromDb);
     }
     // Settings
     const { data: setData, error: setErr } = await sb.from('si_settings').select('*').eq('id', 1).maybeSingle();
@@ -403,10 +413,15 @@
       await pushLocalOnly();
       lastSnapshot = snapshotState();
 
-      // Re-render current view with merged data
-      if (merged && typeof navigate === 'function' && state.ui?.currentView) {
+      // Re-render current view with merged data — always repaint after a pull,
+      // so a fresh device shows cloud rows even if change-detection is conservative.
+      const _vcount = (state.vehicles || []).length;
+      if (typeof navigate === 'function' && state.ui?.currentView) {
         navigate(state.ui.currentView);
+      } else if (typeof navigate === 'function') {
+        navigate('vehicles');
       }
+      if (typeof toast === 'function') toast('\u2601 Cloud sync: ' + _vcount + ' vehicles loaded');
       if (typeof refreshStorageInfo === 'function') refreshStorageInfo();
       if (typeof refreshBell === 'function') refreshBell();
 
@@ -414,7 +429,6 @@
       subscribeAll();
 
       // Tiny status indicator so you know it's live
-      if (typeof toast === 'function') toast('☁ Cloud sync active');
       console.log('[si-cloud] ready — multi-device sync ON');
     } catch (e) {
       console.error('[si-cloud] boot failed:', e);
