@@ -1322,12 +1322,14 @@
     <div class="flex items-center justify-between gap-2 mt-4 flex-wrap">
       <div class="text-xs flex-1" style="color: var(--text-3); min-width: 200px;">
         <i data-lucide="info" class="w-3 h-3 inline"></i>
-        Click "Mark sent" to log this reminder. Brevo sending wires up next (see HTML tab to test now by pasting into Brevo).
+No Brevo yet? Click <b>Copy rendered email</b>, then <b>Open in mail client</b>, then in Outlook select the body and paste (Ctrl+V) — the formatting is kept. <b>Send via Brevo</b> sends directly once set up.
       </div>
       <div class="flex gap-2 flex-wrap">
         <button type="button" class="btn btn-ghost" onclick="closeModal('modal-email-preview')">Cancel</button>
+        <button type="button" class="btn btn-ghost" onclick="copyRenderedEmail()"><i data-lucide="clipboard-check" class="w-4 h-4"></i>Copy rendered email</button>
         <a id="email-preview-send" href="#" class="btn btn-ghost" target="_blank"><i data-lucide="external-link" class="w-4 h-4"></i>Open in mail client</a>
-        <button type="button" class="btn btn-primary" onclick="markEmailSentManual()"><i data-lucide="check" class="w-4 h-4"></i>Mark sent</button>
+        <button type="button" class="btn btn-ghost" onclick="markEmailSentManual()"><i data-lucide="check" class="w-4 h-4"></i>Mark sent</button>
+        <button type="button" id="email-brevo-send" class="btn btn-primary" onclick="sendViaBrevo()"><i data-lucide="send" class="w-4 h-4"></i>Send via Brevo</button>
       </div>
     </div>
   </div>
@@ -1632,6 +1634,9 @@
    STATE & STORAGE LAYER (designed to swap to Supabase later)
    ========================================================================= */
 const STORAGE_KEY = 'drivetrain.v1';
+// Supabase project (same as si-cloud.js) — used to call the send-reminder Edge Function.
+const SI_SUPABASE_URL  = 'https://egcbbfiqzaccsquaytvz.supabase.co';
+const SI_SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnY2JiZmlxemFjY3NxdWF5dHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMDE1MzgsImV4cCI6MjA5MjY3NzUzOH0.2qLR3uLTE8C2tKSQUEV-9q2DF8Hrfad08UQoLv5Q72c';
 
 // Safe wrapper around lucide.createIcons — never throws even if the icon library
 // failed to load (e.g. CDN blocked, offline, slow connection). Icons just don't
@@ -3833,6 +3838,88 @@ function deleteEmailReminder(id) {
     refreshBell();
     toast('Reminder record deleted');
   });
+}
+
+async function copyRenderedEmail() {
+  const html = document.getElementById('email-preview-html-source').textContent;
+  const text = document.getElementById('email-preview-body').textContent;
+  // Preferred: write real text/html to the clipboard so pasting into Outlook renders it.
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+        })
+      ]);
+      toast('Rendered email copied \u2014 paste (Ctrl+V) into the Outlook message body', 'success');
+      return;
+    }
+  } catch (e) { /* fall through to execCommand path */ }
+  // Fallback: select rendered content in a hidden editable node and copy.
+  try {
+    const holder = document.createElement('div');
+    holder.setAttribute('contenteditable', 'true');
+    holder.style.position = 'fixed';
+    holder.style.left = '-9999px';
+    holder.style.top = '0';
+    holder.innerHTML = html;
+    document.body.appendChild(holder);
+    const range = document.createRange();
+    range.selectNodeContents(holder);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const ok = document.execCommand('copy');
+    sel.removeAllRanges();
+    document.body.removeChild(holder);
+    toast(ok ? 'Rendered email copied \u2014 paste into Outlook (Ctrl+V)' : 'Could not copy \u2014 use the HTML tab', ok ? 'success' : 'warning');
+  } catch (e2) {
+    toast('Copy not supported on this browser \u2014 use the HTML tab', 'warning');
+  }
+}
+
+async function sendViaBrevo() {
+  const packageId = document.getElementById('email-preview-package-id').value;
+  const stageKey = document.getElementById('email-preview-stage').value;
+  const pkg = state.packages.find(p => p.id === packageId);
+  if (!pkg) return;
+  const v = state.vehicles.find(x => x.id === pkg.vehicleId);
+  const to = (v && v.customerEmail || '').trim();
+  if (!to) { toast('This customer has no email on file', 'warning'); return; }
+  const fromEmail = (state.settings.companyEmail || '').trim();
+  if (!fromEmail) { toast('Set your company email (a Brevo-verified sender) in Settings first', 'warning'); return; }
+
+  const { subject, textContent, htmlContent } = buildEmailContent(pkg, v, stageKey);
+  const btn = document.getElementById('email-brevo-send');
+  const original = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Sending\u2026'; }
+  try {
+    const resp = await fetch(SI_SUPABASE_URL + '/functions/v1/send-reminder', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + SI_SUPABASE_ANON,
+        'apikey': SI_SUPABASE_ANON,
+      },
+      body: JSON.stringify({
+        to, subject, html: htmlContent, text: textContent,
+        fromEmail,
+        fromName: state.settings.senderName || state.settings.companyName || 'Service Inclusive',
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data.ok === false) {
+      const msg = (data && (typeof data.error === 'string' ? data.error : (data.error && data.error.message))) || ('HTTP ' + resp.status);
+      throw new Error(msg);
+    }
+    toast('\u2709 Sent via Brevo to ' + to, 'success');
+    markEmailSent(packageId, stageKey, to);   // logs as sent + closes modal
+  } catch (e) {
+    toast('Brevo send failed: ' + ((e && e.message) || e), 'warning');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
 }
 
 function markEmailSentManual() {
