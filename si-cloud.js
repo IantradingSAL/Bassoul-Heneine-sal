@@ -374,6 +374,21 @@
       .subscribe();
   }
 
+  // Coalesce a burst of realtime events (e.g. a bulk delete = hundreds of events)
+  // into ONE storage write + ONE repaint, instead of doing both per event.
+  let _rtTimer = null;
+  function scheduleRealtimeFlush() {
+    if (_rtTimer) return;
+    _rtTimer = setTimeout(() => {
+      _rtTimer = null;
+      try { localStorage.setItem('drivetrain.v1', JSON.stringify(state)); } catch (e) {}
+      if (typeof refreshStorageInfo === 'function') refreshStorageInfo();
+      if (typeof refreshBell === 'function') refreshBell();
+      if (typeof navigate === 'function' && state.ui?.currentView) navigate(state.ui.currentView);
+      lastSnapshot = snapshotState();
+    }, 400);
+  }
+
   function applyRealtime(entityKey, m, payload) {
     suppressPush = true;
     try {
@@ -388,14 +403,7 @@
         if (idx >= 0) arr[idx] = row;
         else arr.push(row);
       }
-      // Save to localStorage (without triggering cloud push)
-      try { localStorage.setItem('drivetrain.v1', JSON.stringify(state)); } catch (e) {}
-      // Re-render current view if app helpers are available
-      if (typeof refreshStorageInfo === 'function') refreshStorageInfo();
-      if (typeof refreshBell === 'function') refreshBell();
-      if (typeof navigate === 'function' && state.ui?.currentView) navigate(state.ui.currentView);
-      // Update snapshot so we don't fight this change on the next save()
-      lastSnapshot = snapshotState();
+      scheduleRealtimeFlush();   // debounced — coalesces bursts into one repaint
     } catch (e) {
       console.warn('[si-cloud] realtime apply error:', e);
     } finally {
