@@ -1160,6 +1160,10 @@
     <form id="package-form" class="grid grid-cols-2 gap-4">
       <input type="hidden" id="package-id" />
       <div class="col-span-2">
+        <label class="label">Apply package preset (auto-fills type, duration &amp; mileage)</label>
+        <select class="select" id="package-preset" onchange="applyPackagePreset()"></select>
+      </div>
+      <div class="col-span-2">
         <label class="label">Vehicle (VIN)</label>
         <select class="select" id="package-vehicle" required></select>
       </div>
@@ -1553,6 +1557,22 @@
       </div>
       <div class="divider"></div>
       <div>
+        <div class="label">Package catalog \u2014 auto-fill presets</div>
+        <div class="text-xs mb-2" style="color: var(--text-3);">Define each package once. When you add a package to a vehicle, pick the preset and Type, Duration &amp; Mileage cap fill in automatically.</div>
+        <div style="overflow-x:auto;">
+          <table class="w-full text-xs" id="setting-catalog-table">
+            <thead><tr style="color: var(--text-3); text-align:left;">
+              <th class="py-1 pr-2">Code</th><th class="py-1 pr-2">Type</th>
+              <th class="py-1 pr-2">Years</th><th class="py-1 pr-2">Mileage cap</th>
+              <th class="py-1 pr-2">Price</th><th></th>
+            </tr></thead>
+            <tbody id="setting-catalog-body"></tbody>
+          </table>
+        </div>
+        <button type="button" class="btn btn-ghost mt-2" style="font-size:12px;" onclick="catalogAddRow()"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Add preset</button>
+      </div>
+      <div class="divider"></div>
+      <div>
         <div class="label">Data</div>
         <div class="flex flex-wrap gap-2">
           <button class="btn btn-ghost" onclick="exportData()"><i data-lucide="download" class="w-3.5 h-3.5"></i>Export JSON</button>
@@ -1631,6 +1651,12 @@ const DEFAULT_PACKAGE_TYPES = [
   'Service Plus',
   'Full Service Contract'
 ];
+const DEFAULT_PACKAGE_CATALOG = [
+  // Auto-fill presets. EDIT THESE IN Settings → Package catalog.
+  // years = coverage duration in years; mileageCap = km; price optional.
+  { id: 'pkg-07us', code: '07US', type: 'Basic', years: 3, mileageCap: 40000, price: '' },
+];
+
 const DEFAULT_SERVICE_TYPES = [
   'Oil change', 'Brake pads', 'Brake discs', 'Tire rotation', 'Tire replacement',
   'Battery', 'Air filter', 'Cabin filter', 'Spark plugs', 'Coolant flush',
@@ -1652,6 +1678,7 @@ let state = {
     expiring: 30,
     callAdvanceDays: 60,
     packageTypes: [...DEFAULT_PACKAGE_TYPES],
+    packageCatalog: DEFAULT_PACKAGE_CATALOG.map(x => ({ ...x })),
     serviceTypes: [...DEFAULT_SERVICE_TYPES],
     makes: [...DEFAULT_MAKES],
     agents: ['Imad', 'Sales Rep 1', 'Sales Rep 2'],
@@ -2434,7 +2461,37 @@ function gaugeBar(icon, label, pct, sub) {
   `;
 }
 
-function openPackageModal(id) {
+function populatePackagePresetSelect() {
+  const sel = document.getElementById('package-preset');
+  if (!sel) return;
+  const cat = state.settings.packageCatalog || [];
+  sel.innerHTML = '<option value="">\u2014 None (manual entry) \u2014</option>' +
+    cat.map((c, i) => {
+      const yrs = c.years ? c.years + ' yr' : '';
+      const km = c.mileageCap ? Number(c.mileageCap).toLocaleString() + ' km' : '';
+      const bits = [c.type, yrs, km].filter(Boolean).join(' \u00b7 ');
+      return '<option value="' + i + '">' + escHtml(c.code || '(unnamed)') + (bits ? ' \u2014 ' + escHtml(bits) : '') + '</option>';
+    }).join('');
+}
+
+function applyPackagePreset() {
+  const sel = document.getElementById('package-preset');
+  const cat = state.settings.packageCatalog || [];
+  const c = cat[parseInt(sel.value, 10)];
+  if (!c) return;
+  if (c.type) document.getElementById('package-type').value = c.type;
+  if (c.mileageCap) document.getElementById('package-mileage-cap').value = c.mileageCap;
+  if (c.years) {
+    const months = Math.round(Number(c.years) * 12);
+    document.getElementById('package-duration').value = months;
+    const start = document.getElementById('package-start-date').value;
+    if (start) document.getElementById('package-end-date').value = addMonths(start, months);
+  }
+  const amtEl = document.getElementById('package-amount');
+  if (c.price !== '' && c.price != null && !amtEl.value) amtEl.value = c.price;
+}
+
+function openPackageModal(id, vehicleId) {
   const p = id ? state.packages.find(x => x.id === id) : null;
   document.getElementById('package-modal-title').textContent = p ? 'Edit Package' : 'New Service Package';
   document.getElementById('package-id').value = p?.id || '';
@@ -2445,6 +2502,9 @@ function openPackageModal(id) {
     .map(v => `<option value="${v.id}" ${p?.vehicleId===v.id?'selected':''}>${v.vin} — ${v.make} ${v.model}${v.customerName ? ' · ' + v.customerName : ''}</option>`)
     .join('');
 
+  populatePackagePresetSelect();
+  document.getElementById('package-preset').value = '';
+
   document.getElementById('package-type').value = p?.packageType || '';
   document.getElementById('package-amount').value = p?.invoicedAmount ?? '';
   document.getElementById('package-start-date').value = p?.startDate || todayISO();
@@ -2453,6 +2513,14 @@ function openPackageModal(id) {
   document.getElementById('package-start-mileage').value = p?.startMileage ?? '';
   document.getElementById('package-mileage-cap').value = p?.mileageCap ?? '';
   document.getElementById('package-notes').value = p?.notes || '';
+
+  // Auto-select the vehicle when launched from a specific vehicle, and fill its
+  // current mileage as the start mileage (fires the change handler).
+  if (!p && vehicleId) {
+    const sel2 = document.getElementById('package-vehicle');
+    sel2.value = vehicleId;
+    sel2.dispatchEvent(new Event('change'));
+  }
 
   openModal('modal-package');
 }
@@ -3947,7 +4015,7 @@ function vehicleDetailHTML(v, embedded) {
         <div class="flex gap-2">
           ${actionablePkgs.length ? `<button class="btn btn-call" onclick="openCallModal('${actionablePkgs[0].id}')"><i data-lucide="phone-call" class="w-3.5 h-3.5"></i>Call customer (${actionablePkgs.length} pkg)</button>` : ''}
           <button class="btn btn-ghost" onclick="openVehicleModal('${v.id}')"><i data-lucide="pencil" class="w-3.5 h-3.5"></i>Edit</button>
-          <button class="btn btn-primary" onclick="openPackageModal(); setTimeout(()=>document.getElementById('package-vehicle').value='${v.id}', 50)"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Add Package</button>
+          <button class="btn btn-primary" onclick="openPackageModal(null, '${v.id}')"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Add Package</button>
         </div>
       </div>
 
@@ -3965,7 +4033,7 @@ function vehicleDetailHTML(v, embedded) {
       <div class="card p-5">
         <div class="flex items-center justify-between mb-4">
           <div class="font-display text-xl">Packages (${pkgs.length})</div>
-          <button class="btn btn-ghost" onclick="openPackageModal(); setTimeout(()=>document.getElementById('package-vehicle').value='${v.id}', 50)"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Add</button>
+          <button class="btn btn-ghost" onclick="openPackageModal(null, '${v.id}')"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Add</button>
         </div>
         ${pkgs.length ? pkgs.map(p => `
           <div class="card p-4 mb-3" style="background: var(--surface-2);">
@@ -4160,6 +4228,54 @@ function confirmDialog(title, message, onConfirm) {
   openModal('modal-confirm');
 }
 
+function renderPackageCatalog() {
+  const body = document.getElementById('setting-catalog-body');
+  if (!body) return;
+  const cat = state.settings.packageCatalog || (state.settings.packageCatalog = []);
+  if (!cat.length) {
+    body.innerHTML = '<tr><td colspan="6" class="py-2" style="color: var(--text-3);">No presets yet \u2014 click \u201cAdd preset\u201d.</td></tr>';
+    return;
+  }
+  const cell = (i, field, val, attrs) => '<td class="py-1 pr-2"><input class="input ' + (attrs.mono ? 'font-mono' : '') + '" ' + (attrs.type ? 'type="' + attrs.type + '" ' : '') + (attrs.step ? 'step="' + attrs.step + '" min="0" ' : '') + 'style="padding:4px 6px;font-size:12px;width:' + attrs.w + ';" value="' + escHtml(val == null ? '' : String(val)) + '" placeholder="' + attrs.ph + '" onchange="catalogUpdate(' + i + ',\'' + field + '\',this.value)"></td>';
+  body.innerHTML = cat.map((c, i) =>
+    '<tr>' +
+    cell(i, 'code', c.code, { w:'80px', ph:'07US' }) +
+    cell(i, 'type', c.type, { w:'120px', ph:'Basic' }) +
+    cell(i, 'years', c.years, { w:'60px', ph:'3', type:'number', step:'0.5', mono:true }) +
+    cell(i, 'mileageCap', c.mileageCap, { w:'96px', ph:'40000', type:'number', step:'1', mono:true }) +
+    cell(i, 'price', c.price, { w:'84px', ph:'0', type:'number', step:'0.01', mono:true }) +
+    '<td class="py-1"><button type="button" class="btn btn-ghost" style="padding:4px 6px;" title="Remove" onclick="catalogDeleteRow(' + i + ')"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></td>' +
+    '</tr>'
+  ).join('');
+  safeCreateIcons();
+}
+
+function catalogUpdate(i, field, value) {
+  const cat = state.settings.packageCatalog;
+  if (!cat || !cat[i]) return;
+  if (field === 'years' || field === 'mileageCap' || field === 'price') {
+    cat[i][field] = value === '' ? '' : Number(value);
+  } else {
+    cat[i][field] = value;
+  }
+  save();
+}
+
+function catalogAddRow() {
+  if (!state.settings.packageCatalog) state.settings.packageCatalog = [];
+  state.settings.packageCatalog.push({ id: uid(), code: '', type: '', years: '', mileageCap: '', price: '' });
+  save();
+  renderPackageCatalog();
+}
+
+function catalogDeleteRow(i) {
+  const cat = state.settings.packageCatalog;
+  if (!cat) return;
+  cat.splice(i, 1);
+  save();
+  renderPackageCatalog();
+}
+
 function openSettings() {
   document.getElementById('setting-currency').value = state.settings.currency;
   document.getElementById('setting-warning').value = state.settings.warning;
@@ -4183,6 +4299,7 @@ function openSettings() {
   const ocEl = document.getElementById('setting-fu-override-count');
   if (ocEl) ocEl.textContent = ovc ? (ovc + ' package(s) currently snoozed or stopped.') : 'No packages snoozed or stopped.';
   onDialSchemeChange();
+  renderPackageCatalog();
   openModal('modal-settings');
 }
 
