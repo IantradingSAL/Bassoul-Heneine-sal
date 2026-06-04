@@ -295,13 +295,12 @@
         if (error) console.warn(`[si-cloud] upsert ${m.table} failed:`, error.message);
       }
 
-      // Deletes: ids that were in prev but not in curr
+      // Deletes DISABLED — safe mode. This sync NEVER removes rows from the
+      // cloud, so a local "Reset all", a stale device, or an empty localStorage
+      // can never wipe the seeded fleet. Removals are logged only.
       const removed = [];
       for (const id of prevIds) if (!currIds.has(id)) removed.push(id);
-      if (removed.length) {
-        const { error } = await sb.from(m.table).delete().in('id', removed);
-        if (error) console.warn(`[si-cloud] delete ${m.table} failed:`, error.message);
-      }
+      if (removed.length) console.log(`[si-cloud] ${removed.length} local removals in ${m.table} — NOT pushed (safe mode)`);
     }
 
     // Settings: push if changed
