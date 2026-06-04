@@ -2034,8 +2034,9 @@ function renderTopModels() {
     if (!v.make || !v.model) return;
     ensure(`${v.make} ${v.model}`).vehicles++;
   });
+  const _vById = new Map(state.vehicles.map(x => [x.id, x]));
   state.packages.forEach(p => {
-    const v = state.vehicles.find(x => x.id === p.vehicleId);
+    const v = _vById.get(p.vehicleId);
     if (!v) return;
     const key = `${v.make} ${v.model}`;
     const m = ensure(key);
@@ -2048,7 +2049,7 @@ function renderTopModels() {
     }
   });
   state.services.forEach(s => {
-    const v = state.vehicles.find(x => x.id === s.vehicleId);
+    const v = _vById.get(s.vehicleId);
     if (!v) return;
     ensure(`${v.make} ${v.model}`).services++;
   });
@@ -2185,7 +2186,8 @@ function renderVehicles() {
   if (!filtered.length) {
     tbody.innerHTML = `<tr class="no-hover"><td colspan="8"><div class="empty-state"><div class="empty-state-icon"><i data-lucide="car" class="w-5 h-5"></i></div><div class="text-sm" style="color: var(--text-2);">No vehicles found. Click "Add Vehicle" to start.</div></div></td></tr>`;
   } else {
-    tbody.innerHTML = filtered.map(v => {
+    tbody.innerHTML = filtered.length > 150 ? `<tr class="no-hover"><td colspan="8" style="background:var(--info-soft);color:var(--text-2);font-size:12px;padding:10px 12px;">Showing first 150 of ${filtered.length.toLocaleString()} vehicles — type in the filter box above to find a specific car.</td></tr>` : '';
+    tbody.innerHTML += filtered.slice(0, 150).map(v => {
       const pkgs = state.packages.filter(p => p.vehicleId === v.id);
       const activePkgs = pkgs.filter(p => ['active','expiring'].includes(packageStats(p).status)).length;
       return `<tr onclick="navigate('vehicle-detail', '${v.id}')">
@@ -2284,7 +2286,7 @@ function renderPackages() {
     if (!filtered.length) {
       grid.innerHTML = `<div class="col-span-3 card p-12"><div class="empty-state"><div class="empty-state-icon"><i data-lucide="package" class="w-5 h-5"></i></div><div class="text-sm" style="color: var(--text-2);">No packages found.</div></div></div>`;
     } else {
-      grid.innerHTML = filtered.map(p => packageCard(p)).join('');
+      grid.innerHTML = (filtered.length > 150 ? `<div class="col-span-3" style="background:var(--info-soft);color:var(--text-2);font-size:12px;padding:10px 12px;border-radius:8px;margin-bottom:8px;">Showing first 150 of ${filtered.length.toLocaleString()} packages — use the filter to narrow down.</div>` : '') + filtered.slice(0, 150).map(p => packageCard(p)).join('');
     }
   } else {
     grid.classList.add('hidden');
@@ -2292,7 +2294,7 @@ function renderPackages() {
     if (!filtered.length) {
       listTbody.innerHTML = `<tr class="no-hover"><td colspan="11"><div class="empty-state"><div class="empty-state-icon"><i data-lucide="package" class="w-5 h-5"></i></div><div class="text-sm" style="color: var(--text-2);">No packages found.</div></div></td></tr>`;
     } else {
-      listTbody.innerHTML = filtered.map(p => packageListRow(p)).join('');
+      listTbody.innerHTML = (filtered.length > 150 ? `<tr class="no-hover"><td colspan="11" style="background:var(--info-soft);color:var(--text-2);font-size:12px;padding:10px 12px;">Showing first 150 of ${filtered.length.toLocaleString()} packages — use the filter to narrow down.</td></tr>` : '') + filtered.slice(0, 150).map(p => packageListRow(p)).join('');
     }
   }
   safeCreateIcons();
@@ -2481,7 +2483,8 @@ function renderServices() {
   if (!filtered.length) {
     tbody.innerHTML = `<tr class="no-hover"><td colspan="8"><div class="empty-state"><div class="empty-state-icon"><i data-lucide="wrench" class="w-5 h-5"></i></div><div class="text-sm" style="color: var(--text-2);">No services logged yet.</div></div></td></tr>`;
   } else {
-    tbody.innerHTML = filtered.map(s => {
+    tbody.innerHTML = filtered.length > 150 ? `<tr class="no-hover"><td colspan="8" style="background:var(--info-soft);color:var(--text-2);font-size:12px;padding:10px 12px;">Showing first 150 of ${filtered.length.toLocaleString()} services — use the filter to narrow down.</td></tr>` : '';
+    tbody.innerHTML += filtered.slice(0, 150).map(s => {
       const v = state.vehicles.find(x => x.id === s.vehicleId);
       return `<tr onclick="navigate('vehicle-detail', '${s.vehicleId}')">
         <td class="font-mono">${fmtDate(s.serviceDate)}</td>
@@ -2593,8 +2596,9 @@ function renderAnalytics() {
     if (!modelStats[key]) modelStats[key] = { make: v.make, model: v.model, vehicles: 0, activePackages: 0, totalInvoiced: 0, totalConsumed: 0, services: 0, consumptionPcts: [] };
     modelStats[key].vehicles++;
   });
+  const _vByIdA = new Map(state.vehicles.map(x => [x.id, x]));
   state.packages.forEach(p => {
-    const v = state.vehicles.find(x => x.id === p.vehicleId);
+    const v = _vByIdA.get(p.vehicleId);
     if (!v) return;
     const key = `${v.make}|${v.model}`;
     if (!modelStats[key]) modelStats[key] = { make: v.make, model: v.model, vehicles: 0, activePackages: 0, totalInvoiced: 0, totalConsumed: 0, services: 0, consumptionPcts: [] };
@@ -2605,7 +2609,7 @@ function renderAnalytics() {
     if (['active','expiring'].includes(s.status)) modelStats[key].activePackages++;
   });
   state.services.forEach(s => {
-    const v = state.vehicles.find(x => x.id === s.vehicleId);
+    const v = _vByIdA.get(s.vehicleId);
     if (!v) return;
     const key = `${v.make}|${v.model}`;
     if (modelStats[key]) modelStats[key].services++;
@@ -2668,7 +2672,7 @@ function renderAnalytics() {
   // Top customers
   const customers = {};
   state.packages.forEach(p => {
-    const v = state.vehicles.find(x => x.id === p.vehicleId);
+    const v = _vByIdA.get(p.vehicleId);
     if (!v || !v.customerName) return;
     if (!customers[v.customerName]) customers[v.customerName] = { name: v.customerName, vehicles: new Set(), packages: 0, invoiced: 0 };
     customers[v.customerName].vehicles.add(v.id);
