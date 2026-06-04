@@ -3,58 +3,48 @@
 <title>Service Inclusive — Cloud Check</title>
 <style>
  body{font:16px/1.5 -apple-system,system-ui,sans-serif;margin:0;background:#0b1220;color:#e7eefc;padding:18px}
- h1{font-size:18px;margin:0 0 4px} .sub{color:#9fb0d0;font-size:13px;margin-bottom:16px}
- .card{background:#141d31;border:1px solid #243a5e;border-radius:14px;padding:16px;margin:12px 0;border-color:#243a5e}
- .big{font-size:40px;font-weight:800;letter-spacing:-1px}
- .ok{color:#4ade80}.bad{color:#f87171}.warn{color:#fbbf24}.muted{color:#9fb0d0;font-size:13px}
- table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
- td,th{text-align:left;padding:6px 8px;border-bottom:1px solid #243a5e}
- code{background:#0b1220;padding:2px 6px;border-radius:6px;font-size:12px}
- .step{margin:6px 0}
+ h1{font-size:18px;margin:0 0 4px}.sub{color:#9fb0d0;font-size:13px;margin-bottom:16px}
+ .card{background:#141d31;border:1px solid #243a5e;border-radius:14px;padding:16px;margin:12px 0}
+ .row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid #243a5e}
+ .row b{font-size:30px}.muted{color:#9fb0d0;font-size:13px}.ok{color:#4ade80}.bad{color:#f87171}.warn{color:#fbbf24}
+ #log{white-space:pre-wrap;font-size:12px;color:#9fb0d0}
 </style></head><body>
 <h1>Service Inclusive — Cloud Check</h1>
-<div class="sub">Open this on the same device/network you use for the app. It checks the <code>si_vehicles</code> table directly.</div>
-<div class="card"><div id="conn">⏳ Connecting to Supabase…</div></div>
-<div class="card"><div class="muted">si_vehicles row count</div><div id="count" class="big">—</div><div id="bymake" class="muted"></div></div>
-<div class="card"><div class="muted">Sample rows</div><div id="sample">—</div></div>
-<div class="card"><div class="muted">Raw status</div><div id="log" class="muted" style="white-space:pre-wrap"></div></div>
+<div class="sub">Read-only. Counts exactly what is in the cloud right now.</div>
+<div class="card"><div id="conn">⏳ Connecting…</div></div>
+<div class="card">
+ <div class="row"><span>si_vehicles</span><b id="v">—</b></div>
+ <div class="row"><span>si_packages</span><b id="p">—</b></div>
+ <div class="row"><span>si_services</span><b id="s">—</b></div>
+</div>
+<div class="card"><div class="muted">Vehicles by source</div><div id="src" class="muted">—</div></div>
+<div class="card"><div id="log"></div></div>
 <script>
 (function(){
 const SB_URL="https://egcbbfiqzaccsquaytvz.supabase.co", SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnY2JiZmlxemFjY3NxdWF5dHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMDE1MzgsImV4cCI6MjA5MjY3NzUzOH0.2qLR3uLTE8C2tKSQUEV-9q2DF8Hrfad08UQoLv5Q72c";
-const log=(m)=>{document.getElementById('log').textContent+=m+"\n";};
+const log=m=>{document.getElementById('log').textContent+=m+"\n";};
 const CDN=['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
            'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js'];
-function loadSb(i=0){return new Promise((res,rej)=>{ if(window.supabase?.createClient)return res();
-  if(i>=CDN.length)return rej(new Error('supabase-js CDN blocked'));
-  const s=document.createElement('script');s.src=CDN[i];
-  s.onload=()=>window.supabase?.createClient?res():loadSb(i+1).then(res,rej);
-  s.onerror=()=>{log('CDN failed: '+CDN[i]);loadSb(i+1).then(res,rej);};document.head.appendChild(s);});}
-(async()=>{
- try{
-  log('Loading library…'); await loadSb(); log('Library OK');
+function loadSb(i){i=i||0;return new Promise((res,rej)=>{if(window.supabase&&window.supabase.createClient)return res();
+  if(i>=CDN.length)return rej(new Error('supabase-js CDN blocked — turn on Cloudflare WARP'));
+  var sc=document.createElement('script');sc.src=CDN[i];
+  sc.onload=()=>window.supabase&&window.supabase.createClient?res():loadSb(i+1).then(res,rej);
+  sc.onerror=()=>loadSb(i+1).then(res,rej);document.head.appendChild(sc);});}
+async function cnt(sb,t){const r=await sb.from(t).select('*',{count:'exact',head:true});if(r.error)throw new Error(t+': '+r.error.message);return r.count;}
+(async()=>{try{
+  log('Loading library…'); await loadSb();
   const sb=window.supabase.createClient(SB_URL,SB_KEY);
-  log('Querying count…');
-  const {count,error}=await sb.from('si_vehicles').select('*',{count:'exact',head:true});
-  if(error){throw new Error('Query error: '+error.message+' (code '+(error.code||'?')+')');}
-  document.getElementById('conn').innerHTML='<span class="ok">✅ Reachable & readable by anon key</span>';
-  document.getElementById('count').textContent=count;
-  document.getElementById('count').className='big '+(count>=1282?'ok':(count>0?'warn':'bad'));
-  // by make
-  const {data:mk}=await sb.from('si_vehicles').select('make');
-  const tally={};(mk||[]).forEach(r=>tally[r.make||'(none)']=(tally[r.make||'(none)']||0)+1);
-  document.getElementById('bymake').textContent=Object.entries(tally).map(([k,v])=>k+': '+v).join('   ');
-  const {data}=await sb.from('si_vehicles').select('vin,make,model,year,customer_name').order('created_at',{ascending:false}).limit(5);
-  document.getElementById('sample').innerHTML=(data&&data.length)?
-    '<table><tr><th>VIN</th><th>Make</th><th>Model</th><th>Yr</th><th>Customer</th></tr>'+
-    data.map(r=>'<tr><td>'+r.vin+'</td><td>'+r.make+'</td><td>'+(r.model||'')+'</td><td>'+(r.year||'')+'</td><td>'+(r.customer_name||'')+'</td></tr>').join('')+'</table>'
-    :'<span class="warn">Table reachable but empty (0 rows).</span>';
+  document.getElementById('conn').innerHTML='<span class="ok">✅ Connected (anon)</span>';
+  const v=await cnt(sb,'si_vehicles');document.getElementById('v').textContent=v;document.getElementById('v').className=v>=3000?'ok':(v>0?'warn':'bad');
+  let p='n/a',s='n/a';
+  try{p=await cnt(sb,'si_packages');}catch(e){p='—';log('packages: '+e.message);}
+  try{s=await cnt(sb,'si_services');}catch(e){s='—';log('services: '+e.message);}
+  document.getElementById('p').textContent=p;document.getElementById('s').textContent=s;
+  // vehicles by source
+  const {data}=await sb.from('si_vehicles').select('source');
+  const t={};(data||[]).forEach(r=>{const k=r.source||'(none/demo)';t[k]=(t[k]||0)+1;});
+  document.getElementById('src').textContent=Object.entries(t).map(([k,n])=>k+': '+n).join('   ')||'—';
   log('Done.');
- }catch(e){
-  document.getElementById('conn').innerHTML='<span class="bad">❌ '+e.message+'</span>';
-  document.getElementById('count').textContent='✕';document.getElementById('count').className='big bad';
-  log('FAILED: '+e.message);
-  log('If this says CDN blocked or network/Failed to fetch → your ISP is blocking supabase.co. Turn on Cloudflare WARP and reload.');
- }
-})();
+}catch(e){document.getElementById('conn').innerHTML='<span class="bad">❌ '+e.message+'</span>';log('FAILED: '+e.message);}})();
 })();
 </script></body></html>
