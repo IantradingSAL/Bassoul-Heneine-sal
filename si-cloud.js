@@ -51,10 +51,18 @@
       let idx = 0;
       const tryNext = () => {
         if (idx >= CDN_URLS.length) return reject(new Error('All CDNs failed'));
+        const url = CDN_URLS[idx++];
         const s = document.createElement('script');
-        s.src = CDN_URLS[idx++];
-        s.onload = () => window.supabase?.createClient ? resolve(window.supabase) : tryNext();
-        s.onerror = tryNext;
+        let done = false;
+        // Per-CDN timeout: a CDN blocked/throttled by the ISP can HANG instead of
+        // firing onerror — without this, boot waits forever on the first URL.
+        const t = setTimeout(() => { if (!done) { done = true; s.remove(); tryNext(); } }, 6000);
+        s.src = url;
+        s.onload = () => {
+          if (done) return; done = true; clearTimeout(t);
+          window.supabase?.createClient ? resolve(window.supabase) : tryNext();
+        };
+        s.onerror = () => { if (done) return; done = true; clearTimeout(t); tryNext(); };
         document.head.appendChild(s);
       };
       tryNext();
@@ -193,33 +201,62 @@
     return snap;
   }
 
-  async function pullAll() {
-    const out = {};
-    for (const k of Object.keys(M)) {
-      const m = M[k];
-      // Paginated pull — a plain select() is capped at 1000 rows on Supabase
-      // cloud, so loop with .range() until a short page comes back.
-      let all = [], from = 0, page = 1000, perr = null;
-      for (;;) {
-        const { data, error } = await sb.from(m.table).select('*').range(from, from + page - 1);
-        if (error) { perr = error; break; }
-        all = all.concat(data || []);
-        if (!data || data.length < page) break;
-        from += page;
-      }
-      if (perr) {
-        console.warn(`[si-cloud] pull ${m.table} failed:`, perr.message);
-        out[k] = null;
-        continue;
-      }
-      console.log(`[si-cloud] pulled ${all.length} from ${m.table}`);
-      out[k] = all.map(m.fromDb);
+  // ─── INCREMENTAL SYNC STATE ───────────────────────────────────────────────
+  // After the first full pull we store the newest created_at per table; later
+  // loads fetch only rows newer than that, instead of re-downloading everything.
+  const SYNC_KEY = 'si_sync_v1';
+  const STALE_MS = 6 * 60 * 60 * 1000;                       // force a full pull every 6h
+  const TS_KEYS = ['vehicles', 'packages', 'services', 'followUps']; // tables that have created_at
+
+  function loadSync() { try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || null; } catch (e) { return null; } }
+  function saveSync(s) { try { localStorage.setItem(SYNC_KEY, JSON.stringify(s)); } catch (e) {} }
+  function persistLocal() { try { localStorage.setItem('drivetrain.v1', JSON.stringify(state)); } catch (e) {} }
+  function computeWatermarks() {
+    const perTable = {};
+    for (const k of TS_KEYS) {
+      let max = '';
+      for (const r of (state[M[k].stateKey] || [])) { if (r.createdAt && r.createdAt > max) max = r.createdAt; }
+      if (max) perTable[k] = max;
     }
-    // Settings
+    return perTable;
+  }
+
+  // Pull one table (paginated). With `since`, only fetch rows created after it.
+  async function pullTable(k, since) {
+    const m = M[k];
+    let all = [], from = 0, page = 1000;
+    for (;;) {
+      let q = sb.from(m.table).select('*').range(from, from + page - 1);
+      if (since && k !== 'emailReminders') q = q.gt('created_at', since);
+      const { data, error } = await q;
+      if (error) { console.warn(`[si-cloud] pull ${m.table} failed:`, error.message); return { k, rows: null, error }; }
+      all = all.concat(data || []);
+      if (!data || data.length < page) break;
+      from += page;
+    }
+    console.log(`[si-cloud] pulled ${all.length} from ${m.table}${since ? ' (incremental)' : ''}`);
+    return { k, rows: all.map(m.fromDb) };
+  }
+
+  // All 6 tables + settings IN PARALLEL (was strictly sequential — the main
+  // cause of the multi-minute load against a distant/cold region).
+  async function pullAll(sync) {
+    const out = {};
+    const results = await Promise.all(Object.keys(M).map(k =>
+      pullTable(k, sync && sync.perTable ? sync.perTable[k] : null)));
+    let anyError = false, anyOk = false;
+    for (const r of results) {
+      out[r.k] = r.rows;
+      if (r.error) anyError = true; else anyOk = true;
+    }
     const { data: setData, error: setErr } = await sb.from('si_settings').select('*').eq('id', 1).maybeSingle();
     if (!setErr && setData?.data) out.settings = setData.data;
+    // Flag so boot() knows whether the cloud actually answered.
+    out.__ok = anyOk;
+    out.__error = anyError;
     return out;
   }
+
 
   function mergeIntoState(cloud) {
     let changed = false;
@@ -254,14 +291,17 @@
 
   // Push items that exist locally but weren't in the snapshot from cloud
   // (i.e. local-only items on first connect). Idempotent — upsert.
-  async function pushLocalOnly() {
+  async function pushLocalOnly(cloud) {
     for (const k of Object.keys(M)) {
       const m = M[k];
-      const rows = state[m.stateKey] || [];
-      if (!rows.length) continue;
-      const payload = rows.map(m.toDb);
-      const { error } = await sb.from(m.table).upsert(payload, { onConflict: 'id' });
-      if (error) console.warn(`[si-cloud] initial push ${m.table} failed:`, error.message);
+      const localRows = state[m.stateKey] || [];
+      if (!localRows.length) continue;
+      const cloudIds = new Set((cloud && cloud[k] ? cloud[k] : []).map(r => r.id));
+      const missing = localRows.filter(r => !cloudIds.has(r.id));
+      if (!missing.length) continue;     // cloud already has everything → upload nothing
+      const { error } = await sb.from(m.table).upsert(missing.map(m.toDb), { onConflict: 'id' });
+      if (error) console.warn(`[si-cloud] push ${m.table} failed:`, error.message);
+      else console.log(`[si-cloud] pushed ${missing.length} local-only to ${m.table}`);
     }
     await pushSettings();
   }
@@ -378,12 +418,19 @@
     };
   }
 
+  // Wrap a promise with a hard timeout so a cold/blocked backend can never
+  // leave the app hanging. Rejects after `ms` if not settled.
+  function withTimeout(promise, ms, label) {
+    return Promise.race([
+      promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error((label || 'op') + ' timed out after ' + ms + 'ms')), ms)),
+    ]);
+  }
+
   // ─── BOOT ──────────────────────────────────────────────────────────────────
   async function boot() {
     try {
       // Wait for the page's own init() to finish populating state from localStorage.
-      // The page calls init() synchronously at end of its <script>, so by the time
-      // we run (deferred), state is loaded. Sanity check anyway.
       let attempts = 0;
       while ((typeof state === 'undefined' || typeof save !== 'function') && attempts < 50) {
         await new Promise(r => setTimeout(r, 50));
@@ -395,44 +442,76 @@
       }
 
       console.log('[si-cloud] loading Supabase JS…');
-      await loadSupabaseJs();
+      await withTimeout(loadSupabaseJs(), 20000, 'supabase-js load');
       sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
         realtime: { params: { eventsPerSecond: 5 } },
       });
-      console.log('[si-cloud] pulling cloud data…');
-      const cloud = await pullAll();
-      const merged = mergeIntoState(cloud);
+
+      // Full vs incremental: warm cache + a recent full pull → fetch only new rows.
+      const sync = loadSync();
+      const haveCache = ((state.vehicles && state.vehicles.length) || (state.packages && state.packages.length));
+      let incremental = !!(sync && sync.fullAt && sync.perTable && haveCache &&
+        (Date.now() - new Date(sync.fullAt).getTime() < STALE_MS));
+      console.log('[si-cloud] ' + (incremental ? 'incremental' : 'full') + ' pull…');
+
+      let cloud = await withTimeout(pullAll(incremental ? sync : null), 25000, 'cloud pull');
+      if (!cloud.__ok && incremental) {            // incremental hiccup → one full retry
+        console.warn('[si-cloud] incremental failed — full pull');
+        incremental = false;
+        cloud = await withTimeout(pullAll(null), 25000, 'cloud pull');
+      }
+      if (!cloud.__ok) {
+        cloudReady = false;
+        console.warn('[si-cloud] cloud pull returned no successful tables — local only');
+        if (typeof toast === 'function') toast('Cloud unreachable — showing local data only', 'warning');
+        return;
+      }
+
+      mergeIntoState(cloud);
       lastSnapshot = snapshotState();
       cloudReady = true;
-
-      // Hook into save() AFTER initial pull, so we don't double-push during merge
       hookSave();
 
-      // Push any local-only items up to the cloud (first-sync handoff)
-      await pushLocalOnly();
-      lastSnapshot = snapshotState();
-
-      // Re-render current view with merged data — repaint after a pull, but
-      // never force a different page. If no view is set yet, leave the app's
-      // own init to choose the landing page.
-      const _vcount = (state.vehicles || []).length;
-      if (typeof navigate === 'function' && state.ui?.currentView) {
-        navigate(state.ui.currentView);
+      // Only a FULL pull reconciles local-only rows upward (cheap diff, usually
+      // nothing). Incremental skips the upload entirely; edits sync via save().
+      if (!incremental) {
+        try { await withTimeout(pushLocalOnly(cloud), 20000, 'initial push'); } catch (e) { console.warn('[si-cloud]', e.message); }
+        lastSnapshot = snapshotState();
       }
-      if (typeof toast === 'function') toast('\u2601 Cloud sync: ' + _vcount + ' vehicles loaded');
+
+      // Cache merged data + advance the watermark so the next load is incremental.
+      persistLocal();
+      saveSync({ perTable: computeWatermarks(), fullAt: (incremental && sync) ? sync.fullAt : new Date().toISOString() });
+
+      const _vcount = (state.vehicles || []).length;
+      if (typeof navigate === 'function' && state.ui?.currentView) navigate(state.ui.currentView);
+      if (typeof toast === 'function') toast('\u2601 Cloud ' + (incremental ? 'updated' : 'synced') + ': ' + _vcount + ' vehicles');
       if (typeof refreshStorageInfo === 'function') refreshStorageInfo();
       if (typeof refreshBell === 'function') refreshBell();
 
-      // Start listening for changes from other devices
       subscribeAll();
-
-      // Tiny status indicator so you know it's live
-      console.log('[si-cloud] ready — multi-device sync ON');
+      console.log('[si-cloud] ready — sync ON (' + (incremental ? 'incremental' : 'full') + ')');
     } catch (e) {
+      cloudReady = false;
       console.error('[si-cloud] boot failed:', e);
       if (typeof toast === 'function') toast('Cloud sync offline — local only', 'warning');
     }
   }
+
+  // Manual full re-pull (e.g. after edits made on another device while this was closed).
+  window.siCloudRefresh = async function () {
+    if (!sb) { if (typeof toast === 'function') toast('Cloud not ready yet', 'warning'); return; }
+    try { localStorage.removeItem(SYNC_KEY); } catch (e) {}
+    if (typeof toast === 'function') toast('Refreshing from cloud\u2026');
+    try {
+      const cloud = await withTimeout(pullAll(null), 25000, 'refresh');
+      if (!cloud.__ok) { if (typeof toast === 'function') toast('Refresh failed — cloud unreachable', 'warning'); return; }
+      mergeIntoState(cloud); lastSnapshot = snapshotState();
+      persistLocal(); saveSync({ perTable: computeWatermarks(), fullAt: new Date().toISOString() });
+      if (typeof navigate === 'function' && state.ui?.currentView) navigate(state.ui.currentView);
+      if (typeof toast === 'function') toast('\u2601 Full refresh: ' + (state.vehicles || []).length + ' vehicles', 'success');
+    } catch (e) { if (typeof toast === 'function') toast('Refresh failed: ' + e.message, 'warning'); }
+  };
 
   // Run after DOM + page script have done their thing
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
