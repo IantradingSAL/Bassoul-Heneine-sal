@@ -1704,6 +1704,7 @@ let state = {
 
 function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  rebuildIndexes();
   refreshStorageInfo();
 }
 function load() {
@@ -1714,6 +1715,7 @@ function load() {
       state = { ...state, ...parsed, settings: { ...state.settings, ...(parsed.settings || {}) } };
     } catch (e) { console.warn('Failed to load state', e); }
   }
+  rebuildIndexes();
 }
 function refreshStorageInfo() {
   document.getElementById('storage-vehicles').textContent = state.vehicles.length;
@@ -1840,9 +1842,31 @@ function onDialClicked() {
   setTimeout(() => toast('Dialing — log the call notes when you\'re done', 'success'), 100);
 }
 
+// ─── LOOKUP INDEXES ──────────────────────────────────────────────────────────
+// Rebuilt cheaply (~once per render / per save). Turns repeated O(n) scans like
+// state.services.filter(...) inside per-row loops into O(1) Map lookups — the
+// difference between millions of ops and thousands on a 1,000+ vehicle dataset.
+let IDX = {};
+function rebuildIndexes() {
+  const vehicleById = new Map();
+  for (const v of (state.vehicles || [])) vehicleById.set(v.id, v);
+  const packagesByVehicle = new Map();
+  for (const p of (state.packages || [])) {
+    let a = packagesByVehicle.get(p.vehicleId); if (!a) { a = []; packagesByVehicle.set(p.vehicleId, a); } a.push(p);
+  }
+  const servicesByPackage = new Map();
+  const servicesByVehicle = new Map();
+  for (const s of (state.services || [])) {
+    let a = servicesByPackage.get(s.packageId); if (!a) { a = []; servicesByPackage.set(s.packageId, a); } a.push(s);
+    let b = servicesByVehicle.get(s.vehicleId); if (!b) { b = []; servicesByVehicle.set(s.vehicleId, b); } b.push(s);
+  }
+  IDX = { vehicleById, packagesByVehicle, servicesByPackage, servicesByVehicle };
+}
+
 function packageStats(pkg) {
-  const vehicle = state.vehicles.find(v => v.id === pkg.vehicleId);
-  const services = state.services.filter(s => s.packageId === pkg.id);
+  if (!IDX.vehicleById) rebuildIndexes();
+  const vehicle = IDX.vehicleById.get(pkg.vehicleId);
+  const services = IDX.servicesByPackage.get(pkg.id) || [];
   const today = new Date();
 
   // Time
@@ -1934,6 +1958,12 @@ function navigate(view, args) {
 }
 
 function _renderNavigate(view, args) {
+  rebuildIndexes();
+  // Preserve scroll position when re-rendering the SAME view (e.g. a background
+  // sync repaint) so the page doesn't snap back to the top mid-scroll.
+  const _sameView = !!(state.ui && state.ui.currentView === view);
+  const _prevScroll = _sameView ? (window.scrollY || window.pageYOffset || 0) : 0;
+  if (_sameView && _prevScroll) requestAnimationFrame(() => window.scrollTo(0, _prevScroll));
   state.ui.currentView = view;
   // Preserve the record id for detail views, so a re-render without args
   // (cloud sync, save, etc.) restores the same record instead of bouncing
@@ -2077,7 +2107,7 @@ function renderDashboard() {
   // Recent services
   const recent = [...state.services].sort((a,b) => new Date(b.serviceDate) - new Date(a.serviceDate)).slice(0, 6);
   document.getElementById('recent-services').innerHTML = recent.length ? recent.map(s => {
-    const v = state.vehicles.find(x => x.id === s.vehicleId);
+    const v = IDX.vehicleById.get(s.vehicleId);
     return `<div class="flex items-center justify-between py-2.5 border-b last:border-0" style="border-color: var(--border);">
       <div class="flex items-center gap-3">
         <div class="w-8 h-8 rounded-md flex items-center justify-center" style="background: var(--surface-3);"><i data-lucide="wrench" class="w-3.5 h-3.5" style="color: var(--text-2);"></i></div>
@@ -2276,7 +2306,7 @@ function renderVehicles() {
   } else {
     tbody.innerHTML = filtered.length > 150 ? `<tr class="no-hover"><td colspan="8" style="background:var(--info-soft);color:var(--text-2);font-size:12px;padding:10px 12px;">Showing first 150 of ${filtered.length.toLocaleString()} vehicles — type in the filter box above to find a specific car.</td></tr>` : '';
     tbody.innerHTML += filtered.slice(0, 150).map(v => {
-      const pkgs = state.packages.filter(p => p.vehicleId === v.id);
+      const pkgs = IDX.packagesByVehicle.get(v.id) || [];
       const activePkgs = pkgs.filter(p => ['active','expiring'].includes(packageStats(p).status)).length;
       return `<tr onclick="navigate('vehicle-detail', '${v.id}')">
         <td class="font-mono text-xs">${v.vin}</td>
@@ -2354,7 +2384,7 @@ function renderPackages() {
   const types = [...new Set(state.packages.map(p => p.packageType).filter(Boolean))];
   typeSelect.innerHTML = '<option value="">All types</option>' + types.map(t => `<option value="${t}" ${t===typeFilter?'selected':''}>${t}</option>`).join('');
 
-  const all = state.packages.map(p => ({ ...p, stats: packageStats(p), vehicle: state.vehicles.find(v => v.id === p.vehicleId) }));
+  const all = state.packages.map(p => ({ ...p, stats: packageStats(p), vehicle: IDX.vehicleById.get(p.vehicleId) }));
   const filtered = all.filter(p => {
     if (statusFilter && p.stats.status !== statusFilter) return false;
     if (typeFilter && p.packageType !== typeFilter) return false;
@@ -2603,7 +2633,7 @@ function renderServices() {
   const filtered = sorted.filter(s => {
     if (typeFilter && s.serviceType !== typeFilter) return false;
     if (!search) return true;
-    const v = state.vehicles.find(x => x.id === s.vehicleId);
+    const v = IDX.vehicleById.get(s.vehicleId);
     return [s.description, s.serviceType, s.invoiceNumber, s.technician, v?.vin, v?.plate, v?.customerName]
       .some(x => (x||'').toLowerCase().includes(search));
   });
@@ -2614,7 +2644,7 @@ function renderServices() {
   } else {
     tbody.innerHTML = filtered.length > 150 ? `<tr class="no-hover"><td colspan="8" style="background:var(--info-soft);color:var(--text-2);font-size:12px;padding:10px 12px;">Showing first 150 of ${filtered.length.toLocaleString()} services — use the filter to narrow down.</td></tr>` : '';
     tbody.innerHTML += filtered.slice(0, 150).map(s => {
-      const v = state.vehicles.find(x => x.id === s.vehicleId);
+      const v = IDX.vehicleById.get(s.vehicleId);
       return `<tr onclick="navigate('vehicle-detail', '${s.vehicleId}')">
         <td class="font-mono">${fmtDate(s.serviceDate)}</td>
         <td><div class="font-mono text-xs">${v?.vin?.slice(-7) || '—'}</div><div class="text-xs" style="color: var(--text-3);">${v?.make} ${v?.model}</div></td>
@@ -3160,7 +3190,7 @@ function renderFollowupsHistory() {
   const list = state.followUps
     .map(f => {
       const pkg = state.packages.find(p => p.id === f.packageId);
-      const v = state.vehicles.find(x => x.id === f.vehicleId);
+      const v = IDX.vehicleById.get(f.vehicleId);
       return { ...f, pkg, vehicle: v };
     })
     .filter(f => {
