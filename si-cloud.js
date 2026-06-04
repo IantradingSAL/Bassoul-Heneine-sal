@@ -412,13 +412,12 @@
       await pushLocalOnly();
       lastSnapshot = snapshotState();
 
-      // Re-render current view with merged data — always repaint after a pull,
-      // so a fresh device shows cloud rows even if change-detection is conservative.
+      // Re-render current view with merged data — repaint after a pull, but
+      // never force a different page. If no view is set yet, leave the app's
+      // own init to choose the landing page.
       const _vcount = (state.vehicles || []).length;
       if (typeof navigate === 'function' && state.ui?.currentView) {
         navigate(state.ui.currentView);
-      } else if (typeof navigate === 'function') {
-        navigate('vehicles');
       }
       if (typeof toast === 'function') toast('\u2601 Cloud sync: ' + _vcount + ' vehicles loaded');
       if (typeof refreshStorageInfo === 'function') refreshStorageInfo();
