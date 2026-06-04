@@ -205,7 +205,7 @@
   // After the first full pull we store the newest created_at per table; later
   // loads fetch only rows newer than that, instead of re-downloading everything.
   const SYNC_KEY = 'si_sync_v1';
-  const STALE_MS = 6 * 60 * 60 * 1000;                       // force a full pull every 6h
+  const STALE_MS = 24 * 60 * 60 * 1000;                      // force a full pull at most once a day
   const TS_KEYS = ['vehicles', 'packages', 'services', 'followUps']; // tables that have created_at
 
   function loadSync() { try { return JSON.parse(localStorage.getItem(SYNC_KEY)) || null; } catch (e) { return null; } }
@@ -224,18 +224,32 @@
   // Pull one table (paginated). With `since`, only fetch rows created after it.
   async function pullTable(k, since) {
     const m = M[k];
-    let all = [], from = 0, page = 1000;
-    for (;;) {
-      let q = sb.from(m.table).select('*').range(from, from + page - 1);
+    const page = 1000;
+    const fetchRange = async (fromIdx) => {
+      let q = sb.from(m.table).select('*').range(fromIdx, fromIdx + page - 1);
       if (since && k !== 'emailReminders') q = q.gt('created_at', since);
       const { data, error } = await q;
-      if (error) { console.warn(`[si-cloud] pull ${m.table} failed:`, error.message); return { k, rows: null, error }; }
-      all = all.concat(data || []);
-      if (!data || data.length < page) break;
-      from += page;
+      if (error) throw error;
+      return data || [];
+    };
+    try {
+      let all = await fetchRange(0);
+      // If the first page is full there are more rows — fetch the next pages in
+      // PARALLEL batches (was one-after-another, the main first-load latency).
+      let next = 1;
+      while (all.length === next * page) {
+        const batch = await Promise.all([next, next + 1, next + 2].map(i => fetchRange(i * page)));
+        let added = 0;
+        for (const c of batch) { all = all.concat(c); added += c.length; }
+        if (added < 3 * page) break;   // a non-full batch means we've reached the end
+        next += 3;
+      }
+      console.log(`[si-cloud] pulled ${all.length} from ${m.table}${since ? ' (incremental)' : ''}`);
+      return { k, rows: all.map(m.fromDb) };
+    } catch (error) {
+      console.warn(`[si-cloud] pull ${m.table} failed:`, error.message);
+      return { k, rows: null, error };
     }
-    console.log(`[si-cloud] pulled ${all.length} from ${m.table}${since ? ' (incremental)' : ''}`);
-    return { k, rows: all.map(m.fromDb) };
   }
 
   // All 6 tables + settings IN PARALLEL (was strictly sequential — the main
