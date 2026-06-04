@@ -39,7 +39,7 @@ document.getElementById('go').onclick=async()=>{
   var B=200, done=0, total=ROWS.length;
   for(var i=0;i<total;i+=B){
     var batch=ROWS.slice(i,i+B);
-    var r=await sb.from('si_vehicles').upsert(batch,{onConflict:'id'});
+    var r=await sb.from('si_vehicles').upsert(batch,{onConflict:'vin'});
     if(r.error){throw new Error('Insert failed: '+r.error.message+(r.error.code?(' [code '+r.error.code+']'):'')+
       (String(r.error.message).match(/policy|denied|row-level/i)?' — run si_vehicles_schema_only.sql first (anon policy missing).':''));}
     done+=batch.length;
