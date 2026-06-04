@@ -1476,6 +1476,33 @@
         <input class="input font-mono" type="number" min="15" max="365" id="setting-call-advance" />
         <div class="text-xs mt-1" style="color: var(--text-3);">Show packages in "Action needed" when they have this many days left (or any axis at warning threshold).</div>
       </div>
+      <div class="divider"></div>
+      <div>
+        <div class="label" style="font-size: 12px;">🔔 Follow-up rules</div>
+        <div class="text-xs mb-3" style="color: var(--text-3);">Controls which packages appear under Follow-ups → Action needed.</div>
+      </div>
+      <div>
+        <label class="label">Show packages expiring within (days)</label>
+        <input class="input font-mono" type="number" min="1" max="365" id="setting-fu-window" />
+        <div class="text-xs mt-1" style="color: var(--text-3);">e.g. 30 = only contracts expiring in the next month.</div>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="setting-fu-show-expired" />
+        <label class="label" for="setting-fu-show-expired" style="margin:0;">Also show packages already expired by date</label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="setting-fu-show-exhausted" />
+        <label class="label" for="setting-fu-show-exhausted" style="margin:0;">Also show packages exhausted by mileage / amount</label>
+      </div>
+      <div>
+        <label class="label">Exclude package types from follow-up</label>
+        <input class="input" id="setting-fu-exclude" placeholder="warranty, QBE" />
+        <div class="text-xs mt-1" style="color: var(--text-3);">Comma-separated. Any package whose type contains these words is hidden (e.g. warranty packages).</div>
+      </div>
+      <div>
+        <button class="btn btn-ghost" type="button" onclick="fuClearOverrides()"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>Clear all snoozed / stopped</button>
+        <div class="text-xs mt-1" id="setting-fu-override-count" style="color: var(--text-3);"></div>
+      </div>
       <div>
         <label class="label">Agents (comma-separated)</label>
         <input class="input" id="setting-agents" placeholder="Imad, Sales Rep 1, Sales Rep 2" />
@@ -1636,6 +1663,7 @@ let state = {
     defaultCountryCode: '961',
     dialScheme: 'tel',
     dialTemplate: 'tel:{number}',
+    followup: { windowDays: 30, showExpiredDate: false, showExhausted: false, excludeTypes: [], overrides: {} },
   },
   ui: { currentView: 'dashboard', revenueRange: 6, lookupRecent: [], packagesView: 'cards', followupsTab: 'action', topModelsMetric: 'invoiced' }
 };
@@ -2770,37 +2798,114 @@ function packageFollowUpState(pkg, stats) {
   return 'not_eligible';
 }
 
+function followupCfg() {
+  const c = (state.settings && state.settings.followup) || {};
+  return {
+    windowDays: c.windowDays != null ? c.windowDays : (state.settings.callAdvanceDays || 60),
+    showExpiredDate: !!c.showExpiredDate,
+    showExhausted: !!c.showExhausted,
+    excludeTypes: c.excludeTypes || [],
+    overrides: c.overrides || {},
+  };
+}
+function isFollowUpSuppressed(pkg, stats) {
+  const c = followupCfg();
+  const ov = c.overrides[pkg.id];
+  if (ov) {
+    if (ov.stopped) return true;
+    if (ov.snoozeUntil && ov.snoozeUntil >= todayISO()) return true;
+  }
+  const t = (pkg.packageType || '').toLowerCase();
+  if (c.excludeTypes.some(x => x && t.includes(String(x).toLowerCase()))) return true;
+  if (stats.status === 'expired' && !c.showExpiredDate) return true;
+  if (stats.status === 'exhausted' && !c.showExhausted) return true;
+  return false;
+}
 function isPackageEligibleForFollowUp(pkg, stats) {
-  // Expired/exhausted packages: only show until resolved
+  const c = followupCfg();
   if (['expired','exhausted'].includes(stats.status)) return true;
-  if (stats.remainingDays <= state.settings.callAdvanceDays) return true;
+  if (stats.remainingDays <= c.windowDays) return true;
   if (stats.mileagePct >= state.settings.warning) return true;
   if (stats.moneyPct >= state.settings.warning) return true;
   return false;
 }
 
 function getActionablePackages() {
-  // Returns packages whose follow-up state is 'needs_first_contact', 'in_progress', or 'overdue'
-  return state.packages.map(p => {
+  const c = followupCfg();
+  const vById = new Map(state.vehicles.map(v => [v.id, v]));
+  const today = todayISO();
+  const now = new Date();
+  const out = [];
+  for (const p of state.packages) {
+    const ov = c.overrides[p.id];
+    if (ov && (ov.stopped || (ov.snoozeUntil && ov.snoozeUntil >= today))) continue;
+    const t = (p.packageType || '').toLowerCase();
+    if (c.excludeTypes.some(x => x && t.includes(String(x).toLowerCase()))) continue;
+    if (!c.showExpiredDate && p.endDate && new Date(p.endDate) < now) continue;
+    const vehicle = vById.get(p.vehicleId);
+    if (!vehicle) continue;
     const stats = packageStats(p);
-    const vehicle = state.vehicles.find(v => v.id === p.vehicleId);
+    if (isFollowUpSuppressed(p, stats)) continue;
     const fuState = packageFollowUpState(p, stats);
-    const latest = latestFollowUp(p.id);
-    return { ...p, stats, vehicle, fuState, latest };
-  }).filter(p => ['needs_first_contact','in_progress','overdue'].includes(p.fuState));
+    if (!['needs_first_contact','in_progress','overdue'].includes(fuState)) continue;
+    out.push({ ...p, stats, vehicle, fuState, latest: latestFollowUp(p.id) });
+  }
+  return out;
 }
 
 function getScheduledPackages() {
-  return state.packages.map(p => {
-    const stats = packageStats(p);
-    const vehicle = state.vehicles.find(v => v.id === p.vehicleId);
+  const vById = new Map(state.vehicles.map(v => [v.id, v]));
+  const out = [];
+  for (const p of state.packages) {
     const latest = latestFollowUp(p.id);
-    return { ...p, stats, vehicle, latest };
-  }).filter(p => {
-    if (!p.latest || !p.latest.nextFollowUpDate) return false;
-    if (['renewed','declined','wrong_number'].includes(p.latest.outcome)) return false;
-    return p.latest.nextFollowUpDate >= todayISO();
-  }).sort((a,b) => a.latest.nextFollowUpDate.localeCompare(b.latest.nextFollowUpDate));
+    if (!latest || !latest.nextFollowUpDate) continue;
+    if (['renewed','declined','wrong_number'].includes(latest.outcome)) continue;
+    if (latest.nextFollowUpDate < todayISO()) continue;
+    const vehicle = vById.get(p.vehicleId);
+    if (!vehicle) continue;
+    const stats = packageStats(p);
+    if (isFollowUpSuppressed(p, stats)) continue;
+    out.push({ ...p, stats, vehicle, latest });
+  }
+  return out.sort((a,b) => a.latest.nextFollowUpDate.localeCompare(b.latest.nextFollowUpDate));
+}
+
+function ensureFuCfg() {
+  if (!state.settings.followup) state.settings.followup = { windowDays:30, showExpiredDate:false, showExhausted:false, excludeTypes:[], overrides:{} };
+  if (!state.settings.followup.overrides) state.settings.followup.overrides = {};
+  return state.settings.followup;
+}
+function fuSnooze(pkgId) {
+  const d = new Date(); d.setMonth(d.getMonth()+1);
+  const def = d.toISOString().slice(0,10);
+  const val = prompt('Stop following up on this package until (YYYY-MM-DD):', def);
+  if (!val) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(val.trim())) { toast('Please use date format YYYY-MM-DD'); return; }
+  const fu = ensureFuCfg();
+  fu.overrides[pkgId] = { ...(fu.overrides[pkgId]||{}), snoozeUntil: val.trim(), stopped: false };
+  save(); refreshBell(); navigate('followups');
+  toast('Follow-up snoozed until ' + val.trim());
+}
+function fuStop(pkgId) {
+  const fu = ensureFuCfg();
+  fu.overrides[pkgId] = { ...(fu.overrides[pkgId]||{}), stopped: true, snoozeUntil: null };
+  save(); refreshBell(); navigate('followups');
+  toast('Follow-up stopped for this package');
+}
+function fuResume(pkgId) {
+  const fu = ensureFuCfg();
+  delete fu.overrides[pkgId];
+  save(); refreshBell(); navigate(state.ui.currentView);
+  toast('Follow-up resumed');
+}
+function fuClearOverrides() {
+  const fu = ensureFuCfg();
+  fu.overrides = {};
+  save(); refreshBell();
+  const ocEl = document.getElementById('setting-fu-override-count');
+  if (ocEl) ocEl.textContent = 'No packages snoozed or stopped.';
+  navigate(state.ui.currentView);
+  toast('Cleared all snoozed / stopped follow-ups');
 }
 
 function urgencyScore(p) {
@@ -2895,7 +3000,11 @@ function renderFollowups() {
         </td>
         <td>${lastContactText}</td>
         <td>
-          <button class="btn btn-call" onclick="event.stopPropagation(); openCallModal('${p.id}')"><i data-lucide="phone-call" class="w-3.5 h-3.5"></i>Call</button>
+          <div class="flex gap-1 items-center" style="flex-wrap:wrap;">
+            <button class="btn btn-call" onclick="event.stopPropagation(); openCallModal('${p.id}')"><i data-lucide="phone-call" class="w-3.5 h-3.5"></i>Call</button>
+            <button class="btn btn-ghost" title="Snooze follow-up until a date" onclick="event.stopPropagation(); fuSnooze('${p.id}')"><i data-lucide="alarm-clock" class="w-3.5 h-3.5"></i></button>
+            <button class="btn btn-ghost" title="Stop follow-up for this package" onclick="event.stopPropagation(); fuStop('${p.id}')"><i data-lucide="bell-off" class="w-3.5 h-3.5"></i></button>
+          </div>
         </td>
       </tr>`;
     }).join('');
@@ -4038,6 +4147,14 @@ function openSettings() {
   document.getElementById('setting-country-code').value = state.settings.defaultCountryCode || '961';
   document.getElementById('setting-dial-scheme').value = state.settings.dialScheme || 'tel';
   document.getElementById('setting-dial-template').value = state.settings.dialTemplate || 'tel:{number}';
+  const fu = state.settings.followup || {};
+  document.getElementById('setting-fu-window').value = fu.windowDays != null ? fu.windowDays : 30;
+  document.getElementById('setting-fu-show-expired').checked = !!fu.showExpiredDate;
+  document.getElementById('setting-fu-show-exhausted').checked = !!fu.showExhausted;
+  document.getElementById('setting-fu-exclude').value = (fu.excludeTypes || []).join(', ');
+  const ovc = Object.keys(fu.overrides || {}).length;
+  const ocEl = document.getElementById('setting-fu-override-count');
+  if (ocEl) ocEl.textContent = ovc ? (ovc + ' package(s) currently snoozed or stopped.') : 'No packages snoozed or stopped.';
   onDialSchemeChange();
   openModal('modal-settings');
 }
@@ -4060,6 +4177,12 @@ function saveSettings() {
   state.settings.defaultCountryCode = (document.getElementById('setting-country-code').value || '961').replace(/\D/g, '') || '961';
   state.settings.dialScheme = document.getElementById('setting-dial-scheme').value || 'tel';
   state.settings.dialTemplate = document.getElementById('setting-dial-template').value.trim() || 'tel:{number}';
+  const fu = state.settings.followup || (state.settings.followup = {});
+  fu.windowDays = parseInt(document.getElementById('setting-fu-window').value) || 30;
+  fu.showExpiredDate = document.getElementById('setting-fu-show-expired').checked;
+  fu.showExhausted = document.getElementById('setting-fu-show-exhausted').checked;
+  fu.excludeTypes = document.getElementById('setting-fu-exclude').value.split(',').map(s => s.trim()).filter(Boolean);
+  if (!fu.overrides) fu.overrides = {};
   document.getElementById('currency-prefix').textContent = CURRENCY_SYMBOLS[state.settings.currency];
   populateDatalists();
   refreshBranding();
