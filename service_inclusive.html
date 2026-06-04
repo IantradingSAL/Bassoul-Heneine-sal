@@ -253,6 +253,8 @@
   }
   .font-display { font-family: 'Fraunces', serif; font-weight: 500; letter-spacing: -0.015em; font-variation-settings: "opsz" 96; }
   .font-mono { font-family: 'JetBrains Mono', monospace; }
+  /* Clean tabular number style for KPI stat values (overrides the Fraunces serif) */
+  .stat-num { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important; font-weight: 700; letter-spacing: -0.02em; font-variation-settings: normal; font-feature-settings: 'tnum' 1; }
   .text-grad {
     background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
     -webkit-background-clip: text;
@@ -2004,7 +2006,7 @@ function renderDashboard() {
         </div>
       </div>
       <div class="text-[11px] uppercase tracking-widest" style="color: var(--text-3);">${label}</div>
-      <div class="font-display text-3xl mt-1">${value}</div>
+      <div class="font-display stat-num text-3xl mt-1">${value}</div>
       <div class="text-xs mt-1" style="color: var(--text-2);">${sub}</div>
     </div>`;
 
@@ -3039,7 +3041,7 @@ function renderFollowups() {
         </div>
       </div>
       <div class="text-[11px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">${label}</div>
-      <div class="font-display text-3xl mt-1">${value}</div>
+      <div class="font-display stat-num text-3xl mt-1">${value}</div>
       <div class="text-xs mt-1" style="color: var(--text-2);">${sub}</div>
     </div>`;
 
@@ -3524,6 +3526,18 @@ function buildEmailContent(pkg, vehicle, stageKey) {
   const kmPill = pillColor(stats.mileagePct);
   const moneyPill = pillColor(stats.moneyPct);
 
+  // ─── "Add to calendar" links (email clients run no JS, so these are plain links) ──
+  const _exp = pkg.endDate || '';
+  const _calStart = _exp.replace(/-/g, '');
+  const _endD = new Date(_exp); _endD.setDate(_endD.getDate() + 1);
+  const _calEnd = !isNaN(_endD) ? _endD.toISOString().slice(0, 10).replace(/-/g, '') : _calStart;
+  const _calTitle = `Service package renewal — ${vehicleInfo}${company ? ' (' + company + ')' : ''}`;
+  const _calDetails = `Your ${pkg.packageType} service package for ${vehicleInfo} (plate ${plate}, VIN ${vin}) expires on ${fmtDate(pkg.endDate)}. Contact ${company}${phone ? ' at ' + phone : ''} to renew before it expires.`;
+  const _gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(_calTitle)}&dates=${_calStart}/${_calEnd}&details=${encodeURIComponent(_calDetails)}${company ? '&location=' + encodeURIComponent(company) : ''}`;
+  const _outlook = `https://outlook.office.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(_calTitle)}&body=${encodeURIComponent(_calDetails)}&startdt=${_exp}&enddt=${_exp}&allday=true`;
+  const _gcalHtml = _gcal.replace(/&/g, '&amp;');
+  const _outlookHtml = _outlook.replace(/&/g, '&amp;');
+
   // ─── HTML version (rich, branded, mobile-responsive) ──────────────
   const htmlContent = `<!DOCTYPE html>
 <html lang="en">
@@ -3582,7 +3596,6 @@ function buildEmailContent(pkg, vehicle, stageKey) {
             <tr><td style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">Start date</td><td style="color:#0F172A;font-size:13px;font-family:'Courier New',Consolas,monospace;padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;">${escHtml(fmtDate(pkg.startDate))}</td></tr>
             <tr><td style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">Expiration date</td><td style="color:#DC2626;font-size:13px;font-weight:700;font-family:'Courier New',Consolas,monospace;padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;">${escHtml(fmtDate(pkg.endDate))}</td></tr>
             <tr><td style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">Mileage coverage</td><td style="color:#0F172A;font-size:13px;font-family:'Courier New',Consolas,monospace;padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;">${escHtml(fmtKm(pkg.startMileage))} → ${escHtml(fmtKm(pkg.mileageCap))}</td></tr>
-            <tr><td style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">Invoiced amount</td><td style="color:#0F172A;font-size:13px;font-weight:600;font-family:'Courier New',Consolas,monospace;padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;">${escHtml(fmtMoneyFull(pkg.invoicedAmount))}</td></tr>
           </table>
         </td></tr>
       </table>
@@ -3593,7 +3606,7 @@ function buildEmailContent(pkg, vehicle, stageKey) {
     <tr><td style="padding:0 32px 16px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td width="33%" style="padding-right:4px;vertical-align:top;">
+          <td width="50%" style="padding-right:4px;vertical-align:top;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${timePill.bg};border:1px solid ${timePill.border};border-radius:10px;">
               <tr><td align="center" style="padding:14px 8px;">
                 <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:${timePill.text};font-weight:700;">⏰ Time</div>
@@ -3602,21 +3615,12 @@ function buildEmailContent(pkg, vehicle, stageKey) {
               </td></tr>
             </table>
           </td>
-          <td width="33%" style="padding:0 2px;vertical-align:top;">
+          <td width="50%" style="padding-left:4px;vertical-align:top;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${kmPill.bg};border:1px solid ${kmPill.border};border-radius:10px;">
               <tr><td align="center" style="padding:14px 8px;">
                 <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:${kmPill.text};font-weight:700;">🚗 Mileage</div>
                 <div style="font-size:18px;font-weight:700;color:${kmPill.text};font-family:'Courier New',Consolas,monospace;padding-top:4px;">${stats.remainingKm.toLocaleString()}</div>
                 <div style="font-size:10px;color:${kmPill.text};opacity:0.8;padding-top:2px;">km left</div>
-              </td></tr>
-            </table>
-          </td>
-          <td width="33%" style="padding-left:4px;vertical-align:top;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${moneyPill.bg};border:1px solid ${moneyPill.border};border-radius:10px;">
-              <tr><td align="center" style="padding:14px 8px;">
-                <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:${moneyPill.text};font-weight:700;">💰 Amount</div>
-                <div style="font-size:18px;font-weight:700;color:${moneyPill.text};font-family:'Courier New',Consolas,monospace;padding-top:4px;">${escHtml(fmtMoney(stats.remaining))}</div>
-                <div style="font-size:10px;color:${moneyPill.text};opacity:0.8;padding-top:2px;">remaining</div>
               </td></tr>
             </table>
           </td>
@@ -3637,6 +3641,16 @@ function buildEmailContent(pkg, vehicle, stageKey) {
         </td>
       </tr></table>
     </td></tr>` : ''}
+
+    <!-- Add to calendar CTA -->
+    <tr><td align="center" style="padding:4px 32px 8px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="background:#0EA5E9;border-radius:10px;box-shadow:0 2px 6px rgba(14,165,233,0.25);">
+          <a href="${_gcalHtml}" style="display:inline-block;padding:11px 26px;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:14px;letter-spacing:0.01em;">📅 Add a reminder to my calendar</a>
+        </td>
+      </tr></table>
+      <div style="font-size:11px;color:#94A3B8;padding-top:8px;">Opens in Google Calendar · or <a href="${_outlookHtml}" style="color:#2563EB;text-decoration:none;">add to Outlook</a></div>
+    </td></tr>
 
     <!-- Signature -->
     <tr><td style="padding:16px 32px 24px;font-size:14px;color:#475569;line-height:1.6;border-top:1px solid #E2E8F0;margin-top:8px;">
@@ -3680,14 +3694,16 @@ PACKAGE COVERAGE
 - Start date: ${fmtDate(pkg.startDate)}
 - Expiration date: ${fmtDate(pkg.endDate)}
 - Mileage range: ${fmtKm(pkg.startMileage)} → ${fmtKm(pkg.mileageCap)}
-- Invoiced amount: ${fmtMoneyFull(pkg.invoicedAmount)}
 
 REMAINING COVERAGE
 - Time: ${stats.remainingDays} day${stats.remainingDays === 1 ? '' : 's'} left
 - Mileage: ${fmtKm(stats.remainingKm)} left
-- Amount: ${fmtMoney(stats.remaining)} remaining
 
 We invite you to contact us to discuss renewal options and ensure uninterrupted coverage for your vehicle. Renewing before expiration helps maintain continuous protection and may qualify you for loyalty benefits.
+
+ADD A REMINDER TO YOUR CALENDAR
+- Google Calendar: ${_gcal}
+- Outlook: ${_outlook}
 
 Please do not hesitate to reach out at your earliest convenience.
 
@@ -3848,7 +3864,7 @@ function renderEmailReminders() {
         <span class="badge badge-${meta.urgency === 'info' ? 'info' : meta.urgency === 'warning' ? 'warning' : 'danger'}">${meta.label}</span>
       </div>
       <div class="text-[11px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">${meta.description}</div>
-      <div class="font-display text-3xl mt-1">${count}</div>
+      <div class="font-display stat-num text-3xl mt-1">${count}</div>
       <div class="text-xs mt-1" style="color: var(--text-2);">${count === 0 ? 'No pending emails' : `${count} customer${count===1?'':'s'} to email`}</div>
     </div>`;
   };
@@ -4020,11 +4036,11 @@ function vehicleDetailHTML(v, embedded) {
       </div>
 
       <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
-        <div><div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">Invoiced</div><div class="font-display text-2xl mt-1">${fmtMoney(totalInvoiced)}</div></div>
-        <div><div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">Consumed</div><div class="font-display text-2xl mt-1">${fmtMoney(totalConsumed)}</div></div>
-        <div><div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">Remaining</div><div class="font-display text-2xl mt-1" style="color: var(--accent);">${fmtMoney(totalRemaining)}</div></div>
-        <div><div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">Overall % used</div><div class="font-display text-2xl mt-1" style="color: ${colorForPct(overallPct)};">${overallPct.toFixed(1)}%</div></div>
-        <div><div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">Calls logged</div><div class="font-display text-2xl mt-1">${followUps.length}</div></div>
+        <div><div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">Invoiced</div><div class="font-display stat-num text-2xl mt-1">${fmtMoney(totalInvoiced)}</div></div>
+        <div><div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">Consumed</div><div class="font-display stat-num text-2xl mt-1">${fmtMoney(totalConsumed)}</div></div>
+        <div><div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">Remaining</div><div class="font-display stat-num text-2xl mt-1" style="color: var(--accent);">${fmtMoney(totalRemaining)}</div></div>
+        <div><div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">Overall % used</div><div class="font-display stat-num text-2xl mt-1" style="color: ${colorForPct(overallPct)};">${overallPct.toFixed(1)}%</div></div>
+        <div><div class="text-[10px] uppercase tracking-widest font-semibold" style="color: var(--text-3);">Calls logged</div><div class="font-display stat-num text-2xl mt-1">${followUps.length}</div></div>
       </div>
     </div>
 
