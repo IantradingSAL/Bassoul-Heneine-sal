@@ -690,8 +690,8 @@
     </div>
     <div class="flex items-center gap-3">
       <div class="relative">
-        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style="color: var(--text-3);"></i>
-        <input id="topbar-search" class="input pl-9 font-mono text-xs" placeholder="Search VIN, plate, customer..." style="width: 320px;" />
+        <i data-lucide="search" class="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--text-3);"></i>
+        <input id="topbar-search" class="input pr-9 font-mono text-xs" placeholder="Search VIN, plate, customer..." style="width: 320px;" />
         <div id="search-results" class="absolute top-full mt-2 left-0 right-0 card p-2 max-h-80 overflow-y-auto scroll-area hidden" style="z-index: 30;"></div>
       </div>
       <div class="relative">
@@ -2945,6 +2945,7 @@ function isFollowUpSuppressed(pkg, stats) {
   if (ov) {
     if (ov.stopped) return true;
     if (ov.snoozeUntil && ov.snoozeUntil >= todayISO()) return true;
+    if (ov.pinned) return false;
   }
   const t = (pkg.packageType || '').toLowerCase();
   if (c.excludeTypes.some(x => x && t.includes(String(x).toLowerCase()))) return true;
@@ -2954,6 +2955,8 @@ function isFollowUpSuppressed(pkg, stats) {
 }
 function isPackageEligibleForFollowUp(pkg, stats) {
   const c = followupCfg();
+  const ovEl = c.overrides[pkg.id];
+  if (ovEl && ovEl.pinned) return true;
   if (['expired','exhausted'].includes(stats.status)) return true;
   if (stats.remainingDays <= c.windowDays) return true;
   if (stats.mileagePct >= state.settings.warning) return true;
@@ -2969,10 +2972,14 @@ function getActionablePackages() {
   const out = [];
   for (const p of state.packages) {
     const ov = c.overrides[p.id];
-    if (ov && (ov.stopped || (ov.snoozeUntil && ov.snoozeUntil >= today))) continue;
-    const t = (p.packageType || '').toLowerCase();
-    if (c.excludeTypes.some(x => x && t.includes(String(x).toLowerCase()))) continue;
-    if (!c.showExpiredDate && p.endDate && new Date(p.endDate) < now) continue;
+    if (ov && ov.stopped) continue;
+    if (ov && ov.snoozeUntil && ov.snoozeUntil >= today) continue;
+    const pinned = !!(ov && ov.pinned);
+    if (!pinned) {
+      const t = (p.packageType || '').toLowerCase();
+      if (c.excludeTypes.some(x => x && t.includes(String(x).toLowerCase()))) continue;
+      if (!c.showExpiredDate && p.endDate && new Date(p.endDate) < now) continue;
+    }
     const vehicle = vById.get(p.vehicleId);
     if (!vehicle) continue;
     const stats = packageStats(p);
@@ -3028,6 +3035,29 @@ function fuResume(pkgId) {
   delete fu.overrides[pkgId];
   save(); refreshBell(); navigate(state.ui.currentView);
   toast('Follow-up resumed');
+}
+function isPinnedFollowUp(pkgId) {
+  const ov = ((state.settings && state.settings.followup && state.settings.followup.overrides) || {})[pkgId];
+  return !!(ov && ov.pinned);
+}
+function fuPin(pkgId) {
+  const fu = ensureFuCfg();
+  fu.overrides[pkgId] = { ...(fu.overrides[pkgId] || {}), pinned: true, stopped: false, snoozeUntil: null };
+  save(); refreshBell(); navigate(state.ui.currentView);
+  toast('Added to follow-up cycle');
+}
+function fuUnpin(pkgId) {
+  const fu = ensureFuCfg();
+  const ov = fu.overrides[pkgId];
+  if (ov) {
+    delete ov.pinned;
+    if (!ov.stopped && !ov.snoozeUntil) delete fu.overrides[pkgId];
+  }
+  save(); refreshBell(); navigate(state.ui.currentView);
+  toast('Removed from manual follow-up');
+}
+function fuToggle(pkgId) {
+  if (isPinnedFollowUp(pkgId)) fuUnpin(pkgId); else fuPin(pkgId);
 }
 function fuClearOverrides() {
   const fu = ensureFuCfg();
@@ -4207,6 +4237,7 @@ function vehicleDetailHTML(v, embedded) {
             <div class="flex gap-2 mt-3 flex-wrap">
               <button class="btn btn-ghost flex-1" onclick="openServiceModal(null, '${v.id}', '${p.id}')"><i data-lucide="wrench" class="w-3.5 h-3.5"></i>Log service</button>
               <button class="btn btn-call" onclick="openCallModal('${p.id}')"><i data-lucide="phone-call" class="w-3.5 h-3.5"></i>Call</button>
+              <button class="btn ${isPinnedFollowUp(p.id) ? 'btn-primary' : 'btn-ghost'}" title="${isPinnedFollowUp(p.id) ? 'In the follow-up cycle — click to remove' : 'Add this package to the follow-up cycle now, regardless of time left'}" onclick="event.stopPropagation(); fuToggle('${p.id}')"><i data-lucide="${isPinnedFollowUp(p.id) ? 'bell-ring' : 'bell-plus'}" class="w-3.5 h-3.5"></i>${isPinnedFollowUp(p.id) ? 'In follow-up' : 'Follow-up'}</button>
               <button class="btn btn-ghost" onclick="openPackageModal('${p.id}')"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
               <button class="btn btn-danger-ghost" onclick="deletePackage('${p.id}')"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
             </div>
