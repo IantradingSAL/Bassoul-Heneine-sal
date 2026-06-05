@@ -189,6 +189,8 @@
   .right-0 { right: 0; }
   .left-0 { left: 0; }
   .left-3 { left: 0.75rem; }
+  .right-3 { right: 0.75rem; }
+  .pr-9 { padding-right: 2.25rem; }
   .-translate-y-1\/2 { transform: translateY(-50%); }
   .z-20 { z-index: 20; }
 
@@ -691,7 +693,7 @@
     <div class="flex items-center gap-3">
       <div class="relative">
         <i data-lucide="search" class="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--text-3);"></i>
-        <input id="topbar-search" class="input pr-9 font-mono text-xs" placeholder="Search VIN, plate, customer..." style="width: 320px;" />
+        <input id="topbar-search" class="input pr-9 font-mono text-xs" placeholder="Search VIN, plate, customer..." style="width: 320px; padding-right: 2.75rem;" />
         <div id="search-results" class="absolute top-full mt-2 left-0 right-0 card p-2 max-h-80 overflow-y-auto scroll-area hidden" style="z-index: 30;"></div>
       </div>
       <div class="relative">
@@ -936,7 +938,7 @@
         <div class="flex items-center gap-2 mb-3 flex-wrap">
           <div class="relative" style="flex: 1 1 280px; max-width: 360px;">
             <i data-lucide="search" class="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--text-3);"></i>
-            <input id="fu-action-search" class="input pr-9" placeholder="Filter by customer, VIN, plate, model, package..." style="width: 100%;" />
+            <input id="fu-action-search" class="input pr-9" placeholder="Filter by customer, VIN, plate, model, package..." style="width: 100%; padding-right: 2.75rem;" />
           </div>
           <select id="fu-action-sort" class="input" style="width: auto;">
             <option value="urgency">Sort: Urgency (default)</option>
