@@ -189,8 +189,6 @@
   .right-0 { right: 0; }
   .left-0 { left: 0; }
   .left-3 { left: 0.75rem; }
-  .right-3 { right: 0.75rem; }
-  .pr-9 { padding-right: 2.25rem; }
   .-translate-y-1\/2 { transform: translateY(-50%); }
   .z-20 { z-index: 20; }
 
@@ -692,8 +690,8 @@
     </div>
     <div class="flex items-center gap-3">
       <div class="relative">
-        <i data-lucide="search" class="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--text-3);"></i>
-        <input id="topbar-search" class="input pr-9 font-mono text-xs" placeholder="Search VIN, plate, customer..." style="width: 320px; padding-right: 2.75rem;" />
+        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style="color: var(--text-3);"></i>
+        <input id="topbar-search" class="input pl-9 font-mono text-xs" placeholder="Search VIN, plate, customer..." style="width: 320px;" />
         <div id="search-results" class="absolute top-full mt-2 left-0 right-0 card p-2 max-h-80 overflow-y-auto scroll-area hidden" style="z-index: 30;"></div>
       </div>
       <div class="relative">
@@ -935,28 +933,6 @@
 
       <!-- Action needed -->
       <div id="fu-tab-action" class="fu-tab">
-        <div class="flex items-center gap-2 mb-3 flex-wrap">
-          <div class="relative" style="flex: 1 1 280px; max-width: 360px;">
-            <i data-lucide="search" class="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--text-3);"></i>
-            <input id="fu-action-search" class="input pr-9" placeholder="Filter by customer, VIN, plate, model, package..." style="width: 100%; padding-right: 2.75rem;" />
-          </div>
-          <select id="fu-action-sort" class="input" style="width: auto;">
-            <option value="urgency">Sort: Urgency (default)</option>
-            <option value="customer-asc">Customer A → Z</option>
-            <option value="customer-desc">Customer Z → A</option>
-            <option value="vehicle-asc">Vehicle A → Z</option>
-            <option value="package-asc">Package A → Z</option>
-            <option value="days-asc">Days left — soonest first</option>
-            <option value="days-desc">Days left — latest first</option>
-          </select>
-          <select id="fu-action-state-filter" class="input" style="width: auto;">
-            <option value="">All states</option>
-            <option value="needs_first_contact">Never contacted</option>
-            <option value="overdue">Callback overdue</option>
-            <option value="in_progress">In progress</option>
-            <option value="pinned">Manually added</option>
-          </select>
-        </div>
         <div class="card overflow-hidden">
           <div class="overflow-x-auto scroll-area">
             <table>
@@ -1434,6 +1410,14 @@ No Brevo yet? Click <b>Copy rendered email</b>, then <b>Open in mail client</b>,
           <label class="card p-3 cursor-pointer card-hover" data-status="sms_sent">
             <input type="radio" name="call-status" value="sms_sent" class="sr-only" />
             <div class="flex items-center gap-2"><i data-lucide="message-square" class="w-4 h-4" style="color: var(--info);"></i><span class="text-sm font-medium">SMS sent</span></div>
+          </label>
+          <label class="card p-3 cursor-pointer card-hover" data-status="whatsapp_call">
+            <input type="radio" name="call-status" value="whatsapp_call" class="sr-only" />
+            <div class="flex items-center gap-2"><i data-lucide="phone-call" class="w-4 h-4" style="color: #25D366;"></i><span class="text-sm font-medium">WhatsApp call</span></div>
+          </label>
+          <label class="card p-3 cursor-pointer card-hover" data-status="whatsapp_message">
+            <input type="radio" name="call-status" value="whatsapp_message" class="sr-only" />
+            <div class="flex items-center gap-2"><i data-lucide="message-circle" class="w-4 h-4" style="color: #25D366;"></i><span class="text-sm font-medium">WhatsApp message</span></div>
           </label>
         </div>
       </div>
@@ -1988,6 +1972,9 @@ function _renderNavigate(view, args) {
   const _sameView = !!(state.ui && state.ui.currentView === view);
   const _prevScroll = _sameView ? (window.scrollY || window.pageYOffset || 0) : 0;
   if (_sameView && _prevScroll) requestAnimationFrame(() => window.scrollTo(0, _prevScroll));
+  if (view === 'vehicle-detail' && state.ui.currentView && state.ui.currentView !== 'vehicle-detail') {
+    state.ui.detailFrom = state.ui.currentView;   // so the Back button returns here
+  }
   state.ui.currentView = view;
   // Preserve the record id for detail views, so a re-render without args
   // (cloud sync, save, etc.) restores the same record instead of bouncing
@@ -2903,6 +2890,8 @@ const CALL_STATUS_META = {
   no_answer:          { label: 'No answer',           icon: 'phone-off',      color: 'warning' },
   email_sent:         { label: 'Email sent',          icon: 'mail',           color: 'info' },
   sms_sent:           { label: 'SMS sent',            icon: 'message-square', color: 'info' },
+  whatsapp_call:      { label: 'WhatsApp call',       icon: 'phone-call',     color: 'success' },
+  whatsapp_message:   { label: 'WhatsApp message',    icon: 'message-circle', color: 'success' },
   callback_scheduled: { label: 'Callback scheduled',  icon: 'calendar-clock', color: 'info' },
   renewed:            { label: 'Renewed',             icon: 'check-circle-2', color: 'success' },
   declined:           { label: 'Declined',            icon: 'x-circle',       color: 'danger' },
@@ -2969,7 +2958,6 @@ function isFollowUpSuppressed(pkg, stats) {
   if (ov) {
     if (ov.stopped) return true;
     if (ov.snoozeUntil && ov.snoozeUntil >= todayISO()) return true;
-    if (ov.pinned) return false;
   }
   const t = (pkg.packageType || '').toLowerCase();
   if (c.excludeTypes.some(x => x && t.includes(String(x).toLowerCase()))) return true;
@@ -2979,8 +2967,6 @@ function isFollowUpSuppressed(pkg, stats) {
 }
 function isPackageEligibleForFollowUp(pkg, stats) {
   const c = followupCfg();
-  const ovEl = c.overrides[pkg.id];
-  if (ovEl && ovEl.pinned) return true;
   if (['expired','exhausted'].includes(stats.status)) return true;
   if (stats.remainingDays <= c.windowDays) return true;
   if (stats.mileagePct >= state.settings.warning) return true;
@@ -2996,28 +2982,17 @@ function getActionablePackages() {
   const out = [];
   for (const p of state.packages) {
     const ov = c.overrides[p.id];
-    if (ov && ov.stopped) continue;
-    if (ov && ov.snoozeUntil && ov.snoozeUntil >= today) continue;
-    const pinned = !!(ov && ov.pinned);
-    if (!pinned) {
-      const t = (p.packageType || '').toLowerCase();
-      if (c.excludeTypes.some(x => x && t.includes(String(x).toLowerCase()))) continue;
-      if (!c.showExpiredDate && p.endDate && new Date(p.endDate) < now) continue;
-    }
+    if (ov && (ov.stopped || (ov.snoozeUntil && ov.snoozeUntil >= today))) continue;
+    const t = (p.packageType || '').toLowerCase();
+    if (c.excludeTypes.some(x => x && t.includes(String(x).toLowerCase()))) continue;
+    if (!c.showExpiredDate && p.endDate && new Date(p.endDate) < now) continue;
     const vehicle = vById.get(p.vehicleId);
     if (!vehicle) continue;
     const stats = packageStats(p);
     if (isFollowUpSuppressed(p, stats)) continue;
     const fuState = packageFollowUpState(p, stats);
-    // A manually pinned package should always surface in Action needed, even if a
-    // prior call marked it resolved — UNLESS a future callback is already booked
-    // (then it lives in the Scheduled tab so it isn't listed twice).
-    if (pinned) {
-      if (fuState === 'scheduled') continue;
-    } else if (!['needs_first_contact','in_progress','overdue'].includes(fuState)) {
-      continue;
-    }
-    out.push({ ...p, stats, vehicle, fuState, pinned, latest: latestFollowUp(p.id) });
+    if (!['needs_first_contact','in_progress','overdue'].includes(fuState)) continue;
+    out.push({ ...p, stats, vehicle, fuState, latest: latestFollowUp(p.id) });
   }
   return out;
 }
@@ -3067,35 +3042,6 @@ function fuResume(pkgId) {
   save(); refreshBell(); navigate(state.ui.currentView);
   toast('Follow-up resumed');
 }
-function isPinnedFollowUp(pkgId) {
-  const ov = ((state.settings && state.settings.followup && state.settings.followup.overrides) || {})[pkgId];
-  return !!(ov && ov.pinned);
-}
-function fuPin(pkgId) {
-  const fu = ensureFuCfg();
-  fu.overrides[pkgId] = { ...(fu.overrides[pkgId] || {}), pinned: true, stopped: false, snoozeUntil: null };
-  save(); refreshBell(); navigate(state.ui.currentView);
-  toast('Added to follow-up cycle');
-}
-function fuUnpin(pkgId) {
-  const fu = ensureFuCfg();
-  const ov = fu.overrides[pkgId];
-  if (ov) {
-    delete ov.pinned;
-    if (!ov.stopped && !ov.snoozeUntil) delete fu.overrides[pkgId];
-  }
-  save(); refreshBell(); navigate(state.ui.currentView);
-  toast('Removed from manual follow-up');
-}
-function fuToggle(pkgId) {
-  if (isPinnedFollowUp(pkgId)) fuUnpin(pkgId); else fuPin(pkgId);
-}
-function clearActionFilters() {
-  const s = document.getElementById('fu-action-search'); if (s) s.value = '';
-  const so = document.getElementById('fu-action-sort'); if (so) so.value = 'urgency';
-  const st = document.getElementById('fu-action-state-filter'); if (st) st.value = '';
-  renderFollowups();
-}
 function fuClearOverrides() {
   const fu = ensureFuCfg();
   fu.overrides = {};
@@ -3128,32 +3074,7 @@ function urgencyLabel(p) {
 }
 
 function renderFollowups() {
-  const actionableAll = getActionablePackages();
-  // ── Filter + sort for the Action-needed table (counts/KPIs stay on the full total) ──
-  const fSearch = (document.getElementById('fu-action-search')?.value || '').toLowerCase().trim();
-  const fState = document.getElementById('fu-action-state-filter')?.value || '';
-  const fSort = document.getElementById('fu-action-sort')?.value || 'urgency';
-  let actionable = actionableAll.filter(p => {
-    if (fState) {
-      if (fState === 'pinned') { if (!p.pinned) return false; }
-      else if (p.fuState !== fState) return false;
-    }
-    if (!fSearch) return true;
-    return [p.vehicle.customerName, p.vehicle.vin, p.vehicle.plate, p.vehicle.make, p.vehicle.model, p.packageType, p.vehicle.customerPhone]
-      .some(x => (x || '').toLowerCase().includes(fSearch));
-  });
-  const _nm = p => (p.vehicle.customerName || '~').toLowerCase();
-  const _vh = p => `${p.vehicle.make || ''} ${p.vehicle.model || ''} ${p.vehicle.vin || ''}`.toLowerCase().trim();
-  const _pk = p => (p.packageType || '').toLowerCase();
-  switch (fSort) {
-    case 'customer-asc':  actionable.sort((a,b) => _nm(a).localeCompare(_nm(b))); break;
-    case 'customer-desc': actionable.sort((a,b) => _nm(b).localeCompare(_nm(a))); break;
-    case 'vehicle-asc':   actionable.sort((a,b) => _vh(a).localeCompare(_vh(b))); break;
-    case 'package-asc':   actionable.sort((a,b) => _pk(a).localeCompare(_pk(b))); break;
-    case 'days-asc':      actionable.sort((a,b) => a.stats.remainingDays - b.stats.remainingDays); break;
-    case 'days-desc':     actionable.sort((a,b) => b.stats.remainingDays - a.stats.remainingDays); break;
-    default:              actionable.sort((a,b) => urgencyScore(b) - urgencyScore(a));
-  }
+  const actionable = getActionablePackages().sort((a,b) => urgencyScore(b) - urgencyScore(a));
   const scheduled = getScheduledPackages();
   const history = [...state.followUps].sort((a,b) => new Date(b.callDate) - new Date(a.callDate));
   const renewed = state.followUps.filter(f => f.outcome === 'renewed').length;
@@ -3172,7 +3093,7 @@ function renderFollowups() {
       <div class="text-xs mt-1" style="color: var(--text-2);">${sub}</div>
     </div>`;
 
-  const overdueCount = actionableAll.filter(p => p.fuState === 'overdue').length;
+  const overdueCount = actionable.filter(p => p.fuState === 'overdue').length;
   const todayScheduled = scheduled.filter(p => p.latest.nextFollowUpDate === todayISO()).length;
   const thisWeekScheduled = scheduled.filter(p => {
     const d = new Date(p.latest.nextFollowUpDate);
@@ -3182,24 +3103,21 @@ function renderFollowups() {
   const conversionRate = (renewed + declined) > 0 ? ((renewed / (renewed + declined)) * 100).toFixed(0) : '—';
 
   document.getElementById('followups-kpi').innerHTML = `
-    ${kpiCard('alert-circle', 'Action needed', actionableAll.length, `${overdueCount} callback${overdueCount===1?'':'s'} overdue`, 'var(--danger)', 'var(--danger-soft)')}
+    ${kpiCard('alert-circle', 'Action needed', actionable.length, `${overdueCount} callback${overdueCount===1?'':'s'} overdue`, 'var(--danger)', 'var(--danger-soft)')}
     ${kpiCard('calendar', 'Scheduled today', todayScheduled, `${thisWeekScheduled} this week`, 'var(--info)', 'var(--info-soft)')}
     ${kpiCard('check-circle-2', 'Renewed', renewed, `From ${state.followUps.filter(f=>f.outcome).length || 0} resolved calls`, 'var(--success)', 'var(--success-soft)')}
     ${kpiCard('percent', 'Conversion rate', conversionRate === '—' ? '—' : conversionRate + '%', `${renewed} renewed · ${declined} declined`, 'var(--accent)', 'var(--accent-soft)')}
   `;
 
   // Update tab counts
-  document.getElementById('fu-count-action').textContent = actionableAll.length;
+  document.getElementById('fu-count-action').textContent = actionable.length;
   document.getElementById('fu-count-scheduled').textContent = scheduled.length;
   document.getElementById('fu-count-history').textContent = history.length;
 
   // Action needed table
   const actionBody = document.getElementById('fu-action-tbody');
   if (!actionable.length) {
-    const filtered = actionableAll.length > 0;
-    actionBody.innerHTML = filtered
-      ? `<tr class="no-hover"><td colspan="8"><div class="empty-state"><div class="empty-state-icon"><i data-lucide="filter-x" class="w-5 h-5"></i></div><div class="text-sm" style="color: var(--text-2);">No follow-ups match this filter. <button class="btn btn-ghost" style="margin-left:6px;" onclick="clearActionFilters()"><i data-lucide=\"x\" class=\"w-3.5 h-3.5\"></i>Clear filters</button></div></div></td></tr>`
-      : `<tr class="no-hover"><td colspan="8"><div class="empty-state"><div class="empty-state-icon"><i data-lucide="check-circle-2" class="w-5 h-5" style="color: var(--success);"></i></div><div class="text-sm" style="color: var(--text-2);">All caught up — no follow-ups needed.</div></div></td></tr>`;
+    actionBody.innerHTML = `<tr class="no-hover"><td colspan="8"><div class="empty-state"><div class="empty-state-icon"><i data-lucide="check-circle-2" class="w-5 h-5" style="color: var(--success);"></i></div><div class="text-sm" style="color: var(--text-2);">All caught up — no follow-ups needed.</div></div></td></tr>`;
   } else {
     actionBody.innerHTML = actionable.map(p => {
       const u = urgencyLabel(p);
@@ -3217,7 +3135,7 @@ function renderFollowups() {
           <div class="text-sm">${p.vehicle.make} ${p.vehicle.model}</div>
           <div class="text-xs font-mono" style="color: var(--text-3);">${p.vehicle.vin?.slice(-7)} · ${p.vehicle.plate || ''}</div>
         </td>
-        <td><span class="badge badge-accent">${p.packageType}</span>${p.pinned ? ' <span class="badge badge-info" title="Manually added to the follow-up cycle"><i data-lucide=\"bell-ring\" class=\"w-3 h-3\"></i> Pinned</span>' : ''}</td>
+        <td><span class="badge badge-accent">${p.packageType}</span></td>
         <td><span class="badge ${u.cls}">${u.label}</span></td>
         <td>
           <div class="text-[11px] font-mono" style="color: ${colorForPct(p.stats.timePct)};">T: ${p.stats.timePct.toFixed(0)}%</div>
@@ -3229,7 +3147,6 @@ function renderFollowups() {
           <div class="flex gap-1 items-center" style="flex-wrap:wrap;">
             <button class="btn btn-call" onclick="event.stopPropagation(); openCallModal('${p.id}')"><i data-lucide="phone-call" class="w-3.5 h-3.5"></i>Call</button>
             <button class="btn btn-ghost" title="Snooze follow-up until a date" onclick="event.stopPropagation(); fuSnooze('${p.id}')"><i data-lucide="alarm-clock" class="w-3.5 h-3.5"></i></button>
-            ${p.pinned ? `<button class="btn btn-ghost" title="Remove from manual follow-up" onclick="event.stopPropagation(); fuUnpin('${p.id}')"><i data-lucide="bell-minus" class="w-3.5 h-3.5"></i></button>` : ''}
             <button class="btn btn-ghost" title="Stop follow-up for this package" onclick="event.stopPropagation(); fuStop('${p.id}')"><i data-lucide="bell-off" class="w-3.5 h-3.5"></i></button>
           </div>
         </td>
@@ -4221,9 +4138,13 @@ function vehicleDetailHTML(v, embedded) {
   const overallPct = totalInvoiced ? (totalConsumed / totalInvoiced) * 100 : 0;
   const actionablePkgs = pkgs.filter(p => ['needs_first_contact','in_progress','overdue'].includes(packageFollowUpState(p, p.stats)));
 
+  const _backView = (state.ui.detailFrom && state.ui.detailFrom !== 'vehicle-detail') ? state.ui.detailFrom : 'vehicles';
+  const _backNames = { followups: 'follow-ups', vehicles: 'vehicles', services: 'services', packages: 'packages', analytics: 'analytics', lookup: 'lookup', dashboard: 'dashboard' };
+  const _backLabel = 'Back to ' + (_backNames[_backView] || 'list');
+
   return `
     <div class="${embedded ? '' : 'mb-4'}">
-      ${!embedded ? `<button class="btn btn-ghost mb-4" onclick="navigate('vehicles')"><i data-lucide="arrow-left" class="w-4 h-4"></i>Back to vehicles</button>` : ''}
+      ${!embedded ? `<button class="btn btn-ghost mb-4" onclick="navigate('${_backView}')"><i data-lucide="arrow-left" class="w-4 h-4"></i>${_backLabel}</button>` : ''}
     </div>
 
     <div class="card p-6 mb-4">
@@ -4303,7 +4224,6 @@ function vehicleDetailHTML(v, embedded) {
             <div class="flex gap-2 mt-3 flex-wrap">
               <button class="btn btn-ghost flex-1" onclick="openServiceModal(null, '${v.id}', '${p.id}')"><i data-lucide="wrench" class="w-3.5 h-3.5"></i>Log service</button>
               <button class="btn btn-call" onclick="openCallModal('${p.id}')"><i data-lucide="phone-call" class="w-3.5 h-3.5"></i>Call</button>
-              <button class="btn ${isPinnedFollowUp(p.id) ? 'btn-primary' : 'btn-ghost'}" title="${isPinnedFollowUp(p.id) ? 'In the follow-up cycle — click to remove' : 'Add this package to the follow-up cycle now, regardless of time left'}" onclick="event.stopPropagation(); fuToggle('${p.id}')"><i data-lucide="${isPinnedFollowUp(p.id) ? 'bell-ring' : 'bell-plus'}" class="w-3.5 h-3.5"></i>${isPinnedFollowUp(p.id) ? 'In follow-up' : 'Follow-up'}</button>
               <button class="btn btn-ghost" onclick="openPackageModal('${p.id}')"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
               <button class="btn btn-danger-ghost" onclick="deletePackage('${p.id}')"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
             </div>
@@ -4652,9 +4572,6 @@ document.querySelectorAll('[data-fu-tab]').forEach(el => {
   });
 });
 document.getElementById('fu-history-search')?.addEventListener('input', renderFollowupsHistory);
-document.getElementById('fu-action-search')?.addEventListener('input', renderFollowups);
-document.getElementById('fu-action-sort')?.addEventListener('change', renderFollowups);
-document.getElementById('fu-action-state-filter')?.addEventListener('change', renderFollowups);
 document.getElementById('fu-history-status-filter')?.addEventListener('change', renderFollowupsHistory);
 document.getElementById('fu-emails-sent-filter')?.addEventListener('change', renderEmailReminders);
 document.getElementById('services-search').addEventListener('input', renderServices);
