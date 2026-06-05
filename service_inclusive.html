@@ -1274,8 +1274,8 @@
   <div class="modal modal-lg p-6" style="max-width: 760px;">
     <div class="flex items-center justify-between mb-5">
       <div>
-        <div class="font-display text-2xl">Email Reminder Preview</div>
-        <div class="text-xs mt-1" style="color: var(--text-3);">This is exactly how the customer will see the email. Edit content via Settings → company info.</div>
+        <div class="font-display text-2xl" id="email-preview-title">Email Reminder Preview</div>
+        <div class="text-xs mt-1" style="color: var(--text-3);" id="email-preview-subtitle">This is exactly how the customer will see the email. Edit content via Settings → company info.</div>
       </div>
       <button class="btn btn-ghost" onclick="closeModal('modal-email-preview')"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
@@ -3559,9 +3559,18 @@ function buildEmailContent(pkg, vehicle, stageKey) {
       label: 'Final notice — urgent',
       urgency: `Your service package will expire TOMORROW (${fmtDate(pkg.endDate)}). This is our final reminder.`,
       subject: `URGENT — Service Package Expires Tomorrow (${pkg.packageType})`
+    },
+    'quote': {
+      headerBg: 'linear-gradient(135deg,#7C3AED 0%,#5B21B6 100%)',
+      banner: { bg: '#EDE9FE', border: '#7C3AED', text: '#5B21B6' },
+      label: 'Service package quotation',
+      urgency: `Please find below your quotation for the ${pkg.packageType} service package.`,
+      subject: `Service Package Quotation — ${pkg.packageType}${(vehicleInfo && vehicleInfo !== '—') ? ' (' + vehicleInfo + ')' : ''}`
     }
   };
   const theme = STAGE_THEMES[stageKey] || STAGE_THEMES['3m'];
+  const isQuote = stageKey === 'quote';
+  const packagePrice = fmtMoney(pkg.invoicedAmount);
 
   // Color the status pills based on how much is left for each axis
   // (uses the same thresholds as the in-app gauges so the email matches the dashboard)
@@ -3649,6 +3658,20 @@ function buildEmailContent(pkg, vehicle, stageKey) {
       </table>
     </td></tr>
 
+    ${isQuote ? `<!-- Quoted price -->
+    <tr><td style="padding:8px 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;">
+        <tr><td style="padding:16px 18px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="font-size:11px;font-weight:700;color:#6D28D9;text-transform:uppercase;letter-spacing:0.1em;vertical-align:middle;">💰 Package Price</td>
+              <td style="text-align:right;font-size:24px;font-weight:700;color:#5B21B6;font-family:'Courier New',Consolas,monospace;vertical-align:middle;">${escHtml(packagePrice)}</td>
+            </tr>
+          </table>
+        </td></tr>
+      </table>
+    </td></tr>` : ''}
+
     <!-- Status pills -->
     <tr><td style="padding:12px 32px 8px;font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;">⛽ Remaining Coverage</td></tr>
     <tr><td style="padding:0 32px 16px;">
@@ -3678,27 +3701,29 @@ function buildEmailContent(pkg, vehicle, stageKey) {
 
     <!-- Renewal pitch -->
     <tr><td style="padding:8px 32px 4px;font-size:14px;color:#475569;line-height:1.6;">
-      We invite you to contact us to discuss renewal options and ensure uninterrupted coverage for your vehicle. Renewing before expiration helps maintain continuous protection and may qualify you for loyalty benefits.
+      ${isQuote
+        ? `The price above covers the ${escHtml(pkg.packageType)} service package as detailed. We would be glad to answer any questions and to proceed whenever you are ready.`
+        : `We invite you to contact us to discuss renewal options and ensure uninterrupted coverage for your vehicle. Renewing before expiration helps maintain continuous protection and may qualify you for loyalty benefits.`}
     </td></tr>
 
     <!-- CTA button -->
     ${phone ? `<tr><td align="center" style="padding:20px 32px 8px;">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
         <td style="background:#2563EB;border-radius:10px;box-shadow:0 2px 6px rgba(37,99,235,0.25);">
-          <a href="tel:${escHtml(phone.replace(/[^+\d]/g,''))}" style="display:inline-block;padding:12px 28px;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:14px;letter-spacing:0.01em;">📞 Call us to renew — ${escHtml(phone)}</a>
+          <a href="tel:${escHtml(phone.replace(/[^+\d]/g,''))}" style="display:inline-block;padding:12px 28px;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:14px;letter-spacing:0.01em;">📞 ${isQuote ? 'Call us to proceed' : 'Call us to renew'} — ${escHtml(phone)}</a>
         </td>
       </tr></table>
     </td></tr>` : ''}
 
     <!-- Add to calendar CTA -->
-    <tr><td align="center" style="padding:4px 32px 8px;">
+    ${!isQuote ? `<tr><td align="center" style="padding:4px 32px 8px;">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
         <td style="background:#0EA5E9;border-radius:10px;box-shadow:0 2px 6px rgba(14,165,233,0.25);">
           <a href="${_gcalHtml}" style="display:inline-block;padding:11px 26px;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:14px;letter-spacing:0.01em;">📅 Add a reminder to my calendar</a>
         </td>
       </tr></table>
       <div style="font-size:11px;color:#94A3B8;padding-top:8px;">Opens in Google Calendar · or <a href="${_outlookHtml}" style="color:#2563EB;text-decoration:none;">add to Outlook</a></div>
-    </td></tr>
+    </td></tr>` : ''}
 
     <!-- Signature -->
     <tr><td style="padding:16px 32px 24px;font-size:14px;color:#475569;line-height:1.6;border-top:1px solid #E2E8F0;margin-top:8px;">
@@ -3741,18 +3766,18 @@ PACKAGE COVERAGE
 - Package type: ${pkg.packageType}
 - Start date: ${fmtDate(pkg.startDate)}
 - Expiration date: ${fmtDate(pkg.endDate)}
-- Mileage range: ${fmtKm(pkg.startMileage)} → ${fmtKm(pkg.mileageCap)}
+- Mileage range: ${fmtKm(pkg.startMileage)} → ${fmtKm(pkg.mileageCap)}${isQuote ? '\n- Package price: ' + packagePrice : ''}
 
 REMAINING COVERAGE
 - Time: ${stats.remainingDays} day${stats.remainingDays === 1 ? '' : 's'} left
 - Mileage: ${fmtKm(stats.remainingKm)} left
 
-We invite you to contact us to discuss renewal options and ensure uninterrupted coverage for your vehicle. Renewing before expiration helps maintain continuous protection and may qualify you for loyalty benefits.
-
+${isQuote ? `The price above covers the ${pkg.packageType} service package as detailed. We would be glad to answer any questions and to proceed whenever you are ready.` : `We invite you to contact us to discuss renewal options and ensure uninterrupted coverage for your vehicle. Renewing before expiration helps maintain continuous protection and may qualify you for loyalty benefits.`}
+${isQuote ? '' : `
 ADD A REMINDER TO YOUR CALENDAR
 - Google Calendar: ${_gcal}
 - Outlook: ${_outlook}
-
+`}
 Please do not hesitate to reach out at your earliest convenience.
 
 Best regards,
@@ -3811,6 +3836,20 @@ function previewEmail(packageId, stageKey) {
   } else {
     sendBtn.style.display = 'none';
   }
+
+  // Relabel the shared modal depending on whether this is a reminder or a quotation
+  const isQuote = stageKey === 'quote';
+  const titleEl = document.getElementById('email-preview-title');
+  const subEl = document.getElementById('email-preview-subtitle');
+  const brevoBtn = document.getElementById('email-brevo-send');
+  if (titleEl) titleEl.textContent = isQuote ? 'Quotation Preview' : 'Email Reminder Preview';
+  if (subEl) subEl.textContent = isQuote
+    ? 'This is exactly how the customer will see the quotation. Edit sender info & package price via Settings / the package.'
+    : 'This is exactly how the customer will see the email. Edit content via Settings → company info.';
+  if (brevoBtn) brevoBtn.innerHTML = isQuote
+    ? '<i data-lucide="send" class="w-4 h-4"></i>Send Quotation'
+    : '<i data-lucide="send" class="w-4 h-4"></i>Send via Brevo';
+
   openModal('modal-email-preview');
 }
 
@@ -3956,8 +3995,12 @@ async function sendViaBrevo() {
       const msg = (data && (typeof data.error === 'string' ? data.error : (data.error && data.error.message))) || ('HTTP ' + resp.status);
       throw new Error(msg);
     }
-    toast('\u2709 Sent via Brevo to ' + to, 'success');
-    markEmailSent(packageId, stageKey, to);   // logs as sent + closes modal
+    toast(stageKey === 'quote' ? ('\u2709 Quotation sent to ' + to) : ('\u2709 Sent via Brevo to ' + to), 'success');
+    if (stageKey === 'quote') {
+      closeModal('modal-email-preview');   // quotations aren't part of the reminder tracker
+    } else {
+      markEmailSent(packageId, stageKey, to);   // logs as sent + closes modal
+    }
   } catch (e) {
     toast('Brevo send failed: ' + ((e && e.message) || e), 'warning');
   } finally {
@@ -3971,6 +4014,11 @@ function markEmailSentManual() {
   const pkg = state.packages.find(p => p.id === packageId);
   if (!pkg) return;
   const v = state.vehicles.find(x => x.id === pkg.vehicleId);
+  if (stageKey === 'quote') {
+    toast('Quotation marked as sent');
+    closeModal('modal-email-preview');
+    return;
+  }
   markEmailSent(packageId, stageKey, v?.customerEmail || '(no email)');
 }
 
@@ -4224,6 +4272,7 @@ function vehicleDetailHTML(v, embedded) {
             <div class="flex gap-2 mt-3 flex-wrap">
               <button class="btn btn-ghost flex-1" onclick="openServiceModal(null, '${v.id}', '${p.id}')"><i data-lucide="wrench" class="w-3.5 h-3.5"></i>Log service</button>
               <button class="btn btn-call" onclick="openCallModal('${p.id}')"><i data-lucide="phone-call" class="w-3.5 h-3.5"></i>Call</button>
+              <button class="btn btn-ghost" onclick="previewEmail('${p.id}', 'quote')" title="Email a quotation for this package to the customer"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>Quote</button>
               <button class="btn btn-ghost" onclick="openPackageModal('${p.id}')"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
               <button class="btn btn-danger-ghost" onclick="deletePackage('${p.id}')"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
             </div>
