@@ -689,6 +689,9 @@
       <span id="view-subtitle" class="text-sm" style="color: var(--text-3);"></span>
     </div>
     <div class="flex items-center gap-3">
+      <button id="current-user-badge" class="btn btn-ghost text-xs" style="gap: 6px;" title="Signed-in user — calls and emails are stamped under this name" onclick="onCurrentUserBadgeClick()">
+        <i data-lucide="user-circle" class="w-4 h-4"></i><span id="current-user-name">—</span>
+      </button>
       <div class="relative">
         <i data-lucide="search" class="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style="color: var(--text-3);"></i>
         <input id="topbar-search" class="input pr-9 font-mono text-xs" placeholder="Search VIN, plate, customer..." style="width: 320px; padding-right: 2.75rem;" />
@@ -3401,7 +3404,7 @@ function openCallModal(packageId, followUpId) {
   document.getElementById('call-money-left').textContent = fmtMoney(stats.remaining);
 
   document.getElementById('call-date').value = existing?.callDate || todayISO();
-  document.getElementById('call-agent').value = existing?.agentName || (state.settings.agents?.[0] || '');
+  document.getElementById('call-agent').value = existing?.agentName || getCurrentUser() || (state.settings.agents?.[0] || '');
   document.getElementById('call-duration').value = existing?.callDuration ?? '';
   document.getElementById('call-notes').value = existing?.notes || '';
   document.getElementById('call-outcome').value = existing?.outcome || 'pending';
@@ -3991,7 +3994,7 @@ function markEmailSent(packageId, stageKey, recipientEmail) {
     sentTimestamp: new Date().toISOString(),
     recipientEmail,
     status: 'sent',
-    sentBy: state.settings.senderName || 'User',
+    sentBy: getCurrentUser() || state.settings.senderName || 'User',
   });
   save();
   refreshBell();
@@ -4013,7 +4016,7 @@ function markEmailSkipped(packageId, stageKey) {
     sentTimestamp: new Date().toISOString(),
     recipientEmail: v?.customerEmail || '',
     status: 'skipped',
-    sentBy: state.settings.senderName || 'User',
+    sentBy: getCurrentUser() || state.settings.senderName || 'User',
   });
   save();
   refreshBell();
@@ -4958,12 +4961,101 @@ function refreshBranding() {
   document.querySelectorAll('[data-company-name]').forEach(el => el.textContent = name);
 }
 
+/* ---- Current user = whoever is logged in (shared dashboard login) ----
+   Calls and email "sent by" are stamped automatically under the signed-in
+   employee. Resolution order:
+     1. window.CW_USER / cw_current_emp  (name recorded by the dashboard login)
+     2. name or email from the Supabase auth token (sb-<ref>-auth-token)
+     3. a manual override on this device (only if no login is detected)
+     4. Settings sender name (last resort) */
+const SI_USER_KEY = 'si.currentUser';
+const SI_AUTH_REF = 'egcbbfiqzaccsquaytvz';
+
+function prettyFromEmail(email) {
+  const local = String(email || '').split('@')[0] || String(email || '');
+  const out = local.split(/[._\-]+/).filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return out || String(email || '');
+}
+function userFromAuthToken() {
+  try {
+    const raw = localStorage.getItem('sb-' + SI_AUTH_REF + '-auth-token');
+    if (!raw) return '';
+    const tok = JSON.parse(raw);
+    const sess = tok.currentSession || tok;
+    const u = sess.user || tok.user;
+    if (u) {
+      const m = u.user_metadata || {};
+      if (m.full_name) return String(m.full_name).trim();
+      if (m.name) return String(m.name).trim();
+      if (u.email) return prettyFromEmail(u.email);
+    }
+    const jwt = sess.access_token || tok.access_token;
+    if (jwt) {
+      let p = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const pad = p.length % 4; if (pad) p += '='.repeat(4 - pad);
+      const claims = JSON.parse(atob(p));
+      const m = claims.user_metadata || {};
+      if (m.full_name) return String(m.full_name).trim();
+      if (m.name) return String(m.name).trim();
+      if (claims.name) return String(claims.name).trim();
+      if (claims.email) return prettyFromEmail(claims.email);
+    }
+  } catch (e) {}
+  return '';
+}
+function loggedInUser() {
+  try { if (window.CW_USER && String(window.CW_USER).trim()) return String(window.CW_USER).trim(); } catch (e) {}
+  try {
+    const n = sessionStorage.getItem('cw_current_emp') || localStorage.getItem('cw_current_emp');
+    if (n && n.trim()) return n.trim();
+  } catch (e) {}
+  return userFromAuthToken();
+}
+function getCurrentUser() {
+  const who = loggedInUser();
+  if (who) return who;
+  try { const m = (localStorage.getItem(SI_USER_KEY) || '').trim(); if (m) return m; } catch (e) {}
+  return (state.settings && state.settings.senderName) ? state.settings.senderName : '';
+}
+function ensureAgent(name) {
+  if (!name) return;
+  if (!state.settings.agents) state.settings.agents = [];
+  if (!state.settings.agents.includes(name)) {
+    state.settings.agents.push(name);
+    save();
+    populateDatalists();
+  }
+}
+// Manual fallback — only needed when no signed-in user can be detected
+function onCurrentUserBadgeClick() {
+  const who = loggedInUser();
+  if (who) { toast('Signed in as ' + who + ' — actions are stamped under this name'); return; }
+  const name = (prompt('No signed-in user detected. Enter your name so your actions are stamped correctly:', getCurrentUser()) || '').trim();
+  if (!name) return;
+  try { localStorage.setItem(SI_USER_KEY, name); } catch (e) {}
+  ensureAgent(name);
+  refreshCurrentUserUI();
+  toast('You are now stamped as ' + name);
+}
+function refreshCurrentUserUI() {
+  const el = document.getElementById('current-user-name');
+  const badge = document.getElementById('current-user-badge');
+  const who = getCurrentUser();
+  if (el) el.textContent = who || 'Set your name';
+  if (badge) badge.title = loggedInUser()
+    ? ('Signed in as ' + who + ' — calls & emails are stamped under this name')
+    : 'No login detected — click to set the name your actions are stamped under';
+  if (who) ensureAgent(who);
+}
+
 function init() {
   load();
   // Auto demo-seed removed — was re-seeding 10 fake vehicles into every
   // empty browser (incognito / new device) and leaking them to the cloud.
   // Use Settings → Data → "Load demo" to seed demo data manually when needed.
   populateDatalists();
+  refreshCurrentUserUI();
   refreshBranding();
   refreshStorageInfo();
   refreshBell();
