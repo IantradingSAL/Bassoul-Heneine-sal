@@ -378,43 +378,122 @@ document.querySelectorAll('.si[data-page]').forEach(el => {
 })
 
 // ══ FILE PARSING ══════════════════════════════════════════════════
-function parseBMW(raw){
-  // Map every Excel row into a credit-line record. The natural unique key
-  // is (cn_no + claim_no + item_no + position). Sums per-claim are
-  // computed on demand at render time.
-  return raw.filter(r => r['Credit Note Number'] || r['Claim'] || r['VIN']).map(r => ({
-    claimant:       String(r['Claimant']||'').trim(),
-    cn_no:          String(r['Credit Note Number']||'').trim(),
-    cn_date:        _toIsoDate(r['Credit Note Date']),
-    claim_no:       String(r['Claim']||'').trim(),
-    dealer_claim:   String(r['Dealer Claim Number']||'').trim(),
-    brand:          String(r['Brand']||'').trim(),
-    defect_code:    String(r['Defect Code']||'').trim(),
-    defect_text:    String(r['Defect Code Text']||'').trim(),
-    item_no:        String(r['Claim Item Number']||'').trim(),
-    item_desc:      String(r['Claim Item Description']||'').trim(),
-    position:       String(r['Claim Item Position']||'').trim(),
-    repair_date:    _toIsoDate(r['Repair Date']),
-    ws_indicator:   String(r['WS Indicator']||'').trim(),
-    accepted_price_no_hc:    n(r['Accepted Price w/o HC']),
-    hc:                      n(r['HC']),
-    tax:                     n(r['Tax']),
-    accepted_price_incl_hc:  n(r['Accepted Price incl HC/excl Tax']),
-    accepted_price_incl_tax: n(r['Accepted Price incl Tax/HC']),
-    claimed_price:           n(r['Claimed Price']),
-    claimed_pct:             n(r['Claimed Percent']),
-    accepted_pct:            n(r['Accepted %']),
-    claimed_qty:             n(r['Claimed Quantity']),
-    accepted_qty:            n(r['Accepted Quantity']),
-    most_decisive_msg:       String(r['Most Decisive Message Item']||'').trim(),
-    collective_ref:          String(r['Collective Claim Reference']||'').trim(),
-    crediting_item_status:   String(r['Crediting Item Status']||'').trim(),
-    crediting_status:        String(r['Crediting Status']||'').trim(),
-    item_crediting_status:   String(r['Item Crediting Status']||'').trim(),
-    pdf:           String(r['PDF']||'').trim(),
-    vin:           String(r['VIN']||'').trim().toUpperCase(),
-    month:         _toIsoDate(r['Credit Note Date']) ? _toIsoDate(r['Credit Note Date']).substr(0,7) : ''
-  }))
+// ── normalize a header label: lowercase, alphanumeric only ──
+function _normH(s){ return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]/g,'') }
+
+// canonical field -> accepted normalized header aliases (exact match after _normH)
+const BMW_COLS = {
+  claimant:['claimant'],
+  cn_no:['creditnotenumber','creditnoteno','cnnumber','cnno'],
+  cn_date:['creditnotedate','cndate'],
+  claim_no:['claim','claimnumber','claimno'],
+  dealer_claim:['dealerclaimnumber','dealerclaimno','dealerclaim'],
+  brand:['brand'],
+  defect_code:['defectcode'],
+  defect_text:['defectcodetext','defecttext'],
+  item_no:['claimitemnumber','claimitemno','itemnumber','itemno'],
+  item_desc:['claimitemdescription','itemdescription','itemdesc'],
+  position:['claimitemposition','itemposition','position'],
+  repair_date:['repairdate'],
+  ws_indicator:['wsindicator'],
+  accepted_price_no_hc:['acceptedpricewohc','acceptedpricewithouthc','acceptedpricenohc'],
+  hc:['hc'],
+  tax:['tax'],
+  accepted_price_incl_hc:['acceptedpriceinclhcexcltax','acceptedpriceinclhc'],
+  accepted_price_incl_tax:['acceptedpriceincltaxhc','acceptedpriceincltax'],
+  claimed_price:['claimedprice'],
+  claimed_pct:['claimedpercent','claimedpct'],
+  accepted_pct:['acceptedpercent','acceptedpct','accepted'],
+  claimed_qty:['claimedquantity','claimedqty'],
+  accepted_qty:['acceptedquantity','acceptedqty'],
+  most_decisive_msg:['mostdecisivemessageitem','mostdecisivemessage'],
+  collective_ref:['collectiveclaimreference','collectiveclaimref'],
+  crediting_item_status:['creditingitemstatus'],
+  crediting_status:['creditingstatus'],
+  item_crediting_status:['itemcreditingstatus'],
+  pdf:['pdf'],
+  vin:['vin']
+}
+
+let _bmwLastHeaders = []   // for the on-screen diagnostic
+
+function parseBMW(sheet){
+  // Accept a worksheet (preferred) or a legacy array-of-objects.
+  let aoa
+  if (Array.isArray(sheet)){
+    if (!sheet.length) return []
+    const keys = Object.keys(sheet[0])
+    aoa = [keys, ...sheet.map(o => keys.map(k => o[k]))]
+  } else {
+    aoa = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', blankrows:false})
+  }
+  if (!aoa.length) return []
+
+  // 1) find the header row anywhere in the first 25 rows (skips SAP title/blank rows)
+  const aliasSet = new Set(Object.values(BMW_COLS).flat())
+  let hIdx = -1
+  for (let i = 0; i < Math.min(aoa.length, 25); i++){
+    const hits = aoa[i].reduce((c, cell) => c + (aliasSet.has(_normH(cell)) ? 1 : 0), 0)
+    if (hits >= 2){ hIdx = i; break }
+  }
+  if (hIdx === -1){
+    _bmwLastHeaders = (aoa[0]||[]).map(x => String(x)).filter(Boolean)
+    console.warn('[BMW] no header row found. First row was:', _bmwLastHeaders)
+    return []
+  }
+
+  // 2) map canonical field -> column index
+  const headerRow = aoa[hIdx].map(_normH)
+  _bmwLastHeaders = aoa[hIdx].map(x => String(x)).filter(Boolean)
+  const col = {}
+  for (const [field, aliases] of Object.entries(BMW_COLS))
+    col[field] = headerRow.findIndex(h => aliases.includes(h))
+  const g = (row, f) => { const i = col[f]; return i >= 0 ? row[i] : '' }
+
+  // 3) build records from every data row below the header
+  const out = []
+  for (let i = hIdx + 1; i < aoa.length; i++){
+    const row = aoa[i]
+    if (!row || !row.length) continue
+    const cn_no    = String(g(row,'cn_no')||'').trim()
+    const claim_no = String(g(row,'claim_no')||'').trim()
+    const vin      = String(g(row,'vin')||'').trim().toUpperCase()
+    if (!cn_no && !claim_no && !vin) continue   // skip blank / total rows
+    out.push({
+      claimant:       String(g(row,'claimant')||'').trim(),
+      cn_no,
+      cn_date:        _toIsoDate(g(row,'cn_date')),
+      claim_no,
+      dealer_claim:   String(g(row,'dealer_claim')||'').trim(),
+      brand:          String(g(row,'brand')||'').trim(),
+      defect_code:    String(g(row,'defect_code')||'').trim(),
+      defect_text:    String(g(row,'defect_text')||'').trim(),
+      item_no:        String(g(row,'item_no')||'').trim(),
+      item_desc:      String(g(row,'item_desc')||'').trim(),
+      position:       String(g(row,'position')||'').trim(),
+      repair_date:    _toIsoDate(g(row,'repair_date')),
+      ws_indicator:   String(g(row,'ws_indicator')||'').trim(),
+      accepted_price_no_hc:    n(g(row,'accepted_price_no_hc')),
+      hc:                      n(g(row,'hc')),
+      tax:                     n(g(row,'tax')),
+      accepted_price_incl_hc:  n(g(row,'accepted_price_incl_hc')),
+      accepted_price_incl_tax: n(g(row,'accepted_price_incl_tax')),
+      claimed_price:           n(g(row,'claimed_price')),
+      claimed_pct:             n(g(row,'claimed_pct')),
+      accepted_pct:            n(g(row,'accepted_pct')),
+      claimed_qty:             n(g(row,'claimed_qty')),
+      accepted_qty:            n(g(row,'accepted_qty')),
+      most_decisive_msg:       String(g(row,'most_decisive_msg')||'').trim(),
+      collective_ref:          String(g(row,'collective_ref')||'').trim(),
+      crediting_item_status:   String(g(row,'crediting_item_status')||'').trim(),
+      crediting_status:        String(g(row,'crediting_status')||'').trim(),
+      item_crediting_status:   String(g(row,'item_crediting_status')||'').trim(),
+      pdf:           String(g(row,'pdf')||'').trim(),
+      vin,
+      month:         _toIsoDate(g(row,'cn_date')) ? _toIsoDate(g(row,'cn_date')).substr(0,7) : ''
+    })
+  }
+  return out
 }
 
 // ══ CLOUD I/O ════════════════════════════════════════════════════
@@ -582,12 +661,12 @@ async function handleFile(file){
         return
       }
       const sn = wb.SheetNames.find(s=>/sap|credit/i.test(s)) || wb.SheetNames[0]
-      const raw = XLSX.utils.sheet_to_json(wb.Sheets[sn], {defval:''})
-      const parsed = parseBMW(raw)
+      const parsed = parseBMW(wb.Sheets[sn])
       if (!parsed.length){
         hideLoad()
-        stat('ST_BMW', '⚠️ File parsed but no rows recognised', false)
-        showToast('⚠️ ' + file.name + ' parsed but contained no recognisable rows.')
+        const seen = _bmwLastHeaders.length ? ' · headers seen: ' + _bmwLastHeaders.slice(0,8).join(', ') : ''
+        stat('ST_BMW', '⚠️ No recognisable columns' + seen, false)
+        showToast('⚠️ ' + file.name + ' — no recognisable columns. Found: ' + (_bmwLastHeaders.join(', ') || 'none'))
         return
       }
       // Period detection — most-frequent month
