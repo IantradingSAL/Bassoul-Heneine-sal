@@ -966,7 +966,7 @@
                   <th></th>
                   <th>Customer</th>
                   <th>Vehicle</th>
-                  <th>Package</th>
+                  <th>Packages</th>
                   <th>Urgency</th>
                   <th>Coverage state</th>
                   <th>Last contact</th>
@@ -1406,6 +1406,7 @@ No Brevo yet? Click <b>Copy rendered email</b>, then <b>Open in mail client</b>,
       <input type="hidden" id="call-id" />
       <input type="hidden" id="call-package-id" />
       <input type="hidden" id="call-vehicle-id" />
+      <input type="hidden" id="call-mode" value="single" />
 
       <div>
         <label class="label">Call date</label>
@@ -1457,6 +1458,12 @@ No Brevo yet? Click <b>Copy rendered email</b>, then <b>Open in mail client</b>,
           <option value="declined">Declined — not interested</option>
           <option value="wrong_number">Wrong number / unreachable</option>
         </select>
+      </div>
+
+      <div class="col-span-2 hidden" id="call-pkg-wrap">
+        <label class="label">Packages covered in this call</label>
+        <div id="call-pkg-checklist" class="space-y-2"></div>
+        <div class="text-[10px] mt-1" style="color: var(--text-3);">Each package gets its own outcome and history entry. Uncheck any not discussed; changing the Outcome above sets them all at once.</div>
       </div>
 
       <div>
@@ -3209,57 +3216,64 @@ function renderFollowups() {
     return diff >= 0 && diff <= 7;
   }).length;
   const conversionRate = (renewed + declined) > 0 ? ((renewed / (renewed + declined)) * 100).toFixed(0) : '—';
+  const actionGroupsAll = groupByCustomer(actionable);
 
   document.getElementById('followups-kpi').innerHTML = `
-    ${kpiCard('alert-circle', 'Action needed', actionable.length, `${overdueCount} callback${overdueCount===1?'':'s'} overdue`, 'var(--danger)', 'var(--danger-soft)')}
+    ${kpiCard('alert-circle', 'Action needed', actionGroupsAll.length, `${actionable.length} package${actionable.length===1?'':'s'} · ${overdueCount} overdue`, 'var(--danger)', 'var(--danger-soft)')}
     ${kpiCard('calendar', 'Scheduled today', todayScheduled, `${thisWeekScheduled} this week`, 'var(--info)', 'var(--info-soft)')}
     ${kpiCard('check-circle-2', 'Renewed', renewed, `From ${state.followUps.filter(f=>f.outcome).length || 0} resolved calls`, 'var(--success)', 'var(--success-soft)')}
     ${kpiCard('percent', 'Conversion rate', conversionRate === '—' ? '—' : conversionRate + '%', `${renewed} renewed · ${declined} declined`, 'var(--accent)', 'var(--accent-soft)')}
   `;
 
   // Update tab counts
-  document.getElementById('fu-count-action').textContent = actionable.length;
+  document.getElementById('fu-count-action').textContent = actionGroupsAll.length;
   document.getElementById('fu-count-scheduled').textContent = scheduled.length;
   document.getElementById('fu-count-history').textContent = history.length;
 
-  // Action needed table (filter/sort applied to the view; KPIs keep true totals)
+  // Action needed table — grouped by customer (one call = one customer)
   const actionView = applyActionFilters(actionable);
+  const groups = groupByCustomer(actionView);
   const actionBody = document.getElementById('fu-action-tbody');
   if (!actionable.length) {
     actionBody.innerHTML = `<tr class="no-hover"><td colspan="8"><div class="empty-state"><div class="empty-state-icon"><i data-lucide="check-circle-2" class="w-5 h-5" style="color: var(--success);"></i></div><div class="text-sm" style="color: var(--text-2);">All caught up — no follow-ups needed.</div></div></td></tr>`;
-  } else if (!actionView.length) {
+  } else if (!groups.length) {
     actionBody.innerHTML = `<tr class="no-hover"><td colspan="8"><div class="empty-state"><div class="empty-state-icon"><i data-lucide="filter-x" class="w-5 h-5"></i></div><div class="text-sm" style="color: var(--text-2);">No follow-ups match this filter.</div><button class="btn btn-ghost mt-2" onclick="fuClearActionFilters()"><i data-lucide="x" class="w-3.5 h-3.5"></i>Clear filters</button></div></td></tr>`;
   } else {
-    actionBody.innerHTML = actionView.map(p => {
-      const u = urgencyLabel(p);
-      const lastContactText = p.latest
-        ? `<div class="text-xs">${fmtDate(p.latest.callDate)}</div><div class="text-[10px]" style="color: var(--text-3);">${CALL_STATUS_META[p.latest.status]?.label || p.latest.status}</div>`
+    actionBody.innerHTML = groups.map(g => {
+      const lead = g.lead;
+      const u = urgencyLabel(lead);
+      const multi = g.members.length > 1;
+      const lastContactText = g.lastContact
+        ? `<div class="text-xs">${fmtDate(g.lastContact.callDate)}</div><div class="text-[10px]" style="color: var(--text-3);">${CALL_STATUS_META[g.lastContact.status]?.label || g.lastContact.status}</div>`
         : `<div class="text-xs italic" style="color: var(--text-3);">Never contacted</div>`;
-      const dotClass = p.stats.status === 'expired' || p.stats.status === 'exhausted' || p.fuState === 'overdue' ? 'urgent' : (p.stats.remainingDays <= 30 ? 'warning' : 'scheduled');
-      return `<tr onclick="navigate('vehicle-detail', '${p.vehicle.id}')">
+      const dotClass = lead.stats.status === 'expired' || lead.stats.status === 'exhausted' || lead.fuState === 'overdue' ? 'urgent' : (lead.stats.remainingDays <= 30 ? 'warning' : 'scheduled');
+      const pkgBadges = g.members.map(m =>
+        `<span class="badge badge-accent" title="${escHtml((m.vehicle.make||'') + ' ' + (m.vehicle.model||''))} · exp ${fmtDate(m.endDate)}">${m.packageType}</span>${m.pinned ? ` <span class="badge badge-info" title="Manually added"><i data-lucide="pin" class="w-3 h-3"></i></span>` : ''}`
+      ).join(' ');
+      const vehCell = g.vehicleCount > 1
+        ? `<div class="text-sm">${g.vehicleCount} vehicles</div><div class="text-xs font-mono" style="color: var(--text-3);">${g.members.length} packages</div>`
+        : `<div class="text-sm">${lead.vehicle.make} ${lead.vehicle.model}</div><div class="text-xs font-mono" style="color: var(--text-3);">${lead.vehicle.vin?.slice(-7)} · ${lead.vehicle.plate || ''}</div>`;
+      return `<tr onclick="navigate('vehicle-detail', '${lead.vehicle.id}')">
         <td><span class="status-dot ${dotClass}"></span></td>
         <td>
-          <div class="text-sm font-medium">${p.vehicle.customerName || 'No name'}</div>
-          <div class="text-xs font-mono" style="color: var(--text-3);">${p.vehicle.customerPhone || 'No phone'}</div>
+          <div class="text-sm font-medium">${lead.vehicle.customerName || 'No name'}</div>
+          <div class="text-xs font-mono" style="color: var(--text-3);">${lead.vehicle.customerPhone || 'No phone'}</div>
         </td>
-        <td>
-          <div class="text-sm">${p.vehicle.make} ${p.vehicle.model}</div>
-          <div class="text-xs font-mono" style="color: var(--text-3);">${p.vehicle.vin?.slice(-7)} · ${p.vehicle.plate || ''}</div>
-        </td>
-        <td><span class="badge badge-accent">${p.packageType}</span>${p.pinned ? ` <span class="badge badge-info" title="Manually added to follow-up"><i data-lucide="pin" class="w-3 h-3"></i>Pinned</span>` : ''}</td>
+        <td>${vehCell}</td>
+        <td><div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">${pkgBadges}</div></td>
         <td><span class="badge ${u.cls}">${u.label}</span></td>
         <td>
-          <div class="text-[11px] font-mono" style="color: ${colorForPct(p.stats.timePct)};">T: ${p.stats.timePct.toFixed(0)}%</div>
-          <div class="text-[11px] font-mono" style="color: ${colorForPct(p.stats.mileagePct)};">KM: ${p.stats.mileagePct.toFixed(0)}%</div>
-          <div class="text-[11px] font-mono" style="color: ${colorForPct(p.stats.moneyPct)};">$: ${p.stats.moneyPct.toFixed(0)}%</div>
+          <div class="text-[11px] font-mono" style="color: ${colorForPct(lead.stats.timePct)};">T: ${lead.stats.timePct.toFixed(0)}%</div>
+          <div class="text-[11px] font-mono" style="color: ${colorForPct(lead.stats.mileagePct)};">KM: ${lead.stats.mileagePct.toFixed(0)}%</div>
+          <div class="text-[11px] font-mono" style="color: ${colorForPct(lead.stats.moneyPct)};">$: ${lead.stats.moneyPct.toFixed(0)}%</div>
         </td>
         <td>${lastContactText}</td>
         <td>
           <div class="flex gap-1 items-center" style="flex-wrap:wrap;">
-            <button class="btn btn-call" onclick="event.stopPropagation(); openCallModal('${p.id}')"><i data-lucide="phone-call" class="w-3.5 h-3.5"></i>Call</button>
-            <button class="btn btn-ghost" title="Snooze follow-up until a date" onclick="event.stopPropagation(); fuSnooze('${p.id}')"><i data-lucide="alarm-clock" class="w-3.5 h-3.5"></i></button>
-            <button class="btn btn-ghost" title="Stop follow-up for this package" onclick="event.stopPropagation(); fuStop('${p.id}')"><i data-lucide="bell-off" class="w-3.5 h-3.5"></i></button>
-            ${p.pinned ? `<button class="btn btn-ghost" title="Remove from manual follow-up" onclick="event.stopPropagation(); fuUnpin('${p.id}')"><i data-lucide="bell-minus" class="w-3.5 h-3.5"></i></button>` : ''}
+            <button class="btn btn-call" onclick="event.stopPropagation(); openCustomerCall('${lead.id}')"><i data-lucide="phone-call" class="w-3.5 h-3.5"></i>Call${multi ? ` (${g.members.length})` : ''}</button>
+            <button class="btn btn-ghost" title="Snooze this customer's follow-up" onclick="event.stopPropagation(); fuSnoozeCustomer('${lead.id}')"><i data-lucide="alarm-clock" class="w-3.5 h-3.5"></i></button>
+            <button class="btn btn-ghost" title="Stop follow-up for this customer" onclick="event.stopPropagation(); fuStopCustomer('${lead.id}')"><i data-lucide="bell-off" class="w-3.5 h-3.5"></i></button>
+            ${g.anyPinned ? `<button class="btn btn-ghost" title="Remove manual follow-up for this customer" onclick="event.stopPropagation(); fuUnpinCustomer('${lead.id}')"><i data-lucide="bell-minus" class="w-3.5 h-3.5"></i></button>` : ''}
           </div>
         </td>
       </tr>`;
@@ -3368,6 +3382,156 @@ function refreshFollowupsTabs() {
   document.getElementById('fu-tab-' + tab)?.classList.remove('hidden');
 }
 
+// ---- Customer grouping for Action Required (one call = one customer) ----
+// A customer is keyed by phone (digits only), falling back to name, then vehicle.
+function custKey(v) {
+  if (!v) return 'v:?';
+  const phone = (v.customerPhone || '').replace(/\D/g, '');
+  if (phone) return 'p:' + phone;
+  const name = (v.customerName || '').trim().toLowerCase();
+  if (name) return 'n:' + name;
+  return 'v:' + v.id;
+}
+// Group an (already actionable) package list by customer, preserving the
+// incoming sort order (first time a customer appears = their best-ranked pkg).
+function groupByCustomer(list) {
+  const map = new Map(); const order = [];
+  for (const p of list) {
+    const k = custKey(p.vehicle);
+    if (!map.has(k)) { map.set(k, []); order.push(k); }
+    map.get(k).push(p);
+  }
+  return order.map(k => {
+    const members = map.get(k);
+    const lead = members.reduce((a, b) => urgencyScore(b) > urgencyScore(a) ? b : a);
+    const contacted = members.filter(m => m.latest)
+      .sort((a, b) => new Date(b.latest.callDate) - new Date(a.latest.callDate));
+    const vehIds = new Set(members.map(m => m.vehicle.id));
+    return {
+      key: k, members, lead, vehicle: lead.vehicle,
+      lastContact: contacted[0]?.latest || null,
+      anyPinned: members.some(m => m.pinned),
+      vehicleCount: vehIds.size,
+    };
+  });
+}
+// The currently-actionable package ids for the same customer as leadPkgId.
+function customerActionPkgIds(leadPkgId) {
+  const lead = state.packages.find(p => p.id === leadPkgId);
+  if (!lead) return [];
+  const v = state.vehicles.find(x => x.id === lead.vehicleId);
+  if (!v) return [leadPkgId];
+  const key = custKey(v);
+  return getActionablePackages().filter(p => custKey(p.vehicle) === key).map(p => p.id);
+}
+function fuSnoozeCustomer(leadPkgId) {
+  const ids = customerActionPkgIds(leadPkgId);
+  if (!ids.length) return;
+  const d = new Date(); d.setMonth(d.getMonth() + 1);
+  const def = d.toISOString().slice(0, 10);
+  const val = prompt(`Stop following up on this customer's ${ids.length} package(s) until (YYYY-MM-DD):`, def);
+  if (!val) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(val.trim())) { toast('Please use date format YYYY-MM-DD'); return; }
+  const fu = ensureFuCfg();
+  ids.forEach(id => { fu.overrides[id] = { ...(fu.overrides[id] || {}), snoozeUntil: val.trim(), stopped: false }; });
+  save(); refreshBell(); navigate('followups');
+  toast(`Snoozed ${ids.length} package(s) until ` + val.trim());
+}
+function fuStopCustomer(leadPkgId) {
+  const ids = customerActionPkgIds(leadPkgId);
+  if (!ids.length) return;
+  const fu = ensureFuCfg();
+  ids.forEach(id => { fu.overrides[id] = { ...(fu.overrides[id] || {}), stopped: true, snoozeUntil: null }; });
+  save(); refreshBell(); navigate('followups');
+  toast(`Stopped follow-up for ${ids.length} package(s)`);
+}
+function fuUnpinCustomer(leadPkgId) {
+  const ids = customerActionPkgIds(leadPkgId);
+  const fu = ensureFuCfg();
+  ids.forEach(id => { if (fu.overrides[id]) { delete fu.overrides[id].pinned; if (!Object.keys(fu.overrides[id]).length) delete fu.overrides[id]; } });
+  save(); refreshBell(); navigate('followups');
+  toast('Removed manual follow-up for this customer');
+}
+
+const CALL_OUTCOME_OPTS = [
+  ['pending', 'Pending — still discussing'],
+  ['callback_scheduled', 'Callback scheduled'],
+  ['interested', 'Interested — needs follow-up'],
+  ['renewed', 'Renewed / new package sold'],
+  ['declined', 'Declined — not interested'],
+  ['wrong_number', 'Wrong number / unreachable'],
+];
+function outcomeOptionsHtml(sel) {
+  return CALL_OUTCOME_OPTS.map(([v, l]) => `<option value="${v}"${v === sel ? ' selected' : ''}>${l}</option>`).join('');
+}
+
+// Open the call modal in multi-package mode for a whole customer.
+function openCustomerCall(leadPkgId) {
+  const lead = state.packages.find(p => p.id === leadPkgId);
+  if (!lead) { toast('Package not found', 'danger'); return; }
+  const vehicle = state.vehicles.find(v => v.id === lead.vehicleId);
+  const key = vehicle ? custKey(vehicle) : null;
+  const members = key ? getActionablePackages().filter(p => custKey(p.vehicle) === key) : [];
+  if (members.length <= 1) { openCallModal(leadPkgId); return; }  // single → normal flow
+
+  const leadStats = packageStats(lead);
+  document.getElementById('call-modal-title').textContent = 'Log Customer Call';
+  document.getElementById('call-modal-sub').textContent = `Covers ${members.length} packages for ${vehicle.customerName || 'this customer'}`;
+  document.getElementById('call-id').value = '';
+  document.getElementById('call-mode').value = 'multi';
+  document.getElementById('call-package-id').value = leadPkgId;
+  document.getElementById('call-vehicle-id').value = lead.vehicleId;
+
+  document.getElementById('call-customer-name').textContent = vehicle?.customerName || 'No customer name';
+  const phone = vehicle?.customerPhone || '';
+  const dialUrl = buildDialUrl(phone);
+  const e164 = toE164(phone, state.settings.defaultCountryCode);
+  const phoneEl = document.getElementById('call-customer-phone');
+  phoneEl.textContent = phone || 'No phone on file';
+  phoneEl.href = phone ? dialUrl : '#';
+  document.getElementById('call-customer-phone-e164').textContent = (phone && e164 && e164.replace(/\D/g, '') !== phone.replace(/\D/g, '')) ? `→ ${e164}` : '';
+  const dialBtn = document.getElementById('call-dial-btn');
+  if (phone) { dialBtn.href = dialUrl; dialBtn.style.display = 'inline-flex'; } else { dialBtn.style.display = 'none'; }
+
+  const vehCount = new Set(members.map(m => m.vehicle.id)).size;
+  document.getElementById('call-vehicle-info').textContent = vehCount > 1
+    ? `${vehCount} vehicles` : `${vehicle?.make || ''} ${vehicle?.model || ''} · ${vehicle?.vin?.slice(-7) || ''}`;
+  document.getElementById('call-package-info').textContent = `${members.length} packages in this call`;
+  document.getElementById('call-time-left').textContent = `${leadStats.remainingDays}d`;
+  document.getElementById('call-km-left').textContent = fmtKm(leadStats.remainingKm);
+  document.getElementById('call-money-left').textContent = fmtMoney(leadStats.remaining);
+
+  document.getElementById('call-date').value = todayISO();
+  document.getElementById('call-agent').value = getCurrentUser() || (state.settings.agents?.[0] || '');
+  document.getElementById('call-duration').value = '';
+  document.getElementById('call-notes').value = '';
+  document.getElementById('call-outcome').value = 'pending';
+  document.getElementById('call-next-date').value = '';
+  document.querySelectorAll('input[name="call-status"]').forEach(r => r.checked = false);
+  const radio = document.querySelector('input[name="call-status"][value="called"]');
+  if (radio) radio.checked = true;
+  refreshCallStatusCards();
+
+  const wrap = document.getElementById('call-pkg-wrap');
+  const listEl = document.getElementById('call-pkg-checklist');
+  listEl.innerHTML = members.map(m => {
+    const s = m.stats || packageStats(m);
+    const veh = vehCount > 1 ? `${m.vehicle.make} ${m.vehicle.model} · ` : '';
+    return `<div class="card p-2 flex items-center gap-2" style="justify-content: space-between;">
+      <label class="flex items-center gap-2 cursor-pointer" style="flex: 1;">
+        <input type="checkbox" data-pkg="${m.id}" checked />
+        <span class="text-sm">${veh}<span class="badge badge-accent">${m.packageType}</span> <span class="text-xs" style="color: var(--text-3);">exp ${fmtDate(m.endDate)} · ${s.remainingDays}d</span></span>
+      </label>
+      <select class="select" data-pkg-outcome="${m.id}" style="width: auto; min-width: 180px;">${outcomeOptionsHtml('pending')}</select>
+    </div>`;
+  }).join('');
+  wrap.classList.remove('hidden');
+
+  populateDatalists();
+  openModal('modal-call');
+  safeCreateIcons();
+}
+
 function openCallModal(packageId, followUpId) {
   const pkg = state.packages.find(p => p.id === packageId);
   if (!pkg) { toast('Package not found', 'danger'); return; }
@@ -3381,6 +3545,9 @@ function openCallModal(packageId, followUpId) {
   document.getElementById('call-id').value = existing?.id || '';
   document.getElementById('call-package-id').value = packageId;
   document.getElementById('call-vehicle-id').value = pkg.vehicleId;
+  document.getElementById('call-mode').value = 'single';
+  const _cw = document.getElementById('call-pkg-wrap');
+  if (_cw) { _cw.classList.add('hidden'); document.getElementById('call-pkg-checklist').innerHTML = ''; }
 
   document.getElementById('call-customer-name').textContent = vehicle?.customerName || 'No customer name';
   const phone = vehicle?.customerPhone || '';
@@ -3431,11 +3598,54 @@ function refreshCallStatusCards() {
 
 document.getElementById('call-status-grid').addEventListener('change', refreshCallStatusCards);
 
+// In multi-package mode, changing the top Outcome sets every package's outcome.
+document.getElementById('call-outcome').addEventListener('change', function () {
+  if (document.getElementById('call-mode').value === 'multi') {
+    document.querySelectorAll('#call-pkg-checklist [data-pkg-outcome]').forEach(s => s.value = this.value);
+  }
+});
+
 document.getElementById('call-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const id = document.getElementById('call-id').value;
   const statusRadio = document.querySelector('input[name="call-status"]:checked');
   if (!statusRadio) { toast('Please select a call status', 'danger'); return; }
+
+  // Multi-package (whole-customer) call: one shared call → one record per package.
+  if (document.getElementById('call-mode').value === 'multi') {
+    const checks = [...document.querySelectorAll('#call-pkg-checklist input[data-pkg]')].filter(cb => cb.checked);
+    if (!checks.length) { toast('Select at least one package discussed', 'danger'); return; }
+    const ts = new Date().toISOString();
+    const base = {
+      callDate: document.getElementById('call-date').value,
+      agentName: document.getElementById('call-agent').value.trim(),
+      status: statusRadio.value,
+      nextFollowUpDate: document.getElementById('call-next-date').value || null,
+      callDuration: parseInt(document.getElementById('call-duration').value) || null,
+      notes: document.getElementById('call-notes').value.trim(),
+      createdAt: ts, updatedAt: ts,
+    };
+    if (base.agentName && !state.settings.agents.includes(base.agentName)) state.settings.agents.push(base.agentName);
+    let n = 0, renewedAny = false;
+    checks.forEach(cb => {
+      const pid = cb.getAttribute('data-pkg');
+      const pkg = state.packages.find(p => p.id === pid); if (!pkg) return;
+      const outSel = document.querySelector(`#call-pkg-checklist [data-pkg-outcome="${pid}"]`);
+      const outcome = outSel ? outSel.value : 'pending';
+      if (outcome === 'renewed') renewedAny = true;
+      state.followUps.push({ id: uid(), packageId: pid, vehicleId: pkg.vehicleId, outcome, ...base });
+      n++;
+    });
+    save();
+    closeModal('modal-call');
+    refreshBell();
+    if (state.ui.currentView === 'followups') renderFollowups();
+    else if (state.ui.currentView === 'vehicle-detail') renderVehicleDetail(document.getElementById('call-vehicle-id').value);
+    else if (state.ui.currentView === 'dashboard') renderDashboard();
+    toast(`Call logged for ${n} package${n === 1 ? '' : 's'}${renewedAny ? ' 🎉' : ''}`);
+    return;
+  }
+
   const data = {
     id: id || uid(),
     packageId: document.getElementById('call-package-id').value,
