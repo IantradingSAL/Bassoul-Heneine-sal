@@ -4564,51 +4564,28 @@ function sendEmailToWhatsApp() {
   toast(digits ? 'Opening WhatsApp chat…' : 'Opening WhatsApp — choose a contact');
 }
 
-// ── Download the rendered email/quotation as a PDF (for WhatsApp attachment) ──
-function ensureHtml2Pdf() {
-  return new Promise((resolve, reject) => {
-    if (window.html2pdf) return resolve();
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Could not load the PDF library (check internet connection)'));
-    document.head.appendChild(s);
-  });
-}
-async function downloadEmailPdf() {
-  const btn = document.getElementById('email-pdf-btn');
-  const original = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4"></i>Preparing…'; safeCreateIcons(); }
-  let holder = null;
+// ── Open a print-ready view; the user picks "Save as PDF" (for WhatsApp) ──
+// Uses the browser's native print-to-PDF (vector, reliable) instead of canvas
+// rasterisation, which was producing blank pages.
+function downloadEmailPdf() {
+  const html = document.getElementById('email-preview-html-source').textContent || '';
+  const subject = document.getElementById('email-preview-subject').textContent || 'Document';
+  const w = window.open('', '_blank');
+  if (!w) { toast('Please allow pop-ups for this site, then try again', 'danger'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  try { w.document.title = subject; } catch (e) {}
+  // Force background colours to print and trim the page margins
   try {
-    await ensureHtml2Pdf();
-    const html = document.getElementById('email-preview-html-source').textContent || '';
-    const subject = document.getElementById('email-preview-subject').textContent || 'Document';
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    holder = document.createElement('div');
-    holder.innerHTML = (doc && doc.body) ? doc.body.innerHTML : html;
-    holder.style.position = 'fixed';
-    holder.style.left = '-99999px';
-    holder.style.top = '0';
-    holder.style.width = '640px';
-    holder.style.background = '#F1F5F9';
-    document.body.appendChild(holder);
-    const fname = (subject.replace(/[^\w\-]+/g, '_').replace(/_+/g, '_').slice(0, 60) || 'document') + '.pdf';
-    await window.html2pdf().set({
-      margin: 0,
-      filename: fname,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#F1F5F9' },
-      jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy', 'avoid-all'] },
-    }).from(holder).save();
-    toast('PDF downloaded — attach it in WhatsApp');
-  } catch (e) {
-    toast((e && e.message) ? e.message : 'Could not generate PDF', 'danger');
-  } finally {
-    if (holder) holder.remove();
-    if (btn) { btn.disabled = false; btn.innerHTML = original; safeCreateIcons(); }
-  }
+    const st = w.document.createElement('style');
+    st.textContent = '@page{margin:8mm;} html,body{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;} *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}';
+    (w.document.head || w.document.body || w.document.documentElement).appendChild(st);
+  } catch (e) {}
+  const doPrint = () => { try { w.focus(); w.print(); } catch (e) {} };
+  if (w.document.readyState === 'complete') setTimeout(doPrint, 400);
+  else w.addEventListener('load', () => setTimeout(doPrint, 400));
+  toast('In the print dialog, choose "Save as PDF"');
 }
 
 function markEmailSent(packageId, stageKey, recipientEmail) {
