@@ -1489,6 +1489,54 @@ No Brevo yet? Click <b>Copy rendered email</b>, then <b>Open in mail client</b>,
   </div>
 </div>
 
+<div class="modal-backdrop" id="modal-quote">
+  <div class="modal p-6">
+    <div class="flex items-center justify-between mb-1">
+      <div class="font-display text-2xl">Prepare Quotation</div>
+      <button class="btn btn-ghost" onclick="closeModal('modal-quote')"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+    <div class="text-xs mb-4" style="color: var(--text-3);">Choose the package you're offering. The current package is shown for context — its expiry date appears in the email.</div>
+    <input type="hidden" id="quote-pkg-id" />
+    <div class="card p-3 mb-4" style="background: var(--surface-2);">
+      <div class="text-[11px] uppercase font-semibold" style="color: var(--text-3);">Current package</div>
+      <div class="text-sm mt-1" id="quote-current-summary">—</div>
+    </div>
+    <form id="quote-form" class="grid grid-cols-2 gap-4">
+      <div class="col-span-2">
+        <label class="label">Offered package (pick a preset or enter manually)</label>
+        <select class="select" id="quote-preset" onchange="applyQuotePreset()"></select>
+      </div>
+      <div>
+        <label class="label">Code</label>
+        <input class="input font-mono" id="quote-code" placeholder="07NW" />
+      </div>
+      <div>
+        <label class="label">Type</label>
+        <input class="input" id="quote-type" placeholder="New / Premium" />
+      </div>
+      <div>
+        <label class="label">Duration (years)</label>
+        <input class="input font-mono" type="number" min="0" step="1" id="quote-years" placeholder="3" />
+      </div>
+      <div>
+        <label class="label">Mileage cap (km)</label>
+        <input class="input font-mono" type="number" min="0" step="1" id="quote-cap" placeholder="60000" />
+      </div>
+      <div class="col-span-2">
+        <label class="label">Price</label>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono" style="color: var(--text-3);" id="quote-currency-prefix">$</span>
+          <input class="input font-mono pl-7" type="number" step="0.01" min="0" id="quote-price" placeholder="2500.00" />
+        </div>
+      </div>
+      <div class="col-span-2 flex justify-end gap-2 mt-2">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-quote')">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="previewQuote()"><i data-lucide="file-text" class="w-4 h-4"></i>Preview Quotation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="modal-settings">
   <div class="modal p-6">
     <div class="flex items-center justify-between mb-5">
@@ -3845,6 +3893,249 @@ function getAllPendingEmailReminders() {
   return out.sort((a, b) => a.daysLeft - b.daysLeft);
 }
 
+// Best-effort: figure out a package's catalog code (e.g. 07US) from its type/cap
+function inferPackageCode(pkg) {
+  const cat = state.settings.packageCatalog || [];
+  const t = (pkg.packageType || '').toLowerCase();
+  const exact = cat.find(c => (c.type || '').toLowerCase() === t && Number(c.mileageCap) === Number(pkg.mileageCap));
+  if (exact && exact.code) return exact.code;
+  const byType = cat.find(c => (c.type || '').toLowerCase() === t);
+  return byType ? (byType.code || '') : '';
+}
+
+// Holds the offered package while a quotation is being previewed / sent
+let pendingQuoteOffer = null;
+
+function openQuoteModal(packageId) {
+  const pkg = state.packages.find(p => p.id === packageId);
+  if (!pkg) { toast('Package not found', 'danger'); return; }
+  document.getElementById('quote-pkg-id').value = packageId;
+  const curCode = inferPackageCode(pkg);
+  document.getElementById('quote-current-summary').innerHTML =
+    `<span class="badge badge-accent">${escHtml(pkg.packageType)}</span>${curCode ? ' <span class="font-mono text-xs">' + escHtml(curCode) + '</span>' : ''} · expires <strong>${escHtml(fmtDate(pkg.endDate))}</strong>`;
+  document.getElementById('quote-currency-prefix').textContent = CURRENCY_SYMBOLS[state.settings.currency] || '$';
+
+  const cat = state.settings.packageCatalog || [];
+  const sel = document.getElementById('quote-preset');
+  sel.innerHTML = '<option value="">— Custom / enter manually —</option>' + cat.map((c, i) => {
+    const bits = [c.type, c.years ? c.years + 'y' : '', c.mileageCap ? Number(c.mileageCap).toLocaleString() + 'km' : ''].filter(Boolean).join(' · ');
+    return '<option value="' + i + '">' + escHtml(c.code || '(unnamed)') + (bits ? ' — ' + escHtml(bits) : '') + '</option>';
+  }).join('');
+  sel.value = '';
+
+  // Prefill the offered fields from the current package's matched preset so it's
+  // not blank; the user then picks the upgrade preset or edits the fields.
+  const cur = cat.find(c => (c.code || '').toLowerCase() === (curCode || '').toLowerCase());
+  document.getElementById('quote-code').value = curCode || '';
+  document.getElementById('quote-type').value = pkg.packageType || '';
+  document.getElementById('quote-years').value = cur && cur.years ? cur.years : '';
+  document.getElementById('quote-cap').value = pkg.mileageCap || (cur && cur.mileageCap) || '';
+  document.getElementById('quote-price').value = (cur && cur.price) ? cur.price : '';
+  openModal('modal-quote');
+}
+function applyQuotePreset() {
+  const i = document.getElementById('quote-preset').value;
+  if (i === '') return;
+  const c = (state.settings.packageCatalog || [])[Number(i)];
+  if (!c) return;
+  document.getElementById('quote-code').value = c.code || '';
+  document.getElementById('quote-type').value = c.type || '';
+  document.getElementById('quote-years').value = c.years || '';
+  document.getElementById('quote-cap').value = c.mileageCap || '';
+  if (c.price) document.getElementById('quote-price').value = c.price;
+}
+function previewQuote() {
+  const pkgId = document.getElementById('quote-pkg-id').value;
+  const type = document.getElementById('quote-type').value.trim();
+  if (!type) { toast('Enter the offered package type', 'danger'); return; }
+  pendingQuoteOffer = {
+    code: document.getElementById('quote-code').value.trim(),
+    type,
+    years: document.getElementById('quote-years').value,
+    mileageCap: document.getElementById('quote-cap').value,
+    price: document.getElementById('quote-price').value,
+  };
+  closeModal('modal-quote');
+  previewEmail(pkgId, 'quote');
+}
+
+// Dedicated quotation email: describes the OFFERED package (price + contents +
+// upgrade path), with the current package shown only for context (its expiry).
+function buildQuoteEmail(pkg, vehicle, offer, ctx) {
+  const { company, sender, phone, email, customerName, vehicleInfo, plate, vin, currentMileage } = ctx;
+  offer = offer || {};
+  const oType = (offer.type || pkg.packageType || 'Service Package').toString();
+  const oCode = (offer.code || '').toString().trim();
+  const oYears = (offer.years !== '' && offer.years != null && !isNaN(Number(offer.years))) ? Number(offer.years) : null;
+  const oCap = (offer.mileageCap !== '' && offer.mileageCap != null && !isNaN(Number(offer.mileageCap))) ? Number(offer.mileageCap) : null;
+  const priceNum = (offer.price !== '' && offer.price != null && !isNaN(Number(offer.price))) ? Number(offer.price) : null;
+  const priceText = priceNum != null ? fmtMoney(priceNum) : (offer.price ? String(offer.price) : 'On request');
+
+  const curCode = inferPackageCode(pkg);
+  const isUpgrade = !!oCode && !!curCode && oCode.toLowerCase() !== curCode.toLowerCase();
+  const offerLabel = oType + (oCode ? ' (' + oCode + ')' : '');
+  const upgradeLine = isUpgrade
+    ? `Upgrade from ${curCode} to ${oCode}`
+    : (oCode && !curCode ? `Proposed package ${oCode}` : '');
+
+  const vDate = new Date(); vDate.setMonth(vDate.getMonth() + 1);
+  const validUntilISO = vDate.toISOString().slice(0, 10);
+  const validUntil = fmtDate(validUntilISO);
+
+  const durationText = oYears != null ? (oYears + (oYears === 1 ? ' year' : ' years')) : '—';
+  const mileageText = oCap != null ? ('Up to ' + fmtKm(oCap)) : '—';
+
+  const subject = `Service Package Quotation — ${oType}${isUpgrade ? ' (' + curCode + ' → ' + oCode + ')' : ''}${(vehicleInfo && vehicleInfo !== '—') ? ' · ' + vehicleInfo : ''}`;
+
+  // Calendar reminder link (decide before the quotation expires)
+  const _calStart = validUntilISO.replace(/-/g, '');
+  const _vEnd = new Date(validUntilISO); _vEnd.setDate(_vEnd.getDate() + 1);
+  const _calEnd = !isNaN(_vEnd) ? _vEnd.toISOString().slice(0, 10).replace(/-/g, '') : _calStart;
+  const _calTitle = `Service package quotation — decide by ${validUntil}`;
+  const _calDetails = `Quotation from ${company} for the ${offerLabel} package on ${vehicleInfo} (plate ${plate}, VIN ${vin}). Price: ${priceText}. Valid until ${validUntil}. Contact ${company}${phone ? ' at ' + phone : ''}.`;
+  const _gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(_calTitle)}&dates=${_calStart}/${_calEnd}&details=${encodeURIComponent(_calDetails)}${company ? '&location=' + encodeURIComponent(company) : ''}`;
+  const _gcalHtml = _gcal.replace(/&/g, '&amp;');
+  const _tel = phone ? phone.replace(/[^+\d]/g, '') : '';
+
+  const row = (k, v, strong) => `<tr><td width="42%" style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">${escHtml(k)}</td><td style="color:#0F172A;font-size:13px;${strong ? 'font-weight:700;' : ''}padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;">${escHtml(v)}</td></tr>`;
+  const rowTop = (k, v, strong) => `<tr><td width="42%" style="color:#64748B;font-size:13px;padding:6px 0;">${escHtml(k)}</td><td style="color:#0F172A;font-size:13px;${strong ? 'font-weight:700;' : ''}padding:6px 0;text-align:right;">${escHtml(v)}</td></tr>`;
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escHtml(subject)}</title></head>
+<body style="margin:0;padding:0;background:#F1F5F9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#0F172A;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F1F5F9;padding:24px 12px;">
+<tr><td align="center">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#FFFFFF;border-radius:14px;overflow:hidden;box-shadow:0 4px 14px rgba(15,23,42,0.08);">
+
+    <tr><td style="background:linear-gradient(135deg,#7C3AED 0%,#5B21B6 100%);padding:24px 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr><td style="font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:rgba(255,255,255,0.9);font-weight:700;">Service Package Quotation</td></tr>
+        <tr><td style="font-size:24px;font-weight:700;color:#FFFFFF;padding-top:6px;letter-spacing:-0.02em;">${escHtml(company)}</td></tr>
+        <tr><td style="font-size:13px;color:rgba(255,255,255,0.92);padding-top:4px;">Prepared especially for you</td></tr>
+      </table>
+    </td></tr>
+
+    <tr><td style="background:#EDE9FE;border-top:1px solid #7C3AED;padding:14px 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-size:14px;color:#5B21B6;font-weight:600;line-height:1.5;">📝 Please find below your quotation${upgradeLine ? ' — <strong>' + escHtml(upgradeLine) + '</strong>' : ''}.</td></tr></table>
+    </td></tr>
+
+    <tr><td style="padding:28px 32px 0;font-size:15px;color:#0F172A;line-height:1.6;">
+      Dear <strong>${escHtml(customerName)}</strong>,<br><br>
+      Thank you for your interest. Below is our quotation for ${escHtml(offerLabel)} for your vehicle.
+    </td></tr>
+
+    <!-- Vehicle details -->
+    <tr><td style="padding:20px 32px 8px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+        <tr><td style="padding:16px 18px 8px;font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;">🚘 Vehicle</td></tr>
+        <tr><td style="padding:0 18px 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          ${rowTop('Year / Make / Model', vehicleInfo, true)}
+          ${row('VIN', vin)}
+          ${row('License plate', plate, true)}
+        </table></td></tr>
+      </table>
+    </td></tr>
+
+    <!-- Current package (context) -->
+    <tr><td style="padding:8px 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+        <tr><td style="padding:16px 18px 8px;font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;">📍 Your Current Package</td></tr>
+        <tr><td style="padding:0 18px 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          ${rowTop('Package', pkg.packageType + (curCode ? ' (' + curCode + ')' : ''), true)}
+          <tr><td width="42%" style="color:#64748B;font-size:13px;padding:6px 0;border-top:1px solid #E2E8F0;">Expires on</td><td style="color:#DC2626;font-size:13px;font-weight:700;font-family:'Courier New',Consolas,monospace;padding:6px 0;border-top:1px solid #E2E8F0;text-align:right;">${escHtml(fmtDate(pkg.endDate))}</td></tr>
+        </table></td></tr>
+      </table>
+    </td></tr>
+
+    <!-- Offered package -->
+    <tr><td style="padding:8px 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;">
+        <tr><td style="padding:16px 18px 8px;font-size:10px;font-weight:700;color:#6D28D9;text-transform:uppercase;letter-spacing:0.1em;">✨ Offered Package${isUpgrade ? ' — Upgrade' : ''}</td></tr>
+        <tr><td style="padding:0 18px 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          ${rowTop('Package', offerLabel, true)}
+          ${row('Coverage duration', durationText)}
+          ${row('Mileage coverage', mileageText)}
+          ${isUpgrade ? row('Upgrade path', curCode + ' → ' + oCode, true) : ''}
+        </table></td></tr>
+      </table>
+    </td></tr>
+
+    <!-- Price -->
+    <tr><td style="padding:8px 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#7C3AED;border-radius:10px;">
+        <tr><td style="padding:18px 20px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.85);text-transform:uppercase;letter-spacing:0.1em;vertical-align:middle;">💰 Package Price</td>
+            <td style="text-align:right;font-size:26px;font-weight:700;color:#FFFFFF;font-family:'Courier New',Consolas,monospace;vertical-align:middle;">${escHtml(priceText)}</td>
+          </tr></table>
+        </td></tr>
+      </table>
+    </td></tr>
+
+    <!-- Validity -->
+    <tr><td style="padding:6px 32px 4px;font-size:13px;color:#475569;line-height:1.6;">
+      🗓️ This quotation is <strong>valid for one month</strong>, until <strong>${escHtml(validUntil)}</strong>.
+    </td></tr>
+
+    <!-- Action buttons: Call + Reminder -->
+    <tr><td align="center" style="padding:14px 32px 6px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        ${phone ? `<td style="padding:0 5px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#7C3AED;border-radius:10px;"><a href="tel:${escHtml(_tel)}" style="display:inline-block;padding:12px 24px;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:14px;">📞 Call us — ${escHtml(phone)}</a></td></tr></table></td>` : ''}
+        <td style="padding:0 5px;"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#0EA5E9;border-radius:10px;"><a href="${_gcalHtml}" style="display:inline-block;padding:12px 24px;color:#FFFFFF;text-decoration:none;font-weight:600;font-size:14px;">📅 Set a reminder</a></td></tr></table></td>
+      </tr></table>
+      <div style="font-size:11px;color:#94A3B8;padding-top:8px;">Reminder opens in Google Calendar before the quotation expires</div>
+    </td></tr>
+
+    <tr><td style="padding:10px 32px 4px;font-size:14px;color:#475569;line-height:1.6;">
+      We would be glad to answer any questions and to proceed whenever you are ready.
+    </td></tr>
+
+    <tr><td style="padding:18px 32px 28px;font-size:14px;color:#0F172A;line-height:1.6;">
+      Best regards,<br><strong>${escHtml(sender)}</strong><br>${escHtml(company)}${phone ? '<br>📞 ' + escHtml(phone) : ''}${email ? '<br>✉️ ' + escHtml(email) : ''}
+    </td></tr>
+
+    <tr><td style="background:#0F172A;padding:18px 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.6;">This quotation refers to ${escHtml(offerLabel)} for ${escHtml(vehicleInfo)} (VIN ${escHtml(vin)}). Prices valid until ${escHtml(validUntil)}.</td></tr></table>
+    </td></tr>
+
+  </table>
+</td></tr></table>
+</body></html>`;
+
+  const textContent = `SERVICE PACKAGE QUOTATION — ${company}
+
+Dear ${customerName},
+
+Thank you for your interest. Below is our quotation for ${offerLabel} for your vehicle.
+${upgradeLine ? '\n' + upgradeLine.toUpperCase() + '\n' : ''}
+VEHICLE
+- ${vehicleInfo}
+- VIN: ${vin}
+- Plate: ${plate}
+
+YOUR CURRENT PACKAGE
+- ${pkg.packageType}${curCode ? ' (' + curCode + ')' : ''}
+- Expires on: ${fmtDate(pkg.endDate)}
+
+OFFERED PACKAGE${isUpgrade ? ' (UPGRADE)' : ''}
+- Package: ${offerLabel}
+- Coverage duration: ${durationText}
+- Mileage coverage: ${mileageText}${isUpgrade ? '\n- Upgrade path: ' + curCode + ' -> ' + oCode : ''}
+- PRICE: ${priceText}
+
+This quotation is valid for ONE MONTH, until ${validUntil}.
+
+${phone ? 'Call us: ' + phone + '\n' : ''}Set a reminder (Google Calendar): ${_gcal}
+
+We would be glad to answer any questions and to proceed whenever you are ready.
+
+Best regards,
+${sender}
+${company}${phone ? '\nPhone: ' + phone : ''}${email ? '\nEmail: ' + email : ''}`;
+
+  return { subject, textContent, htmlContent };
+}
+
 function buildEmailContent(pkg, vehicle, stageKey) {
   const stats = packageStats(pkg);
   const stage = stageMeta(stageKey);
@@ -3893,6 +4184,10 @@ function buildEmailContent(pkg, vehicle, stageKey) {
   const theme = STAGE_THEMES[stageKey] || STAGE_THEMES['3m'];
   const isQuote = stageKey === 'quote';
   const packagePrice = fmtMoney(pkg.invoicedAmount);
+
+  if (isQuote) {
+    return buildQuoteEmail(pkg, vehicle, pendingQuoteOffer, { company, sender, phone, email, customerName, vehicleInfo, plate, vin, currentMileage });
+  }
 
   // Color the status pills based on how much is left for each axis
   // (uses the same thresholds as the in-app gauges so the email matches the dashboard)
@@ -4594,7 +4889,7 @@ function vehicleDetailHTML(v, embedded) {
             <div class="flex gap-2 mt-3 flex-wrap">
               <button class="btn btn-ghost flex-1" onclick="openServiceModal(null, '${v.id}', '${p.id}')"><i data-lucide="wrench" class="w-3.5 h-3.5"></i>Log service</button>
               <button class="btn btn-call" onclick="openCallModal('${p.id}')"><i data-lucide="phone-call" class="w-3.5 h-3.5"></i>Call</button>
-              <button class="btn btn-ghost" onclick="previewEmail('${p.id}', 'quote')" title="Email a quotation for this package to the customer"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>Quote</button>
+              <button class="btn btn-ghost" onclick="openQuoteModal('${p.id}')" title="Prepare a quotation for an offered / upgrade package"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>Quote</button>
               ${isPinned(p.id)
                 ? `<button class="btn btn-ghost" title="Remove this package from the follow-up list" onclick="fuUnpin('${p.id}')"><i data-lucide="bell-minus" class="w-3.5 h-3.5"></i>Unpin</button>`
                 : `<button class="btn btn-ghost" title="Add this package to the follow-up list now" onclick="fuPin('${p.id}')"><i data-lucide="bell-plus" class="w-3.5 h-3.5"></i>Follow up</button>`}
