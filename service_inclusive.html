@@ -1353,6 +1353,8 @@ No Brevo yet? Click <b>Copy rendered email</b>, then <b>Open in mail client</b>,
       <div class="flex gap-2 flex-wrap">
         <button type="button" class="btn btn-ghost" onclick="closeModal('modal-email-preview')">Cancel</button>
         <button type="button" class="btn btn-ghost" onclick="copyRenderedEmail()"><i data-lucide="clipboard-check" class="w-4 h-4"></i>Copy rendered email</button>
+        <button type="button" id="email-whatsapp-btn" class="btn btn-ghost" onclick="sendEmailToWhatsApp()"><i data-lucide="message-circle" class="w-4 h-4"></i>Send to WhatsApp</button>
+        <button type="button" id="email-pdf-btn" class="btn btn-ghost" onclick="downloadEmailPdf()"><i data-lucide="file-down" class="w-4 h-4"></i>Download PDF</button>
         <a id="email-preview-send" href="#" class="btn btn-ghost" target="_blank"><i data-lucide="external-link" class="w-4 h-4"></i>Open in mail client</a>
         <button type="button" class="btn btn-ghost" onclick="markEmailSentManual()"><i data-lucide="check" class="w-4 h-4"></i>Mark sent</button>
         <button type="button" id="email-brevo-send" class="btn btn-primary" onclick="sendViaBrevo()"><i data-lucide="send" class="w-4 h-4"></i>Send via Brevo</button>
@@ -4530,6 +4532,83 @@ function switchEmailPreviewTab(tab) {
 function copyEmailHtmlSource() {
   const html = document.getElementById('email-preview-html-source').textContent;
   copyToClipboard(html, 'HTML copied — paste into Brevo email editor (HTML mode) to test');
+}
+
+// ── Send the email/quotation to WhatsApp as formatted plain text ──────────
+// WhatsApp can't hold HTML, so we send clean text using its own markup
+// (*bold* for heading lines). Opens the customer's chat with text pre-filled.
+function emailToWhatsAppText() {
+  const raw = document.getElementById('email-preview-body').textContent || '';
+  return raw.split('\n').map(line => {
+    const t = line.trim();
+    if (t && /[A-Z]/.test(t) && t === t.toUpperCase() && !t.startsWith('-') && t.length <= 60 && !/^https?:/i.test(t)) {
+      return '*' + t + '*';
+    }
+    return line;
+  }).join('\n');
+}
+function whatsAppDigits() {
+  const pkgId = document.getElementById('email-preview-package-id').value;
+  const pkg = state.packages.find(p => p.id === pkgId);
+  const v = pkg ? state.vehicles.find(x => x.id === pkg.vehicleId) : null;
+  const phone = v && v.customerPhone ? v.customerPhone : '';
+  if (!phone) return '';
+  const e164 = toE164(phone, state.settings.defaultCountryCode) || phone;
+  return e164.replace(/\D/g, '');
+}
+function sendEmailToWhatsApp() {
+  const text = emailToWhatsAppText();
+  const digits = whatsAppDigits();
+  const url = (digits ? 'https://wa.me/' + digits : 'https://wa.me/') + '?text=' + encodeURIComponent(text);
+  window.open(url, '_blank');
+  toast(digits ? 'Opening WhatsApp chat…' : 'Opening WhatsApp — choose a contact');
+}
+
+// ── Download the rendered email/quotation as a PDF (for WhatsApp attachment) ──
+function ensureHtml2Pdf() {
+  return new Promise((resolve, reject) => {
+    if (window.html2pdf) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Could not load the PDF library (check internet connection)'));
+    document.head.appendChild(s);
+  });
+}
+async function downloadEmailPdf() {
+  const btn = document.getElementById('email-pdf-btn');
+  const original = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4"></i>Preparing…'; safeCreateIcons(); }
+  let holder = null;
+  try {
+    await ensureHtml2Pdf();
+    const html = document.getElementById('email-preview-html-source').textContent || '';
+    const subject = document.getElementById('email-preview-subject').textContent || 'Document';
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    holder = document.createElement('div');
+    holder.innerHTML = (doc && doc.body) ? doc.body.innerHTML : html;
+    holder.style.position = 'fixed';
+    holder.style.left = '-99999px';
+    holder.style.top = '0';
+    holder.style.width = '640px';
+    holder.style.background = '#F1F5F9';
+    document.body.appendChild(holder);
+    const fname = (subject.replace(/[^\w\-]+/g, '_').replace(/_+/g, '_').slice(0, 60) || 'document') + '.pdf';
+    await window.html2pdf().set({
+      margin: 0,
+      filename: fname,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#F1F5F9' },
+      jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy', 'avoid-all'] },
+    }).from(holder).save();
+    toast('PDF downloaded — attach it in WhatsApp');
+  } catch (e) {
+    toast((e && e.message) ? e.message : 'Could not generate PDF', 'danger');
+  } finally {
+    if (holder) holder.remove();
+    if (btn) { btn.disabled = false; btn.innerHTML = original; safeCreateIcons(); }
+  }
 }
 
 function markEmailSent(packageId, stageKey, recipientEmail) {
