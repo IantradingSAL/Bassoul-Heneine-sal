@@ -1354,6 +1354,7 @@ No Brevo yet? Click <b>Copy rendered email</b>, then <b>Open in mail client</b>,
         <button type="button" class="btn btn-ghost" onclick="closeModal('modal-email-preview')">Cancel</button>
         <button type="button" class="btn btn-ghost" onclick="copyRenderedEmail()"><i data-lucide="clipboard-check" class="w-4 h-4"></i>Copy rendered email</button>
         <button type="button" id="email-whatsapp-btn" class="btn btn-ghost" onclick="sendEmailToWhatsApp()"><i data-lucide="message-circle" class="w-4 h-4"></i>Send to WhatsApp</button>
+        <button type="button" id="email-wa-pdf-btn" class="btn btn-ghost" onclick="shareToWhatsAppWithPdf()"><i data-lucide="file-up" class="w-4 h-4"></i>WhatsApp + PDF</button>
         <button type="button" id="email-pdf-btn" class="btn btn-ghost" onclick="downloadEmailPdf()"><i data-lucide="file-down" class="w-4 h-4"></i>Download PDF</button>
         <a id="email-preview-send" href="#" class="btn btn-ghost" target="_blank"><i data-lucide="external-link" class="w-4 h-4"></i>Open in mail client</a>
         <button type="button" class="btn btn-ghost" onclick="markEmailSentManual()"><i data-lucide="check" class="w-4 h-4"></i>Mark sent</button>
@@ -4586,6 +4587,77 @@ function downloadEmailPdf() {
   if (w.document.readyState === 'complete') setTimeout(doPrint, 400);
   else w.addEventListener('load', () => setTimeout(doPrint, 400));
   toast('In the print dialog, choose "Save as PDF"');
+}
+
+// Lazy-load a script once (returns a promise that resolves when the global exists)
+function ensureLib(globalName, src) {
+  return new Promise((resolve, reject) => {
+    if (window[globalName]) return resolve();
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Could not load a required library (check internet connection)'));
+    document.head.appendChild(s);
+  });
+}
+// Build a real PDF Blob from the already-rendered preview iframe (reliable —
+// it captures a visible, laid-out element rather than an off-screen one).
+async function renderPreviewPdfBlob() {
+  await ensureLib('html2canvas', 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
+  await ensureLib('jspdf', 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js');
+  const iframe = document.getElementById('email-preview-iframe');
+  const body = iframe && iframe.contentDocument ? iframe.contentDocument.body : null;
+  if (!body) throw new Error('Preview not ready');
+  const canvas = await window.html2canvas(body, {
+    scale: 2, useCORS: true, backgroundColor: '#F1F5F9',
+    windowWidth: body.scrollWidth, windowHeight: body.scrollHeight,
+  });
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p', 'pt', 'a4');
+  const pw = pdf.internal.pageSize.getWidth();
+  const ph = pdf.internal.pageSize.getHeight();
+  const imgH = canvas.height * (pw / canvas.width);
+  const img = canvas.toDataURL('image/jpeg', 0.95);
+  pdf.addImage(img, 'JPEG', 0, 0, pw, imgH);
+  let remaining = imgH - ph, offset = -ph;
+  while (remaining > 0) { pdf.addPage(); pdf.addImage(img, 'JPEG', 0, offset, pw, imgH); remaining -= ph; offset -= ph; }
+  return pdf.output('blob');
+}
+function pdfFileName() {
+  const subject = document.getElementById('email-preview-subject').textContent || 'Document';
+  return (subject.replace(/[^\w\-]+/g, '_').replace(/_+/g, '_').slice(0, 60) || 'document') + '.pdf';
+}
+// Phone: opens the native share sheet with the PDF attached (pick WhatsApp →
+// it's already attached). Desktop: downloads the PDF + opens the WhatsApp chat.
+async function shareToWhatsAppWithPdf() {
+  const btn = document.getElementById('email-wa-pdf-btn');
+  const original = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4"></i>Preparing…'; safeCreateIcons(); }
+  try {
+    const blob = await renderPreviewPdfBlob();
+    const subject = document.getElementById('email-preview-subject').textContent || 'Quotation';
+    const file = new File([blob], pdfFileName(), { type: 'application/pdf' });
+    const text = emailToWhatsAppText();
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: subject, text });
+        toast('Pick WhatsApp in the share sheet — the PDF is attached');
+      } catch (e) { if (e && e.name !== 'AbortError') throw e; }
+    } else {
+      // Desktop / unsupported: download the PDF and open the WhatsApp chat to attach
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = pdfFileName();
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      sendEmailToWhatsApp();
+      toast('Desktop can\u2019t auto-attach — PDF downloaded; drag it into the WhatsApp chat that opened');
+    }
+  } catch (e) {
+    toast((e && e.message) ? e.message : 'Could not prepare the PDF', 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; safeCreateIcons(); }
+  }
 }
 
 function markEmailSent(packageId, stageKey, recipientEmail) {
