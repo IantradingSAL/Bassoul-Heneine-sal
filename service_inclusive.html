@@ -1230,6 +1230,7 @@
         <label class="label">Mileage cap (km)</label>
         <input class="input font-mono" type="number" id="package-mileage-cap" min="0" required placeholder="40000" />
       </div>
+      <div class="col-span-2"><label class="label">Service items / description (covered services — used in quotations)</label><textarea class="input" id="package-description" rows="4" placeholder="One per line; start a line with • or - for a bullet. Auto-fills from the preset."></textarea></div>
       <div class="col-span-2"><label class="label">Notes</label><textarea class="input" id="package-notes" rows="2" placeholder="Optional notes..."></textarea></div>
       <div class="col-span-2 flex justify-end gap-2 mt-2">
         <button type="button" class="btn btn-ghost" onclick="closeModal('modal-package')">Cancel</button>
@@ -1529,6 +1530,10 @@ No Brevo yet? Click <b>Copy rendered email</b>, then <b>Open in mail client</b>,
           <input class="input font-mono pl-7" type="number" step="0.01" min="0" id="quote-price" placeholder="2500.00" />
         </div>
       </div>
+      <div class="col-span-2">
+        <label class="label">Service items / description (shown in the quotation)</label>
+        <textarea class="input" id="quote-desc" rows="5" placeholder="One per line; start a line with • or - for a bullet. Auto-fills from the preset."></textarea>
+      </div>
       <div class="col-span-2 flex justify-end gap-2 mt-2">
         <button type="button" class="btn btn-ghost" onclick="closeModal('modal-quote')">Cancel</button>
         <button type="button" class="btn btn-primary" onclick="previewQuote()"><i data-lucide="file-text" class="w-4 h-4"></i>Preview Quotation</button>
@@ -1749,7 +1754,10 @@ const DEFAULT_PACKAGE_TYPES = [
 const DEFAULT_PACKAGE_CATALOG = [
   // Auto-fill presets. EDIT THESE IN Settings → Package catalog.
   // years = coverage duration in years; mileageCap = km; price optional.
-  { id: 'pkg-07us', code: '07US', type: 'Basic', years: 3, mileageCap: 40000, price: '' },
+  // description = covered service items (one per line; start a line with • or - for a bullet).
+  { id: 'pkg-07us', code: '07US', type: 'Basic', years: 3, mileageCap: 40000, price: '', description: '' },
+  { id: 'pkg-07nw', code: '07NW', type: 'BMW Service Inclusive', years: 5, mileageCap: 60000, price: 800,
+    description: 'BMW Service Inclusive - 5 years / 60,000 km\nThe Service Package consists of the following services on the factory-made vehicle:\n• Engine-oil change with oil filter and new oil\n• Service or replacement of air filter, micro filter, spark plugs\n• Service brake fluid\n• Service vehicle check according to manufacturer specifications\nValidity: 5 years / 60,000 km, whichever comes first.' },
 ];
 
 const DEFAULT_SERVICE_TYPES = [
@@ -2617,6 +2625,7 @@ function applyPackagePreset() {
   }
   const amtEl = document.getElementById('package-amount');
   if (c.price !== '' && c.price != null && !amtEl.value) amtEl.value = c.price;
+  if (c.description != null && c.description !== '') document.getElementById('package-description').value = c.description;
 }
 
 function openPackageModal(id, vehicleId) {
@@ -2641,6 +2650,7 @@ function openPackageModal(id, vehicleId) {
   document.getElementById('package-start-mileage').value = p?.startMileage ?? '';
   document.getElementById('package-mileage-cap').value = p?.mileageCap ?? '';
   document.getElementById('package-notes').value = p?.notes || '';
+  document.getElementById('package-description').value = p?.description || '';
 
   // Auto-select the vehicle when launched from a specific vehicle, and fill its
   // current mileage as the start mileage (fires the change handler).
@@ -2692,6 +2702,7 @@ document.getElementById('package-form').addEventListener('submit', (e) => {
     startMileage: parseInt(document.getElementById('package-start-mileage').value),
     mileageCap: parseInt(document.getElementById('package-mileage-cap').value),
     notes: document.getElementById('package-notes').value.trim(),
+    description: document.getElementById('package-description').value.trim(),
     createdAt: id ? state.packages.find(p => p.id === id).createdAt : todayISO(),
   };
   if (data.mileageCap <= data.startMileage) { toast('Mileage cap must be greater than start mileage', 'danger'); return; }
@@ -3903,6 +3914,30 @@ function inferPackageCode(pkg) {
   return byType ? (byType.code || '') : '';
 }
 
+// Render a free-text service description into HTML (bullets for •/-/* lines)
+function quoteDescHtml(desc) {
+  const lines = String(desc || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return '';
+  let out = ''; let inList = false; let first = true;
+  for (const l of lines) {
+    const m = /^[•\-\*]\s*(.*)$/.exec(l);
+    if (m) {
+      if (!inList) { out += '<ul style="margin:6px 0;padding-left:20px;color:#0F172A;font-size:13px;line-height:1.65;">'; inList = true; }
+      out += '<li style="margin:3px 0;">' + escHtml(m[1]) + '</li>';
+    } else {
+      if (inList) { out += '</ul>'; inList = false; }
+      out += '<div style="font-size:13px;color:#0F172A;line-height:1.6;margin:4px 0;' + (first ? 'font-weight:700;' : '') + '">' + escHtml(l) + '</div>';
+    }
+    first = false;
+  }
+  if (inList) out += '</ul>';
+  return out;
+}
+function quoteDescText(desc) {
+  return String(desc || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+    .map(l => /^[•\-\*]\s*/.test(l) ? '- ' + l.replace(/^[•\-\*]\s*/, '') : l).join('\n');
+}
+
 // Holds the offered package while a quotation is being previewed / sent
 let pendingQuoteOffer = null;
 
@@ -3931,6 +3966,7 @@ function openQuoteModal(packageId) {
   document.getElementById('quote-years').value = cur && cur.years ? cur.years : '';
   document.getElementById('quote-cap').value = pkg.mileageCap || (cur && cur.mileageCap) || '';
   document.getElementById('quote-price').value = (cur && cur.price) ? cur.price : '';
+  document.getElementById('quote-desc').value = (cur && cur.description) ? cur.description : (pkg.description || '');
   openModal('modal-quote');
 }
 function applyQuotePreset() {
@@ -3943,6 +3979,7 @@ function applyQuotePreset() {
   document.getElementById('quote-years').value = c.years || '';
   document.getElementById('quote-cap').value = c.mileageCap || '';
   if (c.price) document.getElementById('quote-price').value = c.price;
+  if (c.description != null && c.description !== '') document.getElementById('quote-desc').value = c.description;
 }
 function previewQuote() {
   const pkgId = document.getElementById('quote-pkg-id').value;
@@ -3954,6 +3991,7 @@ function previewQuote() {
     years: document.getElementById('quote-years').value,
     mileageCap: document.getElementById('quote-cap').value,
     price: document.getElementById('quote-price').value,
+    description: document.getElementById('quote-desc').value,
   };
   closeModal('modal-quote');
   previewEmail(pkgId, 'quote');
@@ -3984,6 +4022,8 @@ function buildQuoteEmail(pkg, vehicle, offer, ctx) {
 
   const durationText = oYears != null ? (oYears + (oYears === 1 ? ' year' : ' years')) : '—';
   const mileageText = oCap != null ? ('Up to ' + fmtKm(oCap)) : '—';
+  const descHtmlInner = quoteDescHtml(offer.description);
+  const descText = quoteDescText(offer.description);
 
   const subject = `Service Package Quotation — ${oType}${isUpgrade ? ' (' + curCode + ' → ' + oCode + ')' : ''}${(vehicleInfo && vehicleInfo !== '—') ? ' · ' + vehicleInfo : ''}`;
 
@@ -4060,6 +4100,14 @@ function buildQuoteEmail(pkg, vehicle, offer, ctx) {
       </table>
     </td></tr>
 
+    ${descHtmlInner ? `<!-- Covered services -->
+    <tr><td style="padding:8px 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;">
+        <tr><td style="padding:16px 18px 4px;font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;">🛠️ What's Covered</td></tr>
+        <tr><td style="padding:4px 18px 16px;">${descHtmlInner}</td></tr>
+      </table>
+    </td></tr>` : ''}
+
     <!-- Price -->
     <tr><td style="padding:8px 32px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#7C3AED;border-radius:10px;">
@@ -4122,7 +4170,7 @@ OFFERED PACKAGE${isUpgrade ? ' (UPGRADE)' : ''}
 - Coverage duration: ${durationText}
 - Mileage coverage: ${mileageText}${isUpgrade ? '\n- Upgrade path: ' + curCode + ' -> ' + oCode : ''}
 - PRICE: ${priceText}
-
+${descText ? '\nWHAT\u2019S COVERED\n' + descText + '\n' : ''}
 This quotation is valid for ONE MONTH, until ${validUntil}.
 
 ${phone ? 'Call us: ' + phone + '\n' : ''}Set a reminder (Google Calendar): ${_gcal}
@@ -5064,7 +5112,8 @@ function renderPackageCatalog() {
     cell(i, 'mileageCap', c.mileageCap, { w:'96px', ph:'40000', type:'number', step:'1', mono:true }) +
     cell(i, 'price', c.price, { w:'84px', ph:'0', type:'number', step:'0.01', mono:true }) +
     '<td class="py-1"><button type="button" class="btn btn-ghost" style="padding:4px 6px;" title="Remove" onclick="catalogDeleteRow(' + i + ')"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></td>' +
-    '</tr>'
+    '</tr>' +
+    '<tr><td colspan="6" style="padding:0 8px 12px;"><textarea class="input" rows="3" style="font-size:12px;width:100%;" placeholder="Service items / description — shown in quotations. One per line; start a line with • or - for a bullet." onchange="catalogUpdate(' + i + ',\'description\',this.value)">' + escHtml(c.description || '') + '</textarea></td></tr>'
   ).join('');
   safeCreateIcons();
 }
@@ -5082,7 +5131,7 @@ function catalogUpdate(i, field, value) {
 
 function catalogAddRow() {
   if (!state.settings.packageCatalog) state.settings.packageCatalog = [];
-  state.settings.packageCatalog.push({ id: uid(), code: '', type: '', years: '', mileageCap: '', price: '' });
+  state.settings.packageCatalog.push({ id: uid(), code: '', type: '', years: '', mileageCap: '', price: '', description: '' });
   save();
   renderPackageCatalog();
 }
