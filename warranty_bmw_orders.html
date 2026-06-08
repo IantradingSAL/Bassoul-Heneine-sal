@@ -187,19 +187,14 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .modal-b{padding:18px 20px;display:flex;flex-direction:column;gap:13px;overflow-y:auto}
 .modal-x{background:none;border:1px solid var(--line);border-radius:9px;width:30px;height:30px;cursor:pointer;font-size:15px;color:var(--muted);font-family:inherit}
 .sec-lab{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-top:1px solid var(--line);padding-top:11px;margin-top:2px}
-/* admin visibility panel */
-.adminpanel{border:1px solid var(--bmw);background:rgba(28,105,212,.03)}
-.vis-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;padding:8px 0;border-bottom:1px solid #f1f5f9}
-.vis-row:last-child{border-bottom:0}
-.sw{position:relative;display:inline-block;width:40px;height:22px;flex:none}
-.sw input{display:none}
-.sw .sl{position:absolute;inset:0;background:#cbd5e1;border-radius:999px;transition:.18s;cursor:pointer}
-.sw .sl:before{content:"";position:absolute;height:16px;width:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.18s}
-.sw input:checked + .sl{background:var(--bmw)}
-.sw input:checked + .sl:before{transform:translateX(18px)}
-.rule-chip{display:inline-flex;align-items:center;gap:7px;font-size:11px;padding:5px 9px;border:1px solid var(--line);border-radius:9px;background:#fff}
-.rule-chip b{font-weight:700}
-.rule-chip button{background:none;border:none;color:var(--rose);cursor:pointer;font-size:13px;line-height:1}
+/* filters */
+.filterbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+.filterbar .fld{min-width:130px;flex:1}
+.filterbar .fld.grow{flex:2;min-width:200px}
+.filterbar .btns{display:flex;gap:8px;align-items:center}
+.result-count{font-size:11px;color:var(--muted);font-weight:600;margin-left:auto}
+.section-head{display:flex;align-items:center;gap:10px;margin:4px 0 14px}
+.section-head .ct{margin:0}
 /* hide claim columns for advisor (toggled on <body>) */
 body.hide-wc .c-wc{display:none}
 body.hide-sc .c-sc{display:none}
@@ -238,9 +233,7 @@ body.hide-sc .c-sc{display:none}
       </div>
     </div>
 
-    <div class="al al-i">📝 First step to insert a BMW warranty claim. The <strong>Service Advisor</strong> is set from your login and the <strong>Order</strong> reference is built automatically (GOR0 + number). <strong>Pick-up date, Return date and the Warranty note</strong> are warranty-admin only. <strong>Order date</strong> and <strong>Date</strong> default to today (editable).</div>
-
-    <!-- Claim-date visibility is now managed in Settings → Roles & Access (role center). This page only respects those rules. -->
+    <div class="al al-i">📝 Fill in the order, VIN and customer, then press <strong>Save order</strong>. Your name is set from your login and the <strong>Order</strong> reference (GOR0…) builds itself. <strong>Order date</strong> and <strong>Date</strong> default to today. Pick-up, return and the warranty fields are handled by the warranty admin.</div>
 
     <!-- ── ENTRY FORM ── -->
     <div class="card editor-only">
@@ -249,7 +242,17 @@ body.hide-sc .c-sc{display:none}
         <div class="fld">
           <label>Order Number</label>
           <input id="f_order" type="text" inputmode="numeric" placeholder="e.g. 267779" autocomplete="off">
-          <span class="hint">Manual · digits only</span>
+          <span class="hint">Digits only</span>
+        </div>
+        <div class="fld">
+          <label>VIN</label>
+          <input id="f_vin" type="text" placeholder="e.g. WBA…" autocomplete="off" style="text-transform:uppercase">
+          <span class="hint">Vehicle chassis number</span>
+        </div>
+        <div class="fld">
+          <label>Customer name</label>
+          <input id="f_customer" type="text" placeholder="e.g. Tony Khoury" autocomplete="off">
+          <span class="hint">Owner / company</span>
         </div>
         <div class="fld">
           <label>Order date</label>
@@ -259,7 +262,7 @@ body.hide-sc .c-sc{display:none}
         <div class="fld">
           <label>Date</label>
           <input id="f_date" type="date">
-          <span class="hint">Defaults to today · editable · service / intake</span>
+          <span class="hint">Defaults to today · service / intake</span>
         </div>
         <div class="fld">
           <label>Service advisor <span class="auto-tag">AUTO · LOGIN</span></label>
@@ -269,7 +272,7 @@ body.hide-sc .c-sc{display:none}
         <div class="fld">
           <label>Order <span class="auto-tag">AUTO</span></label>
           <div class="order-ref-box" id="f_orderref">—</div>
-          <span class="hint">Built as GOR0 + Order Number</span>
+          <span class="hint">GOR0 + Order Number</span>
         </div>
         <div class="fld">
           <label>Pick-up date <span class="auto-tag lock-tag" id="tag_pickup">🔒 WARRANTY ADMIN</span></label>
@@ -279,7 +282,7 @@ body.hide-sc .c-sc{display:none}
         <div class="fld">
           <label>Return date <span class="auto-tag lock-tag" id="tag_return">🔒 WARRANTY ADMIN</span></label>
           <input id="f_return" type="date" disabled>
-          <span class="hint" id="hint_return">Visible to advisor · set by warranty admin</span>
+          <span class="hint" id="hint_return">Set by warranty admin</span>
         </div>
         <div class="fld" id="wrap_f_wc">
           <label>Warranty claim date <span class="auto-tag pending-tag">FROM EXCEL</span></label>
@@ -294,12 +297,10 @@ body.hide-sc .c-sc{display:none}
         <div class="fld full">
           <label>Service advisor note</label>
           <textarea id="f_note" rows="2" placeholder="Advisor note — e.g. to be sent today"></textarea>
-          <span class="hint">Optional · your note as the advisor</span>
         </div>
         <div class="fld full">
           <label>Warranty note <span class="auto-tag lock-tag" id="tag_wnote">🔒 WARRANTY ADMIN</span></label>
           <textarea id="f_wnote" rows="2" placeholder="Warranty admin note" disabled></textarea>
-          <span class="hint" id="hint_wnote">Visible to advisor · set by warranty admin</span>
         </div>
       </div>
       <div class="form-actions">
@@ -311,31 +312,56 @@ body.hide-sc .c-sc{display:none}
 
     <!-- ── KPIs ── -->
     <div class="kpis">
-      <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="ks">Total orders</div><div class="kv bmw" id="k_total">—</div><div class="ks">All registered</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="ks">Total orders</div><div class="kv bmw" id="k_total">—</div><div class="ks" id="k_total_sub">All registered</div></div>
       <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="ks">Pending claim match</div><div class="kv sun" id="k_pending">—</div><div class="ks">No warranty claim date yet</div></div>
       <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="ks">Matched</div><div class="kv mint" id="k_matched">—</div><div class="ks">Claim date filled</div></div>
     </div>
 
     <!-- ── TABLE ── -->
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap">
-        <div class="ct" style="margin:0">📋 Registered orders</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="search" class="viewer-ok" placeholder="🔎 Search order / advisor / note" style="padding:7px 11px;border:1px solid var(--line);border-radius:8px;font-size:11px;font-family:inherit;min-width:200px">
-          <button class="btn btn-sm viewer-ok" id="refreshBtn">↻ Refresh</button>
+      <div class="section-head">
+        <div class="ct">📋 Registered orders</div>
+        <span class="result-count" id="resultCount"></span>
+      </div>
+
+      <!-- filters -->
+      <div class="filterbar">
+        <div class="fld grow">
+          <label>Search order / VIN / customer</label>
+          <input id="f_q" placeholder="🔎 Order #, GOR ref, VIN or customer">
+        </div>
+        <div class="fld" id="wrap_advfilter">
+          <label>Service advisor</label>
+          <select id="f_adv"><option value="">All advisors</option></select>
+        </div>
+        <div class="fld">
+          <label>Order date from</label>
+          <input id="f_from" type="date">
+        </div>
+        <div class="fld">
+          <label>Order date to</label>
+          <input id="f_to" type="date">
+        </div>
+        <div class="btns">
+          <button class="btn btn-sm btn-ghost" id="clearFilters">Clear</button>
+          <button class="btn btn-sm btn-ghost" id="printBtn">🖨 Print report</button>
+          <button class="btn btn-sm" id="refreshBtn">↻ Refresh</button>
         </div>
       </div>
+
       <div class="tw">
         <table class="t">
           <thead>
             <tr>
               <th>Order #</th>
               <th>Order</th>
+              <th>VIN</th>
+              <th>Customer</th>
+              <th>Service advisor</th>
               <th>Order date</th>
               <th>Date</th>
               <th>Pick-up</th>
               <th>Return</th>
-              <th>Service advisor</th>
               <th class="c-wc">Warranty claim</th>
               <th class="c-sc">Service claim</th>
               <th>Advisor note</th>
@@ -343,7 +369,7 @@ body.hide-sc .c-sc{display:none}
             </tr>
           </thead>
           <tbody id="tbody">
-            <tr><td colspan="11" style="text-align:center;color:var(--faint);padding:26px">Loading…</td></tr>
+            <tr><td colspan="13" style="text-align:center;color:var(--faint);padding:26px">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -360,35 +386,16 @@ body.hide-sc .c-sc{display:none}
     </div>
     <div class="modal-b">
       <div class="al al-i" style="margin:0" id="m_modeNote">—</div>
-
-      <div class="fld">
-        <label>Service advisor note</label>
-        <textarea id="m_note" rows="2"></textarea>
-      </div>
+      <div class="fld"><label>VIN</label><input id="m_vin" type="text" style="text-transform:uppercase"></div>
+      <div class="fld"><label>Customer name</label><input id="m_customer" type="text"></div>
+      <div class="fld"><label>Service advisor note</label><textarea id="m_note" rows="2"></textarea></div>
 
       <div class="sec-lab">🔒 Warranty admin fields</div>
-      <div class="fld">
-        <label>Pick-up date</label>
-        <input id="m_pickup" type="date">
-      </div>
-      <div class="fld">
-        <label>Return date</label>
-        <input id="m_return" type="date">
-      </div>
-      <div class="fld" id="wrap_m_wc">
-        <label>Warranty claim date &amp; time</label>
-        <input id="m_warranty" type="datetime-local">
-        <span class="hint">Defaults to now · editable · advisors see date only</span>
-      </div>
-      <div class="fld" id="wrap_m_sc">
-        <label>Service claim date &amp; time</label>
-        <input id="m_service" type="datetime-local">
-        <span class="hint">Defaults to now · editable · advisors see date only</span>
-      </div>
-      <div class="fld">
-        <label>Warranty note</label>
-        <textarea id="m_wnote" rows="2"></textarea>
-      </div>
+      <div class="fld"><label>Pick-up date</label><input id="m_pickup" type="date"></div>
+      <div class="fld"><label>Return date</label><input id="m_return" type="date"></div>
+      <div class="fld" id="wrap_m_wc"><label>Warranty claim date &amp; time</label><input id="m_warranty" type="datetime-local"><span class="hint">Defaults to now · advisors see date only</span></div>
+      <div class="fld" id="wrap_m_sc"><label>Service claim date &amp; time</label><input id="m_service" type="datetime-local"><span class="hint">Defaults to now · advisors see date only</span></div>
+      <div class="fld"><label>Warranty note</label><textarea id="m_wnote" rows="2"></textarea></div>
 
       <div class="form-actions" style="margin-top:4px">
         <button class="btn btn-bmw" id="m_save">💾 Save changes</button>
@@ -404,12 +411,8 @@ body.hide-sc .c-sc{display:none}
 <script type="module">
 import { SUPABASE_CONFIG } from './config.js'
 
-// ── Who counts as a "warranty admin". Matched (case-insensitive,
-//    substring) against the employee's custom_role / role. Same logic
-//    is enforced in the DB trigger (warranty_bmw_orders.sql).
 const WARRANTY_ADMIN_ROLES = ['admin', 'manager', 'warranty admin', 'warranty manager']
 
-// ── Supabase client (multi-CDN fallback, same as BMW page) ──
 let createClient = null
 const cdns = [
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
@@ -417,18 +420,14 @@ const cdns = [
   'https://esm.sh/@supabase/supabase-js@2',
   'https://unpkg.com/@supabase/supabase-js@2/dist/module/index.js'
 ]
-for (const url of cdns){
-  try { const m = await import(url); if (m && m.createClient){ createClient = m.createClient; break } }
-  catch(e){ console.warn('[Orders] CDN unreachable:', url) }
-}
+for (const url of cdns){ try { const m = await import(url); if (m && m.createClient){ createClient = m.createClient; break } } catch(e){} }
 if (!createClient){ alert('Could not load Supabase library — please check your network.'); throw new Error('Supabase unreachable') }
 const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
 window._sb = sb
 
-const S = { me:null, advisorName:'—', authEmail:'', empEmail:'', role:'employee', roleKey:'', isAdmin:false,
-            rows:[], editId:null, rules:[], roles:[], emps:[], hideWC:false, hideSC:false }
+const S = { me:null, advisorName:'—', authEmail:'', authUserId:'', empEmail:'', role:'employee', roleKey:'', isAdmin:false,
+            rows:[], view:[], editId:null, rules:[], hideWC:false, hideSC:false }
 
-// ── helpers ──
 const $ = id => document.getElementById(id)
 const val = id => ($(id)?.value || '').trim()
 const todayISO = () => { const d=new Date(); const o=d.getTimezoneOffset(); return new Date(d.getTime()-o*60000).toISOString().slice(0,10) }
@@ -442,60 +441,47 @@ const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'
 const fmtD  = d => { if(!d) return '—'; const dt=new Date(d); if(isNaN(dt)){const p=String(d).slice(0,10).split('-'); return p.length===3?p.join('-'):d} return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) }
 const fmtDT = d => { if(!d) return '—'; const dt=new Date(d); if(isNaN(dt)) return fmtD(d); const hasTime=/\d{2}:\d{2}/.test(String(d)) && !/T00:00/.test(String(d)); return fmtD(d) + (hasTime ? ' · ' + dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '') }
 
-// ── identity + role ──
 async function whoami(){
   let roleStr = (sessionStorage.getItem('cw_role') || localStorage.getItem('cw_role') || '').toLowerCase()
   try{
     const { data:{ user } } = await sb.auth.getUser()
-    S.authEmail = user?.email || ''
+    S.authEmail = user?.email || ''; S.authUserId = user?.id || ''
     if (user){
       const { data } = await sb.from('employees').select('id,name,email,role,custom_role,auth_user_id').eq('auth_user_id', user.id).maybeSingle()
       if (data){ S.me=data; S.empEmail=data.email||''; S.roleKey=(data.role||'').toLowerCase(); roleStr=(data.custom_role||data.role||roleStr||'').toLowerCase() }
     }
-  }catch(e){ console.warn('[Orders] whoami', e) }
+  }catch(e){ console.warn('whoami', e) }
   S.role = roleStr || 'employee'
   S.isAdmin = WARRANTY_ADMIN_ROLES.some(r => S.role.includes(r))
-  S.advisorName = (S.me && S.me.name) || window.CW_USER
-    || sessionStorage.getItem('cw_name') || localStorage.getItem('cw_name') || S.authEmail || '—'
+  S.advisorName = (S.me && S.me.name) || window.CW_USER || sessionStorage.getItem('cw_name') || localStorage.getItem('cw_name') || S.authEmail || '—'
   $('f_advisor').value = S.advisorName
   $('advisorChip').textContent = '👤 ' + S.advisorName + ' · ' + S.role
-  const chip = $('modeChip')
-  chip.textContent = S.isAdmin ? '🔓 Warranty admin' : '🔒 Advisor (locked)'
-  chip.className = 'badge ' + (S.isAdmin ? 'b-ok' : 'b-pend')
+  const chip = $('modeChip'); chip.textContent = S.isAdmin ? '🔓 Warranty admin' : '🔒 Advisor'; chip.className = 'badge ' + (S.isAdmin ? 'b-ok' : 'b-pend')
+  // advisors are scoped to their own cases → hide the advisor filter for them
+  $('wrap_advfilter').style.display = S.isAdmin ? '' : 'none'
+  $('k_total_sub').textContent = S.isAdmin ? 'All registered' : 'Your cases'
   applyRoleLocks()
 }
 
 function applyRoleLocks(){
-  const map = [
-    { input:'f_pickup', tag:'tag_pickup', hint:'hint_pickup', adminHint:'Manual · when the car was collected' },
-    { input:'f_return', tag:'tag_return', hint:'hint_return', adminHint:'Manual · when the car was returned' },
-    { input:'f_wnote',  tag:'tag_wnote',  hint:'hint_wnote',  adminHint:'Optional · warranty admin note' }
-  ]
-  map.forEach(m=>{
-    const el=$(m.input), tag=$(m.tag), hint=$(m.hint); if(!el) return
+  [['f_pickup','tag_pickup','hint_pickup','Manual · when collected'],
+   ['f_return','tag_return','hint_return','Manual · when returned'],
+   ['f_wnote','tag_wnote','hint_wnote','Optional · warranty admin note']
+  ].forEach(([input,tag,hint,adminHint])=>{
+    const el=$(input), t=$(tag), h=$(hint); if(!el) return
     el.disabled = !S.isAdmin
-    if(tag){ tag.textContent = S.isAdmin ? 'ADMIN' : '🔒 WARRANTY ADMIN'; tag.classList.toggle('lock-tag', !S.isAdmin) }
-    if(hint && S.isAdmin) hint.textContent = m.adminHint
+    if(t){ t.textContent = S.isAdmin ? 'ADMIN' : '🔒 WARRANTY ADMIN'; t.classList.toggle('lock-tag', !S.isAdmin) }
+    if(h && S.isAdmin) h.textContent = adminHint
   })
 }
 
-// ── field visibility rules ──
-async function loadRules(){
-  try{
-    const { data } = await sb.from('warranty_bmw_field_rules').select('*')
-    S.rules = data || []
-  }catch(e){ S.rules=[] }
-  resolveVisibility()
-}
+// field-visibility rules (managed in Settings → Roles & Access)
+async function loadRules(){ try{ const {data}=await sb.from('warranty_bmw_field_rules').select('*'); S.rules=data||[] }catch(e){ S.rules=[] } resolveVisibility() }
 function ruleHidden(field){
-  // user override wins, then role, then default; admins never hidden
-  const mine = (S.empEmail||S.authEmail||'').toLowerCase()
-  const u = S.rules.find(r=>r.field===field && r.scope==='user'  && (r.scope_value||'').toLowerCase()===mine)
-  if (u) return !!u.hidden
-  const rr = S.rules.find(r=>r.field===field && r.scope==='role' && [S.roleKey,S.role].includes((r.scope_value||'').toLowerCase()))
-  if (rr) return !!rr.hidden
-  const d = S.rules.find(r=>r.field===field && r.scope==='default')
-  if (d) return !!d.hidden
+  const mine=(S.empEmail||S.authEmail||'').toLowerCase()
+  const u=S.rules.find(r=>r.field===field&&r.scope==='user'&&(r.scope_value||'').toLowerCase()===mine); if(u) return !!u.hidden
+  const rr=S.rules.find(r=>r.field===field&&r.scope==='role'&&[S.roleKey,S.role].includes((r.scope_value||'').toLowerCase())); if(rr) return !!rr.hidden
+  const d=S.rules.find(r=>r.field===field&&r.scope==='default'); if(d) return !!d.hidden
   return false
 }
 function resolveVisibility(){
@@ -507,18 +493,17 @@ function resolveVisibility(){
   const mw=$('wrap_m_wc'), ms=$('wrap_m_sc'); if(mw) mw.style.display=S.hideWC?'none':''; if(ms) ms.style.display=S.hideSC?'none':''
 }
 
-// ── order ref preview ──
-$('f_order').addEventListener('input', () => {
-  const v = val('f_order').replace(/\D/g,''); $('f_order').value=v
-  $('f_orderref').textContent = v ? 'GOR0'+v : '—'
-})
+// order-ref preview + VIN uppercase
+$('f_order').addEventListener('input', () => { const v=val('f_order').replace(/\D/g,''); $('f_order').value=v; $('f_orderref').textContent=v?'GOR0'+v:'—' })
+$('f_vin').addEventListener('input', () => { $('f_vin').value = $('f_vin').value.toUpperCase() })
 
-// ── save new order ──
 async function save(){
   const order_number = val('f_order')
   if (!order_number){ showToast('⚠️ Order Number is required'); $('f_order').focus(); return }
   const payload = {
     order_number,
+    vin: val('f_vin') || null,
+    customer_name: val('f_customer') || null,
     order_date: val('f_orderdate') || null,
     work_date:  val('f_date')      || null,
     service_advisor: S.advisorName === '—' ? null : S.advisorName,
@@ -538,46 +523,124 @@ async function save(){
   showToast('✅ Order GOR0'+order_number+' saved'); clearForm(); load()
 }
 function clearForm(){
-  ['f_order','f_note','f_pickup','f_return','f_wnote'].forEach(id=>{ if($(id)) $(id).value='' })
-  $('f_orderdate').value = todayISO(); $('f_date').value = todayISO()
-  $('f_orderref').textContent='—'; $('f_order').focus()
+  ['f_order','f_vin','f_customer','f_note','f_pickup','f_return','f_wnote'].forEach(id=>{ if($(id)) $(id).value='' })
+  $('f_orderdate').value=todayISO(); $('f_date').value=todayISO(); $('f_orderref').textContent='—'; $('f_order').focus()
 }
 
-// ── load + render orders ──
 async function load(){
   showLoad('Loading orders…')
   const { data, error } = await sb.from('warranty_bmw_orders').select('*').order('created_at',{ascending:false})
   hideLoad()
-  if (error){ showToast('❌ '+(error.message||'').slice(0,90)); $('tbody').innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--rose);padding:26px">'+esc(error.message)+'</td></tr>'; return }
-  S.rows = data || []; render()
+  if (error){ showToast('❌ '+(error.message||'').slice(0,90)); $('tbody').innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--rose);padding:26px">'+esc(error.message)+'</td></tr>'; return }
+  S.rows = data || []
+  populateAdvisorFilter()
+  render()
 }
+
+// advisor sees only their own cases
+function scopeRows(){
+  if (S.isAdmin) return S.rows
+  return S.rows.filter(r =>
+    (S.me && r.service_advisor_id && r.service_advisor_id === S.me.id) ||
+    (r.service_advisor && S.advisorName !== '—' && (r.service_advisor||'').toLowerCase() === S.advisorName.toLowerCase()) ||
+    (r.created_by && S.authUserId && r.created_by === S.authUserId)
+  )
+}
+function applyFilters(rows){
+  const q = val('f_q').toLowerCase()
+  const adv = val('f_adv')
+  const from = val('f_from'), to = val('f_to')
+  return rows.filter(r=>{
+    if (q && !((r.order_number+' '+(r.order_ref||'')+' '+(r.vin||'')+' '+(r.customer_name||'')+' '+(r.service_advisor||'')).toLowerCase().includes(q))) return false
+    if (adv && (r.service_advisor||'') !== adv) return false
+    const od = (r.order_date||'').slice(0,10)
+    if (from && (!od || od < from)) return false
+    if (to && (!od || od > to)) return false
+    return true
+  })
+}
+function populateAdvisorFilter(){
+  if (!S.isAdmin) return
+  const cur = val('f_adv')
+  const names = [...new Set(S.rows.map(r=>r.service_advisor).filter(Boolean))].sort()
+  $('f_adv').innerHTML = '<option value="">All advisors</option>' + names.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join('')
+}
+
 function render(){
-  const q = val('search').toLowerCase()
-  const rows = S.rows.filter(r=> !q || (r.order_number+' '+(r.order_ref||'')+' '+(r.service_advisor||'')+' '+(r.note||'')+' '+(r.warranty_note||'')).toLowerCase().includes(q))
-  const total = S.rows.length, matched = S.rows.filter(r=>r.warranty_claim_date).length
+  const scoped = scopeRows()
+  S.view = applyFilters(scoped)
+  const total = scoped.length, matched = scoped.filter(r=>r.warranty_claim_date).length
   $('k_total').textContent=total; $('k_matched').textContent=matched; $('k_pending').textContent=total-matched
-  const dash = '<span style="color:var(--faint)">—</span>'
-  // admins see date+time on claim fields; advisors see date only
+  $('resultCount').textContent = `Showing ${S.view.length} of ${total}`
+  const dash='<span style="color:var(--faint)">—</span>'
   const claim = v => v ? (S.isAdmin ? fmtDT(v) : fmtD(v)) : null
-  if (!rows.length){ $('tbody').innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--faint);padding:26px">No orders yet — add one above.</td></tr>'; return }
-  $('tbody').innerHTML = rows.map(r=>{
+  if (!S.view.length){ $('tbody').innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--faint);padding:26px">'+(scoped.length?'No orders match the filters.':'No orders yet — add one above.')+'</td></tr>'; return }
+  $('tbody').innerHTML = S.view.map(r=>{
     const wc = r.warranty_claim_date ? '<span class="badge b-ok">'+claim(r.warranty_claim_date)+'</span>' : '<span class="badge b-pend">⏳ pending</span>'
     const sc = r.service_claim_date ? claim(r.service_claim_date) : dash
     return '<tr class="tr-clickable" data-id="'+r.id+'">'
       + '<td class="mono" style="font-weight:700">'+esc(r.order_number)+'</td>'
       + '<td class="mono" style="color:var(--bmw);font-weight:700">'+esc(r.order_ref||('GOR0'+r.order_number))+'</td>'
+      + '<td class="mono" style="font-size:11px">'+esc(r.vin||'')+'</td>'
+      + '<td>'+esc(r.customer_name||'')+'</td>'
+      + '<td>'+esc(r.service_advisor||'—')+'</td>'
       + '<td>'+fmtD(r.order_date)+'</td>'
       + '<td>'+fmtD(r.work_date)+'</td>'
       + '<td>'+(r.pickup_date?fmtD(r.pickup_date):dash)+'</td>'
       + '<td>'+(r.return_date?fmtD(r.return_date):dash)+'</td>'
-      + '<td>'+esc(r.service_advisor||'—')+'</td>'
       + '<td class="c-wc">'+wc+'</td>'
       + '<td class="c-sc">'+sc+'</td>'
-      + '<td style="max-width:150px;color:var(--muted)">'+esc(r.note||'')+'</td>'
-      + '<td style="max-width:150px;color:var(--muted)">'+esc(r.warranty_note||'')+'</td>'
+      + '<td style="max-width:140px;color:var(--muted)">'+esc(r.note||'')+'</td>'
+      + '<td style="max-width:140px;color:var(--muted)">'+esc(r.warranty_note||'')+'</td>'
       + '</tr>'
   }).join('')
   $('tbody').querySelectorAll('tr.tr-clickable').forEach(tr=>tr.addEventListener('click',()=>openModal(+tr.dataset.id)))
+}
+
+// ── print report (current scope + filters) ──
+function printReport(){
+  const rows = S.view
+  const claim = v => v ? (S.isAdmin ? fmtDT(v) : fmtD(v)) : '—'
+  const cols = ['Order #','Order','VIN','Customer','Advisor','Order date','Date','Pick-up','Return']
+  if (!S.hideWC) cols.push('Warranty claim')
+  if (!S.hideSC) cols.push('Service claim')
+  cols.push('Advisor note','Warranty note')
+  const body = rows.map(r=>{
+    const c=[r.order_number, r.order_ref||('GOR0'+r.order_number), r.vin||'', r.customer_name||'', r.service_advisor||'',
+             fmtD(r.order_date), fmtD(r.work_date), r.pickup_date?fmtD(r.pickup_date):'—', r.return_date?fmtD(r.return_date):'—']
+    if (!S.hideWC) c.push(claim(r.warranty_claim_date))
+    if (!S.hideSC) c.push(claim(r.service_claim_date))
+    c.push(r.note||'', r.warranty_note||'')
+    return '<tr>'+c.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>'
+  }).join('')
+  const f=[]
+  if (val('f_q')) f.push('search: "'+val('f_q')+'"')
+  if (val('f_adv')) f.push('advisor: '+val('f_adv'))
+  if (val('f_from')) f.push('from '+val('f_from'))
+  if (val('f_to')) f.push('to '+val('f_to'))
+  if (!S.isAdmin) f.push('advisor: '+S.advisorName)
+  const w = window.open('', '_blank')
+  if (!w){ showToast('⚠️ Allow pop-ups to print'); return }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>BMW Orders Report</title>
+    <style>
+      *{font-family:Arial,Helvetica,sans-serif;box-sizing:border-box}
+      body{margin:24px;color:#0f172a}
+      h1{font-size:18px;margin:0 0 2px} .sub{font-size:11px;color:#64748b;margin-bottom:14px}
+      table{width:100%;border-collapse:collapse;font-size:10px}
+      th,td{border:1px solid #cbd5e1;padding:5px 6px;text-align:left;vertical-align:top}
+      th{background:#1C69D4;color:#fff;font-size:9px;text-transform:uppercase;letter-spacing:.03em}
+      tr:nth-child(even) td{background:#f8fafc}
+      .meta{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;border-bottom:2px solid #1C69D4;padding-bottom:8px}
+      @media print{ @page{ size:landscape; margin:12mm } }
+    </style></head><body>
+    <div class="meta">
+      <div><h1>🇩🇪 BMW Warranty — Orders Report</h1>
+      <div class="sub">Bassoul, Heneine SAL · ${rows.length} order(s)${f.length?' · '+esc(f.join(' · ')):''}</div></div>
+      <div class="sub">Generated ${new Date().toLocaleString('en-GB')}</div>
+    </div>
+    <table><thead><tr>${cols.map(c=>'<th>'+esc(c)+'</th>').join('')}</tr></thead><tbody>${body||'<tr><td colspan="'+cols.length+'">No rows</td></tr>'}</tbody></table>
+    </body></html>`)
+  w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print() }catch(e){} }, 350)
 }
 
 // ── edit modal ──
@@ -585,21 +648,17 @@ function openModal(id){
   const r = S.rows.find(x=>x.id===id); if(!r) return
   S.editId = id
   $('m_title').textContent = 'Edit ' + (r.order_ref||('GOR0'+r.order_number))
-  $('m_note').value = r.note || ''
-  $('m_wnote').value = r.warranty_note || ''
+  $('m_vin').value = r.vin || ''; $('m_customer').value = r.customer_name || ''
+  $('m_note').value = r.note || ''; $('m_wnote').value = r.warranty_note || ''
   setDate('m_pickup', r.pickup_date); setDate('m_return', r.return_date)
-  // claim date+time default to NOW when empty (admin only)
-  if (S.isAdmin){
-    setDT('m_warranty', r.warranty_claim_date || nowLocal())
-    setDT('m_service',  r.service_claim_date  || nowLocal())
-  } else {
-    setDT('m_warranty', r.warranty_claim_date); setDT('m_service', r.service_claim_date)
-  }
-  $('m_note').disabled = S.isAdmin
+  if (S.isAdmin){ setDT('m_warranty', r.warranty_claim_date || nowLocal()); setDT('m_service', r.service_claim_date || nowLocal()) }
+  else { setDT('m_warranty', r.warranty_claim_date); setDT('m_service', r.service_claim_date) }
+  // advisor edits VIN / customer / their own note; admin edits warranty fields
+  $('m_vin').disabled = S.isAdmin; $('m_customer').disabled = S.isAdmin; $('m_note').disabled = S.isAdmin
   ;['m_pickup','m_return','m_warranty','m_service','m_wnote'].forEach(i=>{ $(i).disabled = !S.isAdmin })
   $('m_modeNote').textContent = S.isAdmin
-    ? '🔓 Warranty admin — set pick-up, return and claim date/time, and the warranty note. Advisors see the date only.'
-    : '🔒 Advisor — you can edit your own note. Pick-up, return and warranty fields are managed by the warranty admin.'
+    ? '🔓 Warranty admin — set pick-up, return, claim date/time and the warranty note.'
+    : '🔒 Advisor — edit VIN, customer and your own note. Warranty fields are admin-managed.'
   resolveVisibility()
   $('modalBg').classList.add('on')
 }
@@ -610,9 +669,8 @@ async function saveModal(){
   const dtISO = id => { const v=val(id); return v ? new Date(v).toISOString() : null }
   const upd = S.isAdmin
     ? { pickup_date: val('m_pickup')||null, return_date: val('m_return')||null,
-        warranty_claim_date: dtISO('m_warranty'), service_claim_date: dtISO('m_service'),
-        warranty_note: val('m_wnote')||null }
-    : { note: val('m_note')||null }
+        warranty_claim_date: dtISO('m_warranty'), service_claim_date: dtISO('m_service'), warranty_note: val('m_wnote')||null }
+    : { vin: val('m_vin')||null, customer_name: val('m_customer')||null, note: val('m_note')||null }
   showLoad('Saving…')
   const { error } = await sb.from('warranty_bmw_orders').update(upd).eq('id', S.editId)
   hideLoad()
@@ -620,13 +678,15 @@ async function saveModal(){
   showToast('✅ Updated'); window._closeModal(); load()
 }
 
-// ── wire up ──
+// wire up
 $('saveBtn').addEventListener('click', save)
 $('clearBtn').addEventListener('click', clearForm)
 $('refreshBtn').addEventListener('click', load)
-$('search').addEventListener('input', render)
+$('printBtn').addEventListener('click', printReport)
 $('m_save').addEventListener('click', saveModal)
 $('modalBg').addEventListener('click', e=>{ if(e.target===$('modalBg')) window._closeModal() })
+;['f_q','f_adv','f_from','f_to'].forEach(id=> $(id).addEventListener('input', render))
+$('clearFilters').addEventListener('click', ()=>{ ['f_q','f_adv','f_from','f_to'].forEach(id=>{ if($(id)) $(id).value='' }); render() })
 
 // init
 $('f_orderdate').value = todayISO(); $('f_date').value = todayISO()
