@@ -240,38 +240,7 @@ body.hide-sc .c-sc{display:none}
 
     <div class="al al-i">📝 First step to insert a BMW warranty claim. The <strong>Service Advisor</strong> is set from your login and the <strong>Order</strong> reference is built automatically (GOR0 + number). <strong>Pick-up date, Return date and the Warranty note</strong> are warranty-admin only. <strong>Order date</strong> and <strong>Date</strong> default to today (editable).</div>
 
-    <!-- ── ADMIN VISIBILITY PANEL (warranty admin only) ── -->
-    <div class="card adminpanel" id="adminPanel" style="display:none">
-      <div class="ct">👁 Advisor visibility — claim dates <span class="auto-tag">WARRANTY ADMIN</span></div>
-      <div style="font-size:11px;color:var(--muted);margin:-6px 0 10px">Control whether service advisors can see the <strong>Warranty claim date</strong> and <strong>Service claim date</strong>. Defaults apply to everyone who isn't a warranty admin; add overrides by role or by user. Time of day is never shown to advisors.</div>
-
-      <div class="vis-row">
-        <label class="sw"><input type="checkbox" id="def_wc"><span class="sl"></span></label>
-        <span>Hide <b>Warranty claim date</b> from advisors (default)</span>
-      </div>
-      <div class="vis-row">
-        <label class="sw"><input type="checkbox" id="def_sc"><span class="sl"></span></label>
-        <span>Hide <b>Service claim date</b> from advisors (default)</span>
-      </div>
-
-      <div class="sec-lab" style="margin-top:12px">Overrides · by role / by user</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:10px 0">
-        <div class="fld" style="min-width:150px"><label>Field</label>
-          <select id="ov_field"><option value="warranty_claim_date">Warranty claim date</option><option value="service_claim_date">Service claim date</option></select>
-        </div>
-        <div class="fld" style="min-width:120px"><label>Scope</label>
-          <select id="ov_scope"><option value="role">By role</option><option value="user">By user</option></select>
-        </div>
-        <div class="fld" style="min-width:170px"><label>Who</label>
-          <select id="ov_value"></select>
-        </div>
-        <div class="fld" style="min-width:120px"><label>Visibility</label>
-          <select id="ov_hidden"><option value="true">Hidden</option><option value="false">Visible</option></select>
-        </div>
-        <button class="btn btn-bmw btn-sm" id="ov_add" style="height:36px">+ Add rule</button>
-      </div>
-      <div id="ruleList" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-    </div>
+    <!-- Claim-date visibility is now managed in Settings → Roles & Access (role center). This page only respects those rules. -->
 
     <!-- ── ENTRY FORM ── -->
     <div class="card editor-only">
@@ -508,7 +477,6 @@ function applyRoleLocks(){
     if(tag){ tag.textContent = S.isAdmin ? 'ADMIN' : '🔒 WARRANTY ADMIN'; tag.classList.toggle('lock-tag', !S.isAdmin) }
     if(hint && S.isAdmin) hint.textContent = m.adminHint
   })
-  if (S.isAdmin) $('adminPanel').style.display = ''
 }
 
 // ── field visibility rules ──
@@ -537,49 +505,6 @@ function resolveVisibility(){
   document.body.classList.toggle('hide-sc', S.hideSC)
   const fw=$('wrap_f_wc'), fs=$('wrap_f_sc'); if(fw) fw.style.display=S.hideWC?'none':''; if(fs) fs.style.display=S.hideSC?'none':''
   const mw=$('wrap_m_wc'), ms=$('wrap_m_sc'); if(mw) mw.style.display=S.hideWC?'none':''; if(ms) ms.style.display=S.hideSC?'none':''
-}
-
-// ── admin panel ──
-async function loadPanel(){
-  if (!S.isAdmin) return
-  const [rt, em] = await Promise.all([
-    sb.from('role_templates').select('name,label').order('label'),
-    sb.from('employees').select('name,email').order('name')
-  ])
-  S.roles = rt.data || []
-  S.emps  = em.data || []
-  // defaults
-  $('def_wc').checked = !!(S.rules.find(r=>r.field==='warranty_claim_date'&&r.scope==='default')?.hidden)
-  $('def_sc').checked = !!(S.rules.find(r=>r.field==='service_claim_date'&&r.scope==='default')?.hidden)
-  fillWho()
-  renderRules()
-}
-function fillWho(){
-  const scope = val('ov_scope')
-  const sel = $('ov_value'); sel.innerHTML=''
-  const list = scope==='role'
-    ? S.roles.map(r=>({v:r.name, t:r.label||r.name}))
-    : S.emps.map(e=>({v:e.email, t:e.name+(e.email?(' · '+e.email):'')})).filter(x=>x.v)
-  list.forEach(o=>{ const op=document.createElement('option'); op.value=o.v; op.textContent=o.t; sel.appendChild(op) })
-}
-function renderRules(){
-  const list = S.rules.filter(r=>r.scope!=='default')
-  $('ruleList').innerHTML = list.length ? list.map(r=>{
-    const f = r.field==='warranty_claim_date'?'Warranty claim':'Service claim'
-    return '<span class="rule-chip"><b>'+f+'</b> · '+r.scope+' · '+esc(r.scope_value)+' → '+(r.hidden?'🔒 hidden':'👁 visible')+' <button data-id="'+r.id+'">✕</button></span>'
-  }).join('') : '<span style="font-size:11px;color:var(--faint)">No overrides — only the defaults above apply.</span>'
-  $('ruleList').querySelectorAll('button[data-id]').forEach(b=>b.addEventListener('click',()=>delRule(+b.dataset.id)))
-}
-async function upsertRule(field, scope, scope_value, hidden){
-  const { error } = await sb.from('warranty_bmw_field_rules')
-    .upsert({ field, scope, scope_value, hidden }, { onConflict:'field,scope,scope_value' })
-  if (error){ showToast('❌ '+error.message.slice(0,80)); return false }
-  await loadRules(); resolveVisibility(); return true
-}
-async function delRule(id){
-  const { error } = await sb.from('warranty_bmw_field_rules').delete().eq('id', id)
-  if (error){ showToast('❌ '+error.message.slice(0,80)); return }
-  await loadRules(); renderRules(); resolveVisibility(); showToast('Rule removed')
 }
 
 // ── order ref preview ──
@@ -702,19 +627,11 @@ $('refreshBtn').addEventListener('click', load)
 $('search').addEventListener('input', render)
 $('m_save').addEventListener('click', saveModal)
 $('modalBg').addEventListener('click', e=>{ if(e.target===$('modalBg')) window._closeModal() })
-$('def_wc').addEventListener('change', e=> upsertRule('warranty_claim_date','default','*', e.target.checked))
-$('def_sc').addEventListener('change', e=> upsertRule('service_claim_date','default','*', e.target.checked))
-$('ov_scope').addEventListener('change', fillWho)
-$('ov_add').addEventListener('click', async ()=>{
-  const ok = await upsertRule(val('ov_field'), val('ov_scope'), val('ov_value'), val('ov_hidden')==='true')
-  if (ok){ renderRules(); showToast('Rule saved') }
-})
 
 // init
 $('f_orderdate').value = todayISO(); $('f_date').value = todayISO()
 await whoami()
 await loadRules()
-await loadPanel()
 await load()
 </script>
 </body>
