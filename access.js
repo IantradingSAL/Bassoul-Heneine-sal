@@ -198,6 +198,12 @@
     var pages = Object.keys(byPage)
     if (!pages.length) return
     var levels = await Promise.all(pages.map(levelFor))
+    try {
+      var _summary = {}
+      pages.forEach(function (p, i) { _summary[p] = levels[i] })
+      console.info('[access] link permissions resolved:', _summary,
+        '(only "none" links are hidden; if a page you denied still shows "edit"/"view" here, the role/permission isn\'t saved as none for this user)')
+    } catch (e) {}
     function apply () {
       var fresh = collect()           // re-query in case nav rendered late
       pages.forEach(function (p, i) {
