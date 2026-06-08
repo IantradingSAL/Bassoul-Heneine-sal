@@ -203,6 +203,15 @@ tbody tr:hover{background:#f8fafc}
 }
 .menu-btn{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:var(--card);border:1px solid var(--bdr);cursor:pointer;font-size:18px;font-family:inherit;flex-shrink:0}
 </style>
+<style>
+/* BMW claim-date visibility (added) */
+.vis-wrap{display:flex;flex-direction:column;gap:10px}
+.vis-card{background:var(--card);border:1px solid var(--bdr);border-radius:12px;padding:12px 16px;box-shadow:var(--sh)}
+.vis-role{font-size:13px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.vis-field{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;font-size:12px;flex-wrap:wrap;border-top:1px solid #f1f5f9}
+.vis-field>span{font-weight:600;color:#0f172a}
+.vis-card .built-in{font-size:10px;font-weight:700;color:var(--mu);background:#f1f5f9;padding:1px 7px;border-radius:999px}
+</style>
 </head>
 <body>
 
@@ -291,6 +300,15 @@ tbody tr:hover{background:#f8fafc}
       <div class="role-grid" id="roleGrid">
         <div class="empty">⏳ Loading…</div>
       </div>
+
+      <!-- ── BMW claim-date visibility (added) ── -->
+      <div class="section-h" style="margin-top:30px">
+        <div>
+          <div class="section-t">🇩🇪 BMW claim-date visibility</div>
+          <div class="section-s">Per role, choose whether people can see the BMW <strong>Warranty claim date</strong> and <strong>Service claim date</strong> on the New Order / Claim page. <strong>Inherit</strong> follows the “Everyone (default)” row. The <strong>time</strong> of day is only ever shown to warranty admins, who always see both dates. Per-person overrides: <strong>Employees</strong> tab → edit someone → “Claim-date visibility”.</div>
+        </div>
+      </div>
+      <div class="vis-wrap" id="visGrid"><div class="empty">⏳ Loading…</div></div>
 
       <details class="pages-fold" style="margin-top:24px;background:var(--card);border:1px solid var(--bdr);border-radius:12px;box-shadow:var(--sh)">
         <summary style="padding:14px 18px;cursor:pointer;font-size:13px;font-weight:700;list-style:none;display:flex;align-items:center;gap:10px">
@@ -442,6 +460,18 @@ tbody tr:hover{background:#f8fafc}
           <label><input type="checkbox" id="empPrefWa" checked/>WhatsApp</label>
           <label><input type="checkbox" id="empPrefSms" checked/>SMS</label>
         </div>
+      </div>
+      <div class="full">
+        <label class="fl">BMW claim-date visibility <span style="font-weight:500;color:var(--mu);text-transform:none;letter-spacing:0">(overrides the role default)</span></label>
+        <div class="cb-row" style="gap:20px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px">Warranty claim date
+            <select class="fi" id="empVisWC" style="width:auto;display:inline-block;padding:6px 9px"><option value="">Inherit role</option><option value="false">Visible</option><option value="true">Hidden</option></select>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px">Service claim date
+            <select class="fi" id="empVisSC" style="width:auto;display:inline-block;padding:6px 9px"><option value="">Inherit role</option><option value="false">Visible</option><option value="true">Hidden</option></select>
+          </label>
+        </div>
+        <div class="fl-help">“Inherit role” follows the default set in Roles &amp; Access. Choose Visible/Hidden to override just this person. Warranty admins always see both.</div>
       </div>
       <div class="full">
         <div class="cb-row">
@@ -656,6 +686,7 @@ let employees   = []
 let roles       = []
 let categories  = []
 let settings    = {}
+let visRules    = []         // BMW claim-date visibility rules
 let employeeCounts  = {}     // { roleName: count }
 let unconfirmedUids = new Set()  // auth_user_ids whose email_confirmed_at IS NULL
 
@@ -751,6 +782,12 @@ function fillEmpModal(e){
   $('empPrefEmail').checked = prefs.email !== false
   $('empPrefWa').checked    = prefs.whatsapp !== false
   $('empPrefSms').checked   = prefs.sms !== false
+  // BMW claim-date visibility — per-user overrides (by email)
+  const _mail = (e?.email || '').toLowerCase()
+  const _uwc = visRules.find(r => r.field==='warranty_claim_date' && r.scope==='user' && (r.scope_value||'').toLowerCase()===_mail)
+  const _usc = visRules.find(r => r.field==='service_claim_date'  && r.scope==='user' && (r.scope_value||'').toLowerCase()===_mail)
+  if ($('empVisWC')) $('empVisWC').value = _uwc ? String(_uwc.hidden) : ''
+  if ($('empVisSC')) $('empVisSC').value = _usc ? String(_usc.hidden) : ''
   // Effective role: custom_role overrides role
   const effective = e?.custom_role || e?.role || 'employee'
   populateRoleDropdown(effective)
@@ -899,6 +936,19 @@ $('empSaveBtn').addEventListener('click', async () => {
   } else {
     ntf(`Saved as ⚠️ unlinked — provide a password next time you edit them to create a Supabase login.`, 'err')
   }
+  // ── 4b. Persist per-user BMW claim-date visibility overrides
+  try {
+    for (const [fld, selId] of [['warranty_claim_date','empVisWC'], ['service_claim_date','empVisSC']]) {
+      const v = $(selId) ? $(selId).value : ''
+      if (v === '') {
+        await sb.from('warranty_bmw_field_rules').delete().eq('field', fld).eq('scope', 'user').eq('scope_value', email)
+      } else {
+        await sb.from('warranty_bmw_field_rules').upsert({ field: fld, scope: 'user', scope_value: email, hidden: v === 'true' }, { onConflict: 'field,scope,scope_value' })
+      }
+    }
+    await loadVisRules(); renderVis()
+  } catch (err) { console.warn('claim-date visibility override save failed', err) }
+
   closeModal('empModal')
   loadEmployees()
 })
@@ -944,6 +994,64 @@ async function loadRoles(){
   ;(cRes.data || []).forEach(r => { employeeCounts[r.role_name] = Number(r.employee_count) || 0 })
   renderRoles()
   renderPages()  // re-render Pages tab too
+  renderVis()    // BMW claim-date visibility matrix
+}
+
+// ════════════════════════════════════════════════════════════════
+//  BMW CLAIM-DATE VISIBILITY  (warranty_bmw_field_rules)
+// ════════════════════════════════════════════════════════════════
+async function loadVisRules(){
+  const { data, error } = await sb.from('warranty_bmw_field_rules').select('*')
+  if (error) { console.warn('loadVisRules', error.message); visRules = []; return }
+  visRules = data || []
+}
+function isAdminRoleName(name, label){
+  const v = ((name||'') + ' ' + (label||'')).toLowerCase()
+  return v.includes('admin') || v.includes('manager')
+}
+function visPills(field, scope, value, allowInherit){
+  let cur = 'inherit'
+  const rule = scope === 'default'
+    ? visRules.find(r => r.field===field && r.scope==='default')
+    : visRules.find(r => r.field===field && r.scope===scope && (r.scope_value||'').toLowerCase()===String(value).toLowerCase())
+  if (rule) cur = rule.hidden ? 'hidden' : 'visible'
+  else if (scope === 'default') cur = 'visible'
+  const mk = (l, txt) => `<button type="button" class="perm-pill ${cur===l?'on':''}" data-vis-field="${esc(field)}" data-vis-scope="${esc(scope)}" data-vis-value="${esc(String(value==null?'*':value))}" data-vis-l="${l}">${txt}</button>`
+  let html = ''
+  if (allowInherit) html += mk('inherit', 'Inherit')
+  html += mk('visible', 'Visible') + mk('hidden', 'Hidden')
+  return `<div class="perm-pills">${html}</div>`
+}
+function renderVis(){
+  const grid = $('visGrid'); if (!grid) return
+  const fields = [['warranty_claim_date','Warranty claim date'], ['service_claim_date','Service claim date']]
+  let html = `<div class="vis-card"><div class="vis-role">🌐 Everyone (default)</div>`
+    + fields.map(f => `<div class="vis-field"><span>${f[1]}</span>${visPills(f[0],'default','*',false)}</div>`).join('')
+    + `</div>`
+  ;(roles || []).forEach(r => {
+    if (isAdminRoleName(r.name, r.label)) {
+      html += `<div class="vis-card"><div class="vis-role">${esc(r.icon||'👥')} ${esc(r.label||r.name)} <span class="built-in">always sees both</span></div></div>`
+      return
+    }
+    html += `<div class="vis-card"><div class="vis-role">${esc(r.icon||'👥')} ${esc(r.label||r.name)}</div>`
+      + fields.map(f => `<div class="vis-field"><span>${f[1]}</span>${visPills(f[0],'role',r.name,true)}</div>`).join('')
+      + `</div>`
+  })
+  grid.innerHTML = html
+  grid.querySelectorAll('[data-vis-l]').forEach(b => b.addEventListener('click', () => onVisPill(b)))
+}
+async function onVisPill(b){
+  const field = b.dataset.visField, scope = b.dataset.visScope, value = b.dataset.visValue, lvl = b.dataset.visL
+  if (lvl === 'inherit') {
+    const { error } = await sb.from('warranty_bmw_field_rules').delete().eq('field', field).eq('scope', scope).eq('scope_value', value)
+    if (error) { ntf('Update failed: ' + error.message, 'err'); return }
+    ntf('Set to inherit', 'ok')
+  } else {
+    const { error } = await sb.from('warranty_bmw_field_rules').upsert({ field, scope, scope_value: value, hidden: lvl === 'hidden' }, { onConflict: 'field,scope,scope_value' })
+    if (error) { ntf('Save failed: ' + error.message, 'err'); return }
+    ntf('Visibility updated', 'ok')
+  }
+  await loadVisRules(); renderVis()
 }
 
 function renderRoles(){
@@ -1246,6 +1354,7 @@ $('pageDeleteBtn').addEventListener('click', async () => {
 // ════════════════════════════════════════════════════════════════
 ;(async () => {
   await loadPages()       // pages drive the Roles & Access matrix
+  await loadVisRules()    // BMW claim-date visibility rules (before roles render)
   await loadRoles()       // roles must come second — employees table renders role badges
   await loadEmployees()
   await loadCategories()

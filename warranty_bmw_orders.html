@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="cw-page" content="warranty_bmw_orders">
+<title>BMW Warranty · Order Entry — Bassoul, Heneine SAL</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='10' fill='%231C69D4'/><text x='12' y='17' font-size='12' text-anchor='middle' fill='white' font-weight='800' font-family='Arial'>B</text></svg>">
+
+<script type="module" src="./auth_guard.js"></script>
+<script src="./access.js"></script>
+<script type="module" src="./notifications.js"></script>
+
+<style>
+:root{
+  --bg:#fafbff;
+  --surf:#ffffff;
+  --surf2:#f1f5f9;
+  --line:#e2e8f0;
+  --txt:#0f172a;
+  --muted:#64748b;
+  --faint:#94a3b8;
+  --blue:#3b5fe2;
+  --blue4:#eef2ff;
+  --mono:'SF Mono','Roboto Mono','Menlo',monospace;
+  --mint:#10b981;
+  --mint3:rgba(16,185,129,.08);
+  --rose:#e11d48;
+  --rose3:rgba(225,29,72,.08);
+  --sun:#f59e0b;
+  --lemon:#facc15;
+  --lemon3:rgba(250,204,21,.18);
+  --pur:#8b5cf6;
+  --sky:#0EA5E9;
+  --bmw:#1C69D4;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;font-size:13px;-webkit-font-smoothing:antialiased}
+.app{display:flex;min-height:100vh}
+.sidebar{width:240px;background:#fff;border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 10px 14px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.brand-logo{width:32px;height:32px;background:linear-gradient(135deg,#1C69D4,#0F4FA8);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px}
+.brand-name{font-size:12px;font-weight:800;color:#0f172a;letter-spacing:-.3px;line-height:1.1}
+.brand-sub{font-size:10px;color:var(--muted);font-weight:600}
+.si{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;font-size:12px;color:#475569;font-weight:600;cursor:pointer;transition:background .15s,color .15s;text-decoration:none}
+.si:hover{background:var(--surf2);color:var(--txt)}
+.si.active{background:var(--blue4);color:var(--blue)}
+.si-icon{font-size:14px}
+.si-badge{margin-left:auto;background:var(--blue);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:999px;min-width:18px;text-align:center}
+.main{flex:1;padding:20px 28px;max-width:1700px;margin:0 auto;width:100%}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:14px;flex-wrap:wrap}
+.topbar h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.3px;display:flex;align-items:center;gap:10px}
+.topbar p{margin:2px 0 0;font-size:12px;color:var(--muted);font-weight:500}
+.us-badge{background:linear-gradient(135deg,#1C69D4,#0F4FA8);color:#fff;padding:5px 11px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.04em}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;position:relative;overflow:hidden}
+.kpi-accent{position:absolute;top:0;left:0;width:3px;height:100%}
+.kl{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:5px}
+.kv{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-top:5px;font-variant-numeric:tabular-nums}
+.kv.sky{color:var(--sky)} .kv.sun{color:var(--sun)} .kv.mint{color:var(--mint)} .kv.rose{color:var(--rose)} .kv.pur{color:var(--pur)} .kv.lem{color:#a16207} .kv.bmw{color:var(--bmw)}
+.ks{font-size:10px;color:var(--faint);margin-top:2px;font-weight:500}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+.ct{font-size:13px;font-weight:800;letter-spacing:-.2px;margin:0 0 14px}
+.btn{padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:#475569;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+.btn:hover{background:var(--surf2)}
+.btn-bmw{background:var(--bmw);color:#fff;border-color:var(--bmw)}
+.btn-bmw:hover{background:#0F4FA8}
+.btn-sm{padding:5px 9px;font-size:10px}
+.btn-sun{background:var(--sun);color:#fff;border-color:var(--sun)}
+.btn-sun:hover{filter:brightness(.93)}
+.btn-ghost{background:#fff;color:var(--muted)}
+.tw{overflow-x:auto;border-radius:9px}
+.t{width:100%;border-collapse:collapse;font-size:11px}
+.t th{text-align:left;padding:9px 11px;font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:var(--surf2);white-space:nowrap;border-bottom:1px solid var(--line)}
+.t th.num{text-align:right}
+.t td{padding:9px 11px;border-bottom:1px solid #f1f5f9;font-size:11px;vertical-align:middle}
+.t td.num{text-align:right;font-variant-numeric:tabular-nums}
+.t tbody tr:hover td{background:#fafbff}
+.t .mono{font-family:var(--mono);font-size:10px}
+.t tbody tr.tr-clickable{cursor:pointer;transition:background .12s}
+.t tbody tr.tr-clickable:hover td{background:var(--blue4) !important}
+.t tbody tr.tr-clickable:hover .vin-cell{color:var(--blue);text-decoration:underline}
+.vin-cell{cursor:pointer;transition:color .12s}
+.vin-cell:hover{color:var(--blue) !important;text-decoration:underline}
+.t thead th.sortable{cursor:pointer;user-select:none;position:relative;padding-right:18px}
+.t thead th.sortable:hover{background:#e2e8f0}
+.t thead th.sortable::after{content:"↕";position:absolute;right:5px;top:50%;transform:translateY(-50%);opacity:.3;font-size:10px}
+.t thead th.sort-asc::after{content:"↑";opacity:1;color:var(--blue)}
+.t thead th.sort-desc::after{content:"↓";opacity:1;color:var(--blue)}
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;letter-spacing:.04em;text-transform:uppercase}
+.b-mint{background:rgba(16,185,129,.13);color:#047857}
+.b-rose{background:rgba(225,29,72,.13);color:#9f1239}
+.b-sun{background:rgba(245,158,11,.18);color:#a16207}
+.b-lem{background:#fef3c7;color:#92400e}
+.b-sky{background:rgba(14,165,233,.13);color:#075985}
+.b-pur{background:rgba(139,92,246,.15);color:#5b21b6}
+.b-n{background:#f1f5f9;color:#475569}
+.b-bmw{background:rgba(28,105,212,.13);color:#0F4FA8}
+.dz{border:2px dashed var(--line);border-radius:14px;padding:38px 22px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;display:flex;flex-direction:column;align-items:center;gap:10px}
+.dz>*{pointer-events:none}
+.dz label{pointer-events:auto}
+.dz:hover, .dz.dz-active{border-color:var(--bmw);background:rgba(28,105,212,.04)}
+.dz-emoji{font-size:36px;line-height:1}
+.dz-title{font-size:13px;font-weight:700;color:#0f172a}
+.dz-sub{font-size:11px;color:var(--muted)}
+.dz-input{display:none}
+.dz-pick{padding:7px 14px;background:var(--bmw);color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;pointer-events:auto}
+.al{padding:11px 14px;border-radius:10px;font-size:11px;font-weight:500;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.al-w{background:#fef9c3;color:#854d0e;border:1px solid #fde047}
+.al-i{background:#dbeafe;color:#1e40af;border:1px solid #93c5fd}
+.al-s{background:rgba(16,185,129,.1);color:#047857;border:1px solid rgba(16,185,129,.3)}
+.al-e{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+
+/* Modal */
+.bmw-modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:600;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .25s}
+.bmw-modal-bg.on{opacity:1;pointer-events:auto}
+.bmw-modal{width:920px;max-width:100%;max-height:calc(100vh - 48px);background:#fff;border-radius:18px;box-shadow:0 24px 64px rgba(0,0,0,.28);display:flex;flex-direction:column;transform:scale(.96) translateY(10px);transition:transform .25s cubic-bezier(.16,1,.3,1);overflow:hidden}
+.bmw-modal-bg.on .bmw-modal{transform:scale(1) translateY(0)}
+.bmw-modal-h{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:14px;background:linear-gradient(135deg,rgba(28,105,212,.06),#fff)}
+.bmw-modal-icon{font-size:30px;line-height:1}
+.bmw-modal-title h3{margin:0;font-size:16px;font-weight:800;letter-spacing:-.3px}
+.bmw-modal-title p{margin:3px 0 0;font-size:12px;color:var(--muted);font-family:var(--mono);font-weight:600}
+.bmw-modal-x{background:none;border:1px solid var(--line);border-radius:9px;width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--muted);font-family:inherit}
+.bmw-modal-x:hover{background:var(--surf2);color:var(--txt)}
+.bmw-modal-body{flex:1;overflow-y:auto;padding:14px 22px}
+.vin-section{margin-bottom:18px}
+.vin-section-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.vin-section-h .ct{background:var(--bmw);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:0;text-transform:none;margin:0}
+.vin-mini{font-size:11px;width:100%;border-collapse:collapse}
+.vin-mini th{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:6px 8px;background:var(--surf2);white-space:nowrap}
+.vin-mini th.num{text-align:right}
+.vin-mini td{padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:11px}
+.vin-mini td.num{text-align:right;font-variant-numeric:tabular-nums}
+.vin-mini tbody tr.clickable{cursor:pointer}
+.vin-mini tbody tr.clickable:hover{background:#fafbff}
+.vin-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.vin-stat{background:var(--surf2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.vin-stat-l{font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.vin-stat-v{font-size:16px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+.vin-empty{padding:14px;text-align:center;font-size:11px;color:var(--faint);font-style:italic;background:var(--surf2);border-radius:10px}
+
+.toast{position:fixed;bottom:24px;right:24px;background:#0f172a;color:#fff;padding:11px 16px;border-radius:11px;font-size:12px;font-weight:600;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:900;opacity:0;transform:translateY(8px);transition:all .25s;max-width:420px}
+.toast.on{opacity:1;transform:translateY(0)}
+.lo{position:fixed;inset:0;background:rgba(255,255,255,.85);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:800}
+.lo.on{display:flex}
+.lo-spin{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--bmw);border-radius:50%;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lo-msg{font-size:12px;font-weight:700;color:#0f172a}
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.filters select, .filters input{padding:7px 11px;border:1px solid var(--line);border-radius:8px;font-size:11px;background:#fff;font-family:inherit}
+.fl-l{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-right:3px}
+.page{display:none}
+.page.active{display:block}
+.menuBtn{display:none}
+
+@media (max-width:780px){
+  .app{flex-direction:column}
+  .sidebar{position:fixed;left:-260px;width:240px;height:100vh;z-index:500;transition:left .25s}
+  .sidebar.open{left:0}
+  .main{padding:14px 16px}
+  .menuBtn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;background:#fff;border:1px solid var(--line);cursor:pointer;font-size:18px}
+  .bmw-modal-bg{padding:0;align-items:flex-end}
+  .bmw-modal{max-width:100%;border-radius:18px 18px 0 0;max-height:88vh}
+  .bmw-modal-body{padding:12px 14px}
+  .vin-mini th, .vin-mini td{padding:6px 5px;font-size:10px}
+}
+
+/* ── Order-entry additions ── */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:13px}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:6px}
+.fld input,.fld textarea,.fld select{padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:12px;background:#fff;font-family:inherit;color:var(--txt);width:100%;box-sizing:border-box}
+.fld input:focus,.fld textarea:focus,.fld select:focus{outline:none;border-color:var(--bmw);box-shadow:0 0 0 3px rgba(28,105,212,.12)}
+.fld input:disabled,.fld textarea:disabled,.fld input[readonly]{background:var(--surf2);color:var(--muted);cursor:not-allowed}
+.fld .hint{font-size:9px;color:var(--faint);font-weight:500}
+.fld.full{grid-column:1/-1}
+.auto-tag{display:inline-block;font-size:8px;font-weight:800;padding:1px 6px;border-radius:999px;background:var(--blue4);color:var(--blue);letter-spacing:.04em}
+.pending-tag,.lock-tag{background:#fef9c3;color:#854d0e}
+.order-ref-box{font-family:var(--mono);font-size:14px;font-weight:800;color:var(--bmw);padding:9px 11px;background:rgba(28,105,212,.06);border:1px dashed var(--bmw);border-radius:9px}
+.form-actions{display:flex;gap:9px;align-items:center;margin-top:16px;flex-wrap:wrap}
+.b-pend{background:#fef9c3;color:#854d0e} .b-ok{background:rgba(16,185,129,.12);color:#047857}
+.modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:200;padding:16px}
+.modal-bg.on{display:flex}
+.modal{background:#fff;border-radius:16px;max-width:460px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.22);overflow:hidden;max-height:92vh;display:flex;flex-direction:column}
+.modal-h{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+.modal-h .ct{margin:0}
+.modal-b{padding:18px 20px;display:flex;flex-direction:column;gap:13px;overflow-y:auto}
+.modal-x{background:none;border:1px solid var(--line);border-radius:9px;width:30px;height:30px;cursor:pointer;font-size:15px;color:var(--muted);font-family:inherit}
+.sec-lab{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-top:1px solid var(--line);padding-top:11px;margin-top:2px}
+/* admin visibility panel */
+.adminpanel{border:1px solid var(--bmw);background:rgba(28,105,212,.03)}
+.vis-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;padding:8px 0;border-bottom:1px solid #f1f5f9}
+.vis-row:last-child{border-bottom:0}
+.sw{position:relative;display:inline-block;width:40px;height:22px;flex:none}
+.sw input{display:none}
+.sw .sl{position:absolute;inset:0;background:#cbd5e1;border-radius:999px;transition:.18s;cursor:pointer}
+.sw .sl:before{content:"";position:absolute;height:16px;width:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.18s}
+.sw input:checked + .sl{background:var(--bmw)}
+.sw input:checked + .sl:before{transform:translateX(18px)}
+.rule-chip{display:inline-flex;align-items:center;gap:7px;font-size:11px;padding:5px 9px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.rule-chip b{font-weight:700}
+.rule-chip button{background:none;border:none;color:var(--rose);cursor:pointer;font-size:13px;line-height:1}
+/* hide claim columns for advisor (toggled on <body>) */
+body.hide-wc .c-wc{display:none}
+body.hide-sc .c-sc{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo">B</div>
+      <div>
+        <div class="brand-name">BMW Warranty</div>
+        <div class="brand-sub">Bassoul, Heneine SAL</div>
+      </div>
+    </div>
+    <a href="index.html" class="si"><span class="si-icon">🏠</span><span>Dashboard</span></a>
+    <a href="warranty.html" class="si"><span class="si-icon">🇫🇷</span><span>Renault Warranty</span></a>
+    <div style="border-top:1px solid var(--line);margin:8px 0 6px;padding-top:10px">
+      <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:0 11px 6px">BMW Pages</div>
+    </div>
+    <div class="si active"><span class="si-icon">📝</span><span>New Order / Claim</span></div>
+    <a href="warranty_bmw.html" class="si"><span class="si-icon">🏁</span><span>Credits / Upload</span></a>
+    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v2.0</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="menuBtn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+      <div>
+        <h1>📝 New Order <span class="us-badge">STEP 1 · CLAIM</span></h1>
+        <p>Register the repair order — claim dates are matched later from the BMW credit-notes upload</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+        <span id="modeChip" class="badge b-pend">—</span>
+        <span style="font-size:10px;color:var(--muted);font-weight:600" id="advisorChip">—</span>
+      </div>
+    </div>
+
+    <div class="al al-i">📝 First step to insert a BMW warranty claim. The <strong>Service Advisor</strong> is set from your login and the <strong>Order</strong> reference is built automatically (GOR0 + number). <strong>Pick-up date, Return date and the Warranty note</strong> are warranty-admin only. <strong>Order date</strong> and <strong>Date</strong> default to today (editable).</div>
+
+    <!-- ── ADMIN VISIBILITY PANEL (warranty admin only) ── -->
+    <div class="card adminpanel" id="adminPanel" style="display:none">
+      <div class="ct">👁 Advisor visibility — claim dates <span class="auto-tag">WARRANTY ADMIN</span></div>
+      <div style="font-size:11px;color:var(--muted);margin:-6px 0 10px">Control whether service advisors can see the <strong>Warranty claim date</strong> and <strong>Service claim date</strong>. Defaults apply to everyone who isn't a warranty admin; add overrides by role or by user. Time of day is never shown to advisors.</div>
+
+      <div class="vis-row">
+        <label class="sw"><input type="checkbox" id="def_wc"><span class="sl"></span></label>
+        <span>Hide <b>Warranty claim date</b> from advisors (default)</span>
+      </div>
+      <div class="vis-row">
+        <label class="sw"><input type="checkbox" id="def_sc"><span class="sl"></span></label>
+        <span>Hide <b>Service claim date</b> from advisors (default)</span>
+      </div>
+
+      <div class="sec-lab" style="margin-top:12px">Overrides · by role / by user</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:10px 0">
+        <div class="fld" style="min-width:150px"><label>Field</label>
+          <select id="ov_field"><option value="warranty_claim_date">Warranty claim date</option><option value="service_claim_date">Service claim date</option></select>
+        </div>
+        <div class="fld" style="min-width:120px"><label>Scope</label>
+          <select id="ov_scope"><option value="role">By role</option><option value="user">By user</option></select>
+        </div>
+        <div class="fld" style="min-width:170px"><label>Who</label>
+          <select id="ov_value"></select>
+        </div>
+        <div class="fld" style="min-width:120px"><label>Visibility</label>
+          <select id="ov_hidden"><option value="true">Hidden</option><option value="false">Visible</option></select>
+        </div>
+        <button class="btn btn-bmw btn-sm" id="ov_add" style="height:36px">+ Add rule</button>
+      </div>
+      <div id="ruleList" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    </div>
+
+    <!-- ── ENTRY FORM ── -->
+    <div class="card editor-only">
+      <div class="ct">➕ New repair order</div>
+      <div class="form-grid">
+        <div class="fld">
+          <label>Order Number</label>
+          <input id="f_order" type="text" inputmode="numeric" placeholder="e.g. 267779" autocomplete="off">
+          <span class="hint">Manual · digits only</span>
+        </div>
+        <div class="fld">
+          <label>Order date</label>
+          <input id="f_orderdate" type="date">
+          <span class="hint">Defaults to today · editable</span>
+        </div>
+        <div class="fld">
+          <label>Date</label>
+          <input id="f_date" type="date">
+          <span class="hint">Defaults to today · editable · service / intake</span>
+        </div>
+        <div class="fld">
+          <label>Service advisor <span class="auto-tag">AUTO · LOGIN</span></label>
+          <input id="f_advisor" type="text" readonly value="—">
+          <span class="hint">From your signed-in account</span>
+        </div>
+        <div class="fld">
+          <label>Order <span class="auto-tag">AUTO</span></label>
+          <div class="order-ref-box" id="f_orderref">—</div>
+          <span class="hint">Built as GOR0 + Order Number</span>
+        </div>
+        <div class="fld">
+          <label>Pick-up date <span class="auto-tag lock-tag" id="tag_pickup">🔒 WARRANTY ADMIN</span></label>
+          <input id="f_pickup" type="date" disabled>
+          <span class="hint" id="hint_pickup">Set by warranty admin</span>
+        </div>
+        <div class="fld">
+          <label>Return date <span class="auto-tag lock-tag" id="tag_return">🔒 WARRANTY ADMIN</span></label>
+          <input id="f_return" type="date" disabled>
+          <span class="hint" id="hint_return">Visible to advisor · set by warranty admin</span>
+        </div>
+        <div class="fld" id="wrap_f_wc">
+          <label>Warranty claim date <span class="auto-tag pending-tag">FROM EXCEL</span></label>
+          <input type="text" readonly value="⏳ Pending match">
+          <span class="hint">Matched from BMW credit-notes upload</span>
+        </div>
+        <div class="fld" id="wrap_f_sc">
+          <label>Service Claim date <span class="auto-tag pending-tag">FROM EXCEL</span></label>
+          <input type="text" readonly value="⏳ Pending match">
+          <span class="hint">Matched from BMW credit-notes upload</span>
+        </div>
+        <div class="fld full">
+          <label>Service advisor note</label>
+          <textarea id="f_note" rows="2" placeholder="Advisor note — e.g. to be sent today"></textarea>
+          <span class="hint">Optional · your note as the advisor</span>
+        </div>
+        <div class="fld full">
+          <label>Warranty note <span class="auto-tag lock-tag" id="tag_wnote">🔒 WARRANTY ADMIN</span></label>
+          <textarea id="f_wnote" rows="2" placeholder="Warranty admin note" disabled></textarea>
+          <span class="hint" id="hint_wnote">Visible to advisor · set by warranty admin</span>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-bmw" id="saveBtn">💾 Save order</button>
+        <button class="btn btn-ghost" id="clearBtn">Clear</button>
+        <span id="formStat" style="font-size:11px;color:var(--muted)"></span>
+      </div>
+    </div>
+
+    <!-- ── KPIs ── -->
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="ks">Total orders</div><div class="kv bmw" id="k_total">—</div><div class="ks">All registered</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="ks">Pending claim match</div><div class="kv sun" id="k_pending">—</div><div class="ks">No warranty claim date yet</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="ks">Matched</div><div class="kv mint" id="k_matched">—</div><div class="ks">Claim date filled</div></div>
+    </div>
+
+    <!-- ── TABLE ── -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap">
+        <div class="ct" style="margin:0">📋 Registered orders</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="search" class="viewer-ok" placeholder="🔎 Search order / advisor / note" style="padding:7px 11px;border:1px solid var(--line);border-radius:8px;font-size:11px;font-family:inherit;min-width:200px">
+          <button class="btn btn-sm viewer-ok" id="refreshBtn">↻ Refresh</button>
+        </div>
+      </div>
+      <div class="tw">
+        <table class="t">
+          <thead>
+            <tr>
+              <th>Order #</th>
+              <th>Order</th>
+              <th>Order date</th>
+              <th>Date</th>
+              <th>Pick-up</th>
+              <th>Return</th>
+              <th>Service advisor</th>
+              <th class="c-wc">Warranty claim</th>
+              <th class="c-sc">Service claim</th>
+              <th>Advisor note</th>
+              <th>Warranty note</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr><td colspan="11" style="text-align:center;color:var(--faint);padding:26px">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- edit modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="modal-h">
+      <div class="ct" id="m_title">Edit order</div>
+      <button class="modal-x" onclick="window._closeModal()">✕</button>
+    </div>
+    <div class="modal-b">
+      <div class="al al-i" style="margin:0" id="m_modeNote">—</div>
+
+      <div class="fld">
+        <label>Service advisor note</label>
+        <textarea id="m_note" rows="2"></textarea>
+      </div>
+
+      <div class="sec-lab">🔒 Warranty admin fields</div>
+      <div class="fld">
+        <label>Pick-up date</label>
+        <input id="m_pickup" type="date">
+      </div>
+      <div class="fld">
+        <label>Return date</label>
+        <input id="m_return" type="date">
+      </div>
+      <div class="fld" id="wrap_m_wc">
+        <label>Warranty claim date &amp; time</label>
+        <input id="m_warranty" type="datetime-local">
+        <span class="hint">Defaults to now · editable · advisors see date only</span>
+      </div>
+      <div class="fld" id="wrap_m_sc">
+        <label>Service claim date &amp; time</label>
+        <input id="m_service" type="datetime-local">
+        <span class="hint">Defaults to now · editable · advisors see date only</span>
+      </div>
+      <div class="fld">
+        <label>Warranty note</label>
+        <textarea id="m_wnote" rows="2"></textarea>
+      </div>
+
+      <div class="form-actions" style="margin-top:4px">
+        <button class="btn btn-bmw" id="m_save">💾 Save changes</button>
+        <button class="btn btn-ghost" onclick="window._closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="lo" id="loadingOverlay"><div class="lo-spin"></div><div class="lo-msg" id="loadingMsg">Loading…</div></div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { SUPABASE_CONFIG } from './config.js'
+
+// ── Who counts as a "warranty admin". Matched (case-insensitive,
+//    substring) against the employee's custom_role / role. Same logic
+//    is enforced in the DB trigger (warranty_bmw_orders.sql).
+const WARRANTY_ADMIN_ROLES = ['admin', 'manager', 'warranty admin', 'warranty manager']
+
+// ── Supabase client (multi-CDN fallback, same as BMW page) ──
+let createClient = null
+const cdns = [
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
+  'https://cdn.skypack.dev/@supabase/supabase-js@2',
+  'https://esm.sh/@supabase/supabase-js@2',
+  'https://unpkg.com/@supabase/supabase-js@2/dist/module/index.js'
+]
+for (const url of cdns){
+  try { const m = await import(url); if (m && m.createClient){ createClient = m.createClient; break } }
+  catch(e){ console.warn('[Orders] CDN unreachable:', url) }
+}
+if (!createClient){ alert('Could not load Supabase library — please check your network.'); throw new Error('Supabase unreachable') }
+const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
+window._sb = sb
+
+const S = { me:null, advisorName:'—', authEmail:'', empEmail:'', role:'employee', roleKey:'', isAdmin:false,
+            rows:[], editId:null, rules:[], roles:[], emps:[], hideWC:false, hideSC:false }
+
+// ── helpers ──
+const $ = id => document.getElementById(id)
+const val = id => ($(id)?.value || '').trim()
+const todayISO = () => { const d=new Date(); const o=d.getTimezoneOffset(); return new Date(d.getTime()-o*60000).toISOString().slice(0,10) }
+const nowLocal = () => { const d=new Date(); const o=d.getTimezoneOffset(); return new Date(d.getTime()-o*60000).toISOString().slice(0,16) }
+const setDate = (id,d) => { const el=$(id); if(el) el.value = d ? String(d).slice(0,10) : '' }
+const setDT   = (id,d) => { const el=$(id); if(!el) return; if(!d){ el.value=''; return } const dt=new Date(d); const o=dt.getTimezoneOffset(); el.value=new Date(dt.getTime()-o*60000).toISOString().slice(0,16) }
+const showToast = (msg, ms=3500) => { const t=$('toast'); t.textContent=msg; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),ms) }
+const showLoad = msg => { $('loadingMsg').textContent = msg||'Loading…'; $('loadingOverlay').classList.add('on') }
+const hideLoad = () => $('loadingOverlay').classList.remove('on')
+const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
+const fmtD  = d => { if(!d) return '—'; const dt=new Date(d); if(isNaN(dt)){const p=String(d).slice(0,10).split('-'); return p.length===3?p.join('-'):d} return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) }
+const fmtDT = d => { if(!d) return '—'; const dt=new Date(d); if(isNaN(dt)) return fmtD(d); const hasTime=/\d{2}:\d{2}/.test(String(d)) && !/T00:00/.test(String(d)); return fmtD(d) + (hasTime ? ' · ' + dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '') }
+
+// ── identity + role ──
+async function whoami(){
+  let roleStr = (sessionStorage.getItem('cw_role') || localStorage.getItem('cw_role') || '').toLowerCase()
+  try{
+    const { data:{ user } } = await sb.auth.getUser()
+    S.authEmail = user?.email || ''
+    if (user){
+      const { data } = await sb.from('employees').select('id,name,email,role,custom_role,auth_user_id').eq('auth_user_id', user.id).maybeSingle()
+      if (data){ S.me=data; S.empEmail=data.email||''; S.roleKey=(data.role||'').toLowerCase(); roleStr=(data.custom_role||data.role||roleStr||'').toLowerCase() }
+    }
+  }catch(e){ console.warn('[Orders] whoami', e) }
+  S.role = roleStr || 'employee'
+  S.isAdmin = WARRANTY_ADMIN_ROLES.some(r => S.role.includes(r))
+  S.advisorName = (S.me && S.me.name) || window.CW_USER
+    || sessionStorage.getItem('cw_name') || localStorage.getItem('cw_name') || S.authEmail || '—'
+  $('f_advisor').value = S.advisorName
+  $('advisorChip').textContent = '👤 ' + S.advisorName + ' · ' + S.role
+  const chip = $('modeChip')
+  chip.textContent = S.isAdmin ? '🔓 Warranty admin' : '🔒 Advisor (locked)'
+  chip.className = 'badge ' + (S.isAdmin ? 'b-ok' : 'b-pend')
+  applyRoleLocks()
+}
+
+function applyRoleLocks(){
+  const map = [
+    { input:'f_pickup', tag:'tag_pickup', hint:'hint_pickup', adminHint:'Manual · when the car was collected' },
+    { input:'f_return', tag:'tag_return', hint:'hint_return', adminHint:'Manual · when the car was returned' },
+    { input:'f_wnote',  tag:'tag_wnote',  hint:'hint_wnote',  adminHint:'Optional · warranty admin note' }
+  ]
+  map.forEach(m=>{
+    const el=$(m.input), tag=$(m.tag), hint=$(m.hint); if(!el) return
+    el.disabled = !S.isAdmin
+    if(tag){ tag.textContent = S.isAdmin ? 'ADMIN' : '🔒 WARRANTY ADMIN'; tag.classList.toggle('lock-tag', !S.isAdmin) }
+    if(hint && S.isAdmin) hint.textContent = m.adminHint
+  })
+  if (S.isAdmin) $('adminPanel').style.display = ''
+}
+
+// ── field visibility rules ──
+async function loadRules(){
+  try{
+    const { data } = await sb.from('warranty_bmw_field_rules').select('*')
+    S.rules = data || []
+  }catch(e){ S.rules=[] }
+  resolveVisibility()
+}
+function ruleHidden(field){
+  // user override wins, then role, then default; admins never hidden
+  const mine = (S.empEmail||S.authEmail||'').toLowerCase()
+  const u = S.rules.find(r=>r.field===field && r.scope==='user'  && (r.scope_value||'').toLowerCase()===mine)
+  if (u) return !!u.hidden
+  const rr = S.rules.find(r=>r.field===field && r.scope==='role' && [S.roleKey,S.role].includes((r.scope_value||'').toLowerCase()))
+  if (rr) return !!rr.hidden
+  const d = S.rules.find(r=>r.field===field && r.scope==='default')
+  if (d) return !!d.hidden
+  return false
+}
+function resolveVisibility(){
+  S.hideWC = S.isAdmin ? false : ruleHidden('warranty_claim_date')
+  S.hideSC = S.isAdmin ? false : ruleHidden('service_claim_date')
+  document.body.classList.toggle('hide-wc', S.hideWC)
+  document.body.classList.toggle('hide-sc', S.hideSC)
+  const fw=$('wrap_f_wc'), fs=$('wrap_f_sc'); if(fw) fw.style.display=S.hideWC?'none':''; if(fs) fs.style.display=S.hideSC?'none':''
+  const mw=$('wrap_m_wc'), ms=$('wrap_m_sc'); if(mw) mw.style.display=S.hideWC?'none':''; if(ms) ms.style.display=S.hideSC?'none':''
+}
+
+// ── admin panel ──
+async function loadPanel(){
+  if (!S.isAdmin) return
+  const [rt, em] = await Promise.all([
+    sb.from('role_templates').select('name,label').order('label'),
+    sb.from('employees').select('name,email').order('name')
+  ])
+  S.roles = rt.data || []
+  S.emps  = em.data || []
+  // defaults
+  $('def_wc').checked = !!(S.rules.find(r=>r.field==='warranty_claim_date'&&r.scope==='default')?.hidden)
+  $('def_sc').checked = !!(S.rules.find(r=>r.field==='service_claim_date'&&r.scope==='default')?.hidden)
+  fillWho()
+  renderRules()
+}
+function fillWho(){
+  const scope = val('ov_scope')
+  const sel = $('ov_value'); sel.innerHTML=''
+  const list = scope==='role'
+    ? S.roles.map(r=>({v:r.name, t:r.label||r.name}))
+    : S.emps.map(e=>({v:e.email, t:e.name+(e.email?(' · '+e.email):'')})).filter(x=>x.v)
+  list.forEach(o=>{ const op=document.createElement('option'); op.value=o.v; op.textContent=o.t; sel.appendChild(op) })
+}
+function renderRules(){
+  const list = S.rules.filter(r=>r.scope!=='default')
+  $('ruleList').innerHTML = list.length ? list.map(r=>{
+    const f = r.field==='warranty_claim_date'?'Warranty claim':'Service claim'
+    return '<span class="rule-chip"><b>'+f+'</b> · '+r.scope+' · '+esc(r.scope_value)+' → '+(r.hidden?'🔒 hidden':'👁 visible')+' <button data-id="'+r.id+'">✕</button></span>'
+  }).join('') : '<span style="font-size:11px;color:var(--faint)">No overrides — only the defaults above apply.</span>'
+  $('ruleList').querySelectorAll('button[data-id]').forEach(b=>b.addEventListener('click',()=>delRule(+b.dataset.id)))
+}
+async function upsertRule(field, scope, scope_value, hidden){
+  const { error } = await sb.from('warranty_bmw_field_rules')
+    .upsert({ field, scope, scope_value, hidden }, { onConflict:'field,scope,scope_value' })
+  if (error){ showToast('❌ '+error.message.slice(0,80)); return false }
+  await loadRules(); resolveVisibility(); return true
+}
+async function delRule(id){
+  const { error } = await sb.from('warranty_bmw_field_rules').delete().eq('id', id)
+  if (error){ showToast('❌ '+error.message.slice(0,80)); return }
+  await loadRules(); renderRules(); resolveVisibility(); showToast('Rule removed')
+}
+
+// ── order ref preview ──
+$('f_order').addEventListener('input', () => {
+  const v = val('f_order').replace(/\D/g,''); $('f_order').value=v
+  $('f_orderref').textContent = v ? 'GOR0'+v : '—'
+})
+
+// ── save new order ──
+async function save(){
+  const order_number = val('f_order')
+  if (!order_number){ showToast('⚠️ Order Number is required'); $('f_order').focus(); return }
+  const payload = {
+    order_number,
+    order_date: val('f_orderdate') || null,
+    work_date:  val('f_date')      || null,
+    service_advisor: S.advisorName === '—' ? null : S.advisorName,
+    service_advisor_id: S.me ? S.me.id : null,
+    note: val('f_note') || null,
+    pickup_date:   S.isAdmin ? (val('f_pickup') || null) : null,
+    return_date:   S.isAdmin ? (val('f_return') || null) : null,
+    warranty_note: S.isAdmin ? (val('f_wnote')  || null) : null
+  }
+  $('saveBtn').disabled = true; showLoad('Saving order…')
+  const { error } = await sb.from('warranty_bmw_orders').insert(payload)
+  hideLoad(); $('saveBtn').disabled = false
+  if (error){
+    if (error.code === '23505'){ showToast('⚠️ Order '+order_number+' already exists'); return }
+    showToast('❌ Save failed: '+(error.message||'').slice(0,90)); return
+  }
+  showToast('✅ Order GOR0'+order_number+' saved'); clearForm(); load()
+}
+function clearForm(){
+  ['f_order','f_note','f_pickup','f_return','f_wnote'].forEach(id=>{ if($(id)) $(id).value='' })
+  $('f_orderdate').value = todayISO(); $('f_date').value = todayISO()
+  $('f_orderref').textContent='—'; $('f_order').focus()
+}
+
+// ── load + render orders ──
+async function load(){
+  showLoad('Loading orders…')
+  const { data, error } = await sb.from('warranty_bmw_orders').select('*').order('created_at',{ascending:false})
+  hideLoad()
+  if (error){ showToast('❌ '+(error.message||'').slice(0,90)); $('tbody').innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--rose);padding:26px">'+esc(error.message)+'</td></tr>'; return }
+  S.rows = data || []; render()
+}
+function render(){
+  const q = val('search').toLowerCase()
+  const rows = S.rows.filter(r=> !q || (r.order_number+' '+(r.order_ref||'')+' '+(r.service_advisor||'')+' '+(r.note||'')+' '+(r.warranty_note||'')).toLowerCase().includes(q))
+  const total = S.rows.length, matched = S.rows.filter(r=>r.warranty_claim_date).length
+  $('k_total').textContent=total; $('k_matched').textContent=matched; $('k_pending').textContent=total-matched
+  const dash = '<span style="color:var(--faint)">—</span>'
+  // admins see date+time on claim fields; advisors see date only
+  const claim = v => v ? (S.isAdmin ? fmtDT(v) : fmtD(v)) : null
+  if (!rows.length){ $('tbody').innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--faint);padding:26px">No orders yet — add one above.</td></tr>'; return }
+  $('tbody').innerHTML = rows.map(r=>{
+    const wc = r.warranty_claim_date ? '<span class="badge b-ok">'+claim(r.warranty_claim_date)+'</span>' : '<span class="badge b-pend">⏳ pending</span>'
+    const sc = r.service_claim_date ? claim(r.service_claim_date) : dash
+    return '<tr class="tr-clickable" data-id="'+r.id+'">'
+      + '<td class="mono" style="font-weight:700">'+esc(r.order_number)+'</td>'
+      + '<td class="mono" style="color:var(--bmw);font-weight:700">'+esc(r.order_ref||('GOR0'+r.order_number))+'</td>'
+      + '<td>'+fmtD(r.order_date)+'</td>'
+      + '<td>'+fmtD(r.work_date)+'</td>'
+      + '<td>'+(r.pickup_date?fmtD(r.pickup_date):dash)+'</td>'
+      + '<td>'+(r.return_date?fmtD(r.return_date):dash)+'</td>'
+      + '<td>'+esc(r.service_advisor||'—')+'</td>'
+      + '<td class="c-wc">'+wc+'</td>'
+      + '<td class="c-sc">'+sc+'</td>'
+      + '<td style="max-width:150px;color:var(--muted)">'+esc(r.note||'')+'</td>'
+      + '<td style="max-width:150px;color:var(--muted)">'+esc(r.warranty_note||'')+'</td>'
+      + '</tr>'
+  }).join('')
+  $('tbody').querySelectorAll('tr.tr-clickable').forEach(tr=>tr.addEventListener('click',()=>openModal(+tr.dataset.id)))
+}
+
+// ── edit modal ──
+function openModal(id){
+  const r = S.rows.find(x=>x.id===id); if(!r) return
+  S.editId = id
+  $('m_title').textContent = 'Edit ' + (r.order_ref||('GOR0'+r.order_number))
+  $('m_note').value = r.note || ''
+  $('m_wnote').value = r.warranty_note || ''
+  setDate('m_pickup', r.pickup_date); setDate('m_return', r.return_date)
+  // claim date+time default to NOW when empty (admin only)
+  if (S.isAdmin){
+    setDT('m_warranty', r.warranty_claim_date || nowLocal())
+    setDT('m_service',  r.service_claim_date  || nowLocal())
+  } else {
+    setDT('m_warranty', r.warranty_claim_date); setDT('m_service', r.service_claim_date)
+  }
+  $('m_note').disabled = S.isAdmin
+  ;['m_pickup','m_return','m_warranty','m_service','m_wnote'].forEach(i=>{ $(i).disabled = !S.isAdmin })
+  $('m_modeNote').textContent = S.isAdmin
+    ? '🔓 Warranty admin — set pick-up, return and claim date/time, and the warranty note. Advisors see the date only.'
+    : '🔒 Advisor — you can edit your own note. Pick-up, return and warranty fields are managed by the warranty admin.'
+  resolveVisibility()
+  $('modalBg').classList.add('on')
+}
+window._closeModal = () => { $('modalBg').classList.remove('on'); S.editId=null }
+
+async function saveModal(){
+  if (!S.editId) return
+  const dtISO = id => { const v=val(id); return v ? new Date(v).toISOString() : null }
+  const upd = S.isAdmin
+    ? { pickup_date: val('m_pickup')||null, return_date: val('m_return')||null,
+        warranty_claim_date: dtISO('m_warranty'), service_claim_date: dtISO('m_service'),
+        warranty_note: val('m_wnote')||null }
+    : { note: val('m_note')||null }
+  showLoad('Saving…')
+  const { error } = await sb.from('warranty_bmw_orders').update(upd).eq('id', S.editId)
+  hideLoad()
+  if (error){ showToast('❌ '+(error.message||'').slice(0,90)); return }
+  showToast('✅ Updated'); window._closeModal(); load()
+}
+
+// ── wire up ──
+$('saveBtn').addEventListener('click', save)
+$('clearBtn').addEventListener('click', clearForm)
+$('refreshBtn').addEventListener('click', load)
+$('search').addEventListener('input', render)
+$('m_save').addEventListener('click', saveModal)
+$('modalBg').addEventListener('click', e=>{ if(e.target===$('modalBg')) window._closeModal() })
+$('def_wc').addEventListener('change', e=> upsertRule('warranty_claim_date','default','*', e.target.checked))
+$('def_sc').addEventListener('change', e=> upsertRule('service_claim_date','default','*', e.target.checked))
+$('ov_scope').addEventListener('change', fillWho)
+$('ov_add').addEventListener('click', async ()=>{
+  const ok = await upsertRule(val('ov_field'), val('ov_scope'), val('ov_value'), val('ov_hidden')==='true')
+  if (ok){ renderRules(); showToast('Rule saved') }
+})
+
+// init
+$('f_orderdate').value = todayISO(); $('f_date').value = todayISO()
+await whoami()
+await loadRules()
+await loadPanel()
+await load()
+</script>
+</body>
+</html>
