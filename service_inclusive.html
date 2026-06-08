@@ -1195,6 +1195,14 @@
         <select class="select" id="package-vehicle" required></select>
       </div>
       <div>
+        <label class="label">Vehicle year</label>
+        <input class="input font-mono" type="number" id="package-vehicle-year" min="1980" max="2100" placeholder="2019" />
+      </div>
+      <div>
+        <label class="label">Current mileage (km)</label>
+        <input class="input font-mono" type="number" id="package-vehicle-mileage" min="0" placeholder="50000" />
+      </div>
+      <div>
         <label class="label">Package type</label>
         <input class="input" id="package-type" list="package-type-options" required placeholder="Premium Maintenance" />
         <datalist id="package-type-options"></datalist>
@@ -2655,6 +2663,11 @@ function openPackageModal(id, vehicleId) {
   document.getElementById('package-notes').value = p?.notes || '';
   document.getElementById('package-description').value = p?.description || '';
 
+  // Prefill the vehicle year + current mileage from the package's vehicle.
+  const _pv = state.vehicles.find(v => v.id === (p?.vehicleId || vehicleId));
+  document.getElementById('package-vehicle-year').value = _pv?.year ?? '';
+  document.getElementById('package-vehicle-mileage').value = _pv?.currentMileage ?? '';
+
   // Auto-select the vehicle when launched from a specific vehicle, and fill its
   // current mileage as the start mileage (fires the change handler).
   if (!p && vehicleId) {
@@ -2690,6 +2703,9 @@ document.getElementById('package-vehicle').addEventListener('change', (e) => {
   const v = state.vehicles.find(x => x.id === e.target.value);
   const startEl = document.getElementById('package-start-mileage');
   if (v && !startEl.value) startEl.value = v.currentMileage || 0;
+  const yEl = document.getElementById('package-vehicle-year');
+  const mEl = document.getElementById('package-vehicle-mileage');
+  if (v) { if (yEl) yEl.value = v.year ?? ''; if (mEl) mEl.value = v.currentMileage ?? ''; }
 });
 
 document.getElementById('package-form').addEventListener('submit', (e) => {
@@ -2710,6 +2726,18 @@ document.getElementById('package-form').addEventListener('submit', (e) => {
   };
   if (data.mileageCap <= data.startMileage) { toast('Mileage cap must be greater than start mileage', 'danger'); return; }
   if (new Date(data.endDate) <= new Date(data.startDate)) { toast('End date must be after start date', 'danger'); return; }
+  // Persist the Vehicle year + Current mileage entered on the package form back onto the vehicle.
+  const _veh = state.vehicles.find(v => v.id === data.vehicleId);
+  if (_veh) {
+    const _yIn = document.getElementById('package-vehicle-year').value;
+    const _mIn = document.getElementById('package-vehicle-mileage').value;
+    const _newYear = _yIn === '' ? _veh.year : (parseInt(_yIn) || null);
+    const _newMileage = _mIn === '' ? _veh.currentMileage : (parseInt(_mIn) || 0);
+    if (_newYear !== _veh.year || _newMileage !== _veh.currentMileage) {
+      _veh.year = _newYear; _veh.currentMileage = _newMileage;
+      state.vehicles = state.vehicles.map(v => v.id === _veh.id ? _veh : v);
+    }
+  }
   if (id) {
     state.packages = state.packages.map(p => p.id === id ? data : p);
     toast('Package updated');
