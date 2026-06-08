@@ -171,6 +171,44 @@
     } catch (e) { /* swallow */ }
   }
 
+  // ─── Hide nav links / dashboard tiles the user has no access to ──
+  // Runs on EVERY page so a role with 'none' on a page never even sees
+  // the link to it (in addition to being blocked on direct visit).
+  // Only 'none' is hidden — 'view' keeps the link (read-only is allowed).
+  var _permCache = {}
+  async function levelFor (page) {
+    if (_permCache[page] !== undefined) return _permCache[page]
+    var l = await fetchPermissionLevel(page)
+    _permCache[page] = l
+    return l
+  }
+  async function hideForbiddenLinks () {
+    function collect () {
+      var byPage = {}
+      var anchors = document.querySelectorAll('a[href$=".html"]')
+      Array.prototype.forEach.call(anchors, function (a) {
+        var href = a.getAttribute('href') || ''
+        var f = href.split('/').pop().replace(/\.html?$/i, '')
+        if (!f || f === 'index') return            // dashboard is always allowed
+        ;(byPage[f] = byPage[f] || []).push(a)
+      })
+      return byPage
+    }
+    var byPage = collect()
+    var pages = Object.keys(byPage)
+    if (!pages.length) return
+    var levels = await Promise.all(pages.map(levelFor))
+    function apply () {
+      var fresh = collect()           // re-query in case nav rendered late
+      pages.forEach(function (p, i) {
+        if (levels[i] !== 'none') return
+        ;(fresh[p] || []).forEach(function (a) { a.style.display = 'none' })
+      })
+    }
+    apply()
+    setTimeout(apply, 1200)           // second pass for JS-rendered menus/tiles
+  }
+
   // ─── 4. Run after parse ──────────────────────────────────────
   async function run () {
     var page = currentPageId()
@@ -178,6 +216,8 @@
     await new Promise(function (r) { setTimeout(r, 50) })
     // Fire-and-forget auto-registration on every page (incl. dashboard)
     registerPage(page)
+    // Hide links/tiles the user cannot access (runs on every page)
+    hideForbiddenLinks()
     if (page === 'dashboard') return    // dashboard is always reachable
     var level = await fetchPermissionLevel(page)
     window.CW_PERMISSION = level
