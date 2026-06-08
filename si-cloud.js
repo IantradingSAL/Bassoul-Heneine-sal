@@ -100,14 +100,14 @@
         invoiced_amount: p.invoicedAmount || 0,
         start_date: toIsoDate(p.startDate), end_date: toIsoDate(p.endDate),
         start_mileage: p.startMileage || 0, mileage_cap: p.mileageCap || 0,
-        notes: p.notes || null, created_at: p.createdAt || null,
+        notes: p.notes || null, description: p.description || null, created_at: p.createdAt || null,
       }),
       fromDb: r => ({
         id: r.id, vehicleId: r.vehicle_id || '', packageType: r.package_type || '',
         invoicedAmount: Number(r.invoiced_amount) || 0,
         startDate: r.start_date || '', endDate: r.end_date || '',
         startMileage: r.start_mileage || 0, mileageCap: r.mileage_cap || 0,
-        notes: r.notes || '', createdAt: r.created_at || null,
+        notes: r.notes || '', description: r.description || '', createdAt: r.created_at || null,
       }),
     },
     services: {
