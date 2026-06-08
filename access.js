@@ -215,11 +215,31 @@
     setTimeout(apply, 1200)           // second pass for JS-rendered menus/tiles
   }
 
+  // Wait until the config bridge (window.__SUPA__) AND the auth token are
+  // present. On the FIRST load right after login these can lag a beat, and
+  // a fixed 50ms isn't enough — the permission check then fails open and
+  // shows links that should be hidden until you refresh. Poll instead.
+  function _tokenPresent () {
+    try {
+      if (!window.__SUPA__ || !window.__SUPA__.url) return false
+      var ref = new URL(window.__SUPA__.url).hostname.split('.')[0]
+      return !!localStorage.getItem('sb-' + ref + '-auth-token')
+    } catch (e) { return false }
+  }
+  async function waitForReady (timeoutMs) {
+    var start = Date.now()
+    while (!_tokenPresent()) {
+      if (Date.now() - start > (timeoutMs || 4000)) return false
+      await new Promise(function (r) { setTimeout(r, 120) })
+    }
+    return true
+  }
+
   // ─── 4. Run after parse ──────────────────────────────────────
   async function run () {
     var page = currentPageId()
     // Give config.js (a module) a moment to set window.__SUPA__.
-    await new Promise(function (r) { setTimeout(r, 50) })
+    await waitForReady(4000)
     // Fire-and-forget auto-registration on every page (incl. dashboard)
     registerPage(page)
     // Hide links/tiles the user cannot access (runs on every page)
@@ -241,4 +261,19 @@
   } else {
     run()
   }
+
+  // If login happens WITHOUT a full page reload (e.g. the dashboard shows a
+  // login form, then swaps to the app in place), access.js has already run
+  // with no token. Watch for the token appearing and re-apply link hiding so
+  // the user doesn't have to refresh to get the correct, role-filtered view.
+  ;(function watchAuth () {
+    var had = _tokenPresent()
+    var ticks = 0
+    var iv = setInterval(function () {
+      var now = _tokenPresent()
+      if (now && !had) { _permCache = {}; hideForbiddenLinks() }   // just signed in
+      had = now
+      if (++ticks > 120) clearInterval(iv)                          // stop after ~60s
+    }, 500)
+  })()
 })()
