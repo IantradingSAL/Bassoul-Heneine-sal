@@ -3633,7 +3633,7 @@ function saveRej(){
   // Refresh EVERY page that depends on rejection data so totals/charts
   // update immediately — not just the Rejections list.
   ;[ 'rRej', 'rGCM', 'rOverview', 'rExpense', 'rCompare', 'rAvP',
-     'rBonus', 'rShortfall', 'rAge', 'rRecovery', 'rTrends', 'rComp', 'rAP', 'rShf', 'rCorr' ].forEach(fnName => {
+     'rBonus', 'rShortfall', 'rAge', 'rRecovery', 'rTrends', 'rComp', 'rAP', 'rShf', 'rCorr', 'rCompClaim' ].forEach(fnName => {
     if (typeof window[fnName] === 'function') {
       try { window[fnName]() } catch (e) { /* ignore page-not-rendered errors */ }
     }
@@ -4382,7 +4382,7 @@ function rComp(){
     <th>VIN</th><th>GCM Invoice #</th><th>GCM RO</th><th>Month</th><th>Exp</th><th>GCM Status</th>
     <th class="num">GCM Asked (€)</th><th class="num">GCM Paid (€)</th>
     <th>INC Invoice #</th><th>INC Svc Order</th><th>INC Location</th><th>INC Date</th><th class="num">INC Mileage</th>
-    <th class="num">INC Amount (€)</th><th class="num">Δ (€)</th>
+    <th class="num">INC Amount (€)</th><th class="num">Δ (€)</th><th>Action</th>
   </tr></thead><tbody>`;
   deepRows.slice(0,600).forEach(r=>{
     const rowStyle=r.source==='inc_only'?'background:rgba(14,165,233,.05)':!r.hasMatch?'background:rgba(244,63,94,.05)':'';
@@ -4408,9 +4408,10 @@ function rComp(){
       <td class="num" style="font-size:10px;color:var(--muted)">${r.incMileage?r.incMileage.toLocaleString():'—'}</td>
       <td class="num">${r.incAmt!==null?f(r.incAmt):'—'}</td>
       <td class="num">${dCell}</td>
+      <td>${(()=>{ if(r.source==='inc_only'||!r.gcmInv) return '<span style="color:var(--faint);font-size:10px">—</span>'; const rd=S.rej[r.gcmInv],isR=r.gcmSt===4,isDed=r.gcmSt===0&&((r.gcmAsked||0)-(r.gcmPaid||0))>0.01; return isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openModal('${esc(r.gcmInv)}','${esc(r.vin)}')">${rd?'✏️ Edit':'+ Track'}</button>`:isDed?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sky'}" onclick="event.stopPropagation();openModal('${esc(r.gcmInv)}','${esc(r.vin)}')" title="Record collection difference / correct amount to invoice">${rd?'✏️ Edit':'+ Track Δ'}</button>`:(rd?`<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();openModal('${esc(r.gcmInv)}','${esc(r.vin)}')">✏️ Edit</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'); })()}</td>
     </tr>`;
   });
-  if(deepRows.length>600)h2+=`<tr><td colspan="15" style="text-align:center;padding:12px;color:var(--muted);font-size:11px">… ${deepRows.length-600} more rows</td></tr>`;
+  if(deepRows.length>600)h2+=`<tr><td colspan="16" style="text-align:center;padding:12px;color:var(--muted);font-size:11px">… ${deepRows.length-600} more rows</td></tr>`;
   h2+=`</tbody></table></div></div>
   <div class="al al-i" style="margin-top:12px">🔵 Blue rows = in INCADEA only (no matching GCM claim). 🔴 Red rows = in GCM with no matching INCADEA invoice (matched by invoice # or RO #).</div>`;
   T.innerHTML=h2;
@@ -4464,10 +4465,12 @@ function rCompClaim(){
   <div class="tw"><table class="t"><thead><tr>
     <th>VIN</th><th>GCM Invoice #</th><th>RO / Order</th><th>Month</th><th>Exp</th><th>Status</th>
     <th class="num">GCM Asked (€)</th><th class="num">GCM Paid (€)</th>
-    <th>INC Invoice #</th><th>INC Location</th><th class="num">INC Amount (€)</th><th class="num">Δ (€)</th></tr></thead><tbody>`;
+    <th>INC Invoice #</th><th>INC Location</th><th class="num">INC Amount (€)</th><th class="num">Δ (€)</th><th>Action</th></tr></thead><tbody>`;
   rows.slice(0,600).forEach(r=>{
     const rowStyle=!r.hasMatch?'background:rgba(244,63,94,.05)':'';
     const dCell=r.delta!==null?`<span class="${dc(r.delta)}" style="font-weight:700">${f(r.delta)}</span>`:'<span class="badge b-rose" style="font-size:8px">No INC match</span>';
+    const rd=S.rej[r.inv],isR=r.st===4,isDed=r.st===0&&(r.asked-r.paid)>0.01;
+    const act=isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openModal('${esc(r.inv)}','${esc(r.vin)}')">${rd?'✏️ Edit':'+ Track'}</button>`:isDed?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sky'}" onclick="event.stopPropagation();openModal('${esc(r.inv)}','${esc(r.vin)}')" title="Record collection difference / correct amount to invoice">${rd?'✏️ Edit':'+ Track Δ'}</button>`:(rd?`<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();openModal('${esc(r.inv)}','${esc(r.vin)}')">✏️ Edit</button>`:'<span style="color:var(--faint);font-size:10px">—</span>');
     h+=`<tr style="${rowStyle}">
       <td class="mono" style="font-size:10px">${r.vin}</td>
       <td class="mono">${r.inv||'—'}</td>
@@ -4481,10 +4484,11 @@ function rCompClaim(){
       <td style="font-size:10px;color:var(--sky)">${r.incLoc||'—'}</td>
       <td class="num">${r.incAmt!==null?f(r.incAmt):'—'}</td>
       <td class="num">${dCell}</td>
+      <td>${act}</td>
     </tr>`;
   });
-  if(rows.length>600)h+=`<tr><td colspan="12" style="text-align:center;padding:12px;color:var(--muted);font-size:11px">… ${rows.length-600} more claims — use filters to narrow down 🔍</td></tr>`;
-  h+=`</tbody><tfoot><tr class="tr-grand"><td colspan="6">TOTAL</td><td class="num">${f(rows.reduce((s,r)=>s+(r.asked||0),0))}</td><td class="num">${f(tPaid)}</td><td colspan="2"></td><td class="num">${f(tInc)}</td><td class="num">${f(tDelta)}</td></tr></tfoot></table></div></div>
+  if(rows.length>600)h+=`<tr><td colspan="13" style="text-align:center;padding:12px;color:var(--muted);font-size:11px">… ${rows.length-600} more claims — use filters to narrow down 🔍</td></tr>`;
+  h+=`</tbody><tfoot><tr class="tr-grand"><td colspan="6">TOTAL</td><td class="num">${f(rows.reduce((s,r)=>s+(r.asked||0),0))}</td><td class="num">${f(tPaid)}</td><td colspan="2"></td><td class="num">${f(tInc)}</td><td class="num">${f(tDelta)}</td><td></td></tr></tfoot></table></div></div>
   <div class="al al-i" style="margin-top:12px">🔴 Red rows = GCM claim with no matching Incadea invoice (matched by invoice # or RO #). Δ = GCM Paid − Incadea Amount; green = positive, red = negative.</div>`;
   T.innerHTML=h;
 }
