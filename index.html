@@ -76,6 +76,18 @@ a{color:inherit;text-decoration:none}
 .lf-err.on{display:block}
 .lf-foot{font-size:11px;color:var(--dim);text-align:center;margin-top:18px}
 .lf-foot strong{color:var(--mu)}
+.lf-ok{
+  font-size:12px;color:var(--green,#16a34a);
+  background:var(--g50,rgba(22,163,74,.08));border:1px solid var(--g100,rgba(22,163,74,.28));
+  border-radius:9px;padding:10px 12px;display:none;line-height:1.45;
+}
+.lf-ok.on{display:block}
+.lf-linkrow{text-align:center;margin-top:14px}
+.lf-link{
+  background:none;border:none;padding:0;cursor:pointer;
+  font-family:var(--f);font-size:12px;font-weight:700;color:var(--blue);
+}
+.lf-link:hover{text-decoration:underline}
 
 /* ════ DASHBOARD ═══════════════════════════════════════════════ */
 .app{display:none;min-height:100vh}
@@ -329,6 +341,41 @@ tbody tr:hover{background:#f8fafc}
       <div class="lf-err" id="loginErr"></div>
       <button class="lf-btn" id="loginBtn" type="submit">Sign in →</button>
     </form>
+    <div class="lf-linkrow" id="forgotRow">
+      <button type="button" class="lf-link" id="forgotLink">Forgot your password?</button>
+    </div>
+
+    <!-- ── Password reset · request a link ──────────────────────── -->
+    <div class="lf" id="resetReqPanel" style="display:none">
+      <div class="login-h" style="font-size:18px">Reset your password</div>
+      <div class="login-sub" style="margin-bottom:4px">Enter your username or email and we'll email you a reset link.</div>
+      <div>
+        <label for="resetEmail">Username or email</label>
+        <input id="resetEmail" type="text" autocomplete="username" spellcheck="false" placeholder="e.g. Imad or you@bashen.com"/>
+      </div>
+      <div class="lf-err" id="resetReqErr"></div>
+      <div class="lf-ok"  id="resetReqOk"></div>
+      <button class="lf-btn" id="resetReqBtn" type="button">Send reset link →</button>
+      <div class="lf-linkrow"><button type="button" class="lf-link" id="backToLogin1">← Back to sign in</button></div>
+    </div>
+
+    <!-- ── Password reset · set a new password (recovery-link landing) ── -->
+    <div class="lf" id="resetNewPanel" style="display:none">
+      <div class="login-h" style="font-size:18px">Set a new password</div>
+      <div class="login-sub" style="margin-bottom:4px">Choose a new password for your account.</div>
+      <div>
+        <label for="newPass">New password</label>
+        <input id="newPass" type="password" autocomplete="new-password" placeholder="At least 8 characters"/>
+      </div>
+      <div>
+        <label for="newPass2">Confirm new password</label>
+        <input id="newPass2" type="password" autocomplete="new-password" placeholder="Re-enter password"/>
+      </div>
+      <div class="lf-err" id="resetNewErr"></div>
+      <div class="lf-ok"  id="resetNewOk"></div>
+      <button class="lf-btn" id="resetNewBtn" type="button">Update password →</button>
+    </div>
+
     <div class="lf-foot">© 2026 <strong>IanTradingSAL</strong> · All rights reserved</div>
   </div>
 </div>
@@ -587,7 +634,24 @@ tbody tr:hover{background:#f8fafc}
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 import { SUPABASE_CONFIG } from './config.js'
 
+// Capture the URL hash BEFORE createClient runs (it may consume/clear it).
+const _initialHash = location.hash || ''
 const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
+const isRecoveryFlow = _initialHash.includes('type=recovery')
+
+// ─── login card view toggles (sign-in ↔ reset panels) ─────────
+function _show(id, on){ const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none' }
+function showLoginForm(){ _show('loginForm',true);  _show('forgotRow',true);  _show('resetReqPanel',false); _show('resetNewPanel',false) }
+function showForgotPanel(){
+  _show('loginForm',false); _show('forgotRow',false); _show('resetReqPanel',true); _show('resetNewPanel',false)
+  const f=document.getElementById('uName'), r=document.getElementById('resetEmail')
+  if (r && f && f.value) r.value = f.value.trim()
+}
+function showResetPanel(){
+  const ls=document.getElementById('loginScreen'); if (ls) ls.style.display=''
+  const app=document.getElementById('appShell');  if (app) app.classList.remove('on')
+  _show('loginForm',false); _show('forgotRow',false); _show('resetReqPanel',false); _show('resetNewPanel',true)
+}
 
 // ════════════════════════════════════════════════════════════════
 //  Confirmation-email token recovery
@@ -600,9 +664,9 @@ const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
 //  the address bar, and show a friendly "welcome" toast.
 // ════════════════════════════════════════════════════════════════
 ;(async function pickUpEmailTokens(){
-  if (!location.hash || !location.hash.includes('access_token')) return
+  if (!_initialHash || !_initialHash.includes('access_token')) return
   try {
-    const params = new URLSearchParams(location.hash.replace(/^#/, ''))
+    const params = new URLSearchParams(_initialHash.replace(/^#/, ''))
     const access_token  = params.get('access_token')
     const refresh_token = params.get('refresh_token')
     const type          = params.get('type') || 'signup'
@@ -615,10 +679,12 @@ const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
     }
     // Clean the URL so the tokens don't stay visible
     history.replaceState(null, '', location.pathname + location.search)
-    // Show a friendly message — user lands as fully authenticated
-    setTimeout(() => {
-      try { ntf(type === 'recovery' ? 'Password reset confirmed — please set a new password.' : '✅ Email confirmed. Welcome aboard!', 'ok') } catch {}
-    }, 600)
+    if (type === 'recovery') {
+      // Reset link → reveal the "set a new password" panel
+      showResetPanel()
+    } else {
+      setTimeout(() => { try { ntf('✅ Email confirmed. Welcome aboard!', 'ok') } catch {} }, 600)
+    }
   } catch (e) {
     console.warn('Token pickup error:', e)
   }
@@ -687,6 +753,9 @@ function showLogin(){
 
 // On page load: if a valid session exists, jump straight to the app.
 ;(async () => {
+  // Recovery link → never auto-enter the app; show the set-password panel.
+  if (isRecoveryFlow) { showResetPanel(); return }
+
   // Defensive cleanup of stale tokens from other Supabase projects
   // (same approach as auth_guard.js — keeps stale JWTs from being sent).
   try {
@@ -712,6 +781,35 @@ function showLogin(){
 sb.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT') showLogin()
 })
+
+// ─── shared: load employee profile, set session vars, enter app ──
+async function hydrateEmpAndEnter(user){
+  const email = user?.email || ''
+  let { data: emp } = await sb.from('employees')
+    .select('id, name, role, custom_role, auth_user_id')
+    .eq('auth_user_id', user.id).maybeSingle()
+
+  if (!emp && email) {
+    const { data: empByEmail } = await sb.from('employees')
+      .select('id, name, role, custom_role, auth_user_id')
+      .eq('email', email).maybeSingle()
+    if (empByEmail) {
+      if (!empByEmail.auth_user_id) {
+        await sb.from('employees').update({ auth_user_id: user.id }).eq('id', empByEmail.id)
+      }
+      emp = empByEmail
+    }
+  }
+
+  if (emp) {
+    sessionStorage.setItem('cw_current_emp', emp.name || '')
+    sessionStorage.setItem('cw_role', emp.custom_role || emp.role || 'employee')
+  } else {
+    sessionStorage.setItem('cw_current_emp', email.split('@')[0])
+    sessionStorage.setItem('cw_role', 'employee')
+  }
+  showApp(user)
+}
 
 // ─── login form ────────────────────────────────────────────────
 $('loginForm').addEventListener('submit', async (e) => {
@@ -746,37 +844,7 @@ $('loginForm').addEventListener('submit', async (e) => {
     const { data: signIn, error: signErr } = await sb.auth.signInWithPassword({ email, password: pw })
     if (signErr) throw signErr
 
-    // Fetch the employee profile. Try matching by auth_user_id first;
-    // if no match (because the admin created the profile without
-    // pasting in the UUID), fall back to email and link it now.
-    let { data: emp } = await sb.from('employees')
-      .select('id, name, role, custom_role, auth_user_id')
-      .eq('auth_user_id', signIn.user.id).maybeSingle()
-
-    if (!emp) {
-      const { data: empByEmail } = await sb.from('employees')
-        .select('id, name, role, custom_role, auth_user_id')
-        .eq('email', email).maybeSingle()
-      if (empByEmail) {
-        if (!empByEmail.auth_user_id) {
-          // First-time login — link this auth user to the employee row.
-          await sb.from('employees')
-            .update({ auth_user_id: signIn.user.id })
-            .eq('id', empByEmail.id)
-        }
-        emp = empByEmail
-      }
-    }
-
-    if (emp) {
-      sessionStorage.setItem('cw_current_emp', emp.name || '')
-      sessionStorage.setItem('cw_role', emp.custom_role || emp.role || 'employee')
-    } else {
-      sessionStorage.setItem('cw_current_emp', email.split('@')[0])
-      sessionStorage.setItem('cw_role', 'employee')
-    }
-
-    showApp(signIn.user)
+    await hydrateEmpAndEnter(signIn.user)
   } catch (ex) {
     console.warn(ex)
     err.textContent = ex?.message?.includes('Invalid login') || ex?.message === 'Unknown username'
@@ -796,6 +864,88 @@ $('signOutBtn').addEventListener('click', async () => {
   sessionStorage.removeItem('cw_role')
   showLogin()
 })
+
+// ─── password reset ────────────────────────────────────────────
+// Resolve a username to its email (same RPC the login uses).
+// Returns: an email string, '' (empty input), or null (username not found).
+async function resolveToEmail(idIn){
+  let email = (idIn || '').trim()
+  if (!email) return ''
+  if (!email.includes('@')) {
+    const { data, error } = await sb.rpc('lookup_login_email', { p_username: email })
+    if (error || !data) return null
+    email = data
+  }
+  return email
+}
+
+document.getElementById('forgotLink')?.addEventListener('click', () => {
+  document.getElementById('loginErr')?.classList.remove('on')
+  showForgotPanel()
+})
+document.getElementById('backToLogin1')?.addEventListener('click', showLoginForm)
+
+// Step 1 — send the reset email
+document.getElementById('resetReqBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('resetReqBtn')
+  const err = document.getElementById('resetReqErr')
+  const ok  = document.getElementById('resetReqOk')
+  err.classList.remove('on'); ok.classList.remove('on')
+
+  const idIn = document.getElementById('resetEmail').value.trim()
+  if (!idIn) { err.textContent = 'Please enter your username or email.'; err.classList.add('on'); return }
+
+  btn.disabled = true; const t = btn.textContent; btn.textContent = 'Sending…'
+  // Neutral message — never reveal whether an account exists.
+  const neutral = 'If an account matches that, a reset link is on its way. Check your inbox (and spam folder).'
+  try {
+    const email = await resolveToEmail(idIn)
+    if (email && email.includes('@')) {
+      const redirectTo = location.origin + location.pathname  // returns here with #...type=recovery
+      await sb.auth.resetPasswordForEmail(email, { redirectTo })
+    }
+    ok.textContent = neutral; ok.classList.add('on')
+  } catch (ex) {
+    console.warn('reset request:', ex)
+    ok.textContent = neutral; ok.classList.add('on')
+  } finally {
+    btn.disabled = false; btn.textContent = t
+  }
+})
+
+// Step 2 — set the new password (after clicking the email link)
+document.getElementById('resetNewBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('resetNewBtn')
+  const err = document.getElementById('resetNewErr')
+  const ok  = document.getElementById('resetNewOk')
+  err.classList.remove('on'); ok.classList.remove('on')
+
+  const p1 = document.getElementById('newPass').value
+  const p2 = document.getElementById('newPass2').value
+  if (!p1 || p1.length < 8) { err.textContent = 'Password must be at least 8 characters.'; err.classList.add('on'); return }
+  if (p1 !== p2)            { err.textContent = 'Passwords do not match.';                  err.classList.add('on'); return }
+
+  btn.disabled = true; const t = btn.textContent; btn.textContent = 'Updating…'
+  try {
+    const { error } = await sb.auth.updateUser({ password: p1 })
+    if (error) throw error
+    ok.textContent = 'Password updated. Signing you in…'; ok.classList.add('on')
+    history.replaceState(null, '', location.pathname + location.search)
+    const { data } = await sb.auth.getUser()
+    setTimeout(() => { hydrateEmpAndEnter(data.user).catch(() => showLoginForm()) }, 700)
+  } catch (ex) {
+    console.warn('reset update:', ex)
+    err.textContent = /session|auth|expired|jwt/i.test(ex?.message || '')
+      ? 'Your reset link has expired. Please go back and request a new one.'
+      : (ex.message || 'Could not update password. Please try again.')
+    err.classList.add('on')
+  } finally {
+    btn.disabled = false; btn.textContent = t
+  }
+})
+
+// Catch Supabase's own recovery detection (PKCE / auto-processed URLs)
+sb.auth.onAuthStateChange((event) => { if (event === 'PASSWORD_RECOVERY') showResetPanel() })
 
 // ─── mobile menu ──────────────────────────────────────────────
 ;(function(){
