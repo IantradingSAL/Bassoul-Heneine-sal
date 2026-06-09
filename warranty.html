@@ -1036,7 +1036,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
     </div>
 
     <!-- STEP 1: REJECTION TYPE -->
-    <div style="margin-bottom:16px">
+    <div style="margin-bottom:16px" id="M_STEP1">
       <label class="flb" style="margin-bottom:10px;display:block">① Rejection Type</label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div id="M_TYPE_FULL" onclick="setRejType('full')" style="border:2px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;transition:all .15s;background:var(--surf2)">
@@ -1071,9 +1071,40 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
       </div>
     </div>
 
+    <!-- CORRECTION / COLLECTION-DIFFERENCE BLOCK — shown when asked ≠ paid -->
+    <div id="M_CORR_BLOCK" style="display:none;background:linear-gradient(135deg,var(--sky3,#E0F2FE),#EFF6FF);border:1.5px solid rgba(14,165,233,.3);border-radius:12px;padding:14px 16px;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:var(--sky);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">💧 Collection Difference / Correct Amount to Invoice</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label class="flb" style="font-size:9px">Amount actually collected (€)</label>
+          <input class="fi" id="M_COLLECTED_AMT" type="number" step="0.01" min="0" placeholder="e.g. 380.00" oninput="calcCorr()"/>
+          <div style="font-size:9px;color:var(--muted);margin-top:3px">What was really received from Renault (leave blank if same as Paid).</div>
+        </div>
+        <div>
+          <label class="flb" style="font-size:9px">Correct amount that should be invoiced (€)</label>
+          <input class="fi" id="M_CORR_AMT" type="number" step="0.01" min="0" placeholder="e.g. 450.00" oninput="calcCorr()"/>
+          <div style="font-size:9px;color:var(--muted);margin-top:3px">For PSD / corrected claims — feeds the <strong>Asked vs Paid</strong> "Should Invoice" total.</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:var(--surf);border-radius:10px;padding:10px 12px;border:1.5px solid var(--border)">
+        <div>
+          <div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:3px">CLAIMED (€)</div>
+          <div style="font-size:13px;font-weight:800;color:var(--sky)" id="M_CR2_CLAIMED">—</div>
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:3px">PAID / COLLECTED (€)</div>
+          <div style="font-size:13px;font-weight:800;color:var(--mint)" id="M_CR2_PAID">—</div>
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:3px">DIFFERENCE (€)</div>
+          <div style="font-size:13px;font-weight:800" id="M_CR2_DIFF">—</div>
+        </div>
+      </div>
+    </div>
+
     <!-- STEP 2: REASON -->
     <div style="margin-bottom:14px">
-      <label class="flb">② Reason for Rejection</label>
+      <label class="flb" id="M_REASON_LBL">② Reason for Rejection</label>
       <select class="fi" id="M_REASON">
         <option value="">— Select reason —</option>
         <option>Test not supported</option>
@@ -1182,7 +1213,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
 
     <div class="fac">
       <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-sun btn-sm" onclick="saveRej()">💾 Save Rejection Protocol</button>
+      <button class="btn btn-sun btn-sm" id="M_SAVE_BTN" onclick="saveRej()">💾 Save Rejection Protocol</button>
     </div>
   </div>
 </div>
@@ -1276,6 +1307,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
   <div class="si" data-page="bonus" onclick="go(this)"><span class="si-emoji">⭐</span>Bonus 1%</div>
   <div class="ss">📊 Analytics</div>
   <div class="si" data-page="shortfall" onclick="go(this)"><span class="si-emoji">📋</span>Shortfall Report<span class="sbadge sb-rose" id="B_SHF">–</span></div>
+  <div class="si" data-page="corrections" onclick="go(this)"><span class="si-emoji">💧</span>Collection & Corrections<span class="sbadge sb-sky" id="B_CORR">–</span></div>
   <div class="si" data-page="ageing" onclick="go(this)"><span class="si-emoji">⏰</span>Rejection Ageing<span class="sbadge sb-rose" id="B_AGE">–</span></div>
   <div class="si" data-page="recovery" onclick="go(this)"><span class="si-emoji">🔄</span>Recovery Rate</div>
   <div class="si" data-page="trends" onclick="go(this)"><span class="si-emoji">📉</span>Rejection Trends</div>
@@ -1469,7 +1501,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--mint3)">📈</div><div><div class="ph-title">Asked vs Paid</div><div class="ph-sub">Gap analysis — what you asked vs what Renault paid</div></div></div>
     <div id="AP_E" class="al al-i" style="display:none">⬆️ Upload GCM to view this analysis.</div>
-    <div id="AP_K" class="krow k4" style="display:none"></div>
+    <div id="AP_K" class="krow k3" style="display:none"></div>
     <div id="AP_T"></div>
   </div></div>
 </div>
@@ -1670,6 +1702,26 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
     <div id="SHF_T"></div>
   </div></div>
 </div>
+
+<!-- ══ COLLECTION & CORRECTIONS PAGE ══════════════════════ -->
+<div class="page-area" id="P_corrections" style="display:none">
+  <div class="filterbar">
+    <div class="fg nobr"><span class="fl">Filter</span><select class="fsel" id="F_CORRF" onchange="rCorr()">
+      <option value="">All tracked differences</option>
+      <option value="collection">💧 Collection differences</option>
+      <option value="corrected">🧾 Has corrected invoice amount</option>
+      <option value="rejection">❌ Rejections with correction</option>
+    </select></div>
+    <div class="fg nobr"><span class="fl">Search</span><input class="finput" id="F_CORRQ" placeholder="VIN, invoice, reason…" oninput="rCorr()"/></div>
+    <button class="btn btn-ghost btn-sm" onclick="exportCorrCSV()" style="margin-left:auto">📥 Export to CSV</button>
+  </div>
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--sky3,#E0F2FE)">💧</div><div><div class="ph-title">Collection &amp; Corrections</div><div class="ph-sub">Every claim with a collection difference or a corrected invoice amount — detailed report</div></div></div>
+    <div id="CORR_E" class="al al-i" style="display:none">No collection differences or corrections tracked yet. On the GCM page, use "+ Track Δ" on a paid claim with a gap, or enter a corrected amount in the protocol.</div>
+    <div id="CORR_K" class="krow k4" style="display:none"></div>
+    <div id="CORR_T"></div>
+  </div></div>
+</div>
 </div></div>
 
 <script>
@@ -1757,6 +1809,10 @@ async function cwResubLoad(){
         origPaid:     row.orig_paid != null ? Number(row.orig_paid) : null,
         rejectedAmt:  row.rejected_amt != null ? Number(row.rejected_amt) : null,
         acceptedAmt:  row.accepted_amt != null ? Number(row.accepted_amt) : null,
+        recType:      row.record_type || 'rejection',
+        collectedAmt: row.collected_amt != null ? Number(row.collected_amt) : null,
+        corrAmt:      row.corrected_invoice_amt != null ? Number(row.corrected_invoice_amt) : null,
+        collectionDiff: row.collection_diff != null ? Number(row.collection_diff) : null,
         status:       row.status,
         autoMatched:  row.auto_matched,
         notes:        row.notes,
@@ -1821,6 +1877,10 @@ async function cwResubUpsert(origInvoice, claim){
     resub_date:     _toIsoDate(d.resubDate),
     rejected_amt:   d.rejectedAmt ?? null,
     accepted_amt:   d.acceptedAmt ?? null,
+    record_type:    d.recType || 'rejection',
+    collected_amt:  d.collectedAmt ?? null,
+    corrected_invoice_amt: d.corrAmt ?? null,
+    collection_diff: d.collectionDiff ?? null,
     credited_amt:   d.creditedAmt ?? null,
     credit_date:    _toIsoDate(d.creditDate),
     shortfall:      d.shortfall   ?? null,
@@ -2494,7 +2554,7 @@ function go(el){
   document.querySelectorAll('.page-area').forEach(p=>p.style.display='none');
   const pg = el.dataset.page;
   document.getElementById('P_'+pg).style.display = 'flex';
-  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,monthly_report:rRptInit,uploads_history:rUploadHistory})[pg]?.();
+  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,corrections:rCorr,monthly_report:rRptInit,uploads_history:rUploadHistory})[pg]?.();
 }
 
 // ══ DRAG & DROP ══════════════════════════════════════════════
@@ -3292,7 +3352,24 @@ function fillIF(){
 
 // ══ MODAL — REJECTION PROTOCOL ══════════════════════════════
 let _rejType = 'full'; // 'full' or 'partial'
+let _recType = 'rejection'; // 'rejection' (status 4) or 'collection' (paid w/ difference)
 let _mkClaim = null;   // the claim object currently being tracked
+
+// Live calc for the Collection-Difference / Correct-Invoice block.
+function calcCorr(){
+  if(!_mkClaim) return;
+  const claimed = _mkClaim.ta||0;
+  const paid    = _mkClaim.tp||0;
+  const collectedRaw = document.getElementById('M_COLLECTED_AMT')?.value;
+  const collected = (collectedRaw!==''&&collectedRaw!=null) ? (parseFloat(collectedRaw)||0) : paid;
+  const diff = claimed - collected;
+  const cl=document.getElementById('M_CR2_CLAIMED');
+  const pd=document.getElementById('M_CR2_PAID');
+  const df=document.getElementById('M_CR2_DIFF');
+  if(cl) cl.textContent='€'+f(claimed);
+  if(pd) pd.textContent='€'+f(collected);
+  if(df){ df.textContent='€'+f(diff); df.style.color=diff>0.01?'var(--rose)':diff<-0.01?'var(--sky)':'var(--mint)'; }
+}
 
 function setRejType(type){
   _rejType = type;
@@ -3343,8 +3420,22 @@ function calcCreditRecovery(){
 function openModal(inv,vin){
   _mk=inv;
   _mkClaim = S.gcm.find(r=>r.inv===inv)||null;
-  document.getElementById('MTITLE').textContent = 'Rejection Protocol — '+inv;
+  const d=S.rej[inv]||{};
+  // Mode: rejected claims (status 4) → rejection protocol; paid claims with a
+  // claimed-vs-paid gap (status 0) → collection-difference / correction.
+  const isRejected = _mkClaim ? (_mkClaim.st===4) : (d.recType!=='collection');
+  _recType = isRejected ? 'rejection' : 'collection';
+  const gap = _mkClaim ? ((_mkClaim.ta||0)-(_mkClaim.tp||0)) : 0;
+
+  document.getElementById('MTITLE').textContent = (isRejected?'Rejection Protocol — ':'Collection Difference — ')+inv;
   document.getElementById('MSUB').textContent = 'VIN: '+vin;
+  // Toggle rejection-only Step 1, relabel reason + save button by mode.
+  const step1=document.getElementById('M_STEP1'); if(step1) step1.style.display=isRejected?'block':'none';
+  const rlbl=document.getElementById('M_REASON_LBL'); if(rlbl) rlbl.textContent=isRejected?'② Reason for Rejection':'② Reason for Difference';
+  const sbtn=document.getElementById('M_SAVE_BTN'); if(sbtn) sbtn.textContent=isRejected?'💾 Save Rejection Protocol':'💾 Save Collection Protocol';
+  // Correction block: show whenever there is a claimed-vs-paid gap, or in collection mode.
+  const corrBlock=document.getElementById('M_CORR_BLOCK');
+  if(corrBlock) corrBlock.style.display=(!isRejected || Math.abs(gap)>0.01)?'block':'none';
 
   if(_mkClaim){
     const ta=_mkClaim.ta||0, tp=_mkClaim.tp||0, rejAmt=ta-tp;
@@ -3353,7 +3444,6 @@ function openModal(inv,vin){
     document.getElementById('M_SHOW_REJ').textContent='€'+f(rejAmt>0?rejAmt:ta);
   }
 
-  const d=S.rej[inv]||{};
   document.getElementById('M_REASON').value=d.reason||'';
   document.getElementById('M_NEWCLAIM').value=d.newClaim||'';
   document.getElementById('M_REINV').value=d.reInv||'';
@@ -3366,8 +3456,14 @@ function openModal(inv,vin){
   const creditDateEl=document.getElementById('M_CREDIT_DATE');
   if(creditedAmtEl) creditedAmtEl.value=d.creditedAmt||'';
   if(creditDateEl) creditDateEl.value=d.creditDate||'';
+  // Collection / correction fields
+  const collEl=document.getElementById('M_COLLECTED_AMT');
+  const corrEl=document.getElementById('M_CORR_AMT');
+  if(collEl) collEl.value=(d.collectedAmt!=null?d.collectedAmt:'');
+  if(corrEl) corrEl.value=(d.corrAmt!=null?d.corrAmt:'');
+  calcCorr();
 
-  const savedType=d.rejType||'full';
+  const savedType=d.rejType||(isRejected?'full':'partial');
   _rejType=savedType;
   document.getElementById('M_TYPE_FULL').style.border='2px solid var(--border)';
   document.getElementById('M_TYPE_FULL').style.background='var(--surf2)';
@@ -3375,6 +3471,8 @@ function openModal(inv,vin){
   document.getElementById('M_TYPE_PART').style.background='var(--surf2)';
   document.getElementById('M_PARTIAL_INFO').style.display='none';
   setRejType(savedType);
+  // The "Partial Rejection" auto-calc box is rejection-only; hide it for collection records.
+  if(!isRejected){const pi=document.getElementById('M_PARTIAL_INFO');if(pi)pi.style.display='none';}
   onStatusChange();
   if(d.creditedAmt) calcCreditRecovery();
 
@@ -3426,7 +3524,15 @@ function saveRej(){
   const shortfall=rejAmt-creditedAmt;
   const recoveryRate=rejAmt>0?(creditedAmt/rejAmt*100):0;
 
+  // Collection-difference / correction inputs
+  const collectedRaw=document.getElementById('M_COLLECTED_AMT')?.value;
+  const corrRaw=document.getElementById('M_CORR_AMT')?.value;
+  const collectedAmt=(collectedRaw!==''&&collectedRaw!=null)?(parseFloat(collectedRaw)||0):null;
+  const corrAmt=(corrRaw!==''&&corrRaw!=null)?(parseFloat(corrRaw)||0):null;
+  const collectionDiff=ta-((collectedAmt!=null)?collectedAmt:tp);
+
   S.rej[_mk]={
+    recType:_recType,
     rejType:_rejType,
     reason:gv('M_REASON'),
     newClaim:newClaim||null,
@@ -3445,6 +3551,10 @@ function saveRej(){
     origPaid:tp,
     rejectedAmt:rejAmt,
     acceptedAmt:acceptedAmt,
+    // Collection difference / correction
+    collectedAmt:collectedAmt,
+    corrAmt:corrAmt,
+    collectionDiff:collectionDiff,
     autoMatched:autoMatchedNow || (S.rej[_mk]?.autoMatched ?? false),
     ts:new Date().toISOString()
   };
@@ -3453,7 +3563,7 @@ function saveRej(){
   // Refresh EVERY page that depends on rejection data so totals/charts
   // update immediately — not just the Rejections list.
   ;[ 'rRej', 'rGCM', 'rOverview', 'rExpense', 'rCompare', 'rAvP',
-     'rBonus', 'rShortfall', 'rAge', 'rRecovery', 'rTrends' ].forEach(fnName => {
+     'rBonus', 'rShortfall', 'rAge', 'rRecovery', 'rTrends', 'rComp', 'rAP', 'rShf', 'rCorr' ].forEach(fnName => {
     if (typeof window[fnName] === 'function') {
       try { window[fnName]() } catch (e) { /* ignore page-not-rendered errors */ }
     }
@@ -4026,7 +4136,7 @@ function rGCM(){
       <td class="num">${f(r.ta)}</td>
       <td class="num" style="font-weight:700">${f(r.tp)}</td>
       <td><span class="badge ${isDed?'b-sun':isP?'b-mint':isR?'b-rose':'b-n'}" ${isDed?`title="Paid with deduction — asked €${f(r.ta)}, paid €${f(r.tp)}"`:''}>${isP?(isDed?'⚠️ Paid −€'+f(ded):'✅ Paid'):isR?'❌ Rejected':'Stat '+r.st}</span>${isR&&rd?.rejType?` <span class="badge ${rd.rejType==='full'?'b-rose':'b-lem'}" style="margin-left:2px">${rd.rejType==='full'?'Full':'Partial'}</span>`:''}${resubChainBadge(r)}</td>
-      <td>${isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openModal('${esc(r.inv)}','${r.vin}')">${rd?'✏️ Edit':'+ Track'}</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'}</td>
+      <td>${isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openModal('${esc(r.inv)}','${r.vin}')">${rd?'✏️ Edit':'+ Track'}</button>`:isDed?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sky'}" onclick="event.stopPropagation();openModal('${esc(r.inv)}','${r.vin}')" title="Record collection difference / correct amount to invoice">${rd?'✏️ Edit':'+ Track Δ'}</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'}</td>
     </tr>`;
   });
   if(rows.length>600)h+=`<tr><td colspan="17" style="text-align:center;padding:14px;color:var(--muted);font-size:11px;font-weight:500">… ${rows.length-600} more rows — use filters to narrow down 🔍</td></tr>`;
@@ -4140,7 +4250,9 @@ function rComp(){
     <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚖️ Difference (€)</div><div class="kv ${Math.abs(tD)>0.01?'lem':'mint'}">${f(tD)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">✅ Perfect Matches</div><div class="kv mint">${mtch}</div><div class="ks">of ${mg.length} VINs</div></div>`;
 
-  const dc=v=>Math.abs(v)<=0.01?'dz':v>0?'dp':'dn';
+  // Incadea vs GCM colour rule (per request): positive Δ = green, negative Δ = red.
+  // .dp = rose (red), .dn = mint (green) globally — so we map +→dn, −→dp here only.
+  const dc=v=>Math.abs(v)<=0.01?'dz':v>0?'dn':'dp';
 
   // ── VIN SUMMARY VIEW ──────────────────────────────────────
   if(view==='vin'){
@@ -4250,27 +4362,34 @@ function rAP(){
   const allRows=S.gcm.filter(r=>(!mf||r.month===mf)&&(!ef||r.exp===ef));
   const supersededIds = new Set(allRows.filter(_isSupersededByResubmission).map(r => r.inv));
   const rows = allRows.filter(r => !supersededIds.has(r.inv));
-  const byME={};rows.forEach(r=>{const k=r.month+'||'+r.exp;if(!byME[k])byME[k]={m:r.month,exp:r.exp,expD:r.expD,cnt:0,pa:0,pp:0,la:0,lp:0,ea:0,ep:0,ta:0,tp:0};byME[k].cnt++;byME[k].pa+=r.pa;byME[k].pp+=r.pp;byME[k].la+=r.la;byME[k].lp+=r.lp;byME[k].ea+=(r.ea||0);byME[k].ep+=(r.ep||0);byME[k].ta+=r.ta;byME[k].tp+=r.tp;});
+  const byME={};rows.forEach(r=>{const k=r.month+'||'+r.exp;if(!byME[k])byME[k]={m:r.month,exp:r.exp,expD:r.expD,cnt:0,pa:0,pp:0,la:0,lp:0,ea:0,ep:0,ta:0,tp:0,ci:0};byME[k].cnt++;byME[k].pa+=r.pa;byME[k].pp+=r.pp;byME[k].la+=r.la;byME[k].lp+=r.lp;byME[k].ea+=(r.ea||0);byME[k].ep+=(r.ep||0);byME[k].ta+=r.ta;byME[k].tp+=r.tp;
+    // "Should Invoice" = corrected amount entered on the claim, else the paid amount.
+    const _c=S.rej[r.inv]; byME[k].ci += (_c&&_c.corrAmt!=null)?_c.corrAmt:r.tp;});
   const items=Object.values(byME).sort((a,b)=>a.m.localeCompare(b.m)||a.exp.localeCompare(b.exp));
-  const tTA=sm(items,'ta'),tTP=sm(items,'tp');
+  const tTA=sm(items,'ta'),tTP=sm(items,'tp'),tCI=sm(items,'ci');
   const rr=tTA>0?(1-tTP/tTA)*100:0;
+  const rrC=tTA>0?(1-tCI/tTA)*100:0;
+  const corrCount=rows.filter(r=>{const c=S.rej[r.inv];return c&&c.corrAmt!=null;}).length;
   K.style.display='grid';
   K.innerHTML=`
     <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📤 Total Asked (€)</div><div class="kv sky">${f(tTA)}</div>${supersededIds.size?`<div class="ks">${supersededIds.size} superseded ${supersededIds.size===1?'row':'rows'} excluded</div>`:''}</div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💵 Total Paid (€)</div><div class="kv mint">${f(tTP)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">📉 Total Deducted (€)</div><div class="kv rose">${f(tTA-tTP)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">📊 Deduction Rate</div><div class="kv ${rr>5?'rose':rr>2?'lem':'mint'}">${rr.toFixed(1)}%</div></div>`;
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">📊 Deduction Rate</div><div class="kv ${rr>5?'rose':rr>2?'lem':'mint'}">${rr.toFixed(1)}%</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">🧾 Should Invoice (€)</div><div class="kv sky">${f(tCI)}</div>${corrCount?`<div class="ks">${corrCount} corrected ${corrCount===1?'claim':'claims'}</div>`:'<div class="ks">no corrections yet</div>'}</div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">📊 Corrected Deduction Rate</div><div class="kv ${rrC>5?'rose':rrC>2?'lem':'mint'}">${rrC.toFixed(1)}%</div></div>`;
   let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">📈 Asked vs Paid — by Month & Expense Code</div><div class="tw"><table class="t">
-  <thead><tr><th>Month</th><th>Exp Code</th><th>Description</th><th class="num">Claims</th><th class="num">Parts Asked</th><th class="num">Parts Paid</th><th class="num">Δ Parts</th><th class="num">Labour Asked</th><th class="num">Labour Paid</th><th class="num">Δ Labour</th><th class="num">Total Asked</th><th class="num">Total Paid</th><th class="num">Deducted</th></tr></thead><tbody>`;
-  let pm='',ms={cnt:0,pa:0,pp:0,la:0,lp:0,ta:0,tp:0};
+  <thead><tr><th>Month</th><th>Exp Code</th><th>Description</th><th class="num">Claims</th><th class="num">Parts Asked</th><th class="num">Parts Paid</th><th class="num">Δ Parts</th><th class="num">Labour Asked</th><th class="num">Labour Paid</th><th class="num">Δ Labour</th><th class="num">Total Asked</th><th class="num">Total Paid</th><th class="num">Deducted</th><th class="num" title="Corrected amount that should be invoiced — overrides Paid where a correction was entered">Should Invoice</th></tr></thead><tbody>`;
+  let pm='',ms={cnt:0,pa:0,pp:0,la:0,lp:0,ta:0,tp:0,ci:0};
   items.forEach(r=>{
-    if(pm&&r.m!==pm){h+=`<tr class="tr-sub"><td colspan="3">📅 Subtotal ${fmM(pm)}</td><td class="num">${ms.cnt}</td><td class="num">${f(ms.pa)}</td><td class="num">${f(ms.pp)}</td><td class="num dp">${f(ms.pa-ms.pp)}</td><td class="num">${f(ms.la)}</td><td class="num">${f(ms.lp)}</td><td class="num dp">${f(ms.la-ms.lp)}</td><td class="num">${f(ms.ta)}</td><td class="num">${f(ms.tp)}</td><td class="num dp">${f(ms.ta-ms.tp)}</td></tr>`;ms={cnt:0,pa:0,pp:0,la:0,lp:0,ta:0,tp:0};}
-    ms.cnt+=r.cnt;ms.pa+=r.pa;ms.pp+=r.pp;ms.la+=r.la;ms.lp+=r.lp;ms.ta+=r.ta;ms.tp+=r.tp;pm=r.m;
+    if(pm&&r.m!==pm){h+=`<tr class="tr-sub"><td colspan="3">📅 Subtotal ${fmM(pm)}</td><td class="num">${ms.cnt}</td><td class="num">${f(ms.pa)}</td><td class="num">${f(ms.pp)}</td><td class="num dp">${f(ms.pa-ms.pp)}</td><td class="num">${f(ms.la)}</td><td class="num">${f(ms.lp)}</td><td class="num dp">${f(ms.la-ms.lp)}</td><td class="num">${f(ms.ta)}</td><td class="num">${f(ms.tp)}</td><td class="num dp">${f(ms.ta-ms.tp)}</td><td class="num">${f(ms.ci)}</td></tr>`;ms={cnt:0,pa:0,pp:0,la:0,lp:0,ta:0,tp:0,ci:0};}
+    ms.cnt+=r.cnt;ms.pa+=r.pa;ms.pp+=r.pp;ms.la+=r.la;ms.lp+=r.lp;ms.ta+=r.ta;ms.tp+=r.tp;ms.ci+=r.ci;pm=r.m;
     const pd=r.pa-r.pp,ld=r.la-r.lp,td=r.ta-r.tp;
-    h+=`<tr><td style="font-weight:600">${fmM(r.m)}</td><td><span class="badge b-sun">${r.exp}</span></td><td style="font-size:10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${r.expD||'–'}</td><td class="num">${r.cnt}</td><td class="num">${f(r.pa)}</td><td class="num">${f(r.pp)}</td><td class="num ${pd>0.01?'dp':'dz'}">${f(pd)}</td><td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td><td class="num ${ld>0.01?'dp':'dz'}">${f(ld)}</td><td class="num">${f(r.ta)}</td><td class="num">${f(r.tp)}</td><td class="num ${td>0.01?'dp':'dz'}">${f(td)}</td></tr>`;
+    const ciDiff=Math.abs(r.ci-r.tp)>0.01;
+    h+=`<tr><td style="font-weight:600">${fmM(r.m)}</td><td><span class="badge b-sun">${r.exp}</span></td><td style="font-size:10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${r.expD||'–'}</td><td class="num">${r.cnt}</td><td class="num">${f(r.pa)}</td><td class="num">${f(r.pp)}</td><td class="num ${pd>0.01?'dp':'dz'}">${f(pd)}</td><td class="num">${f(r.la)}</td><td class="num">${f(r.lp)}</td><td class="num ${ld>0.01?'dp':'dz'}">${f(ld)}</td><td class="num">${f(r.ta)}</td><td class="num">${f(r.tp)}</td><td class="num ${td>0.01?'dp':'dz'}">${f(td)}</td><td class="num" style="${ciDiff?'font-weight:800;color:var(--sky)':''}">${f(r.ci)}</td></tr>`;
   });
-  if(pm)h+=`<tr class="tr-sub"><td colspan="3">📅 Subtotal ${fmM(pm)}</td><td class="num">${ms.cnt}</td><td class="num">${f(ms.pa)}</td><td class="num">${f(ms.pp)}</td><td class="num dp">${f(ms.pa-ms.pp)}</td><td class="num">${f(ms.la)}</td><td class="num">${f(ms.lp)}</td><td class="num dp">${f(ms.la-ms.lp)}</td><td class="num">${f(ms.ta)}</td><td class="num">${f(ms.tp)}</td><td class="num dp">${f(ms.ta-ms.tp)}</td></tr>`;
-  h+=`</tbody><tfoot><tr class="tr-grand"><td colspan="3">GRAND TOTAL</td><td class="num">${sm(items,'cnt')}</td><td class="num">${f(sm(items,'pa'))}</td><td class="num">${f(sm(items,'pp'))}</td><td class="num">${f(sm(items,'pa')-sm(items,'pp'))}</td><td class="num">${f(sm(items,'la'))}</td><td class="num">${f(sm(items,'lp'))}</td><td class="num">${f(sm(items,'la')-sm(items,'lp'))}</td><td class="num">${f(tTA)}</td><td class="num">${f(tTP)}</td><td class="num">${f(tTA-tTP)}</td></tr></tfoot></table></div></div>`;
+  if(pm)h+=`<tr class="tr-sub"><td colspan="3">📅 Subtotal ${fmM(pm)}</td><td class="num">${ms.cnt}</td><td class="num">${f(ms.pa)}</td><td class="num">${f(ms.pp)}</td><td class="num dp">${f(ms.pa-ms.pp)}</td><td class="num">${f(ms.la)}</td><td class="num">${f(ms.lp)}</td><td class="num dp">${f(ms.la-ms.lp)}</td><td class="num">${f(ms.ta)}</td><td class="num">${f(ms.tp)}</td><td class="num dp">${f(ms.ta-ms.tp)}</td><td class="num">${f(ms.ci)}</td></tr>`;
+  h+=`</tbody><tfoot><tr class="tr-grand"><td colspan="3">GRAND TOTAL</td><td class="num">${sm(items,'cnt')}</td><td class="num">${f(sm(items,'pa'))}</td><td class="num">${f(sm(items,'pp'))}</td><td class="num">${f(sm(items,'pa')-sm(items,'pp'))}</td><td class="num">${f(sm(items,'la'))}</td><td class="num">${f(sm(items,'lp'))}</td><td class="num">${f(sm(items,'la')-sm(items,'lp'))}</td><td class="num">${f(tTA)}</td><td class="num">${f(tTP)}</td><td class="num">${f(tTA-tTP)}</td><td class="num">${f(tCI)}</td></tr></tfoot></table></div></div>`;
   T.innerHTML=h;
 }
 
@@ -4878,6 +4997,92 @@ function _rptKPIs(rows){
     rejRate, recRate,
     bonusRows, totalLabour, totalBonus
   };
+}
+
+// ══ RENDER COLLECTION & CORRECTIONS ════════════════════════════
+let _corrRows=[];
+function rCorr(){
+  const E=document.getElementById('CORR_E'),K=document.getElementById('CORR_K'),T=document.getElementById('CORR_T');
+  if(!E||!K||!T) return;
+  const ff=gv('F_CORRF'),qf=(gv('F_CORRQ')||'').toLowerCase();
+  // Build from GCM claims that have a tracked record with a collection diff or a corrected amount.
+  let rows=S.gcm.map(r=>{
+    const d=S.rej[r.inv]; if(!d) return null;
+    const hasCorr=d.corrAmt!=null, hasColl=d.collectedAmt!=null, isColl=d.recType==='collection';
+    if(!hasCorr&&!hasColl&&!isColl) return null;
+    const claimed=r.ta||0, paid=r.tp||0;
+    const collected=(d.collectedAmt!=null)?d.collectedAmt:paid;
+    const corrected=(d.corrAmt!=null)?d.corrAmt:null;
+    const diff=claimed-collected;            // shortfall in collection vs claimed
+    return {inv:r.inv,vin:r.vin,month:r.month,exp:r.exp,st:r.st,recType:d.recType||'rejection',
+            claimed,paid,collected,corrected,diff,reason:d.reason||'',status:d.status||'pending',notes:d.notes||''};
+  }).filter(Boolean);
+  // Filter
+  if(ff==='collection')rows=rows.filter(r=>r.recType==='collection');
+  else if(ff==='corrected')rows=rows.filter(r=>r.corrected!=null);
+  else if(ff==='rejection')rows=rows.filter(r=>r.recType==='rejection'&&r.corrected!=null);
+  if(qf)rows=rows.filter(r=>[r.vin,r.inv,r.reason,r.notes].join('|').toLowerCase().includes(qf));
+  rows.sort((a,b)=>(b.month||'').localeCompare(a.month||'')||Math.abs(b.diff)-Math.abs(a.diff));
+  _corrRows=rows;
+  const badge=document.getElementById('B_CORR'); if(badge) badge.textContent=rows.length;
+
+  if(!rows.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}
+  E.style.display='none';
+  const tClaimed=rows.reduce((s,r)=>s+r.claimed,0);
+  const tColl=rows.reduce((s,r)=>s+r.collected,0);
+  const tCorr=rows.reduce((s,r)=>s+(r.corrected!=null?r.corrected:r.paid),0);
+  const tDiff=rows.reduce((s,r)=>s+r.diff,0);
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">💧 Tracked Differences</div><div class="kv sky">${rows.length}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💵 Total Collected (€)</div><div class="kv mint">${f(tColl)}</div><div class="ks">of €${f(tClaimed)} claimed</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">🧾 Should Invoice (€)</div><div class="kv sky">${f(tCorr)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">📉 Net Difference (€)</div><div class="kv ${tDiff>0.01?'rose':tDiff<-0.01?'sky':'mint'}">${f(tDiff)}</div></div>`;
+  const stTxt=s=>({pending:'🔴 Pending',resubmitted:'🔄 Resubmitted',escalated:'⬆️ Escalated',credited:'💚 Credited',resolved:'✅ Resolved',written_off:'💀 Written Off'}[s]||s);
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">💧 Collection differences &amp; corrected invoice amounts — ${rows.length} record${rows.length===1?'':'s'}</div>
+  <div class="tw"><table class="t"><thead><tr>
+    <th>Month</th><th>Invoice #</th><th>VIN</th><th>Exp</th><th>Type</th>
+    <th class="num">Claimed (€)</th><th class="num">Paid (€)</th><th class="num">Collected (€)</th><th class="num">Should Invoice (€)</th><th class="num">Difference (€)</th>
+    <th>Reason</th><th>Status</th><th>Notes</th><th>Action</th></tr></thead><tbody>`;
+  rows.slice(0,600).forEach(r=>{
+    const diffStyle=r.diff>0.01?'color:var(--rose);font-weight:700':r.diff<-0.01?'color:var(--sky);font-weight:700':'color:var(--faint)';
+    const typeBadge=r.recType==='collection'?'<span class="badge b-sky">💧 Collection</span>':'<span class="badge b-rose">❌ Rejection</span>';
+    h+=`<tr>
+      <td style="white-space:nowrap;font-size:11px;font-weight:600">${r.month?fmM(r.month):'–'}</td>
+      <td class="mono">${r.inv}</td>
+      <td class="mono" style="font-size:10px">${r.vin}</td>
+      <td>${r.exp?`<span class="badge b-sun">${r.exp}</span>`:'–'}</td>
+      <td>${typeBadge}</td>
+      <td class="num">${f(r.claimed)}</td>
+      <td class="num">${f(r.paid)}</td>
+      <td class="num">${f(r.collected)}</td>
+      <td class="num" style="${r.corrected!=null?'font-weight:800;color:var(--sky)':'color:var(--faint)'}">${r.corrected!=null?f(r.corrected):'—'}</td>
+      <td class="num" style="${diffStyle}">${f(r.diff)}</td>
+      <td style="font-size:10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.reason||'–'}</td>
+      <td style="font-size:10px;white-space:nowrap">${stTxt(r.status)}</td>
+      <td style="font-size:10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.notes)}">${r.notes||'–'}</td>
+      <td><button class="btn btn-ghost btn-xs" onclick="openModal('${esc(r.inv)}','${esc(r.vin)}')">✏️ Edit</button></td>
+    </tr>`;
+  });
+  if(rows.length>600)h+=`<tr><td colspan="14" style="text-align:center;padding:12px;color:var(--muted);font-size:11px">… ${rows.length-600} more rows — use filters to narrow down 🔍</td></tr>`;
+  h+=`</tbody><tfoot><tr class="tr-grand"><td colspan="5">GRAND TOTAL</td><td class="num">${f(tClaimed)}</td><td class="num">${f(rows.reduce((s,r)=>s+r.paid,0))}</td><td class="num">${f(tColl)}</td><td class="num">${f(tCorr)}</td><td class="num">${f(tDiff)}</td><td colspan="4"></td></tr></tfoot></table></div></div>`;
+  T.innerHTML=h;
+}
+
+function exportCorrCSV(){
+  if(!_corrRows||!_corrRows.length){showToast('⚠️ Nothing to export — no tracked differences yet.');return;}
+  const head=['Month','Invoice','VIN','ExpCode','Type','Claimed','Paid','Collected','ShouldInvoice','Difference','Reason','Status','Notes'];
+  const esc2=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const lines=[head.join(',')];
+  _corrRows.forEach(r=>{
+    lines.push([r.month,r.inv,r.vin,r.exp,r.recType,r.claimed.toFixed(2),r.paid.toFixed(2),r.collected.toFixed(2),
+      (r.corrected!=null?r.corrected.toFixed(2):''),r.diff.toFixed(2),r.reason,r.status,r.notes].map(esc2).join(','));
+  });
+  const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='collection_corrections_'+new Date().toISOString().substr(0,10)+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  showToast('✅ Exported '+_corrRows.length+' rows to CSV');
 }
 
 function rRptInit(){
