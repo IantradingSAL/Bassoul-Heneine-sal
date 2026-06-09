@@ -3357,6 +3357,54 @@ function esc(s){return String(s).replace(/'/g,"\\'");}
 let _toastTimer;
 function showToast(msg){const t=document.getElementById('TOAST');t.innerHTML=msg;t.classList.add('show');clearTimeout(_toastTimer);_toastTimer=setTimeout(()=>t.classList.remove('show'),3000);}
 
+// ── GCM ↔ INCADEA matching ─────────────────────────────────────────
+// INCADEA prefixes its references: a GCM invoice 277341 appears in INCADEA as
+// "GAR0277341", and a GCM RO 264168 as service order "G0R0264168". We therefore
+// match on the numeric core (digits only, leading zeros stripped) in addition to
+// the exact value, across both the INC invoice # and INC service-order #.
+function _incNorm(s){return String(s==null?'':s).replace(/\D/g,'').replace(/^0+/,'');}
+function _buildIncMaps(){
+  const byNo={},bySvc={},byNoN={},bySvcN={};
+  (S.inc||[]).forEach(r=>{
+    if(r.no){const k=String(r.no).trim();if(k)byNo[k]=r;const n=_incNorm(r.no);if(n&&!byNoN[n])byNoN[n]=r;}
+    if(r.svcOrd){const k=String(r.svcOrd).trim();if(k)bySvc[k]=r;const n=_incNorm(r.svcOrd);if(n&&!bySvcN[n])bySvcN[n]=r;}
+  });
+  return {byNo,bySvc,byNoN,bySvcN};
+}
+function _matchInc(g,M){
+  const inv=String(g.inv||'').trim(),ro=String(g.ro||'').trim();
+  const ni=_incNorm(g.inv),nr=_incNorm(g.ro);
+  return M.byNo[inv]||M.bySvc[inv]||M.byNo[ro]||M.bySvc[ro]
+    ||(ni&&(M.byNoN[ni]||M.bySvcN[ni]))
+    ||(nr&&(M.bySvcN[nr]||M.byNoN[nr]))||null;
+}
+
+// ── RESET FILTERS ───────────────────────────────────────────────────
+// A "↺ Reset" button is injected into every .filterbar. It clears that
+// page's selects (back to first option) and text inputs, then re-renders.
+const PAGE_RENDER={gcm:'rGCM',overview:'rOV',expense:'rExp',comparison:'rComp',comparison_claim:'rCompClaim',askedpaid:'rAP',rejections:'rRej',incadea:'rInc',bonus:'rBonus',ageing:'rAge',recovery:'rRec',trends:'rTrd',shortfall:'rShf',corrections:'rCorr',monthly_report:'rRptInit',uploads_history:'rUploadHistory'};
+function resetFilters(btn){
+  const bar=btn.closest('.filterbar'); if(!bar) return;
+  bar.querySelectorAll('select').forEach(s=>{s.selectedIndex=0;});
+  bar.querySelectorAll('input').forEach(i=>{ if(i.type==='checkbox'||i.type==='radio') i.checked=false; else i.value=''; });
+  const area=btn.closest('.page-area');
+  const pg=area?area.id.replace(/^P_/,''):null;
+  const fnName=pg?PAGE_RENDER[pg]:null;
+  if(fnName&&typeof window[fnName]==='function'){ try{window[fnName]();}catch(e){} }
+}
+function injectResetButtons(){
+  document.querySelectorAll('.filterbar').forEach(bar=>{
+    if(bar.querySelector('.btn-reset')) return;
+    const b=document.createElement('button');
+    b.className='btn btn-ghost btn-sm btn-reset';
+    b.textContent='↺ Reset';
+    b.style.marginLeft='auto';
+    b.setAttribute('onclick','resetFilters(this)');
+    bar.appendChild(b);
+  });
+}
+document.addEventListener('DOMContentLoaded',injectResetButtons);
+
 function fillGF(){
   const months=[...new Set(S.gcm.map(r=>r.month))].filter(Boolean).sort();
   const exps=[...new Set(S.gcm.map(r=>r.exp))].filter(Boolean).sort();
@@ -4305,14 +4353,14 @@ function rComp(){
   // GCM key: inv (invoice#). INCADEA key: no (invoice#) or svcOrd
   const gcmRows=S.gcm.filter(r=>true);
   const incByVin={};S.inc.forEach(r=>{if(!incByVin[r.vin])incByVin[r.vin]=[];incByVin[r.vin].push(r);});
-  const incByNo={};S.inc.forEach(r=>{if(r.no)incByNo[r.no]=r;});
+  const _M=_buildIncMaps();
 
   let qfInv=qf;
   let deepRows=[];
   // For each GCM claim, try to find matching INCADEA invoice
   gcmRows.forEach(g=>{
     if(qfInv&&![g.vin,g.inv,g.ro].join('|').toLowerCase().includes(qfInv)) return;
-    const incMatch=incByNo[g.inv]||incByNo[g.ro]||null;
+    const incMatch=_matchInc(g,_M);
     const gTotal=g.tp;
     const iTotal=incMatch?incMatch.amt:null;
     const delta=iTotal!==null?gTotal-iTotal:null;
@@ -4385,10 +4433,10 @@ function rCompClaim(){
   E.style.display='none';
   const mf=gv('F_CCM'),ef=gv('F_CCE'),vf=gv('F_CCV'),qf=(gv('F_CCQ')||'').toLowerCase();
   const dc=v=>Math.abs(v)<=0.01?'dz':v>0?'dn':'dp';   // +→green(.dn), −→red(.dp)
-  const incByNo={};S.inc.forEach(r=>{if(r.no)incByNo[String(r.no).trim()]=r;});
+  const _M=_buildIncMaps();
 
   let rows=S.gcm.filter(r=>(!mf||r.month===mf)&&(!ef||r.exp===ef)).map(g=>{
-    const incMatch=incByNo[String(g.inv).trim()]||incByNo[String(g.ro).trim()]||null;
+    const incMatch=_matchInc(g,_M);
     const incAmt=incMatch?incMatch.amt:null;
     const delta=incAmt!==null?(g.tp-incAmt):null;     // GCM paid − Incadea amount
     return {vin:g.vin,inv:g.inv,ro:g.ro,month:g.month,exp:g.exp,st:g.st,asked:g.ta,paid:g.tp,
