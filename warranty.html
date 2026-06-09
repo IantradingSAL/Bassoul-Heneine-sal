@@ -4408,7 +4408,7 @@ function rComp(){
       <td class="num" style="font-size:10px;color:var(--muted)">${r.incMileage?r.incMileage.toLocaleString():'—'}</td>
       <td class="num">${r.incAmt!==null?f(r.incAmt):'—'}</td>
       <td class="num">${dCell}</td>
-      <td>${(()=>{ if(r.source==='inc_only'||!r.gcmInv) return '<span style="color:var(--faint);font-size:10px">—</span>'; const rd=S.rej[r.gcmInv],isR=r.gcmSt===4,isDed=r.gcmSt===0&&((r.gcmAsked||0)-(r.gcmPaid||0))>0.01; return isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openModal('${esc(r.gcmInv)}','${esc(r.vin)}')">${rd?'✏️ Edit':'+ Track'}</button>`:isDed?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sky'}" onclick="event.stopPropagation();openModal('${esc(r.gcmInv)}','${esc(r.vin)}')" title="Record collection difference / correct amount to invoice">${rd?'✏️ Edit':'+ Track Δ'}</button>`:(rd?`<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();openModal('${esc(r.gcmInv)}','${esc(r.vin)}')">✏️ Edit</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'); })()}</td>
+      <td>${(()=>{ if(r.source==='inc_only'||!r.gcmInv) return '<span style="color:var(--faint);font-size:10px">—</span>'; const rd=S.rej[r.gcmInv],isR=r.gcmSt===4,isDed=r.gcmSt===0&&(((r.gcmAsked||0)-(r.gcmPaid||0))>0.01||(r.delta!==null&&Math.abs(r.delta)>0.01)); return isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openModal('${esc(r.gcmInv)}','${esc(r.vin)}')">${rd?'✏️ Edit':'+ Track'}</button>`:isDed?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sky'}" onclick="event.stopPropagation();openModal('${esc(r.gcmInv)}','${esc(r.vin)}')" title="Record collection difference / correct amount to invoice">${rd?'✏️ Edit':'+ Track Δ'}</button>`:(rd?`<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();openModal('${esc(r.gcmInv)}','${esc(r.vin)}')">✏️ Edit</button>`:'<span style="color:var(--faint);font-size:10px">—</span>'); })()}</td>
     </tr>`;
   });
   if(deepRows.length>600)h2+=`<tr><td colspan="16" style="text-align:center;padding:12px;color:var(--muted);font-size:11px">… ${deepRows.length-600} more rows</td></tr>`;
@@ -4469,7 +4469,7 @@ function rCompClaim(){
   rows.slice(0,600).forEach(r=>{
     const rowStyle=!r.hasMatch?'background:rgba(244,63,94,.05)':'';
     const dCell=r.delta!==null?`<span class="${dc(r.delta)}" style="font-weight:700">${f(r.delta)}</span>`:'<span class="badge b-rose" style="font-size:8px">No INC match</span>';
-    const rd=S.rej[r.inv],isR=r.st===4,isDed=r.st===0&&(r.asked-r.paid)>0.01;
+    const rd=S.rej[r.inv],isR=r.st===4,isDed=r.st===0&&((r.asked-r.paid)>0.01||(r.delta!==null&&Math.abs(r.delta)>0.01));
     const act=isR?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openModal('${esc(r.inv)}','${esc(r.vin)}')">${rd?'✏️ Edit':'+ Track'}</button>`:isDed?`<button class="btn btn-sm ${rd?'btn-ghost':'btn-sky'}" onclick="event.stopPropagation();openModal('${esc(r.inv)}','${esc(r.vin)}')" title="Record collection difference / correct amount to invoice">${rd?'✏️ Edit':'+ Track Δ'}</button>`:(rd?`<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();openModal('${esc(r.inv)}','${esc(r.vin)}')">✏️ Edit</button>`:'<span style="color:var(--faint);font-size:10px">—</span>');
     h+=`<tr style="${rowStyle}">
       <td class="mono" style="font-size:10px">${r.vin}</td>
