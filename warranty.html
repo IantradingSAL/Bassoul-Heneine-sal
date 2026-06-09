@@ -1300,6 +1300,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
   <div class="si" data-page="overview" onclick="go(this)"><span class="si-emoji">📊</span>General View</div>
   <div class="si" data-page="expense" onclick="go(this)"><span class="si-emoji">🏷️</span>Expense Codes</div>
   <div class="si" data-page="comparison" onclick="go(this)"><span class="si-emoji">⚖️</span>Incadea vs GCM</div>
+  <div class="si" data-page="comparison_claim" onclick="go(this)"><span class="si-emoji">⚖️</span>Incadea vs GCM (Claim)</div>
   <div class="si" data-page="askedpaid" onclick="go(this)"><span class="si-emoji">📈</span>Asked vs Paid</div>
   <div class="si" data-page="rejections" onclick="go(this)"><span class="si-emoji">❌</span>Rejections<span class="sbadge sb-rose" id="B_REJ">–</span></div>
   <div class="ss">🔢 Data</div>
@@ -1489,6 +1490,27 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
     <div id="CMP_E" class="al al-i" style="display:none">⬆️ Upload both GCM and Incadea files to reconcile.</div>
     <div id="CMP_K" class="krow k4" style="display:none"></div>
     <div id="CMP_T"></div>
+  </div></div>
+</div>
+
+<!-- ══ COMPARISON PAGE — BY CLAIM ════════════════════════ -->
+<div class="page-area" id="P_comparison_claim" style="display:none">
+  <div class="filterbar">
+    <div class="fg"><span class="fl">Month</span><select class="fsel" id="F_CCM" onchange="rCompClaim()"><option value="">All</option></select></div>
+    <div class="fg nobr"><span class="fl">Expense Code</span><select class="fsel" id="F_CCE" onchange="rCompClaim()"><option value="">All</option></select></div>
+    <div class="fg"><span class="fl">Show</span><select class="fsel" id="F_CCV" onchange="rCompClaim()">
+      <option value="">All claims</option>
+      <option value="diff">⚠️ Differences only</option>
+      <option value="match">✅ Matches only</option>
+      <option value="unmatched">🔴 No Incadea match</option>
+    </select></div>
+    <div class="fg nobr"><span class="fl">Search</span><input class="finput" id="F_CCQ" placeholder="VIN, invoice, RO…" oninput="rCompClaim()"/></div>
+  </div>
+  <div class="scroll"><div class="page">
+    <div class="ph"><div class="ph-icon" style="background:var(--pur3)">⚖️</div><div><div class="ph-title">Incadea vs GCM — by Claim</div><div class="ph-sub">Reconciliation per GCM claim — one row per claim, matched to its Incadea invoice</div></div></div>
+    <div id="CMC_E" class="al al-i" style="display:none">⬆️ Upload both GCM and Incadea files to reconcile.</div>
+    <div id="CMC_K" class="krow k5" style="display:none"></div>
+    <div id="CMC_T"></div>
   </div></div>
 </div>
 
@@ -2554,7 +2576,7 @@ function go(el){
   document.querySelectorAll('.page-area').forEach(p=>p.style.display='none');
   const pg = el.dataset.page;
   document.getElementById('P_'+pg).style.display = 'flex';
-  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,corrections:rCorr,monthly_report:rRptInit,uploads_history:rUploadHistory})[pg]?.();
+  ({gcm:rGCM,overview:rOV,expense:rExp,comparison:rComp,comparison_claim:rCompClaim,askedpaid:rAP,rejections:rRej,incadea:rInc,bonus:rBonus,ageing:rAge,recovery:rRec,trends:rTrd,shortfall:rShf,corrections:rCorr,monthly_report:rRptInit,uploads_history:rUploadHistory})[pg]?.();
 }
 
 // ══ DRAG & DROP ══════════════════════════════════════════════
@@ -3338,8 +3360,8 @@ function showToast(msg){const t=document.getElementById('TOAST');t.innerHTML=msg
 function fillGF(){
   const months=[...new Set(S.gcm.map(r=>r.month))].filter(Boolean).sort();
   const exps=[...new Set(S.gcm.map(r=>r.exp))].filter(Boolean).sort();
-  ['F_GM','F_EM','F_AM','F_RM'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.innerHTML='<option value="">All</option>';months.forEach(m=>el.innerHTML+=`<option value="${m}">${fmM(m)}</option>`);});
-  ['F_GE','F_AE'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.innerHTML='<option value="">All</option>';exps.forEach(e=>el.innerHTML+=`<option value="${e}">${e}</option>`);});
+  ['F_GM','F_EM','F_AM','F_RM','F_CCM'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.innerHTML='<option value="">All</option>';months.forEach(m=>el.innerHTML+=`<option value="${m}">${fmM(m)}</option>`);});
+  ['F_GE','F_AE','F_CCE'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.innerHTML='<option value="">All</option>';exps.forEach(e=>el.innerHTML+=`<option value="${e}">${e}</option>`);});
 }
 function fillIF(){
   const makes=[...new Set(S.inc.map(r=>r.make))].filter(Boolean).sort();
@@ -4351,6 +4373,72 @@ function showVinDrill(vin){
   const el=document.getElementById('F_CV');if(el)el.value='invoice';
   const qEl=document.getElementById('F_CQ');if(qEl)qEl.value=vin;
   rComp();
+}
+
+// ══ RENDER INCADEA vs GCM — BY CLAIM ═══════════════════════════
+// One row per GCM claim, matched to its Incadea invoice (by invoice # then RO #).
+// Colour rule (same as the VIN page): positive Δ = green, negative Δ = red.
+function rCompClaim(){
+  const E=document.getElementById('CMC_E'),K=document.getElementById('CMC_K'),T=document.getElementById('CMC_T');
+  if(!E||!K||!T) return;
+  if(!S.gcm.length||!S.inc.length){E.style.display='flex';K.style.display='none';T.innerHTML='';return;}
+  E.style.display='none';
+  const mf=gv('F_CCM'),ef=gv('F_CCE'),vf=gv('F_CCV'),qf=(gv('F_CCQ')||'').toLowerCase();
+  const dc=v=>Math.abs(v)<=0.01?'dz':v>0?'dn':'dp';   // +→green(.dn), −→red(.dp)
+  const incByNo={};S.inc.forEach(r=>{if(r.no)incByNo[String(r.no).trim()]=r;});
+
+  let rows=S.gcm.filter(r=>(!mf||r.month===mf)&&(!ef||r.exp===ef)).map(g=>{
+    const incMatch=incByNo[String(g.inv).trim()]||incByNo[String(g.ro).trim()]||null;
+    const incAmt=incMatch?incMatch.amt:null;
+    const delta=incAmt!==null?(g.tp-incAmt):null;     // GCM paid − Incadea amount
+    return {vin:g.vin,inv:g.inv,ro:g.ro,month:g.month,exp:g.exp,st:g.st,asked:g.ta,paid:g.tp,
+            incNo:incMatch?.no||null,incLoc:incMatch?.loc||null,incAmt,delta,hasMatch:!!incMatch};
+  });
+  if(vf==='diff')rows=rows.filter(r=>r.hasMatch&&Math.abs(r.delta)>0.01);
+  else if(vf==='match')rows=rows.filter(r=>r.hasMatch&&Math.abs(r.delta)<=0.01);
+  else if(vf==='unmatched')rows=rows.filter(r=>!r.hasMatch);
+  if(qf)rows=rows.filter(r=>[r.vin,r.inv,r.ro].join('|').toLowerCase().includes(qf));
+  rows.sort((a,b)=>(b.month||'').localeCompare(a.month||'')||(b.delta!==null?Math.abs(b.delta):0)-(a.delta!==null?Math.abs(a.delta):0));
+
+  const matched=rows.filter(r=>r.hasMatch).length;
+  const tPaid=rows.reduce((s,r)=>s+(r.paid||0),0);
+  const tInc=rows.reduce((s,r)=>s+(r.incAmt||0),0);
+  const tDelta=rows.filter(r=>r.delta!==null).reduce((s,r)=>s+r.delta,0);
+  K.style.display='grid';
+  K.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">📋 Claims</div><div class="kv pur">${rows.length.toLocaleString()}</div><div class="ks">${matched} matched to INC</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">📋 GCM Paid (€)</div><div class="kv sun">${f(tPaid)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">🔧 Incadea (€)</div><div class="kv sky">${f(tInc)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚖️ Difference (€)</div><div class="kv ${tDelta>0.01?'mint':tDelta<-0.01?'rose':'mint'}">${f(tDelta)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">🔴 No INC Match</div><div class="kv rose">${rows.length-matched}</div></div>`;
+  const stBadge=st=>st===0?'<span class="badge b-mint">✅ Paid</span>':st===4?'<span class="badge b-rose">❌ Rejected</span>':'<span class="badge b-n">—</span>';
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="ct" style="padding:14px 16px 0">⚖️ Incadea ↔ GCM by Claim — ${rows.length} claim${rows.length===1?'':'s'}</div>
+  <div class="tw"><table class="t"><thead><tr>
+    <th>VIN</th><th>GCM Invoice #</th><th>RO / Order</th><th>Month</th><th>Exp</th><th>Status</th>
+    <th class="num">GCM Asked (€)</th><th class="num">GCM Paid (€)</th>
+    <th>INC Invoice #</th><th>INC Location</th><th class="num">INC Amount (€)</th><th class="num">Δ (€)</th></tr></thead><tbody>`;
+  rows.slice(0,600).forEach(r=>{
+    const rowStyle=!r.hasMatch?'background:rgba(244,63,94,.05)':'';
+    const dCell=r.delta!==null?`<span class="${dc(r.delta)}" style="font-weight:700">${f(r.delta)}</span>`:'<span class="badge b-rose" style="font-size:8px">No INC match</span>';
+    h+=`<tr style="${rowStyle}">
+      <td class="mono" style="font-size:10px">${r.vin}</td>
+      <td class="mono">${r.inv||'—'}</td>
+      <td class="mono" style="font-size:9px;color:var(--muted)">${r.ro||'—'}</td>
+      <td style="white-space:nowrap;font-size:11px;font-weight:600">${r.month?fmM(r.month):'—'}</td>
+      <td>${r.exp?`<span class="badge b-sun">${r.exp}</span>`:'—'}</td>
+      <td>${stBadge(r.st)}</td>
+      <td class="num">${f(r.asked)}</td>
+      <td class="num" style="font-weight:700">${f(r.paid)}</td>
+      <td class="mono">${r.incNo||'<span style="color:var(--faint)">—</span>'}</td>
+      <td style="font-size:10px;color:var(--sky)">${r.incLoc||'—'}</td>
+      <td class="num">${r.incAmt!==null?f(r.incAmt):'—'}</td>
+      <td class="num">${dCell}</td>
+    </tr>`;
+  });
+  if(rows.length>600)h+=`<tr><td colspan="12" style="text-align:center;padding:12px;color:var(--muted);font-size:11px">… ${rows.length-600} more claims — use filters to narrow down 🔍</td></tr>`;
+  h+=`</tbody><tfoot><tr class="tr-grand"><td colspan="6">TOTAL</td><td class="num">${f(rows.reduce((s,r)=>s+(r.asked||0),0))}</td><td class="num">${f(tPaid)}</td><td colspan="2"></td><td class="num">${f(tInc)}</td><td class="num">${f(tDelta)}</td></tr></tfoot></table></div></div>
+  <div class="al al-i" style="margin-top:12px">🔴 Red rows = GCM claim with no matching Incadea invoice (matched by invoice # or RO #). Δ = GCM Paid − Incadea Amount; green = positive, red = negative.</div>`;
+  T.innerHTML=h;
 }
 
 // ══ RENDER ASKED vs PAID ══════════════════════════════════════
