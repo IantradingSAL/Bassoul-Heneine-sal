@@ -1035,6 +1035,20 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
       </div>
     </div>
 
+    <!-- INCADEA REFERENCE — matched record for this claim -->
+    <div id="M_INC_BLOCK" style="display:none;background:var(--surf2);border:1.5px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:16px">
+      <div style="font-size:10px;font-weight:700;color:var(--sky);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">🔧 INCADEA Match</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div><div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:2px">INC INVOICE #</div><div style="font-size:13px;font-weight:800;font-family:'JetBrains Mono',monospace" id="M_INC_NO">—</div></div>
+        <div><div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:2px">INC SVC ORDER</div><div style="font-size:13px;font-weight:800;font-family:'JetBrains Mono',monospace" id="M_INC_SVC">—</div></div>
+        <div><div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:2px">INC LOCATION</div><div style="font-size:13px;font-weight:800;color:var(--sky)" id="M_INC_LOC">—</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+        <div><div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:2px">INC AMOUNT (€)</div><div style="font-size:13px;font-weight:800;color:var(--sky)" id="M_INC_AMT">—</div></div>
+        <div><div style="font-size:9px;font-weight:700;color:var(--muted);margin-bottom:2px">Δ GCM PAID − INC (€)</div><div style="font-size:13px;font-weight:800" id="M_INC_DELTA">—</div></div>
+      </div>
+    </div>
+
     <!-- STEP 1: REJECTION TYPE -->
     <div style="margin-bottom:16px" id="M_STEP1">
       <label class="flb" style="margin-bottom:10px;display:block">① Rejection Type</label>
@@ -3506,6 +3520,30 @@ function openModal(inv,vin){
   // Correction block: show whenever there is a claimed-vs-paid gap, or in collection mode.
   const corrBlock=document.getElementById('M_CORR_BLOCK');
   if(corrBlock) corrBlock.style.display=(!isRejected || Math.abs(gap)>0.01)?'block':'none';
+
+  // INCADEA reference — show the matched INCADEA record for this claim.
+  const incBlk=document.getElementById('M_INC_BLOCK');
+  if(incBlk){
+    const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+    if(_mkClaim && S.inc && S.inc.length){
+      const incM=_matchInc(_mkClaim,_buildIncMaps());
+      incBlk.style.display='block';
+      if(incM){
+        set('M_INC_NO', incM.no||'—');
+        set('M_INC_SVC', incM.svcOrd||'—');
+        set('M_INC_LOC', incM.loc||'—');
+        set('M_INC_AMT', '€'+f(incM.amt));
+        const dlt=(_mkClaim.tp||0)-(incM.amt||0);
+        const de=document.getElementById('M_INC_DELTA');
+        if(de){de.textContent='€'+f(dlt);de.style.color=dlt>0.01?'var(--mint)':dlt<-0.01?'var(--rose)':'var(--ink2)';}
+      } else {
+        set('M_INC_NO','— no match —'); set('M_INC_SVC','—'); set('M_INC_LOC','—'); set('M_INC_AMT','—');
+        const de=document.getElementById('M_INC_DELTA'); if(de){de.textContent='—'; de.style.color='var(--faint)';}
+      }
+    } else {
+      incBlk.style.display='none';
+    }
+  }
 
   if(_mkClaim){
     const ta=_mkClaim.ta||0, tp=_mkClaim.tp||0, rejAmt=ta-tp;
