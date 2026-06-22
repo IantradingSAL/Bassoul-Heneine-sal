@@ -213,7 +213,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
     <div class="si" data-page="statement"><span class="si-icon">💶</span><span>BMW Statement</span></div>
     <div class="nav-sec">Data</div>
     <div class="si" data-page="upload"><span class="si-icon">📤</span><span>Upload Center</span></div>
-    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v3.1</div>
+    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v3.2</div>
   </aside>
 
   <main class="main">
@@ -466,7 +466,7 @@ function parseSubmissions(wb){
     sheetRows(ws).forEach(r=>{const no=String(r['No.']||'').trim();if(!no)return
       const ls=String(r['Last Submission']||r['Last Submission No.']||'').trim(),dd=toIso(r['Document Date'])
       out.push({id:kind+':'+no,claim_kind:kind,no:no,make_code:String(r['Make Code']||'').trim()||null,status:String(r['Status']||'').trim()||null,
-        last_submission:ls||null,sub_key:subkey(ls),vin:String(r['VIN']||'').trim().toUpperCase()||null,license_no:String(r['License No.']||'').trim()||null,
+        last_submission:ls||null,sub_key:(kind==='bsi'?(subkey(ls)||subkey(no)):subkey(ls)),vin:String(r['VIN']||'').trim().toUpperCase()||null,license_no:String(r['License No.']||'').trim()||null,
         doc_no:String(r['Document No.']||'').trim()||null,service_order_no:String(r['Service Order No.']||'').trim()||null,
         document_date:dd,dealer_status:String(r['Dealer Status']||'').trim()||null,dealer_claim_submitted_date:toIso(r['Dealer Claim Submitted Date']||r['Dealer Claim Submitted D']),
         warranty_type:String(r['Warranty Type']||'').trim()||null,bill_to_customer_no:String(r['Bill-to Customer No.']||'').trim()||null,
@@ -562,7 +562,18 @@ async function refreshData(){
 function reconcile(){
   const invByDoc={};S.inv.forEach(i=>invByDoc[i.doc_no]=i)
   const credByKey={};S.cred.forEach(c=>{(credByKey[c.dcn_key]=credByKey[c.dcn_key]||[]).push(c)})
-  const claims=S.subs.map(s=>{
+  // dedupe submissions to one row per (kind, claim-number); BSI claims can appear twice
+  // (a SERVCON row with Last Submission + a No.-keyed row with it blank). Prefer the row
+  // that carries Last Submission; fall back to No. for the claim key when it is blank.
+  const _byClaim={}
+  for(const s of S.subs){
+    const sk=(s.claim_kind==='bsi')?(s.sub_key||subkey(s.no)):(s.sub_key||'')
+    const k=s.claim_kind+'|'+(sk||('id:'+s.id))
+    if(!_byClaim[k]){_byClaim[k]={...s,sub_key:sk}}
+    else{const e=_byClaim[k];if(!e.last_submission&&s.last_submission){e.last_submission=s.last_submission;e.no=s.no}e.doc_no=e.doc_no||s.doc_no;e.vin=e.vin||s.vin;e.status=e.status||s.status;e.document_date=e.document_date||s.document_date}
+  }
+  const _subs=Object.values(_byClaim)
+  const claims=_subs.map(s=>{
     const inv=invByDoc[s.doc_no]||null, cr=credByKey[s.sub_key]||[]
     const st={Success:0,Warning:0,Error:0};let labor=0,parts=0,ext=0,accepted=0,claimedPrice=0
     const cnNos=new Set(),defects=new Set();let cnDate=null,repairDate=null
@@ -583,7 +594,7 @@ function reconcile(){
       cn_no:[...cnNos].join(', '),defect_codes:[...defects],lag_days:days(repairDate,cnDate)}
   })
   // orphan credits: keys present in credits but not in any submission
-  const subKeys=new Set(S.subs.map(s=>s.sub_key))
+  const subKeys=new Set(_subs.map(s=>s.sub_key))
   const orphanByKey={}
   S.cred.forEach(c=>{if(subKeys.has(c.dcn_key))return;(orphanByKey[c.dcn_key]=orphanByKey[c.dcn_key]||[]).push(c)})
   const orphans=Object.entries(orphanByKey).map(([key,cr])=>{
