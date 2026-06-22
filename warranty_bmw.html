@@ -587,16 +587,26 @@ function reconcile(){
   const orphanByKey={}
   S.cred.forEach(c=>{if(subKeys.has(c.dcn_key))return;(orphanByKey[c.dcn_key]=orphanByKey[c.dcn_key]||[]).push(c)})
   const orphans=Object.entries(orphanByKey).map(([key,cr])=>{
-    const st={Success:0,Warning:0,Error:0};let accepted=0;const cnNos=new Set();let cnDate=null
-    cr.forEach(c=>{accepted+=Number(c.accepted_price_incl_hc)||0;if(c.crediting_item_status)st[c.crediting_item_status]=(st[c.crediting_item_status]||0)+1;if(c.credit_note_number)cnNos.add(c.credit_note_number);if(c.credit_note_date&&(!cnDate||c.credit_note_date>cnDate))cnDate=c.credit_note_date})
-    return {kind:cr[0].credit_type==='bsi'?'bsi':'warranty',orphan:true,sub_key:key,dealer_claim_number:cr[0].dealer_claim_number,credits:cr,vin:cr[0].vin||'',brand:cr[0].brand||'',make:cr[0].brand||'',
-      month:cnDate?cnDate.slice(0,7):'',cn_date:cnDate,items_count:cr.length,answered:true,accepted,invoiced:0,gap:0,
-      status_overall:st.Error>0?'Error':st.Warning>0?'Warning':'Success',statuses:st,cn_no:[...cnNos].join(', ')}
+    const st={Success:0,Warning:0,Error:0};let accepted=0,labor=0,parts=0,ext=0,claimedPrice=0;const cnNos=new Set(),defects=new Set();let cnDate=null,repairDate=null
+    cr.forEach(c=>{const a=Number(c.accepted_price_incl_hc)||0;accepted+=a;claimedPrice+=Number(c.claimed_price)||0
+      const p=c.claim_item_position||'';if(/labor/i.test(p))labor+=a;else if(/spare|material/i.test(p))parts+=a;else if(/external/i.test(p))ext+=a
+      if(c.crediting_item_status)st[c.crediting_item_status]=(st[c.crediting_item_status]||0)+1
+      if(c.credit_note_number)cnNos.add(c.credit_note_number);if(c.defect_code)defects.add(c.defect_code)
+      if(c.credit_note_date&&(!cnDate||c.credit_note_date>cnDate))cnDate=c.credit_note_date
+      if(c.repair_date&&!repairDate)repairDate=c.repair_date})
+    return {kind:cr[0].credit_type==='bsi'?'bsi':'warranty',orphan:true,noSubmission:true,sub:null,inv:null,
+      no:cr[0].dealer_claim_number,record_no:'',sub_key:key,dealer_claim_number:cr[0].dealer_claim_number,credits:cr,
+      vin:cr[0].vin||'',brand:cr[0].brand||'',make:cr[0].brand||'',model:'',sub_status:'(no submission on file)',document_date:null,
+      month:cnDate?cnDate.slice(0,7):'',cn_date:cnDate,repair_date:repairDate,items_count:cr.length,answered:true,
+      accepted,invoiced:0,claimed_price:claimedPrice,gap:0,accept_ratio:0,labor,parts,ext,
+      status_overall:st.Error>0?'Error':st.Warning>0?'Warning':'Success',statuses:st,cn_no:[...cnNos].join(', '),
+      defect_codes:[...defects],lag_days:days(repairDate,cnDate)}
   })
   return {claims,orphans}
 }
 function inScope(x){return S.scope==='all'||x.kind===S.scope}
 function scopedClaims(){return reconcile().claims.filter(inScope)}
+function scopedOrphans(){return reconcile().orphans.filter(inScope)}
 
 // ══ SORT helpers ════════════════════════════════════════════════
 function sortClick(k,c){const cur=S.sortState[k]||{col:-1,dir:'asc'};let dir='asc';if(cur.col===c&&cur.dir==='asc')dir='desc';S.sortState[k]={col:c,dir};renderPage(currentPage())}
@@ -608,7 +618,7 @@ const kindBadge=k=>k==='bsi'?'<span class="badge b-sky">BSI</span>':'<span class
 
 // ══ MODAL ═══════════════════════════════════════════════════════
 function openClaim(kind,no){
-  const claim=reconcile().claims.find(c=>c.kind===kind&&c.no===no);if(!claim){showToast('Claim not found');return}
+  const _rec=reconcile();const claim=[..._rec.claims,..._rec.orphans].find(c=>c.kind===kind&&c.no===no);if(!claim){showToast('Claim not found');return}
   let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
   const items=claim.credits
   bg.innerHTML=`<div class="bmw-modal"><div class="bmw-modal-h"><div class="bmw-modal-icon">🔗</div>
@@ -674,7 +684,7 @@ window.openVin=openVin
 
 // ── recovery tracking modal (reuses warranty_bmw_resub; key = kind:no)
 function openTrack(kind,no){
-  const claim=reconcile().claims.find(c=>c.kind===kind&&c.no===no);if(!claim)return
+  const _r=reconcile();const claim=[..._r.claims,..._r.orphans].find(c=>c.kind===kind&&c.no===no);if(!claim)return
   const key=kind+':'+no,ex=S.resub[key]||{}
   let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
   const fld=(id,label,val,type)=>`<div><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">${label}</label><input id="${id}" type="${type||'text'}" value="${esc(val||'')}" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit"></div>`
@@ -700,7 +710,7 @@ function openTrack(kind,no){
 }
 window.openTrack=openTrack
 async function saveTrack(kind,no){
-  const claim=reconcile().claims.find(c=>c.kind===kind&&c.no===no);if(!claim)return
+  const _r=reconcile();const claim=[..._r.claims,..._r.orphans].find(c=>c.kind===kind&&c.no===no);if(!claim)return
   const key=kind+':'+no,credited=parseFloat(document.getElementById('tr_credited').value)||null
   const payload={orig_claim:key,orig_vin:claim.vin||null,orig_brand:claim.make||null,orig_month:claim.month||null,orig_amount:claim.accepted||claim.invoiced||null,
     new_claim:document.getElementById('tr_newclaim').value||null,reason:document.getElementById('tr_reason').value||null,
@@ -743,6 +753,8 @@ function rDash(){
   const answered=claims.filter(c=>c.answered).length,pending=claims.length-answered
   const err=claims.filter(c=>c.status_overall==='Error').length,warn=claims.filter(c=>c.status_overall==='Warning').length,success=claims.filter(c=>c.status_overall==='Success').length
   const series=monthly(claims)
+  const offCredits=scopedOrphans();const offVal=offCredits.reduce((s,c)=>s+c.accepted,0)
+  const offCard=offCredits.length?`<div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 Credited · No Submission</div><div class="kv pur">${f0(offVal)}</div><div class="ks">${f0(offCredits.length)} claims · submission file not loaded</div></div>`:''
   // flow strip
   document.getElementById('flow').innerHTML=`<div class="flow" style="margin:0">
     <div class="flow-step"><div class="fl-t">🧾 Invoiced (incadea)</div><div class="fl-v">€${f0(invoiced)}</div><div class="fl-s">${f0(claims.length)} claims billed</div></div>
@@ -757,7 +769,7 @@ function rDash(){
     <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited (€)</div><div class="kv mint">${f0(accepted)}</div><div class="ks">of €${fk(invoiced)} invoiced</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">🎯 Credited Rate</div><div class="kv sky">${pct(accepted,invoiced).toFixed(1)}%</div><div class="ks">€${fk(invoiced-accepted)} gap</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending Answer</div><div class="kv sun">${f0(pending)}</div><div class="ks">submitted, awaiting BMW</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">⚠️ Needs Attention</div><div class="kv rose">${f0(err+warn)}</div><div class="ks">${err} errors · ${warn} warnings</div></div>`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">⚠️ Needs Attention</div><div class="kv rose">${f0(err+warn)}</div><div class="ks">${err} errors · ${warn} warnings</div></div>`+offCard
   document.getElementById('CH_trend').innerHTML=trendChart(series.map(s=>({label:fmM(s.month),short:fmMs(s.month),value:s.accepted,count:s.cnt})))
   document.getElementById('CH_status').innerHTML=donutChart([{label:'Success',value:success,color:'#10b981'},{label:'Warning',value:warn,color:'#eab308'},{label:'Error',value:err,color:'#e11d48'},{label:'Pending',value:pending,color:'#f59e0b'}],{centerTop:f0(claims.length),centerSub:'CLAIMS'})
   document.getElementById('CH_gap').innerHTML=groupBarChart(series.map(s=>({label:fmMs(s.month),a:s.invoiced,b:s.accepted,aLabel:'Invoiced',bLabel:'Credited'})))
@@ -773,30 +785,30 @@ function rDash(){
 }
 
 function rPipe(){
-  const all=scopedClaims()
+  const all=scopedClaims().concat(scopedOrphans())
   const sf=document.getElementById('pp_status').value,mk=document.getElementById('pp_make').value,mo=document.getElementById('pp_month').value,q=document.getElementById('pp_search').value.toLowerCase().trim()
   let rows=all.filter(c=>{if(sf&&c.status_overall!==sf)return false;if(mk&&c.make!==mk)return false;if(mo&&c.month!==mo)return false;if(q&&![c.no,c.record_no,c.doc_no,c.vin,c.cn_no].join('|').toLowerCase().includes(q))return false;return true})
   rows=applySort(rows,'pp',[c=>c.document_date,c=>c.kind,c=>c.no,c=>c.doc_no,c=>c.make,c=>c.vin,c=>c.invoiced,c=>c.accepted,c=>c.gap,c=>c.accept_ratio,c=>c.status_overall])
   window._ppRows=rows
-  const invoiced=rows.reduce((s,c)=>s+c.invoiced,0),accepted=rows.reduce((s,c)=>s+c.accepted,0),pending=rows.filter(c=>!c.answered).length
+  const invoiced=rows.reduce((s,c)=>s+c.invoiced,0),accepted=rows.reduce((s,c)=>s+c.accepted,0),pending=rows.filter(c=>!c.answered).length,noSub=rows.filter(c=>c.noSubmission).length
   document.getElementById('K_pipe').innerHTML=`
     <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">🔗 Claims</div><div class="kv bmw">${f0(rows.length)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced €</div><div class="kv slate">${f0(invoiced)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">Δ Gap €</div><div class="kv rose">${f0(invoiced-accepted)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending</div><div class="kv sun">${f0(pending)}</div></div>`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending</div><div class="kv sun">${f0(pending)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 No Submission</div><div class="kv pur">${f0(noSub)}</div><div class="ks">credited, file not loaded</div></div>`
   let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
     ${th('Sub Date','pp',0)}${th('Kind','pp',1)}${th('Claim No.','pp',2)}${th('Invoice (GAR)','pp',3)}${th('Make','pp',4)}${th('VIN','pp',5)}
     ${th('Invoiced €','pp',6,{num:1})}${th('Credited €','pp',7,{num:1})}${th('Gap €','pp',8,{num:1})}${th('Cred %','pp',9,{num:1})}${th('Outcome','pp',10)}<th>Action</th></tr></thead><tbody>`
   rows.slice(0,700).forEach(c=>{const tr=S.resub[c.kind+':'+c.no]
     h+=`<tr class="tr-clickable" onclick="if(!event.target.closest('button,.vin-cell'))openClaim('${esc(c.kind)}','${esc(c.no)}')">
-      <td style="font-size:10px;color:var(--muted)">${esc(c.document_date||'')}</td><td>${kindBadge(c.kind)}</td><td class="mono" style="font-weight:600">${esc(c.no)}<div style="font-size:9px;color:var(--faint);font-weight:400">${c.kind==='bsi'?'contract ':'rec '}${esc(c.record_no||'')}</div></td>
+      <td style="font-size:10px;color:var(--muted)">${esc(c.document_date||'')}</td><td>${kindBadge(c.kind)}</td><td class="mono" style="font-weight:600">${esc(c.no)}<div style="font-size:9px;font-weight:400">${c.noSubmission?'<span style="color:var(--sun)">no submission file</span>':'<span style="color:var(--faint)">'+(c.kind==='bsi'?'contract ':'rec ')+esc(c.record_no||'')+'</span>'}</div></td>
       <td class="mono">${esc(c.doc_no||'—')}</td><td><span class="badge b-n">${esc(c.make||'—')}</span></td>
       <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
-      <td class="num">${f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
-      <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c.answered?f(c.gap):'—'}</td>
+      <td class="num">${c.noSubmission?'<span style="color:var(--faint)">—</span>':f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
+      <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c.noSubmission?'<span style="color:var(--faint)">—</span>':(c.answered?f(c.gap):'—')}</td>
       <td class="num">${c.answered&&c.invoiced?`<span style="font-weight:700;color:${c.accept_ratio>=85?'var(--mint-d)':c.accept_ratio>=65?'var(--lemon-d)':'var(--rose-d)'}">${c.accept_ratio.toFixed(0)}%</span>`:'—'}</td>
-      <td>${sBadge(c.status_overall)}${tr?` <span class="badge b-sky">${tr.status}</span>`:''}</td>
+      <td>${sBadge(c.status_overall)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${tr?` <span class="badge b-sky">${tr.status}</span>`:''}</td>
       <td>${(c.status_overall==='Error'||c.status_overall==='Warning')?`<button class="btn btn-sm ${tr?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr?'✏️':'+ Track'}</button>`:'<span style="color:var(--faint)">—</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="12" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
@@ -818,21 +830,21 @@ function rCredits(){
     <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🔗 No Submission</div><div class="kv slate">${f0(orphans.filter(inScope).length)}</div><div class="ks">credits w/o 2026 submission</div></div>`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 Credited · No Submission</div><div class="kv pur">${f0(orphans.filter(inScope).length)}</div><div class="ks">submission file not loaded</div></div>`
   let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>CN Date</th><th>Credit Note</th><th>Kind</th><th>Dealer Claim</th><th>Brand</th><th>VIN</th><th class="num">Lines</th><th class="num">Credited €</th><th>Status</th><th>Link</th></tr></thead><tbody>`
   rows.slice(0,700).forEach(c=>{h+=`<tr class="tr-clickable" onclick="${c.orphan?`openVin('${esc(c.vin)}')`:`openClaim('${esc(c.kind)}','${esc(c.no)}')`}">
     <td style="font-size:10px;color:var(--muted)">${esc(c.cn_date||'')}</td><td class="mono" style="font-weight:600">${esc(c.cn_no||'')}</td><td>${kindBadge(c.kind)}</td>
     <td class="mono">${esc(c.dealer_claim_number||c.sub?.last_submission||'—')}</td><td><span class="badge b-n">${esc(c.credits[0]?.brand||'—')}</span></td>
     <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td><td class="num">${c.items_count}</td>
     <td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}</td>
-    <td>${c.orphan?'<span class="badge b-sun">no submission</span>':'<span class="badge b-mint">linked</span>'}</td></tr>`})
+    <td>${c.orphan?'<span class="badge b-pur" title="BMW credited this, but no matching submission row is loaded">credited · no sub</span>':'<span class="badge b-mint">linked</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="10" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
   document.getElementById('T_cr').innerHTML=h
 }
 
 function rRej(){
-  const claims=scopedClaims().filter(c=>c.status_overall==='Error'||c.status_overall==='Warning')
+  const claims=scopedClaims().concat(scopedOrphans()).filter(c=>c.status_overall==='Error'||c.status_overall==='Warning')
   const sf=document.getElementById('rj_status').value,mk=document.getElementById('rj_make').value,q=document.getElementById('rj_search').value.toLowerCase().trim()
   let rows=claims.filter(c=>{const tr=S.resub[c.kind+':'+c.no]
     if(sf==='Error'&&c.status_overall!=='Error')return false;if(sf==='Warning'&&c.status_overall!=='Warning')return false
