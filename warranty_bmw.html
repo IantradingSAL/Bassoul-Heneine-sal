@@ -213,7 +213,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
     <div class="si" data-page="statement"><span class="si-icon">💶</span><span>BMW Statement</span></div>
     <div class="nav-sec">Data</div>
     <div class="si" data-page="upload"><span class="si-icon">📤</span><span>Upload Center</span></div>
-    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v3.2</div>
+    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v3.3</div>
   </aside>
 
   <main class="main">
@@ -586,7 +586,7 @@ function reconcile(){
     const answered=cr.length>0
     const status_overall=!answered?'Pending':st.Error>0?'Error':st.Warning>0?'Warning':'Success'
     const invoiced=inv?Number(inv.total_invoiced)||0:0
-    return {kind:s.kind,no:s.last_submission||s.no,record_no:s.no,sub:s,inv,credits:cr,vin:s.vin||inv?.vin||(cr[0]?.vin)||'',make:s.make_code||inv?.make_code||'',
+    return {kind:s.claim_kind,no:s.last_submission||s.no,record_no:s.no,sub:s,inv,credits:cr,vin:s.vin||inv?.vin||(cr[0]?.vin)||'',make:s.make_code||inv?.make_code||'',
       brand:cr[0]?.brand||'',model:inv?.model||'',month:s.month||(cnDate?cnDate.slice(0,7):''),
       doc_no:s.doc_no,sub_key:s.sub_key,sub_status:s.status||'',document_date:s.document_date,cn_date:cnDate,repair_date:repairDate,
       items_count:cr.length,answered,status_overall,statuses:st,labor,parts,ext,
