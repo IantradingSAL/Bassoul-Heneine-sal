@@ -176,6 +176,23 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
   .bmw-modal-bg{padding:0;align-items:flex-end}.bmw-modal{max-width:100%;border-radius:20px 20px 0 0;max-height:88vh}
   .bmw-modal-body{padding:12px 14px}.hbar-row{grid-template-columns:96px 1fr 72px}
 }
+/* ── Statement / print ── */
+.stmt-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:2px solid var(--bmw)}
+.stmt-head h2{margin:0;font-size:18px;font-weight:800;letter-spacing:-.3px}
+.stmt-head .sub{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:3px}
+.stmt-head .co{text-align:right;font-size:11px;color:var(--muted);font-weight:600;line-height:1.5}
+.stmt-co-name{font-size:14px;font-weight:800;color:var(--txt)}
+@media print{
+  .sidebar,.topbar,.menuBtn,#st_actions,.scope,.sync-pill,.si-badge{display:none!important}
+  .main{padding:0;max-width:100%}
+  .page:not(.active){display:none}
+  .card{box-shadow:none;border:1px solid #d4dbe6;break-inside:avoid;margin-bottom:10px}
+  .kpi{box-shadow:none;border:1px solid #d4dbe6}
+  .kpi:hover{transform:none}
+  body{background:#fff}
+  .t th{position:static}
+  @page{margin:14mm}
+}
 </style>
 </head>
 <body>
@@ -193,6 +210,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
     <div class="si" data-page="credits"><span class="si-icon">📑</span><span>Credit Notes</span></div>
     <div class="si" data-page="rejections"><span class="si-icon">⚠️</span><span>Rejections</span><span class="si-badge" id="B_rej" style="background:var(--rose)">0</span></div>
     <div class="si" data-page="insights"><span class="si-icon">🔍</span><span>Insights</span></div>
+    <div class="si" data-page="statement"><span class="si-icon">💶</span><span>BMW Statement</span></div>
     <div class="nav-sec">Data</div>
     <div class="si" data-page="upload"><span class="si-icon">📤</span><span>Upload Center</span></div>
     <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v3.0</div>
@@ -279,6 +297,18 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         <button data-ins="timing">⏱️ Processing Time</button>
       </div>
       <div id="INS_body"></div>
+    </div>
+
+    <!-- STATEMENT -->
+    <div class="page" id="P_statement">
+      <div class="card" id="st_actions" style="margin-bottom:14px"><div class="filters">
+        <span class="fl-l">Make</span><select id="st_make"><option value="">All</option></select>
+        <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer"><input type="checkbox" id="st_out" checked style="width:15px;height:15px"> Outstanding only</label>
+        <span style="flex:1"></span>
+        <button class="btn btn-sm" id="st_csv">⬇ CSV</button>
+        <button class="btn btn-sm btn-bmw" id="st_print">🖨️ Print</button>
+      </div></div>
+      <div id="T_statement"></div>
     </div>
 
     <!-- UPLOAD -->
@@ -691,7 +721,7 @@ function exportCSV(name,headers,rows){const csv=[headers.join(',')].concat(rows.
 
 // ══ RENDER ══════════════════════════════════════════════════════
 function currentPage(){return document.querySelector('.si.active')?.dataset.page||'dashboard'}
-function renderPage(p){if(p==='dashboard')rDash();if(p==='pipeline')rPipe();if(p==='credits')rCredits();if(p==='rejections')rRej();if(p==='insights')rInsights();if(p==='upload')rUploadHist()}
+function renderPage(p){if(p==='dashboard')rDash();if(p==='pipeline')rPipe();if(p==='credits')rCredits();if(p==='rejections')rRej();if(p==='insights')rInsights();if(p==='statement')rStatement();if(p==='upload')rUploadHist()}
 function monthly(claims){const m={};claims.forEach(c=>{if(!c.month)return;if(!m[c.month])m[c.month]={month:c.month,cnt:0,invoiced:0,accepted:0,answered:0,err:0,warn:0,success:0,pending:0,labor:0,parts:0,ext:0};const b=m[c.month];b.cnt++;b.invoiced+=c.invoiced;b.accepted+=c.accepted;b.labor+=c.labor;b.parts+=c.parts;b.ext+=c.ext;if(!c.answered)b.pending++;else{b.answered++;if(c.status_overall==='Error')b.err++;else if(c.status_overall==='Warning')b.warn++;else b.success++}});return Object.values(m).sort((a,b)=>a.month.localeCompare(b.month))}
 
 function updateBadges(){
@@ -702,7 +732,7 @@ function updateBadges(){
   const makes=[...new Set(reconcile().claims.map(c=>c.make).filter(Boolean))].sort()
   const months=[...new Set(reconcile().claims.map(c=>c.month).filter(Boolean))].sort().reverse()
   const brands=[...new Set(S.cred.map(c=>c.brand).filter(Boolean))].sort()
-  ;[['pp_make',makes],['rj_make',makes]].forEach(([id,arr])=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">All</option>'+arr.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')})
+  ;[['pp_make',makes],['rj_make',makes],['st_make',makes]].forEach(([id,arr])=>{const el=document.getElementById(id);if(el){const cur=el.value;el.innerHTML='<option value="">All</option>'+arr.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');el.value=cur}})
   const cb=document.getElementById('cr_brand');if(cb)cb.innerHTML='<option value="">All</option>'+brands.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')
   const mo=document.getElementById('pp_month');if(mo)mo.innerHTML='<option value="">All</option>'+months.map(m=>`<option value="${esc(m)}">${esc(fmM(m))}</option>`).join('')
 }
@@ -917,6 +947,49 @@ function rInsights(){
   }
 }
 
+// ── BMW receivables statement: what BMW still owes us
+function statementRows(){
+  const onlyOut=document.getElementById('st_out').checked, mk=document.getElementById('st_make').value
+  let rows=scopedClaims().filter(c=>!mk||c.make===mk)
+  rows.forEach(c=>{c._pending=!c.answered;c._shortfall=c.answered?Math.max(c.invoiced-c.accepted,0):0;c._owed=c._pending?c.invoiced:c._shortfall
+    c._otype=c._pending?'pending':(c._shortfall>0.5?'shortfall':'settled')})
+  if(onlyOut)rows=rows.filter(c=>c._owed>0.5)
+  return rows.sort((a,b)=>b._owed-a._owed)
+}
+function rStatement(){
+  const rows=statementRows();window._stRows=rows
+  const invoiced=rows.reduce((s,c)=>s+c.invoiced,0),credited=rows.reduce((s,c)=>s+c.accepted,0)
+  const pendingVal=rows.filter(c=>c._pending).reduce((s,c)=>s+c.invoiced,0)
+  const shortfallVal=rows.reduce((s,c)=>s+c._shortfall,0),outstanding=pendingVal+shortfallVal
+  const scopeLbl=S.scope==='all'?'Warranty + BSI':S.scope==='bsi'?'BSI only':'Warranty only'
+  const today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
+  let h=`<div class="card">
+    <div class="stmt-head">
+      <div><h2>BMW Warranty &amp; BSI — Receivables Statement</h2><div class="sub">Amounts invoiced to BMW vs credited back · ${esc(scopeLbl)}</div></div>
+      <div class="co"><div class="stmt-co-name">Bassoul, Heneine SAL</div>Generated ${esc(today)}<br>${f0(rows.length)} claims${document.getElementById('st_out').checked?' (outstanding)':''}</div>
+    </div>
+    <div class="kpis" style="margin-bottom:16px">
+      <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced (€)</div><div class="kv slate">${f0(invoiced)}</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited (€)</div><div class="kv mint">${f0(credited)}</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">📌 Outstanding (€)</div><div class="kv rose">${f0(outstanding)}</div><div class="ks">total BMW owes</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending (€)</div><div class="kv sun">${f0(pendingVal)}</div><div class="ks">awaiting BMW answer</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔻 Shortfall (€)</div><div class="kv lem">${f0(shortfallVal)}</div><div class="ks">answered &amp; underpaid</div></div>
+    </div>
+    <div class="tw"><table class="t"><thead><tr><th>#</th><th>Invoice (GAR)</th><th>Kind</th><th>Make</th><th>VIN</th><th>Sub Date</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th>Status</th><th class="num">Owed €</th></tr></thead><tbody>`
+  rows.slice(0,800).forEach((c,i)=>{const ob=c._otype==='pending'?'<span class="badge b-sun">⏳ Pending</span>':c._otype==='shortfall'?'<span class="badge b-lem">🔻 Shortfall</span>':'<span class="badge b-mint">✅ Settled</span>'
+    h+=`<tr class="tr-clickable" onclick="if(!event.target.closest('.vin-cell'))openClaim('${esc(c.kind)}','${esc(c.no)}')">
+      <td style="color:var(--faint)">${i+1}</td><td class="mono" style="font-weight:600">${esc(c.doc_no||'—')}</td><td>${kindBadge(c.kind)}</td>
+      <td><span class="badge b-n">${esc(c.make||'—')}</span></td><td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
+      <td style="font-size:10px;color:var(--muted)">${esc(c.document_date||'')}</td><td class="num">${f(c.invoiced)}</td>
+      <td class="num" style="font-weight:600">${c.answered?f(c.accepted):'—'}</td><td>${ob}</td>
+      <td class="num" style="font-weight:800;color:${c._owed>0.5?'var(--rose-d)':'var(--mint-d)'}">${f(c._owed)}</td></tr>`})
+  if(rows.length>800)h+=`<tr><td colspan="10" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-800} more — filter to narrow</td></tr>`
+  h+=`</tbody><tfoot><tr><td colspan="6">TOTAL · ${f0(rows.length)} claims</td><td class="num">${f0(invoiced)}</td><td class="num">${f0(credited)}</td><td></td><td class="num" style="color:var(--rose-d)">${f0(outstanding)}</td></tr></tfoot></table></div>
+    <div style="font-size:10px;color:var(--faint);margin-top:10px">⏳ Pending = submitted to BMW, no credit note received yet (full invoiced amount in process). 🔻 Shortfall = BMW answered but credited less than invoiced. Owed for settled claims is €0.</div>
+  </div>`
+  document.getElementById('T_statement').innerHTML = h
+}
+
 async function rUploadHist(){
   const {data,error}=await sb.from('warranty_uploads').select('*').in('file_type',['bmw_incadea','bmw_submission','bmw_credits']).order('uploaded_at',{ascending:false}).limit(60)
   if(error){document.getElementById('upHist').innerHTML='⚠️ '+error.message;return}
@@ -933,6 +1006,9 @@ async function rUploadHist(){
 ;['rj_status','rj_make','rj_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rRej);e.addEventListener('change',rRej)})
 document.querySelectorAll('#insSeg button').forEach(b=>b.addEventListener('click',()=>{S.insTab=b.dataset.ins;rInsights()}))
 document.getElementById('pp_export').addEventListener('click',()=>{const rows=(window._ppRows||[]).map(c=>[c.kind,c.no,c.sub.last_submission,c.doc_no,c.make,c.vin,c.document_date,c.invoiced.toFixed(2),c.answered?c.accepted.toFixed(2):'',c.gap.toFixed(2),c.status_overall,c.cn_no]);exportCSV('bmw_pipeline.csv',['Kind','Submission','SubNo','Invoice','Make','VIN','SubDate','Invoiced','Credited','Gap','Outcome','CreditNotes'],rows);showToast('⬇ Exported '+rows.length+' claims')})
+;['st_make','st_out'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('change',rStatement)})
+document.getElementById('st_csv').addEventListener('click',()=>{const rows=(window._stRows||[]).map(c=>[c.doc_no,c.kind,c.make,c.vin,c.document_date,c.invoiced.toFixed(2),c.answered?c.accepted.toFixed(2):'',c._otype,c._owed.toFixed(2)]);exportCSV('bmw_statement.csv',['Invoice','Kind','Make','VIN','SubDate','Invoiced','Credited','Type','Owed'],rows);showToast('⬇ Exported statement — '+rows.length+' rows')})
+document.getElementById('st_print').addEventListener('click',()=>window.print())
 
 // ══ INIT ════════════════════════════════════════════════════════
 ;(async()=>{
