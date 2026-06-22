@@ -13,156 +13,168 @@
 
 <style>
 :root{
-  --bg:#fafbff;
-  --surf:#ffffff;
-  --surf2:#f1f5f9;
-  --line:#e2e8f0;
-  --txt:#0f172a;
-  --muted:#64748b;
-  --faint:#94a3b8;
-  --blue:#3b5fe2;
-  --blue4:#eef2ff;
+  --bg:#f6f8fc;--surf:#fff;--surf2:#f1f5f9;--surf3:#f8fafc;--line:#e6ebf2;--line2:#eef2f7;
+  --txt:#0f172a;--muted:#64748b;--faint:#94a3b8;--blue:#3b5fe2;--blue4:#eef2ff;
   --mono:'SF Mono','Roboto Mono','Menlo',monospace;
-  --mint:#10b981;
-  --mint3:rgba(16,185,129,.08);
-  --rose:#e11d48;
-  --rose3:rgba(225,29,72,.08);
-  --sun:#f59e0b;
-  --lemon:#facc15;
-  --lemon3:rgba(250,204,21,.18);
-  --pur:#8b5cf6;
-  --sky:#0EA5E9;
-  --bmw:#1C69D4;
+  --mint:#10b981;--mint-d:#047857;--rose:#e11d48;--rose-d:#9f1239;--sun:#f59e0b;
+  --lemon:#eab308;--lemon-d:#a16207;--pur:#8b5cf6;--sky:#0EA5E9;--slate:#64748b;
+  --bmw:#1C69D4;--bmw-d:#0F4FA8;
+  --shadow:0 1px 2px rgba(15,23,42,.04),0 4px 16px rgba(15,23,42,.04);
+  --shadow-lg:0 8px 30px rgba(15,23,42,.08);
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;font-size:13px;-webkit-font-smoothing:antialiased}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;font-size:13px;-webkit-font-smoothing:antialiased}
 .app{display:flex;min-height:100vh}
-.sidebar{width:240px;background:#fff;border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh;overflow-y:auto}
-.brand{display:flex;align-items:center;gap:10px;padding:6px 10px 14px;border-bottom:1px solid var(--line);margin-bottom:10px}
-.brand-logo{width:32px;height:32px;background:linear-gradient(135deg,#1C69D4,#0F4FA8);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px}
-.brand-name{font-size:12px;font-weight:800;color:#0f172a;letter-spacing:-.3px;line-height:1.1}
-.brand-sub{font-size:10px;color:var(--muted);font-weight:600}
-.si{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;font-size:12px;color:#475569;font-weight:600;cursor:pointer;transition:background .15s,color .15s;text-decoration:none}
+.sidebar{width:248px;background:#fff;border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:3px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:11px;padding:4px 8px 16px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.brand-logo{width:38px;height:38px;background:linear-gradient(135deg,#1C69D4,#0F4FA8);border-radius:11px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;box-shadow:0 4px 12px rgba(28,105,212,.3)}
+.brand-name{font-size:13px;font-weight:800;letter-spacing:-.3px;line-height:1.1}
+.brand-sub{font-size:10px;color:var(--muted);font-weight:600;margin-top:2px}
+.nav-sec{font-size:9px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;padding:14px 11px 6px}
+.si{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;font-size:12.5px;color:#475569;font-weight:600;cursor:pointer;transition:background .15s,color .15s;text-decoration:none;position:relative}
 .si:hover{background:var(--surf2);color:var(--txt)}
-.si.active{background:var(--blue4);color:var(--blue)}
-.si-icon{font-size:14px}
-.si-badge{margin-left:auto;background:var(--blue);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:999px;min-width:18px;text-align:center}
-.main{flex:1;padding:20px 28px;max-width:1700px;margin:0 auto;width:100%}
-.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:14px;flex-wrap:wrap}
-.topbar h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.3px;display:flex;align-items:center;gap:10px}
-.topbar p{margin:2px 0 0;font-size:12px;color:var(--muted);font-weight:500}
-.us-badge{background:linear-gradient(135deg,#1C69D4,#0F4FA8);color:#fff;padding:5px 11px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.04em}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
-.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;position:relative;overflow:hidden}
-.kpi-accent{position:absolute;top:0;left:0;width:3px;height:100%}
-.kl{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:5px}
-.kv{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-top:5px;font-variant-numeric:tabular-nums}
-.kv.sky{color:var(--sky)} .kv.sun{color:var(--sun)} .kv.mint{color:var(--mint)} .kv.rose{color:var(--rose)} .kv.pur{color:var(--pur)} .kv.lem{color:#a16207} .kv.bmw{color:var(--bmw)}
-.ks{font-size:10px;color:var(--faint);margin-top:2px;font-weight:500}
-.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
-.ct{font-size:13px;font-weight:800;letter-spacing:-.2px;margin:0 0 14px}
-.btn{padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:#475569;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
-.btn:hover{background:var(--surf2)}
-.btn-bmw{background:var(--bmw);color:#fff;border-color:var(--bmw)}
-.btn-bmw:hover{background:#0F4FA8}
-.btn-sm{padding:5px 9px;font-size:10px}
-.btn-sun{background:var(--sun);color:#fff;border-color:var(--sun)}
-.btn-sun:hover{filter:brightness(.93)}
+.si.active{background:var(--blue4);color:var(--bmw)}
+.si.active::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:18px;background:var(--bmw);border-radius:0 3px 3px 0}
+.si-icon{font-size:15px;width:18px;text-align:center}
+.si-badge{margin-left:auto;background:var(--bmw);color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;min-width:18px;text-align:center}
+.main{flex:1;padding:22px 30px 60px;max-width:1820px;margin:0 auto;width:100%}
+.topbar{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;gap:14px;flex-wrap:wrap}
+.topbar h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.5px;display:flex;align-items:center;gap:11px}
+.topbar p{margin:4px 0 0;font-size:12px;color:var(--muted);font-weight:500}
+.us-badge{background:linear-gradient(135deg,#1C69D4,#0F4FA8);color:#fff;padding:4px 10px;border-radius:999px;font-size:9px;font-weight:700;letter-spacing:.06em;vertical-align:middle}
+.topbar-r{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.sync-pill{font-size:10px;color:var(--muted);font-weight:600;background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 12px;display:flex;align-items:center;gap:6px}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 0 3px rgba(16,185,129,.15)}
+.scope{display:inline-flex;background:var(--surf2);border-radius:10px;padding:3px;gap:2px}
+.scope button{border:none;background:none;padding:6px 14px;border-radius:8px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}
+.scope button.on{background:#fff;color:var(--bmw);box-shadow:var(--shadow)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:13px;margin-bottom:18px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px 17px;position:relative;overflow:hidden;box-shadow:var(--shadow);transition:transform .15s,box-shadow .15s}
+.kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.kpi-accent{position:absolute;top:0;left:0;width:100%;height:3px}
+.kl{font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:6px}
+.kv{font-size:25px;font-weight:800;letter-spacing:-.6px;margin-top:7px;font-variant-numeric:tabular-nums;line-height:1}
+.kv.sky{color:var(--sky)}.kv.sun{color:var(--sun)}.kv.mint{color:var(--mint-d)}.kv.rose{color:var(--rose-d)}.kv.pur{color:var(--pur)}.kv.lem{color:var(--lemon-d)}.kv.bmw{color:var(--bmw)}.kv.slate{color:var(--slate)}
+.ks{font-size:10.5px;color:var(--faint);margin-top:5px;font-weight:600;display:flex;align-items:center;gap:5px}
+.ks .up{color:var(--mint-d)}.ks .down{color:var(--rose-d)}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:19px 20px;margin-bottom:15px;box-shadow:var(--shadow)}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.ct{font-size:14px;font-weight:800;letter-spacing:-.2px;margin:0;display:flex;align-items:center;gap:8px}
+.ct-sub{font-size:11px;color:var(--muted);font-weight:500;margin:3px 0 0}
+.grid-2{display:grid;grid-template-columns:1.55fr 1fr;gap:15px;margin-bottom:15px}
+@media(max-width:1000px){.grid-2{grid-template-columns:1fr}}
+.btn{padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:#fff;color:#475569;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit}
+.btn:hover{background:var(--surf2);border-color:#d4dbe6}
+.btn-bmw{background:var(--bmw);color:#fff;border-color:var(--bmw)}.btn-bmw:hover{background:var(--bmw-d)}
+.btn-sm{padding:5px 10px;font-size:10px}
+.btn-sun{background:var(--sun);color:#fff;border-color:var(--sun)}.btn-sun:hover{filter:brightness(.93)}
 .btn-ghost{background:#fff;color:var(--muted)}
-.tw{overflow-x:auto;border-radius:9px}
-.t{width:100%;border-collapse:collapse;font-size:11px}
-.t th{text-align:left;padding:9px 11px;font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:var(--surf2);white-space:nowrap;border-bottom:1px solid var(--line)}
+.tw{overflow-x:auto;border-radius:12px}
+.t{width:100%;border-collapse:collapse;font-size:11.5px}
+.t th{text-align:left;padding:10px 12px;font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:var(--surf3);white-space:nowrap;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1}
 .t th.num{text-align:right}
-.t td{padding:9px 11px;border-bottom:1px solid #f1f5f9;font-size:11px;vertical-align:middle}
+.t td{padding:10px 12px;border-bottom:1px solid var(--line2);font-size:11.5px;vertical-align:middle}
 .t td.num{text-align:right;font-variant-numeric:tabular-nums}
+.t tbody tr:last-child td{border-bottom:none}
 .t tbody tr:hover td{background:#fafbff}
-.t .mono{font-family:var(--mono);font-size:10px}
+.t .mono{font-family:var(--mono);font-size:10.5px}
 .t tbody tr.tr-clickable{cursor:pointer;transition:background .12s}
 .t tbody tr.tr-clickable:hover td{background:var(--blue4) !important}
-.t tbody tr.tr-clickable:hover .vin-cell{color:var(--blue);text-decoration:underline}
-.vin-cell{cursor:pointer;transition:color .12s}
-.vin-cell:hover{color:var(--blue) !important;text-decoration:underline}
+.vin-cell{cursor:pointer;transition:color .12s}.vin-cell:hover{color:var(--bmw)!important;text-decoration:underline}
 .t thead th.sortable{cursor:pointer;user-select:none;position:relative;padding-right:18px}
-.t thead th.sortable:hover{background:#e2e8f0}
+.t thead th.sortable:hover{background:#e9eef6}
 .t thead th.sortable::after{content:"↕";position:absolute;right:5px;top:50%;transform:translateY(-50%);opacity:.3;font-size:10px}
-.t thead th.sort-asc::after{content:"↑";opacity:1;color:var(--blue)}
-.t thead th.sort-desc::after{content:"↓";opacity:1;color:var(--blue)}
-.badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;letter-spacing:.04em;text-transform:uppercase}
-.b-mint{background:rgba(16,185,129,.13);color:#047857}
-.b-rose{background:rgba(225,29,72,.13);color:#9f1239}
-.b-sun{background:rgba(245,158,11,.18);color:#a16207}
-.b-lem{background:#fef3c7;color:#92400e}
-.b-sky{background:rgba(14,165,233,.13);color:#075985}
-.b-pur{background:rgba(139,92,246,.15);color:#5b21b6}
-.b-n{background:#f1f5f9;color:#475569}
-.b-bmw{background:rgba(28,105,212,.13);color:#0F4FA8}
-.dz{border:2px dashed var(--line);border-radius:14px;padding:38px 22px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;display:flex;flex-direction:column;align-items:center;gap:10px}
-.dz>*{pointer-events:none}
-.dz label{pointer-events:auto}
-.dz:hover, .dz.dz-active{border-color:var(--bmw);background:rgba(28,105,212,.04)}
-.dz-emoji{font-size:36px;line-height:1}
-.dz-title{font-size:13px;font-weight:700;color:#0f172a}
-.dz-sub{font-size:11px;color:var(--muted)}
-.dz-input{display:none}
-.dz-pick{padding:7px 14px;background:var(--bmw);color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;pointer-events:auto}
-.al{padding:11px 14px;border-radius:10px;font-size:11px;font-weight:500;margin-bottom:12px;display:flex;align-items:center;gap:10px}
-.al-w{background:#fef9c3;color:#854d0e;border:1px solid #fde047}
-.al-i{background:#dbeafe;color:#1e40af;border:1px solid #93c5fd}
-.al-s{background:rgba(16,185,129,.1);color:#047857;border:1px solid rgba(16,185,129,.3)}
-.al-e{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
-
-/* Modal */
-.bmw-modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:600;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .25s}
+.t thead th.sort-asc::after{content:"↑";opacity:1;color:var(--bmw)}
+.t thead th.sort-desc::after{content:"↓";opacity:1;color:var(--bmw)}
+.t tfoot td{padding:10px 12px;font-weight:800;font-size:11px;background:var(--surf3);border-top:2px solid var(--line)}
+.t tfoot td.num{text-align:right;font-variant-numeric:tabular-nums}
+.badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}
+.b-mint{background:rgba(16,185,129,.13);color:#047857}.b-rose{background:rgba(225,29,72,.13);color:#9f1239}
+.b-sun{background:rgba(245,158,11,.18);color:#a16207}.b-lem{background:#fef3c7;color:#92400e}
+.b-sky{background:rgba(14,165,233,.13);color:#075985}.b-pur{background:rgba(139,92,246,.15);color:#5b21b6}
+.b-n{background:#f1f5f9;color:#475569}.b-bmw{background:rgba(28,105,212,.13);color:#0F4FA8}
+.mbar{height:6px;border-radius:999px;background:var(--surf2);overflow:hidden;min-width:54px}
+.mbar>span{display:block;height:100%;border-radius:999px}
+.chart-wrap{width:100%}.chart-wrap svg{display:block;width:100%;height:auto}
+.chart-empty{padding:40px;text-align:center;font-size:11.5px;color:var(--faint);font-style:italic}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:6px;justify-content:center}
+.legend-i{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;color:var(--muted)}
+.legend-dot{width:9px;height:9px;border-radius:3px;flex:none}.legend-i b{color:var(--txt);font-variant-numeric:tabular-nums}
+.hbar-row{display:grid;grid-template-columns:130px 1fr 92px;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid var(--line2)}
+.hbar-row:last-child{border-bottom:none}
+.hbar-label{font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hbar-track{height:22px;background:var(--surf2);border-radius:7px;overflow:hidden;position:relative}
+.hbar-fill{height:100%;border-radius:7px;transition:width .5s cubic-bezier(.16,1,.3,1)}
+.hbar-val{font-size:11.5px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.dz{border:2px dashed var(--line);border-radius:16px;padding:34px 22px;text-align:center;cursor:pointer;transition:all .2s;background:linear-gradient(180deg,#fff,#fafcff);display:flex;flex-direction:column;align-items:center;gap:10px}
+.dz>*{pointer-events:none}.dz label{pointer-events:auto}
+.dz:hover,.dz.dz-active{border-color:var(--bmw);background:rgba(28,105,212,.04)}
+.dz-emoji{font-size:38px;line-height:1}.dz-title{font-size:14px;font-weight:800}.dz-sub{font-size:11.5px;color:var(--muted)}
+.dz-input{display:none}.dz-pick{padding:9px 18px;background:var(--bmw);color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;pointer-events:auto;box-shadow:0 4px 12px rgba(28,105,212,.25)}
+.src-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+@media(max-width:780px){.src-grid{grid-template-columns:1fr}}
+.src{border:1px solid var(--line);border-radius:13px;padding:13px 15px;background:var(--surf3)}
+.src h4{margin:0 0 3px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:7px}
+.src p{margin:0;font-size:10.5px;color:var(--muted)}
+.src .cnt{font-size:19px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums}
+.al{padding:12px 15px;border-radius:12px;font-size:11.5px;font-weight:500;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.al-i{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.filters select,.filters input{padding:8px 12px;border:1px solid var(--line);border-radius:10px;font-size:11.5px;background:#fff;font-family:inherit;color:var(--txt)}
+.filters select:focus,.filters input:focus{outline:none;border-color:var(--bmw);box-shadow:0 0 0 3px rgba(28,105,212,.1)}
+.fl-l{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.seg{display:inline-flex;background:var(--surf2);border-radius:11px;padding:3px;gap:2px;margin-bottom:15px;flex-wrap:wrap}
+.seg button{border:none;background:none;padding:7px 14px;border-radius:9px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}
+.seg button.on{background:#fff;color:var(--bmw);box-shadow:var(--shadow)}
+.bmw-modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);z-index:600;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .25s}
 .bmw-modal-bg.on{opacity:1;pointer-events:auto}
-.bmw-modal{width:920px;max-width:100%;max-height:calc(100vh - 48px);background:#fff;border-radius:18px;box-shadow:0 24px 64px rgba(0,0,0,.28);display:flex;flex-direction:column;transform:scale(.96) translateY(10px);transition:transform .25s cubic-bezier(.16,1,.3,1);overflow:hidden}
+.bmw-modal{width:960px;max-width:100%;max-height:calc(100vh - 48px);background:#fff;border-radius:20px;box-shadow:0 24px 64px rgba(0,0,0,.28);display:flex;flex-direction:column;transform:scale(.96) translateY(10px);transition:transform .25s cubic-bezier(.16,1,.3,1);overflow:hidden}
 .bmw-modal-bg.on .bmw-modal{transform:scale(1) translateY(0)}
-.bmw-modal-h{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:14px;background:linear-gradient(135deg,rgba(28,105,212,.06),#fff)}
+.bmw-modal-h{padding:19px 24px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:14px;background:linear-gradient(135deg,rgba(28,105,212,.07),#fff)}
 .bmw-modal-icon{font-size:30px;line-height:1}
 .bmw-modal-title h3{margin:0;font-size:16px;font-weight:800;letter-spacing:-.3px}
-.bmw-modal-title p{margin:3px 0 0;font-size:12px;color:var(--muted);font-family:var(--mono);font-weight:600}
-.bmw-modal-x{background:none;border:1px solid var(--line);border-radius:9px;width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--muted);font-family:inherit}
-.bmw-modal-x:hover{background:var(--surf2);color:var(--txt)}
-.bmw-modal-body{flex:1;overflow-y:auto;padding:14px 22px}
+.bmw-modal-title p{margin:4px 0 0;font-size:12px;color:var(--muted);font-family:var(--mono);font-weight:600}
+.bmw-modal-x{background:none;border:1px solid var(--line);border-radius:10px;width:34px;height:34px;cursor:pointer;font-size:16px;color:var(--muted);font-family:inherit}
+.bmw-modal-x:hover{background:var(--surf2)}
+.bmw-modal-body{flex:1;overflow-y:auto;padding:16px 24px}
 .vin-section{margin-bottom:18px}
-.vin-section-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.vin-section-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid var(--line)}
 .vin-section-h .ct{background:var(--bmw);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:0;text-transform:none;margin:0}
 .vin-mini{font-size:11px;width:100%;border-collapse:collapse}
-.vin-mini th{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:6px 8px;background:var(--surf2);white-space:nowrap}
+.vin-mini th{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:7px 9px;background:var(--surf3);white-space:nowrap}
 .vin-mini th.num{text-align:right}
-.vin-mini td{padding:7px 8px;border-bottom:1px solid #f1f5f9;font-size:11px}
+.vin-mini td{padding:8px 9px;border-bottom:1px solid var(--line2);font-size:11px}
 .vin-mini td.num{text-align:right;font-variant-numeric:tabular-nums}
-.vin-mini tbody tr.clickable{cursor:pointer}
-.vin-mini tbody tr.clickable:hover{background:#fafbff}
-.vin-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
-.vin-stat{background:var(--surf2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.vin-mini tbody tr.clickable{cursor:pointer}.vin-mini tbody tr.clickable:hover{background:#fafbff}
+.vin-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-bottom:16px}
+.vin-stat{background:var(--surf3);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
 .vin-stat-l{font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
-.vin-stat-v{font-size:16px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
-.vin-empty{padding:14px;text-align:center;font-size:11px;color:var(--faint);font-style:italic;background:var(--surf2);border-radius:10px}
-
-.toast{position:fixed;bottom:24px;right:24px;background:#0f172a;color:#fff;padding:11px 16px;border-radius:11px;font-size:12px;font-weight:600;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:900;opacity:0;transform:translateY(8px);transition:all .25s;max-width:420px}
+.vin-stat-v{font-size:17px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
+.vin-empty{padding:16px;text-align:center;font-size:11px;color:var(--faint);font-style:italic;background:var(--surf3);border-radius:12px}
+.flow{display:flex;align-items:stretch;gap:0;margin-bottom:16px;flex-wrap:wrap}
+.flow-step{flex:1;min-width:150px;background:var(--surf3);border:1px solid var(--line);border-radius:12px;padding:12px 14px;position:relative}
+.flow-step .fl-t{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.flow-step .fl-v{font-size:15px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums}
+.flow-step .fl-s{font-size:10px;color:var(--faint);margin-top:2px;font-weight:600}
+.flow-arrow{align-self:center;color:var(--faint);font-size:18px;padding:0 8px;font-weight:800}
+.toast{position:fixed;bottom:24px;right:24px;background:#0f172a;color:#fff;padding:12px 17px;border-radius:12px;font-size:12px;font-weight:600;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:900;opacity:0;transform:translateY(8px);transition:all .25s;max-width:440px}
 .toast.on{opacity:1;transform:translateY(0)}
-.lo{position:fixed;inset:0;background:rgba(255,255,255,.85);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:800}
+.lo{position:fixed;inset:0;background:rgba(246,248,252,.85);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:800}
 .lo.on{display:flex}
-.lo-spin{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--bmw);border-radius:50%;animation:spin .9s linear infinite}
+.lo-spin{width:40px;height:40px;border:3px solid var(--line);border-top-color:var(--bmw);border-radius:50%;animation:spin .9s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.lo-msg{font-size:12px;font-weight:700;color:#0f172a}
-.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
-.filters select, .filters input{padding:7px 11px;border:1px solid var(--line);border-radius:8px;font-size:11px;background:#fff;font-family:inherit}
-.fl-l{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-right:3px}
-.page{display:none}
-.page.active{display:block}
+.lo-msg{font-size:12px;font-weight:700}
+.page{display:none}.page.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .menuBtn{display:none}
-
-@media (max-width:780px){
+@media(max-width:780px){
   .app{flex-direction:column}
-  .sidebar{position:fixed;left:-260px;width:240px;height:100vh;z-index:500;transition:left .25s}
+  .sidebar{position:fixed;left:-270px;width:248px;height:100vh;z-index:500;transition:left .25s}
   .sidebar.open{left:0}
-  .main{padding:14px 16px}
-  .menuBtn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;background:#fff;border:1px solid var(--line);cursor:pointer;font-size:18px}
-  .bmw-modal-bg{padding:0;align-items:flex-end}
-  .bmw-modal{max-width:100%;border-radius:18px 18px 0 0;max-height:88vh}
-  .bmw-modal-body{padding:12px 14px}
-  .vin-mini th, .vin-mini td{padding:6px 5px;font-size:10px}
+  .main{padding:14px 16px 50px}.grid-2{grid-template-columns:1fr}
+  .menuBtn{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:#fff;border:1px solid var(--line);cursor:pointer;font-size:18px}
+  .bmw-modal-bg{padding:0;align-items:flex-end}.bmw-modal{max-width:100%;border-radius:20px 20px 0 0;max-height:88vh}
+  .bmw-modal-body{padding:12px 14px}.hbar-row{grid-template-columns:96px 1fr 72px}
 }
 </style>
 </head>
@@ -171,118 +183,124 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
   <aside class="sidebar" id="sidebar">
     <div class="brand">
       <div class="brand-logo">B</div>
-      <div>
-        <div class="brand-name">BMW Warranty</div>
-        <div class="brand-sub">Bassoul, Heneine SAL</div>
-      </div>
+      <div><div class="brand-name">BMW Warranty</div><div class="brand-sub">Bassoul, Heneine SAL</div></div>
     </div>
     <a href="index.html" class="si"><span class="si-icon">🏠</span><span>Dashboard</span></a>
     <a href="warranty.html" class="si"><span class="si-icon">🇫🇷</span><span>Renault Warranty</span></a>
-    <div style="border-top:1px solid var(--line);margin:8px 0 6px;padding-top:10px">
-      <div style="font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:0 11px 6px">BMW Pages</div>
-    </div>
-    <div class="si active" data-page="upload"><span class="si-icon">📤</span><span>Upload Center</span></div>
-    <div class="si" data-page="claims"><span class="si-icon">📋</span><span>Credits / Claims</span><span class="si-badge" id="B_BMW">0</span></div>
-    <div class="si" data-page="rejections"><span class="si-icon">⚠️</span><span>Rejections</span><span class="si-badge" id="B_REJ" style="background:var(--rose)">0</span></div>
-    <div class="si" data-page="overview"><span class="si-icon">📊</span><span>Overview</span></div>
-    <div class="si" data-page="trends"><span class="si-icon">📈</span><span>Trends</span></div>
-    <div class="si" data-page="recovery"><span class="si-icon">🔄</span><span>Recovery</span></div>
-    <div class="si" data-page="brand_split"><span class="si-icon">🚗</span><span>Brand Split</span></div>
-    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v2.0</div>
+    <div class="nav-sec">Reconciliation</div>
+    <div class="si active" data-page="dashboard"><span class="si-icon">📊</span><span>Dashboard</span></div>
+    <div class="si" data-page="pipeline"><span class="si-icon">🔗</span><span>Claim Pipeline</span><span class="si-badge" id="B_pipe">0</span></div>
+    <div class="si" data-page="credits"><span class="si-icon">📑</span><span>Credit Notes</span></div>
+    <div class="si" data-page="rejections"><span class="si-icon">⚠️</span><span>Rejections</span><span class="si-badge" id="B_rej" style="background:var(--rose)">0</span></div>
+    <div class="si" data-page="insights"><span class="si-icon">🔍</span><span>Insights</span></div>
+    <div class="nav-sec">Data</div>
+    <div class="si" data-page="upload"><span class="si-icon">📤</span><span>Upload Center</span></div>
+    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v3.0</div>
   </aside>
 
   <main class="main">
     <div class="topbar">
       <button class="menuBtn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
       <div>
-        <h1>🇩🇪 BMW Warranty <span class="us-badge">CLOUD-SYNCED</span></h1>
-        <p>Credit notes archive · resubmission tracking · multi-month aggregation</p>
+        <h1>🇩🇪 BMW Warranty <span class="us-badge">RECONCILIATION</span></h1>
+        <p>incadea invoices · warranty &amp; BSI submissions · BMW credit notes — linked end-to-end</p>
       </div>
-      <div style="font-size:10px;color:var(--muted);font-weight:600" id="lastSync">—</div>
-    </div>
-
-    <!-- ── UPLOAD ── -->
-    <div class="page active" id="P_upload">
-      <div class="al al-i">📤 Drop monthly Credit Notes Excel files here. Records that already exist in the cloud are auto-skipped (safe to re-upload).</div>
-
-      <div class="card">
-        <div class="ct">📤 Upload Credit Notes</div>
-        <div class="dz" id="dropzone">
-          <div class="dz-emoji">📦</div>
-          <div class="dz-title">Drop the Credit Notes file here, or click to choose</div>
-          <div class="dz-sub">.xlsx exported from SAP — typically named "Credit_Notes_*.xlsx"</div>
-          <label for="fileInput" class="dz-pick">Choose file</label>
-          <input type="file" id="fileInput" class="dz-input" accept=".xlsx,.xls">
+      <div class="topbar-r">
+        <div class="scope" id="scopeSel">
+          <button class="on" data-scope="all">All</button>
+          <button data-scope="warranty">Warranty</button>
+          <button data-scope="bsi">BSI</button>
         </div>
-        <div id="ST_BMW" style="margin-top:12px;font-size:11px;color:var(--muted);font-weight:600"></div>
-      </div>
-
-      <div class="card">
-        <div class="ct">📚 Upload History</div>
-        <div id="upHist" style="font-size:11px;color:var(--muted)">Loading…</div>
+        <div class="sync-pill" id="lastSync"><span class="sync-dot"></span><span>—</span></div>
       </div>
     </div>
 
-    <!-- ── CREDITS / CLAIMS ── -->
-    <div class="page" id="P_claims">
-      <div class="kpis" id="K_claims"></div>
-      <div class="card">
-        <div class="filters">
-          <span class="fl-l">Brand</span>
-          <select id="cl_brand"><option value="">All</option></select>
-          <span class="fl-l">Status</span>
-          <select id="cl_status">
-            <option value="">All</option>
-            <option value="Success">Success</option>
-            <option value="Warning">Warning</option>
-            <option value="Error">Error</option>
-          </select>
-          <span class="fl-l">Month</span>
-          <select id="cl_month"><option value="">All</option></select>
-          <input type="text" id="cl_search" placeholder="Search VIN, Claim, Dealer #, Credit Note…" style="flex:1;min-width:200px">
-        </div>
+    <!-- DASHBOARD -->
+    <div class="page active" id="P_dashboard">
+      <div class="card" id="flowCard" style="padding:16px 20px"><div id="flow"></div></div>
+      <div class="kpis" id="K_dash"></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-h"><div><div class="ct">📈 Credited Value Trend</div><div class="ct-sub">Monthly € credited by BMW &amp; claim volume</div></div></div><div id="CH_trend" class="chart-wrap"></div></div>
+        <div class="card"><div class="card-h"><div><div class="ct">🎯 Claim Status Mix</div><div class="ct-sub">Pending vs answered outcome</div></div></div><div id="CH_status"></div></div>
       </div>
-      <div id="T_claims"></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-h"><div><div class="ct">💶 Invoiced vs Credited by Month</div><div class="ct-sub">The gap is value BMW didn't credit</div></div></div><div id="CH_gap"></div></div>
+        <div class="card"><div class="card-h"><div><div class="ct">🚗 Make Split</div><div class="ct-sub">Credited € by make</div></div></div><div id="CH_make"></div></div>
+      </div>
+      <div class="card"><div class="card-h"><div><div class="ct">📅 Monthly Performance</div><div class="ct-sub">Invoiced → credited, acceptance &amp; error rates</div></div></div><div id="T_monthly"></div></div>
     </div>
 
-    <!-- ── REJECTIONS ── -->
+    <!-- PIPELINE -->
+    <div class="page" id="P_pipeline">
+      <div class="kpis" id="K_pipe"></div>
+      <div class="card"><div class="filters">
+        <span class="fl-l">Outcome</span>
+        <select id="pp_status"><option value="">All</option><option value="Pending">⏳ Pending answer</option><option value="Success">✅ Success</option><option value="Warning">⚠️ Warning</option><option value="Error">❌ Error</option></select>
+        <span class="fl-l">Make</span><select id="pp_make"><option value="">All</option></select>
+        <span class="fl-l">Month</span><select id="pp_month"><option value="">All</option></select>
+        <input type="text" id="pp_search" placeholder="Search VIN, invoice GAR…, submission #, claim…" style="flex:1;min-width:220px">
+        <button class="btn btn-sm" id="pp_export">⬇ CSV</button>
+      </div></div>
+      <div id="T_pipe"></div>
+    </div>
+
+    <!-- CREDIT NOTES -->
+    <div class="page" id="P_credits">
+      <div class="kpis" id="K_cr"></div>
+      <div class="card"><div class="filters">
+        <span class="fl-l">Status</span>
+        <select id="cr_status"><option value="">All</option><option value="Success">Success</option><option value="Warning">Warning</option><option value="Error">Error</option></select>
+        <span class="fl-l">Brand</span><select id="cr_brand"><option value="">All</option></select>
+        <span class="fl-l">Link</span><select id="cr_link"><option value="">All</option><option value="linked">Linked to submission</option><option value="orphan">No submission record</option></select>
+        <input type="text" id="cr_search" placeholder="Search VIN, credit note IWE…, dealer claim…" style="flex:1;min-width:220px">
+      </div></div>
+      <div id="T_cr"></div>
+    </div>
+
+    <!-- REJECTIONS -->
     <div class="page" id="P_rejections">
       <div class="kpis" id="K_rej"></div>
-      <div class="card">
-        <div class="filters">
-          <span class="fl-l">Status</span>
-          <select id="rj_status">
-            <option value="">All Errors + Warnings</option>
-            <option value="Error">Errors only</option>
-            <option value="Warning">Warnings only</option>
-            <option value="tracked">Tracked only</option>
-            <option value="untracked">Untracked only</option>
-          </select>
-        </div>
-      </div>
+      <div class="card"><div class="filters">
+        <span class="fl-l">Show</span>
+        <select id="rj_status"><option value="">Errors + Warnings</option><option value="Error">Errors only</option><option value="Warning">Warnings only</option><option value="tracked">Tracked only</option><option value="untracked">Untracked only</option></select>
+        <span class="fl-l">Make</span><select id="rj_make"><option value="">All</option></select>
+        <input type="text" id="rj_search" placeholder="Search VIN, claim, invoice…" style="flex:1;min-width:200px">
+      </div></div>
       <div id="T_rej"></div>
     </div>
 
-    <!-- ── OVERVIEW ── -->
-    <div class="page" id="P_overview">
-      <div class="kpis" id="K_ov"></div>
-      <div id="T_ov"></div>
+    <!-- INSIGHTS -->
+    <div class="page" id="P_insights">
+      <div class="seg" id="insSeg">
+        <button class="on" data-ins="pending">⏳ Pending &amp; Overdue</button>
+        <button data-ins="gap">💸 Invoiced vs Credited</button>
+        <button data-ins="defects">🔧 Top Defects</button>
+        <button data-ins="dealers">🏬 Customers / Dealers</button>
+        <button data-ins="timing">⏱️ Processing Time</button>
+      </div>
+      <div id="INS_body"></div>
     </div>
 
-    <!-- ── TRENDS ── -->
-    <div class="page" id="P_trends">
-      <div id="T_trends"></div>
-    </div>
-
-    <!-- ── RECOVERY ── -->
-    <div class="page" id="P_recovery">
-      <div class="kpis" id="K_rec"></div>
-      <div id="T_recovery"></div>
-    </div>
-
-    <!-- ── BRAND SPLIT ── -->
-    <div class="page" id="P_brand_split">
-      <div id="T_brand"></div>
+    <!-- UPLOAD -->
+    <div class="page" id="P_upload">
+      <div class="al al-i">📤 Drop all three files together — incadea, the Warranty/BSI submissions, and the SAP credit notes. The system auto-detects each file type, de-duplicates, and re-links the chain.</div>
+      <div class="card">
+        <div class="card-h"><div class="ct">📦 Upload Files</div></div>
+        <div class="dz" id="dropzone">
+          <div class="dz-emoji">📦</div>
+          <div class="dz-title">Drop incadea / submission / credit-note files here</div>
+          <div class="dz-sub">.xlsx — drop one, two, or all three at once, in any order</div>
+          <label for="fileInput" class="dz-pick">Choose files</label>
+          <input type="file" id="fileInput" class="dz-input" accept=".xlsx,.xls" multiple>
+        </div>
+        <div id="ST_BMW" style="margin-top:13px;font-size:11.5px;color:var(--muted);font-weight:600"></div>
+        <div class="src-grid">
+          <div class="src"><h4>🧾 incadea Invoices</h4><p>GAR… invoices · what we billed</p><div class="cnt" id="cnt_inv">0</div></div>
+          <div class="src"><h4>📨 Submissions</h4><p>Warranty + BSI sent to BMW</p><div class="cnt" id="cnt_sub">0</div></div>
+          <div class="src"><h4>📑 Credit Notes</h4><p>IWE… lines · BMW's answer</p><div class="cnt" id="cnt_cr">0</div></div>
+        </div>
+      </div>
+      <div class="card"><div class="card-h"><div class="ct">📚 Upload History</div></div><div id="upHist" style="font-size:11.5px;color:var(--muted)">Loading…</div></div>
     </div>
   </main>
 </div>
@@ -292,1088 +310,639 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 
 <script type="module">
 import { SUPABASE_CONFIG } from './config.js'
-
-// Multi-CDN fallback for Supabase
 let createClient = null
-const cdns = [
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
-  'https://cdn.skypack.dev/@supabase/supabase-js@2',
-  'https://esm.sh/@supabase/supabase-js@2',
-  'https://unpkg.com/@supabase/supabase-js@2/dist/module/index.js'
-]
-for (const url of cdns){
-  try { const m = await import(url); if (m && m.createClient) { createClient = m.createClient; break } }
-  catch(e){ console.warn('[BMW] CDN unreachable:', url) }
+for (const url of ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm','https://cdn.skypack.dev/@supabase/supabase-js@2','https://esm.sh/@supabase/supabase-js@2','https://unpkg.com/@supabase/supabase-js@2/dist/module/index.js']){
+  try{ const m=await import(url); if(m&&m.createClient){createClient=m.createClient;break} }catch(e){ console.warn('[BMW] CDN unreachable:',url) }
 }
-if (!createClient) {
-  alert('Could not load Supabase library — please check your network.')
-  throw new Error('Supabase library unreachable')
-}
+if(!createClient){ alert('Could not load Supabase library — check your network.'); throw new Error('Supabase unreachable') }
 const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
 window._sb = sb
 
-// State
-const S = {
-  cred: [],         // raw credit-line items from cloud
-  resub: {},        // claim_no → tracking record
-  brands: new Set(),
-  months: new Set(),
-  me: null,
-  sortState: {}
-}
+const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:{}, insTab:'pending' }
 window.S = S
-window._sortState = S.sortState
 
-// ── Identity
-async function whoami(){
-  try {
-    const { data: { user } } = await sb.auth.getUser()
-    if (user){
-      const { data } = await sb.from('employees').select('id,name').eq('auth_user_id', user.id).maybeSingle()
-      if (data) S.me = data
-    }
-  } catch {}
+async function whoami(){ try{ const {data:{user}}=await sb.auth.getUser(); if(user){ const {data}=await sb.from('employees').select('id,name').eq('auth_user_id',user.id).maybeSingle(); if(data)S.me=data } }catch{} }
+
+// ── helpers
+const f=v=>(Number(v)||0).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})
+const f0=v=>(Number(v)||0).toLocaleString('en-GB',{maximumFractionDigits:0})
+const fk=v=>{v=Number(v)||0;const a=Math.abs(v);if(a>=1e6)return(v/1e6).toFixed(a>=1e7?0:1)+'M';if(a>=1e3)return(v/1e3).toFixed(a>=1e4?0:1)+'k';return v.toFixed(0)}
+const pct=(a,b)=>b>0?(a/b*100):0
+const num=v=>{if(v==null)return 0;const n=parseFloat(String(v).replace(/,/g,''));return isFinite(n)?n:0}
+const esc=s=>String(s==null?'':s).replace(/[<>"'&]/g,c=>({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'})[c])
+const subkey=v=>String(v==null?'':v).replace(/\D/g,'').replace(/^0+/,'')
+const fmM=m=>{if(!m)return'';const[y,mo]=m.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)-1]+' '+y}
+const fmMs=m=>{if(!m)return'';const[y,mo]=m.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)-1]+" '"+y.substr(2)}
+const days=(a,b)=>{if(!a||!b)return null;const d1=new Date(a),d2=new Date(b);if(isNaN(d1)||isNaN(d2))return null;return Math.round((d2-d1)/86400000)}
+const toIso=v=>{if(v==null)return null;if(v instanceof Date)return isNaN(v)?null:v.toISOString().slice(0,10);const s=String(v).trim();if(!s||s==='0')return null;if(typeof v==='number'&&v>20000&&v<80000)return new Date(Date.UTC(1899,11,30)+Math.floor(v)*864e5).toISOString().slice(0,10);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];const m2=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);if(m2){let[_,d,mo,y]=m2;if(y.length===2)y='20'+y;return y+'-'+mo.padStart(2,'0')+'-'+d.padStart(2,'0')}const t=Date.parse(s);return isNaN(t)?null:new Date(t).toISOString().slice(0,10)}
+const showToast=(msg,ms=3800)=>{const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),ms)}
+const showLoad=msg=>{document.getElementById('loadingMsg').textContent=msg||'Loading…';document.getElementById('loadingOverlay').classList.add('on')}
+const hideLoad=()=>document.getElementById('loadingOverlay').classList.remove('on')
+const stat=(id,msg,ok)=>{const el=document.getElementById(id);if(!el)return;el.style.color=ok===true?'var(--mint-d)':ok===false?'var(--rose-d)':'var(--muted)';el.textContent=msg}
+window.showToast=showToast
+
+// ── nav + scope
+document.querySelectorAll('.si[data-page]').forEach(el=>el.addEventListener('click',()=>{
+  document.querySelectorAll('.si[data-page]').forEach(s=>s.classList.remove('active'));el.classList.add('active')
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('P_'+el.dataset.page).classList.add('active')
+  document.getElementById('sidebar').classList.remove('open');renderPage(el.dataset.page)
+}))
+document.querySelectorAll('#scopeSel button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#scopeSel button').forEach(x=>x.classList.remove('on'));b.classList.add('on');S.scope=b.dataset.scope;updateBadges();renderPage(currentPage())
+}))
+
+// ══ CHARTS ══════════════════════════════════════════════════════
+const PALETTE=['#1C69D4','#10b981','#f59e0b','#8b5cf6','#0EA5E9','#e11d48','#14b8a6','#f97316','#6366f1','#84cc16']
+function donutChart(segments,opts={}){
+  const data=segments.filter(s=>s.value>0),total=data.reduce((s,x)=>s+x.value,0)
+  if(!total)return '<div class="chart-empty">No data yet</div>'
+  const size=168,sw=26,r=(size-sw)/2,cx=size/2,cy=size/2,C=2*Math.PI*r;let off=0
+  const arcs=data.map(s=>{const len=(s.value/total)*C;const el=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${sw}" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"><title>${esc(s.label)}: ${opts.money?'€'+f(s.value):f0(s.value)}</title></circle>`;off+=len;return el}).join('')
+  const svg=`<div class="chart-wrap"><svg viewBox="0 0 ${size} ${size}" style="max-width:${size}px;margin:0 auto">${arcs}<text x="${cx}" y="${cy-3}" text-anchor="middle" font-size="23" font-weight="800" fill="#0f172a">${opts.centerTop!=null?opts.centerTop:f0(total)}</text><text x="${cx}" y="${cy+15}" text-anchor="middle" font-size="9" font-weight="700" fill="#94a3b8" letter-spacing=".06em">${esc(opts.centerSub||'')}</text></svg></div>`
+  const legend=`<div class="legend">${data.map(s=>`<span class="legend-i"><span class="legend-dot" style="background:${s.color}"></span>${esc(s.label)} <b>${opts.money?'€'+fk(s.value):f0(s.value)}</b> <span style="color:var(--faint)">(${(s.value/total*100).toFixed(0)}%)</span></span>`).join('')}</div>`
+  return svg+legend
+}
+function trendChart(series){
+  if(!series.length)return '<div class="chart-empty">No data yet — upload files to begin</div>'
+  const W=720,H=250,P={t:18,r:14,b:34,l:46},iw=W-P.l-P.r,ih=H-P.t-P.b
+  const maxV=Math.max(...series.map(s=>s.value),1),stepX=series.length>1?iw/(series.length-1):0
+  const X=i=>P.l+(series.length>1?stepX*i:iw/2),Y=v=>P.t+ih-(v/maxV)*ih
+  const pts=series.map((s,i)=>[X(i),Y(s.value)])
+  const line=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')
+  const area=`M${pts[0][0].toFixed(1)} ${(P.t+ih).toFixed(1)} `+pts.map(p=>'L'+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')+` L${pts[pts.length-1][0].toFixed(1)} ${(P.t+ih).toFixed(1)} Z`
+  const grid=[0,.25,.5,.75,1].map(g=>{const gy=P.t+ih-g*ih;return `<line x1="${P.l}" y1="${gy.toFixed(1)}" x2="${W-P.r}" y2="${gy.toFixed(1)}" stroke="#eef2f7"/><text x="${P.l-8}" y="${(gy+3).toFixed(1)}" text-anchor="end" font-size="9" fill="#94a3b8" font-weight="600">${fk(g*maxV)}</text>`}).join('')
+  const dots=pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="#fff" stroke="#1C69D4" stroke-width="2"><title>${esc(series[i].label)}: €${f(series[i].value)} · ${series[i].count} claims</title></circle>`).join('')
+  const every=Math.ceil(series.length/12)
+  const xlab=series.map((s,i)=>(i%every===0||i===series.length-1)?`<text x="${X(i).toFixed(1)}" y="${H-12}" text-anchor="middle" font-size="9" fill="#64748b" font-weight="600">${esc(s.short||s.label)}</text>`:'').join('')
+  return `<div class="chart-wrap"><svg viewBox="0 0 ${W} ${H}"><defs><linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1C69D4" stop-opacity=".28"/><stop offset="100%" stop-color="#1C69D4" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#gA)"/><path d="${line}" fill="none" stroke="#1C69D4" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}${xlab}</svg></div>`
+}
+function hbars(rows,opts={}){
+  if(!rows.length)return '<div class="chart-empty">No data yet</div>'
+  const max=Math.max(...rows.map(r=>r.value),1)
+  return `<div>${rows.map((r,i)=>{const w=Math.max((r.value/max)*100,1),col=r.color||PALETTE[i%PALETTE.length];return `<div class="hbar-row"><div class="hbar-label" title="${esc(r.label)}">${esc(r.label)}</div><div class="hbar-track"><div class="hbar-fill" style="width:${w.toFixed(1)}%;background:${col}"></div></div><div class="hbar-val">${opts.money?'€'+fk(r.value):f0(r.value)}</div></div>`}).join('')}</div>`
+}
+function groupBarChart(series){ // claimed/invoiced vs accepted per month
+  if(!series.length)return '<div class="chart-empty">No data yet</div>'
+  const maxV=Math.max(...series.map(s=>Math.max(s.a,s.b)),1)
+  let h=`<div style="display:flex;align-items:flex-end;gap:10px;height:230px;padding:10px 4px;overflow-x:auto">`
+  series.forEach(m=>{const ah=m.a/maxV*100,bh=m.b/maxV*100;h+=`<div style="flex:1;min-width:34px;display:flex;flex-direction:column;align-items:center;gap:5px;justify-content:flex-end;height:100%"><div style="display:flex;align-items:flex-end;gap:3px;height:100%;width:100%;justify-content:center"><div title="${esc(m.aLabel)} €${f(m.a)}" style="width:42%;background:#cbd5e1;height:${ah}%;border-radius:5px 5px 0 0;min-height:2px"></div><div title="${esc(m.bLabel)} €${f(m.b)}" style="width:42%;background:linear-gradient(180deg,#1C69D4,#0F4FA8);height:${bh}%;border-radius:5px 5px 0 0;min-height:2px"></div></div><div style="font-size:9px;color:var(--muted);font-weight:600">${esc(m.label)}</div></div>`})
+  h+=`</div><div class="legend"><span class="legend-i"><span class="legend-dot" style="background:#cbd5e1"></span>${esc(series[0].aLabel)}</span><span class="legend-i"><span class="legend-dot" style="background:#1C69D4"></span>${esc(series[0].bLabel)}</span></div>`
+  return h
 }
 
-// ── Helpers
-const f = v => (Number(v)||0).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})
-const n = v => isNaN(parseFloat(v)) ? 0 : parseFloat(v)
-const esc = s => String(s||'').replace(/[<>"'&]/g, c=>({'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'})[c])
-const fmM = m => { if(!m)return''; const [y,mo]=m.split('-'); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)-1]+' '+y }
-const _toIsoDate = v => {
-  if (!v) return null
-  if (v instanceof Date) return v.toISOString().substr(0,10)
-  const s = String(v).trim()
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substr(0,10)
-  const d = new Date(s)
-  if (isNaN(d.getTime())) return null
-  return d.toISOString().substr(0,10)
+// ══ PARSERS ═════════════════════════════════════════════════════
+function sheetRows(ws,lastCols){
+  const a=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,blankrows:false});if(!a.length)return[]
+  // find header row in first 5
+  let hi=0;for(let i=0;i<Math.min(a.length,6);i++){const r=(a[i]||[]).map(x=>String(x==null?'':x).toLowerCase());if(r.includes('no.')||r.includes('credit note number')||r.includes('claimant')){hi=i;break}}
+  const hdr=(a[hi]||[]).map(x=>String(x==null?'':x).trim());const map={},all={}
+  hdr.forEach((h,i)=>{if(!h)return;if(!(h in map))map[h]=i;(all[h]=all[h]||[]).push(i)})
+  ;(lastCols||[]).forEach(c=>{if(all[c]&&all[c].length>1)map[c]=all[c][all[c].length-1]})
+  const out=[];for(let i=hi+1;i<a.length;i++){const r=a[i];if(!r||!r.some(c=>c!=null))continue;const o={};for(const k in map)o[k]=r[map[k]];out.push(o)}
+  return out
 }
-const showToast = (msg, ms=3500) => {
-  const t = document.getElementById('toast')
-  t.textContent = msg
-  t.classList.add('on')
-  setTimeout(()=>t.classList.remove('on'), ms)
+function detectKind(wb){
+  const names=wb.SheetNames.map(s=>s.toLowerCase())
+  if(names.includes('incadea'))return 'incadea'
+  if(wb.SheetNames.find(s=>/sap document export|credit note/i.test(s)))return 'credits'
+  if(names.includes('warranty')||names.includes('bsi'))return 'submission'
+  // header sniff fallback
+  for(const sn of wb.SheetNames){const r=sheetRows(wb.Sheets[sn]);if(!r.length)continue;const keys=Object.keys(r[0]||{}).map(k=>k.toLowerCase())
+    if(keys.includes('reference vin')&&keys.includes('service order no.'))return 'incadea'
+    if(keys.includes('dealer claim number')&&keys.includes('credit note number'))return 'credits'
+    if(keys.includes('document no.')&&(keys.includes('last submission')||keys.includes('last submission no.')))return 'submission'}
+  return null
 }
-const showLoad = msg => { document.getElementById('loadingMsg').textContent = msg||'Loading…'; document.getElementById('loadingOverlay').classList.add('on') }
-const hideLoad = () => document.getElementById('loadingOverlay').classList.remove('on')
-const stat = (id, msg, ok) => {
-  const el = document.getElementById(id)
-  if (!el) return
-  el.style.color = ok===true?'var(--mint)':ok===false?'var(--rose)':'var(--muted)'
-  el.textContent = msg
+function parseIncadea(wb){
+  const ws=wb.Sheets[wb.SheetNames.find(s=>/incadea/i.test(s))||wb.SheetNames[0]]
+  return sheetRows(ws).map(r=>{const doc=String(r['No.']||'').trim();if(!doc)return null
+    const labors=num(r['Total Labors']),parts=num(r['Total Parts']),ext=num(r['Total G/L and Ext. Serv.']),posting=toIso(r['Posting Date'])
+    return {doc_no:doc,make_code:String(r['Make Code']||'').trim()||null,vin:String(r['Reference VIN']||r['Service VIN']||'').trim().toUpperCase()||null,model:String(r['Model']||'').trim()||null,
+      sell_to_customer_name:String(r['Sell-to Customer Name']||'').trim()||null,bill_to_name:String(r['Bill-to Name']||'').trim()||null,service_order_no:String(r['Service Order No.']||'').trim()||null,
+      order_date:toIso(r['Order Date']),posting_date:posting,initial_registration:toIso(r['Initial Registration']),
+      total_labors:labors,total_parts:parts,total_ext:ext,total_invoiced:labors+parts+ext,
+      vehicle_mileage:Math.trunc(num(r['Vehicle Mileage']))||null,service_mileage:Math.trunc(num(r['Service Mileage']))||null,
+      service_posting_group:String(r['Service Posting Group']||'').trim()||null,payment_method_code:String(r['Payment Method Code']||'').trim()||null,
+      own_sale:/^y/i.test(String(r['Own Sale']||''))?true:(/^n/i.test(String(r['Own Sale']||''))?false:null),
+      month:posting?posting.slice(0,7):null}
+  }).filter(Boolean)
 }
-window.showToast = showToast
-
-// ── Page navigation
-document.querySelectorAll('.si[data-page]').forEach(el => {
-  el.addEventListener('click', () => {
-    document.querySelectorAll('.si[data-page]').forEach(s=>s.classList.remove('active'))
-    el.classList.add('active')
-    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'))
-    document.getElementById('P_'+el.dataset.page).classList.add('active')
-    document.getElementById('sidebar').classList.remove('open')
-    renderPage(el.dataset.page)
-  })
-})
-
-// ══ FILE PARSING ══════════════════════════════════════════════════
-// ── normalize a header label: lowercase, alphanumeric only ──
-function _normH(s){ return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]/g,'') }
-
-// canonical field -> accepted normalized header aliases (exact match after _normH)
-const BMW_COLS = {
-  claimant:['claimant'],
-  cn_no:['creditnotenumber','creditnoteno','cnnumber','cnno'],
-  cn_date:['creditnotedate','cndate'],
-  claim_no:['claim','claimnumber','claimno'],
-  dealer_claim:['dealerclaimnumber','dealerclaimno','dealerclaim'],
-  brand:['brand'],
-  defect_code:['defectcode'],
-  defect_text:['defectcodetext','defecttext'],
-  item_no:['claimitemnumber','claimitemno','itemnumber','itemno'],
-  item_desc:['claimitemdescription','itemdescription','itemdesc'],
-  position:['claimitemposition','itemposition','position'],
-  repair_date:['repairdate'],
-  ws_indicator:['wsindicator'],
-  accepted_price_no_hc:['acceptedpricewohc','acceptedpricewithouthc','acceptedpricenohc'],
-  hc:['hc'],
-  tax:['tax'],
-  accepted_price_incl_hc:['acceptedpriceinclhcexcltax','acceptedpriceinclhc'],
-  accepted_price_incl_tax:['acceptedpriceincltaxhc','acceptedpriceincltax'],
-  claimed_price:['claimedprice'],
-  claimed_pct:['claimedpercent','claimedpct'],
-  accepted_pct:['acceptedpercent','acceptedpct','accepted'],
-  claimed_qty:['claimedquantity','claimedqty'],
-  accepted_qty:['acceptedquantity','acceptedqty'],
-  most_decisive_msg:['mostdecisivemessageitem','mostdecisivemessage'],
-  collective_ref:['collectiveclaimreference','collectiveclaimref'],
-  crediting_item_status:['creditingitemstatus'],
-  crediting_status:['creditingstatus'],
-  item_crediting_status:['itemcreditingstatus'],
-  pdf:['pdf'],
-  vin:['vin']
-}
-
-let _bmwLastHeaders = []   // for the on-screen diagnostic
-
-function parseBMW(sheet){
-  // Accept a worksheet (preferred) or a legacy array-of-objects.
-  let aoa
-  if (Array.isArray(sheet)){
-    if (!sheet.length) return []
-    const keys = Object.keys(sheet[0])
-    aoa = [keys, ...sheet.map(o => keys.map(k => o[k]))]
-  } else {
-    aoa = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', blankrows:false})
-  }
-  if (!aoa.length) return []
-
-  // 1) find the header row anywhere in the first 25 rows (skips SAP title/blank rows)
-  const aliasSet = new Set(Object.values(BMW_COLS).flat())
-  let hIdx = -1
-  for (let i = 0; i < Math.min(aoa.length, 25); i++){
-    const hits = aoa[i].reduce((c, cell) => c + (aliasSet.has(_normH(cell)) ? 1 : 0), 0)
-    if (hits >= 2){ hIdx = i; break }
-  }
-  if (hIdx === -1){
-    _bmwLastHeaders = (aoa[0]||[]).map(x => String(x)).filter(Boolean)
-    console.warn('[BMW] no header row found. First row was:', _bmwLastHeaders)
-    return []
-  }
-
-  // 2) map canonical field -> column index
-  const headerRow = aoa[hIdx].map(_normH)
-  _bmwLastHeaders = aoa[hIdx].map(x => String(x)).filter(Boolean)
-  const col = {}
-  for (const [field, aliases] of Object.entries(BMW_COLS))
-    col[field] = headerRow.findIndex(h => aliases.includes(h))
-  const g = (row, f) => { const i = col[f]; return i >= 0 ? row[i] : '' }
-
-  // 3) build records from every data row below the header
-  const out = []
-  for (let i = hIdx + 1; i < aoa.length; i++){
-    const row = aoa[i]
-    if (!row || !row.length) continue
-    const cn_no    = String(g(row,'cn_no')||'').trim()
-    const claim_no = String(g(row,'claim_no')||'').trim()
-    const vin      = String(g(row,'vin')||'').trim().toUpperCase()
-    if (!cn_no && !claim_no && !vin) continue   // skip blank / total rows
-    out.push({
-      claimant:       String(g(row,'claimant')||'').trim(),
-      cn_no,
-      cn_date:        _toIsoDate(g(row,'cn_date')),
-      claim_no,
-      dealer_claim:   String(g(row,'dealer_claim')||'').trim(),
-      brand:          String(g(row,'brand')||'').trim(),
-      defect_code:    String(g(row,'defect_code')||'').trim(),
-      defect_text:    String(g(row,'defect_text')||'').trim(),
-      item_no:        String(g(row,'item_no')||'').trim(),
-      item_desc:      String(g(row,'item_desc')||'').trim(),
-      position:       String(g(row,'position')||'').trim(),
-      repair_date:    _toIsoDate(g(row,'repair_date')),
-      ws_indicator:   String(g(row,'ws_indicator')||'').trim(),
-      accepted_price_no_hc:    n(g(row,'accepted_price_no_hc')),
-      hc:                      n(g(row,'hc')),
-      tax:                     n(g(row,'tax')),
-      accepted_price_incl_hc:  n(g(row,'accepted_price_incl_hc')),
-      accepted_price_incl_tax: n(g(row,'accepted_price_incl_tax')),
-      claimed_price:           n(g(row,'claimed_price')),
-      claimed_pct:             n(g(row,'claimed_pct')),
-      accepted_pct:            n(g(row,'accepted_pct')),
-      claimed_qty:             n(g(row,'claimed_qty')),
-      accepted_qty:            n(g(row,'accepted_qty')),
-      most_decisive_msg:       String(g(row,'most_decisive_msg')||'').trim(),
-      collective_ref:          String(g(row,'collective_ref')||'').trim(),
-      crediting_item_status:   String(g(row,'crediting_item_status')||'').trim(),
-      crediting_status:        String(g(row,'crediting_status')||'').trim(),
-      item_crediting_status:   String(g(row,'item_crediting_status')||'').trim(),
-      pdf:           String(g(row,'pdf')||'').trim(),
-      vin,
-      month:         _toIsoDate(g(row,'cn_date')) ? _toIsoDate(g(row,'cn_date')).substr(0,7) : ''
+function parseSubmissions(wb){
+  const out=[]
+  const sheetsToDo=[['Warranty','warranty'],['BSI','bsi']]
+  for(const [sn,kind] of sheetsToDo){
+    const ws=wb.Sheets[wb.SheetNames.find(s=>s.toLowerCase()===sn.toLowerCase())]
+    if(!ws)continue
+    sheetRows(ws).forEach(r=>{const no=String(r['No.']||'').trim();if(!no)return
+      const ls=String(r['Last Submission']||r['Last Submission No.']||'').trim(),dd=toIso(r['Document Date'])
+      out.push({id:kind+':'+no,claim_kind:kind,no:no,make_code:String(r['Make Code']||'').trim()||null,status:String(r['Status']||'').trim()||null,
+        last_submission:ls||null,sub_key:subkey(ls),vin:String(r['VIN']||'').trim().toUpperCase()||null,license_no:String(r['License No.']||'').trim()||null,
+        doc_no:String(r['Document No.']||'').trim()||null,service_order_no:String(r['Service Order No.']||'').trim()||null,
+        document_date:dd,dealer_status:String(r['Dealer Status']||'').trim()||null,dealer_claim_submitted_date:toIso(r['Dealer Claim Submitted Date']||r['Dealer Claim Submitted D']),
+        warranty_type:String(r['Warranty Type']||'').trim()||null,bill_to_customer_no:String(r['Bill-to Customer No.']||'').trim()||null,
+        sell_to_customer_no:String(r['Sell-to Customer No.']||r['Service Contract Customer']||'').trim()||null,
+        service_advisor:String(r['Service Advisor No./Appointment']||r['Service Advisor No.']||'').trim()||null,
+        created_by:String(r['Created by']||'').trim()||null,created_on:toIso(r['Created on']),month:dd?dd.slice(0,7):null})
     })
   }
   return out
 }
+function parseCredits(wb){
+  const ws=wb.Sheets[wb.SheetNames.find(s=>/sap document export|credit note/i.test(s))||wb.SheetNames[0]]
+  const seq={}  // per-base-key occurrence counter → keeps physically-distinct lines unique, stable across re-uploads
+  return sheetRows(ws).map(r=>{const cnn=String(r['Credit Note Number']||'').trim(),dcn=String(r['Dealer Claim Number']||'').trim(),item=String(r['Claim Item Number']||'').trim();const pos=String(r['Claim Item Position']||'').trim()
+    if(!cnn||!dcn||!item)return null
+    const cd=toIso(r['Credit Note Date'])
+    const baseId=[cnn,String(r['Claim']||''),item,pos,dcn].join('|');seq[baseId]=(seq[baseId]||0)+1
+    return {id:baseId+'#'+seq[baseId],credit_type:/^0+\d/.test(dcn)?'warranty':'bsi',dealer_claim_number:dcn,dcn_key:subkey(dcn),
+      credit_note_number:cnn,credit_note_date:cd,bmw_internal_claim:String(r['Claim']||'').trim()||null,claimant:String(r['Claimant']||'').trim()||null,
+      brand:String(r['Brand']||'').trim()||null,vin:String(r['VIN']||'').trim().toUpperCase()||null,repair_date:toIso(r['Repair Date']),
+      defect_code:String(r['Defect Code']||'').trim()||null,defect_text:String(r['Defect Code Text']||'').trim()||null,
+      claim_item_number:item,claim_item_position:pos||null,claim_item_type:String(r['Claim Item Type']||'').trim()||null,claim_item_description:String(r['Claim Item Description']||'').trim()||null,
+      accepted_price_excl_hc:num(r['Accepted Price w/o HC']),hc:num(r['HC']),tax:num(r['Tax']),
+      accepted_price_incl_hc:num(r['Accepted Price incl HC/excl Tax']),accepted_price_incl_tax:num(r['Accepted Price incl Tax/HC']),
+      claimed_price:num(r['Claimed Price']),claimed_pct:num(r['Claimed Percent']),accepted_pct:num(r['Accepted %']),
+      claimed_qty:num(r['Claimed Quantity']),accepted_qty:num(r['Accepted Quantity']),
+      crediting_item_status:String(r['Crediting Item Status']||'').trim()||null,crediting_status:String(r['Crediting Status']||'').trim()||null,
+      most_decisive_message:String(r['Most Decisive Message Item']||r['Most decisive mess.']||'').trim()||null,
+      collective_claim_ref:String(r['Collective Claim Reference']||'').trim()||null,month:cd?cd.slice(0,7):null}
+  }).filter(Boolean)
+}
 
-// ══ CLOUD I/O ════════════════════════════════════════════════════
-async function loadCreditsFromCloud(){
-  let all = []; let from = 0; const step = 1000
-  while (true){
-    const { data, error } = await sb
-      .from('warranty_bmw_credits')
-      .select('*')
-      .order('cn_date', { ascending: false })
-      .range(from, from + step - 1)
-    if (error){ console.warn('BMW credits load failed:', error.message); break }
-    if (!data || !data.length) break
-    all = all.concat(data)
-    if (data.length < step) break
-    from += step
-  }
+// ══ CLOUD I/O ═══════════════════════════════════════════════════
+async function loadAll(table,order){
+  let all=[],from=0;const step=1000
+  while(true){let q=sb.from(table).select('*').range(from,from+step-1);if(order)q=q.order(order,{ascending:false})
+    const {data,error}=await q;if(error){console.warn(table+' load failed:',error.message);break}
+    if(!data||!data.length)break;all=all.concat(data);if(data.length<step)break;from+=step}
   return all
 }
-
-async function loadResubFromCloud(){
-  const { data, error } = await sb.from('warranty_bmw_resub').select('*').limit(5000)
-  if (error){ console.warn('BMW resub load failed:', error.message); return {} }
-  const map = {}
-  ;(data||[]).forEach(r => { if (r.orig_claim) map[r.orig_claim] = r })
-  return map
+async function loadResub(){const {data,error}=await sb.from('warranty_bmw_resub').select('*').limit(8000);if(error){console.warn('resub:',error.message);return{}}const m={};(data||[]).forEach(r=>{if(r.orig_claim)m[r.orig_claim]=r});return m}
+async function upsertChunked(table,rows,conflict,label){
+  if(!rows.length)return 0;const cs=300;let done=0
+  for(let i=0;i<rows.length;i+=cs){showLoad(`${label}: ${i+1}–${Math.min(i+cs,rows.length)} of ${rows.length}…`)
+    const {error}=await sb.from(table).upsert(rows.slice(i,i+cs),{onConflict:conflict});if(error)throw new Error(table+': '+error.message);done+=Math.min(cs,rows.length-i)}
+  return done
+}
+async function logUpload(fileName,fileType,period,count){
+  try{await sb.from('warranty_uploads').insert({file_name:fileName,file_type:fileType,period_label:period,row_count:count,uploaded_by:S.me?.id||null,uploaded_by_name:S.me?.name||null})}catch(e){console.warn('upload log:',e.message)}
 }
 
-async function uploadBMW(fileName, fileSize, period, rows){
-  // Dedup against existing keys (cn_no + claim_no + item_no + position)
-  showLoad('Checking for duplicates…')
-  let existing = new Set()
-  let from = 0; const step = 1000
-  while (true){
-    const { data, error } = await sb
-      .from('warranty_bmw_credits')
-      .select('cn_no,claim_no,item_no,position')
-      .range(from, from + step - 1)
-    if (error){ console.warn('[BMW] dedup-fetch failed:', error.message); break }
-    if (!data || !data.length) break
-    data.forEach(d => existing.add([d.cn_no, d.claim_no, d.item_no, d.position].join('||')))
-    if (data.length < step) break
-    from += step
-  }
-  const totalIncoming = rows.length
-  const newRows = rows.filter(r => !existing.has([r.cn_no, r.claim_no, r.item_no, r.position].join('||')))
-  const skipped = totalIncoming - newRows.length
-  console.log(`[BMW] dedup: incoming=${totalIncoming} alreadyInCloud=${existing.size} new=${newRows.length} skipped=${skipped}`)
-
-  if (newRows.length === 0){
-    return { inserted: 0, skipped, totalIncoming, uploadId: null }
-  }
-
-  // Insert upload header
-  showLoad('Saving file metadata…')
-  const { data: hdr, error: hErr } = await sb
-    .from('warranty_uploads')
-    .insert({
-      file_name: fileName,
-      file_type: 'bmw',
-      period_label: period,
-      row_count: newRows.length,
-      file_size_bytes: fileSize || null,
-      uploaded_by: S.me?.id || null,
-      uploaded_by_name: S.me?.name || null
-    })
-    .select().single()
-  if (hErr) throw new Error('Header insert failed: ' + hErr.message)
-  const uploadId = hdr.id
-
-  // Insert credits in chunks
-  const chunkSize = 200
-  for (let i = 0; i < newRows.length; i += chunkSize){
-    showLoad(`Saving rows ${i+1}–${Math.min(i+chunkSize,newRows.length)} of ${newRows.length}…`)
-    const chunk = newRows.slice(i, i+chunkSize).map(r => ({
-      upload_id: uploadId,
-      file_name: fileName,
-      claimant: r.claimant || null,
-      cn_no: r.cn_no || null,
-      cn_date: r.cn_date || null,
-      claim_no: r.claim_no || null,
-      dealer_claim: r.dealer_claim || null,
-      brand: r.brand || null,
-      defect_code: r.defect_code || null,
-      defect_text: r.defect_text || null,
-      item_no: r.item_no || null,
-      item_desc: r.item_desc || null,
-      position: r.position || null,
-      repair_date: r.repair_date || null,
-      ws_indicator: r.ws_indicator || null,
-      vin: r.vin || null,
-      pdf: r.pdf || null,
-      accepted_price_no_hc: r.accepted_price_no_hc || 0,
-      hc: r.hc || 0,
-      tax: r.tax || 0,
-      accepted_price_incl_hc: r.accepted_price_incl_hc || 0,
-      accepted_price_incl_tax: r.accepted_price_incl_tax || 0,
-      claimed_price: r.claimed_price || 0,
-      claimed_pct: r.claimed_pct || 0,
-      accepted_pct: r.accepted_pct || 0,
-      claimed_qty: r.claimed_qty || 0,
-      accepted_qty: r.accepted_qty || 0,
-      most_decisive_msg: r.most_decisive_msg || null,
-      collective_ref: r.collective_ref || null,
-      crediting_item_status: r.crediting_item_status || null,
-      crediting_status: r.crediting_status || null,
-      item_crediting_status: r.item_crediting_status || null,
-      month: r.month || null
-    }))
-    const { error } = await sb.from('warranty_bmw_credits').insert(chunk)
-    if (error) throw new Error('Row insert failed at chunk ' + (i/chunkSize) + ': ' + error.message)
-  }
-  return { inserted: newRows.length, skipped, totalIncoming, uploadId }
-}
-
-// ══ FILE UPLOAD HANDLING ══════════════════════════════════════════
+// ══ UPLOAD ══════════════════════════════════════════════════════
 function setupDropzone(){
-  const dz = document.getElementById('dropzone')
-  const inp = document.getElementById('fileInput')
-  let dzActive = false
-  const wire = ev => dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation() })
-  ;['dragenter','dragover','dragleave','drop'].forEach(wire)
-  dz.addEventListener('dragenter', e => { dz.classList.add('dz-active'); dzActive = true })
-  dz.addEventListener('dragover',  e => dz.classList.add('dz-active'))
-  dz.addEventListener('dragleave', e => { if (e.target === dz) dz.classList.remove('dz-active') })
-  dz.addEventListener('drop', async e => {
-    dz.classList.remove('dz-active')
-    const files = [...e.dataTransfer.files]
-    if (files.length) await handleFile(files[0])
-    setTimeout(()=>{ dzActive=false }, 250)
-  })
-  dz.addEventListener('click', e => {
-    if (dzActive) return
-    if (e.target.tagName !== 'LABEL') inp.click()
-  })
-  inp.addEventListener('change', async e => {
-    if (e.target.files.length) await handleFile(e.target.files[0])
-    inp.value = ''
-  })
-  ;['dragover','drop'].forEach(ev => window.addEventListener(ev, e => e.preventDefault()))
+  const dz=document.getElementById('dropzone'),inp=document.getElementById('fileInput');let active=false
+  ;['dragenter','dragover','dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation()}))
+  dz.addEventListener('dragenter',()=>{dz.classList.add('dz-active');active=true})
+  dz.addEventListener('dragover',()=>dz.classList.add('dz-active'))
+  dz.addEventListener('dragleave',e=>{if(e.target===dz)dz.classList.remove('dz-active')})
+  dz.addEventListener('drop',async e=>{dz.classList.remove('dz-active');const fs=[...e.dataTransfer.files];if(fs.length)await handleFiles(fs);setTimeout(()=>active=false,250)})
+  dz.addEventListener('click',e=>{if(active)return;if(e.target.tagName!=='LABEL')inp.click()})
+  inp.addEventListener('change',async e=>{if(e.target.files.length)await handleFiles([...e.target.files]);inp.value=''})
+  ;['dragover','drop'].forEach(ev=>window.addEventListener(ev,e=>e.preventDefault()))
 }
-
-async function handleFile(file){
-  if (!/\.(xlsx|xls)$/i.test(file.name)){
-    showToast('❌ ' + file.name + ' is not an Excel file')
-    return
+async function readWb(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>{try{res(XLSX.read(e.target.result,{type:'array',cellDates:true}))}catch(err){try{const b=new Uint8Array(e.target.result);let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);res(XLSX.read(s,{type:'binary',cellDates:true}))}catch(e2){rej(e2)}}};r.onerror=rej;r.readAsArrayBuffer(file)})}
+async function handleFiles(files){
+  const summary=[]
+  for(const file of files){
+    if(!/\.(xlsx|xls)$/i.test(file.name)){showToast('❌ '+file.name+' is not Excel');continue}
+    showLoad('Reading '+file.name+' …')
+    let wb;try{wb=await readWb(file)}catch(e){hideLoad();showToast('❌ Cannot read '+file.name);continue}
+    const kind=detectKind(wb)
+    try{
+      if(kind==='incadea'){const rows=parseIncadea(wb);await upsertChunked('bmw_rec_invoices',rows,'doc_no','Invoices');await logUpload(file.name,'bmw_incadea',rows[0]?.month||'',rows.length);summary.push(`🧾 ${rows.length} invoices`)}
+      else if(kind==='submission'){const rows=parseSubmissions(wb);await upsertChunked('bmw_rec_submissions',rows,'id','Submissions');await logUpload(file.name,'bmw_submission','',rows.length);summary.push(`📨 ${rows.length} submissions`)}
+      else if(kind==='credits'){const rows=parseCredits(wb);await upsertChunked('bmw_rec_credits',rows,'id','Credit notes');await logUpload(file.name,'bmw_credits',rows[0]?.month||'',rows.length);summary.push(`📑 ${rows.length} credit lines`)}
+      else {hideLoad();showToast('⚠️ '+file.name+': could not detect file type');summary.push('⚠️ '+file.name+' unrecognised')}
+    }catch(err){hideLoad();console.error(err);showToast('❌ '+file.name+': '+err.message.slice(0,80));stat('ST_BMW','❌ '+err.message,false);summary.push('❌ '+file.name)}
   }
-  showLoad('Reading ' + file.name + ' …')
-  const r = new FileReader()
-  r.onload = async e => {
-    try {
-      let wb = null, readErr = null
-      try { wb = XLSX.read(e.target.result, {type:'array', cellDates:true}) }
-      catch (err) { readErr = err
-        try {
-          const bytes = new Uint8Array(e.target.result)
-          let bin = ''; for (let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i])
-          wb = XLSX.read(bin, {type:'binary', cellDates:true}); readErr = null
-        } catch (err2) { readErr = err2 }
-      }
-      if (!wb || !wb.SheetNames.length){
-        hideLoad()
-        stat('ST_BMW', '❌ Cannot read file — ' + (readErr?.message || 'unknown format'), false)
-        showToast('❌ ' + file.name + ' is not a valid Excel file. Try opening in Excel and saving as .xlsx.')
-        return
-      }
-      const sn = wb.SheetNames.find(s=>/sap|credit/i.test(s)) || wb.SheetNames[0]
-      const parsed = parseBMW(wb.Sheets[sn])
-      if (!parsed.length){
-        hideLoad()
-        const seen = _bmwLastHeaders.length ? ' · headers seen: ' + _bmwLastHeaders.slice(0,8).join(', ') : ''
-        stat('ST_BMW', '⚠️ No recognisable columns' + seen, false)
-        showToast('⚠️ ' + file.name + ' — no recognisable columns. Found: ' + (_bmwLastHeaders.join(', ') || 'none'))
-        return
-      }
-      // Period detection — most-frequent month
-      const monthCounts = {}
-      parsed.forEach(r => { if (r.month) monthCounts[r.month] = (monthCounts[r.month]||0)+1 })
-      const period = Object.keys(monthCounts).sort((a,b) => monthCounts[b]-monthCounts[a])[0] || ''
-
-      // Push to cloud
-      let uploadResult = null
-      try {
-        uploadResult = await uploadBMW(file.name, file.size, period, parsed)
-      } catch (err){
-        hideLoad()
-        showToast('❌ Cloud upload failed: ' + err.message.slice(0,80))
-        stat('ST_BMW', '❌ ' + err.message, false)
-        console.error('[BMW] upload error:', err)
-        return
-      }
-
-      // Reload from cloud
-      showLoad('Refreshing data…')
-      S.cred = await loadCreditsFromCloud()
-      hideLoad()
-
-      // Status toast
-      const ins = uploadResult.inserted || 0, sk = uploadResult.skipped || 0, tot = uploadResult.totalIncoming || 0
-      let msg, statMsg
-      if (ins === 0 && sk > 0){
-        msg = '✅ All ' + sk + ' rows already in cloud — no duplicates added'
-        statMsg = '✅ ' + tot + ' rows in file · all already in cloud'
-      } else if (ins > 0 && sk > 0){
-        msg = '🎉 ' + ins + ' new line items added · ' + sk + ' duplicates skipped'
-        statMsg = '✅ ' + ins + ' new of ' + tot + ' · ' + sk + ' skipped'
-      } else if (ins > 0 && sk === 0){
-        msg = '🎉 ' + ins + ' line items added · all new'
-        statMsg = '✅ ' + ins + ' new rows · period ' + (period||'mixed')
-      } else {
-        msg = '⚠️ No records found'
-        statMsg = '⚠️ Empty'
-      }
-      showToast(msg)
-      stat('ST_BMW', statMsg, true)
-      updateBadges()
-      renderPage(currentPage())
-    } catch (err){
-      hideLoad()
-      console.error('[BMW] handleFile error:', err)
-      showToast('❌ Error: ' + err.message)
-      stat('ST_BMW', '❌ ' + err.message, false)
-    }
-  }
-  r.readAsArrayBuffer(file)
+  showLoad('Refreshing…');await refreshData();hideLoad()
+  stat('ST_BMW','✅ '+summary.join(' · '),true);showToast('🎉 Imported — '+summary.join(' · '))
+  updateBadges();renderPage(currentPage());rUploadHist()
 }
 
-// ══ AGGREGATION (claim-level rollup from line items) ══════════════
-function buildClaims(){
-  const map = {}
-  for (const r of S.cred){
-    const k = r.claim_no || ''
-    if (!k) continue
-    if (!map[k]){
-      map[k] = {
-        claim_no: k,
-        cn_no: r.cn_no, cn_date: r.cn_date, dealer_claim: r.dealer_claim,
-        vin: r.vin, brand: r.brand, month: r.month,
-        repair_date: r.repair_date,
-        items_count: 0,
-        total_accepted: 0, total_claimed: 0, total_hc: 0, total_tax: 0,
-        labor: 0, parts: 0, ext: 0,
-        statuses: {Success:0, Warning:0, Error:0}, status_overall: '',
-        defect_codes: new Set(),
-        items: []
-      }
-    }
-    const c = map[k]
-    c.items_count++
-    c.total_accepted += Number(r.accepted_price_incl_hc) || 0
-    c.total_claimed  += Number(r.claimed_price) || 0
-    c.total_hc       += Number(r.hc) || 0
-    c.total_tax      += Number(r.tax) || 0
-    if (/labor/i.test(r.position||'')) c.labor += Number(r.accepted_price_incl_hc) || 0
-    else if (/spare|material/i.test(r.position||'')) c.parts += Number(r.accepted_price_incl_hc) || 0
-    else if (/external/i.test(r.position||'')) c.ext += Number(r.accepted_price_incl_hc) || 0
-    if (r.crediting_item_status) c.statuses[r.crediting_item_status] = (c.statuses[r.crediting_item_status]||0) + 1
-    if (r.defect_code) c.defect_codes.add(r.defect_code)
-    c.items.push(r)
-  }
-  // Resolve overall status: any Error → Error; any Warning → Warning; else Success
-  Object.values(map).forEach(c => {
-    c.status_overall = c.statuses.Error > 0 ? 'Error'
-                     : c.statuses.Warning > 0 ? 'Warning' : 'Success'
-    c.defect_codes = [...c.defect_codes]
+async function refreshData(){
+  const [inv,subs,cred,resub]=await Promise.all([loadAll('bmw_rec_invoices','posting_date'),loadAll('bmw_rec_submissions','document_date'),loadAll('bmw_rec_credits','credit_note_date'),loadResub()])
+  S.inv=inv;S.subs=subs;S.cred=cred;S.resub=resub
+  document.getElementById('cnt_inv').textContent=f0(inv.length)
+  document.getElementById('cnt_sub').textContent=f0(subs.length)
+  document.getElementById('cnt_cr').textContent=f0(cred.length)
+}
+
+// ══ RECONCILIATION ENGINE (validated on real data) ══════════════
+function reconcile(){
+  const invByDoc={};S.inv.forEach(i=>invByDoc[i.doc_no]=i)
+  const credByKey={};S.cred.forEach(c=>{(credByKey[c.dcn_key]=credByKey[c.dcn_key]||[]).push(c)})
+  const claims=S.subs.map(s=>{
+    const inv=invByDoc[s.doc_no]||null, cr=credByKey[s.sub_key]||[]
+    const st={Success:0,Warning:0,Error:0};let labor=0,parts=0,ext=0,accepted=0,claimedPrice=0
+    const cnNos=new Set(),defects=new Set();let cnDate=null,repairDate=null
+    cr.forEach(c=>{const a=Number(c.accepted_price_incl_hc)||0;accepted+=a;claimedPrice+=Number(c.claimed_price)||0
+      const p=c.claim_item_position||'';if(/labor/i.test(p))labor+=a;else if(/spare|material/i.test(p))parts+=a;else if(/external/i.test(p))ext+=a
+      if(c.crediting_item_status)st[c.crediting_item_status]=(st[c.crediting_item_status]||0)+1
+      if(c.credit_note_number)cnNos.add(c.credit_note_number);if(c.defect_code)defects.add(c.defect_code)
+      if(c.credit_note_date&&(!cnDate||c.credit_note_date>cnDate))cnDate=c.credit_note_date
+      if(c.repair_date&&!repairDate)repairDate=c.repair_date})
+    const answered=cr.length>0
+    const status_overall=!answered?'Pending':st.Error>0?'Error':st.Warning>0?'Warning':'Success'
+    const invoiced=inv?Number(inv.total_invoiced)||0:0
+    return {kind:s.kind,no:s.no,sub:s,inv,credits:cr,vin:s.vin||inv?.vin||(cr[0]?.vin)||'',make:s.make_code||inv?.make_code||'',
+      brand:cr[0]?.brand||'',model:inv?.model||'',month:s.month||(cnDate?cnDate.slice(0,7):''),
+      doc_no:s.doc_no,sub_key:s.sub_key,sub_status:s.status||'',document_date:s.document_date,cn_date:cnDate,repair_date:repairDate,
+      items_count:cr.length,answered,status_overall,statuses:st,labor,parts,ext,
+      invoiced,accepted,claimed_price:claimedPrice,gap:invoiced-accepted,accept_ratio:pct(accepted,invoiced),
+      cn_no:[...cnNos].join(', '),defect_codes:[...defects],lag_days:days(repairDate,cnDate)}
   })
-  return Object.values(map).sort((a,b) => (b.cn_date||'').localeCompare(a.cn_date||''))
-}
-
-// ══ SORT + ROW-CLICK helpers (shared) ═════════════════════════════
-function sortClick(tableKey, colIdx){
-  const cur = S.sortState[tableKey] || {col:-1, dir:'asc'}
-  let dir = 'asc'
-  if (cur.col === colIdx && cur.dir === 'asc') dir = 'desc'
-  S.sortState[tableKey] = {col: colIdx, dir}
-  renderPage(currentPage())
-}
-window.sortClick = sortClick
-function applySort(rows, tableKey, accessors){
-  const st = S.sortState[tableKey]; if (!st || st.col<0 || !accessors[st.col]) return rows
-  const acc = accessors[st.col], dir = st.dir==='desc'?-1:1
-  return [...rows].sort((a,b) => {
-    const va = acc(a), vb = acc(b)
-    if (va==null && vb==null) return 0
-    if (va==null) return 1
-    if (vb==null) return -1
-    if (typeof va==='number' && typeof vb==='number') return (va-vb)*dir
-    return String(va).localeCompare(String(vb))*dir
+  // orphan credits: keys present in credits but not in any submission
+  const subKeys=new Set(S.subs.map(s=>s.sub_key))
+  const orphanByKey={}
+  S.cred.forEach(c=>{if(subKeys.has(c.dcn_key))return;(orphanByKey[c.dcn_key]=orphanByKey[c.dcn_key]||[]).push(c)})
+  const orphans=Object.entries(orphanByKey).map(([key,cr])=>{
+    const st={Success:0,Warning:0,Error:0};let accepted=0;const cnNos=new Set();let cnDate=null
+    cr.forEach(c=>{accepted+=Number(c.accepted_price_incl_hc)||0;if(c.crediting_item_status)st[c.crediting_item_status]=(st[c.crediting_item_status]||0)+1;if(c.credit_note_number)cnNos.add(c.credit_note_number);if(c.credit_note_date&&(!cnDate||c.credit_note_date>cnDate))cnDate=c.credit_note_date})
+    return {kind:cr[0].credit_type==='bsi'?'bsi':'warranty',orphan:true,sub_key:key,dealer_claim_number:cr[0].dealer_claim_number,credits:cr,vin:cr[0].vin||'',brand:cr[0].brand||'',make:cr[0].brand||'',
+      month:cnDate?cnDate.slice(0,7):'',cn_date:cnDate,items_count:cr.length,answered:true,accepted,invoiced:0,gap:0,
+      status_overall:st.Error>0?'Error':st.Warning>0?'Warning':'Success',statuses:st,cn_no:[...cnNos].join(', ')}
   })
+  return {claims,orphans}
 }
-function th(label, tableKey, idx, opts){
-  opts = opts || {}; const st = S.sortState[tableKey] || {}
-  const cls = ['sortable']; if (opts.num) cls.push('num')
-  if (st.col === idx) cls.push(st.dir==='desc'?'sort-desc':'sort-asc')
-  return `<th class="${cls.join(' ')}" onclick="sortClick('${tableKey}',${idx})">${label}</th>`
-}
+function inScope(x){return S.scope==='all'||x.kind===S.scope}
+function scopedClaims(){return reconcile().claims.filter(inScope)}
 
-// ══ MODAL: Claim Detail with line items ═══════════════════════════
-function openClaimDetail(claimNo){
-  const claim = buildClaims().find(c => c.claim_no === claimNo)
-  if (!claim){ showToast('Claim not found'); return }
-  let bg = document.querySelector('.bmw-modal-bg'); if (bg) bg.remove()
-  bg = document.createElement('div'); bg.className = 'bmw-modal-bg'
-  const statusBadge = claim.status_overall === 'Error'
-    ? '<span class="badge b-rose">❌ Error</span>'
-    : claim.status_overall === 'Warning'
-    ? '<span class="badge b-lem">⚠️ Warning</span>'
-    : '<span class="badge b-mint">✅ Success</span>'
-  bg.innerHTML = `
-    <div class="bmw-modal" role="dialog">
-      <div class="bmw-modal-h">
-        <div class="bmw-modal-icon">📋</div>
-        <div class="bmw-modal-title" style="flex:1">
-          <h3>Claim ${esc(claim.claim_no)} · Dealer ${esc(claim.dealer_claim)}</h3>
-          <p>${esc(claim.brand)} · ${esc(claim.vin||'no VIN')} · CN ${esc(claim.cn_no)} · ${esc(claim.cn_date||'')}</p>
-        </div>
-        <button class="bmw-modal-x" onclick="closeBmwModal()">✕</button>
+// ══ SORT helpers ════════════════════════════════════════════════
+function sortClick(k,c){const cur=S.sortState[k]||{col:-1,dir:'asc'};let dir='asc';if(cur.col===c&&cur.dir==='asc')dir='desc';S.sortState[k]={col:c,dir};renderPage(currentPage())}
+window.sortClick=sortClick
+function applySort(rows,k,acc){const st=S.sortState[k];if(!st||st.col<0||!acc[st.col])return rows;const a=acc[st.col],d=st.dir==='desc'?-1:1;return[...rows].sort((x,y)=>{const va=a(x),vb=a(y);if(va==null&&vb==null)return 0;if(va==null)return 1;if(vb==null)return -1;if(typeof va==='number'&&typeof vb==='number')return(va-vb)*d;return String(va).localeCompare(String(vb))*d})}
+function th(l,k,i,o){o=o||{};const st=S.sortState[k]||{};const cls=['sortable'];if(o.num)cls.push('num');if(st.col===i)cls.push(st.dir==='desc'?'sort-desc':'sort-asc');return `<th class="${cls.join(' ')}" onclick="sortClick('${k}',${i})">${l}</th>`}
+const sBadge=s=>s==='Error'?'<span class="badge b-rose">❌ Error</span>':s==='Warning'?'<span class="badge b-lem">⚠️ Warning</span>':s==='Pending'?'<span class="badge b-sun">⏳ Pending</span>':'<span class="badge b-mint">✅ Success</span>'
+const kindBadge=k=>k==='bsi'?'<span class="badge b-sky">BSI</span>':'<span class="badge b-bmw">Warranty</span>'
+
+// ══ MODAL ═══════════════════════════════════════════════════════
+function openClaim(kind,no){
+  const claim=reconcile().claims.find(c=>c.kind===kind&&c.no===no);if(!claim){showToast('Claim not found');return}
+  let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
+  const items=claim.credits
+  bg.innerHTML=`<div class="bmw-modal"><div class="bmw-modal-h"><div class="bmw-modal-icon">🔗</div>
+    <div class="bmw-modal-title" style="flex:1"><h3>${kindBadge(claim.kind)} Submission ${esc(claim.no)} · Sub# ${esc(claim.sub.last_submission||'—')}</h3>
+    <p>${esc(claim.make)} · ${esc(claim.vin||'no VIN')} · invoice ${esc(claim.doc_no||'—')}</p></div>
+    <button class="bmw-modal-x" onclick="closeModal()">✕</button></div>
+    <div class="bmw-modal-body">
+      <div class="flow">
+        <div class="flow-step"><div class="fl-t">🧾 Invoiced (incadea)</div><div class="fl-v">€${f(claim.invoiced)}</div><div class="fl-s">${claim.inv?esc(claim.inv.model||''):'no invoice row'}</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><div class="fl-t">📨 Submitted</div><div class="fl-v" style="font-size:13px">${esc(claim.sub_status||'—')}</div><div class="fl-s">${esc(claim.document_date||'')}</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><div class="fl-t">📑 BMW Answer</div><div class="fl-v">${claim.answered?'€'+f(claim.accepted):'—'}</div><div class="fl-s">${claim.answered?sBadge(claim.status_overall):'⏳ no credit note yet'}</div></div>
+        <div class="flow-arrow">=</div>
+        <div class="flow-step" style="background:${claim.gap>0.5?'#fff1f2':'#f0fdf4'}"><div class="fl-t">Δ Gap</div><div class="fl-v" style="color:${claim.gap>0.5?'var(--rose-d)':'var(--mint-d)'}">€${f(claim.gap)}</div><div class="fl-s">${claim.invoiced?claim.accept_ratio.toFixed(0)+'% credited':''}</div></div>
       </div>
-      <div class="bmw-modal-body">
-        <div class="vin-summary">
-          <div class="vin-stat"><div class="vin-stat-l">Status</div><div style="margin-top:4px">${statusBadge}</div><div class="vin-stat-l" style="text-transform:none;color:var(--faint);margin-top:3px">${claim.statuses.Success} ok · ${claim.statuses.Warning} warn · ${claim.statuses.Error} err</div></div>
-          <div class="vin-stat"><div class="vin-stat-l">Items</div><div class="vin-stat-v" style="color:var(--bmw)">${claim.items_count}</div></div>
-          <div class="vin-stat"><div class="vin-stat-l">Total Accepted</div><div class="vin-stat-v" style="color:var(--mint)">€${f(claim.total_accepted)}</div></div>
-          <div class="vin-stat"><div class="vin-stat-l">Repair Date</div><div class="vin-stat-v" style="font-size:13px">${esc(claim.repair_date||'—')}</div></div>
-        </div>
-
-        <div class="vin-section">
-          <div class="vin-section-h"><span>💰 Cost breakdown</span></div>
-          <table class="vin-mini">
-            <thead><tr><th>Component</th><th class="num">Accepted (€)</th><th class="num">Items</th></tr></thead>
-            <tbody>
-              <tr><td>Labor</td><td class="num">${f(claim.labor)}</td><td class="num">${claim.items.filter(i=>/labor/i.test(i.position||'')).length}</td></tr>
-              <tr><td>Spare Parts</td><td class="num">${f(claim.parts)}</td><td class="num">${claim.items.filter(i=>/spare|material/i.test(i.position||'')).length}</td></tr>
-              <tr><td>External Activity</td><td class="num">${f(claim.ext)}</td><td class="num">${claim.items.filter(i=>/external/i.test(i.position||'')).length}</td></tr>
-              <tr style="border-top:2px solid var(--line);font-weight:700"><td>TOTAL</td><td class="num">${f(claim.total_accepted)}</td><td class="num">${claim.items_count}</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="vin-section">
-          <div class="vin-section-h"><span>📑 Line items</span><span class="ct">${claim.items.length}</span></div>
-          <table class="vin-mini">
-            <thead><tr><th>Position</th><th>Item #</th><th>Description</th><th>Defect</th><th class="num">Qty</th><th class="num">Accepted (€)</th><th>Status</th></tr></thead>
-            <tbody>${claim.items.map(it => `<tr>
-              <td>${esc(it.position)}</td>
-              <td class="mono">${esc(it.item_no)}</td>
-              <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(it.item_desc)}">${esc(it.item_desc)}</td>
-              <td class="mono" style="color:var(--muted)" title="${esc(it.defect_text)}">${esc(it.defect_code||'—')}</td>
-              <td class="num">${it.accepted_qty}</td>
-              <td class="num" style="font-weight:600">${f(it.accepted_price_incl_hc)}</td>
-              <td>${it.crediting_item_status==='Success'?'<span class="badge b-mint">✓</span>':it.crediting_item_status==='Warning'?'<span class="badge b-lem">⚠</span>':'<span class="badge b-rose">✗</span>'}</td>
-            </tr>`).join('')}</tbody>
-          </table>
-        </div>
-
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
-          ${claim.vin?`<button class="btn btn-bmw btn-sm" onclick="closeBmwModal();openVinHistory('${esc(claim.vin)}')">🚗 Full VIN history</button>`:''}
-          ${claim.status_overall!=='Success'?`<button class="btn btn-sun btn-sm" onclick="closeBmwModal();openTrackModal('${esc(claim.claim_no)}')">${S.resub[claim.claim_no]?'✏️ Edit':'+ Track'} resubmission</button>`:''}
-        </div>
+      ${claim.answered?`<div class="vin-section"><div class="vin-section-h"><span>📑 Credit lines</span><span class="ct">${items.length}</span></div>
+        <table class="vin-mini"><thead><tr><th>Credit Note</th><th>Position</th><th>Description</th><th>Defect</th><th class="num">Qty</th><th class="num">Accepted €</th><th>Status</th></tr></thead>
+        <tbody>${items.map(it=>`<tr><td class="mono">${esc(it.credit_note_number)}</td><td>${esc(it.claim_item_position||'')}</td>
+          <td style="max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(it.claim_item_description)}">${esc(it.claim_item_description||'')}</td>
+          <td class="mono" style="color:var(--muted)" title="${esc(it.defect_text)}">${esc(it.defect_code||'—')}</td>
+          <td class="num">${f0(it.accepted_qty)}</td><td class="num" style="font-weight:600">${f(it.accepted_price_incl_hc)}</td>
+          <td>${it.crediting_item_status==='Success'?'<span class="badge b-mint">✓</span>':it.crediting_item_status==='Warning'?'<span class="badge b-lem">⚠</span>':'<span class="badge b-rose">✗</span>'}</td></tr>`).join('')}</tbody></table></div>`
+        :'<div class="vin-empty">⏳ This claim was submitted to BMW but no credit note has been received yet.</div>'}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+        ${claim.vin?`<button class="btn btn-bmw btn-sm" onclick="closeModal();openVin('${esc(claim.vin)}')">🚗 Full VIN history</button>`:''}
+        ${(claim.status_overall==='Error'||claim.status_overall==='Warning')?`<button class="btn btn-sun btn-sm" onclick="closeModal();openTrack('${esc(claim.kind)}','${esc(claim.no)}')">${S.resub[claim.kind+':'+claim.no]?'✏️ Edit':'+ Track'} recovery</button>`:''}
       </div>
-    </div>`
-  document.body.appendChild(bg)
-  requestAnimationFrame(()=>bg.classList.add('on'))
-  bg.addEventListener('click', e => { if (e.target===bg) closeBmwModal() })
-  document.addEventListener('keydown', escClose)
+    </div></div>`
+  document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
+  bg.addEventListener('click',e=>{if(e.target===bg)closeModal()});document.addEventListener('keydown',escClose)
 }
-window.openClaimDetail = openClaimDetail
+window.openClaim=openClaim
+function closeModal(){const bg=document.querySelector('.bmw-modal-bg');if(!bg)return;bg.classList.remove('on');setTimeout(()=>bg.remove(),280);document.removeEventListener('keydown',escClose)}
+window.closeModal=closeModal
+function escClose(e){if(e.key==='Escape')closeModal()}
+function openVin(vin){
+  if(!vin)return;vin=String(vin).toUpperCase().trim()
+  const all=reconcile();const claims=all.claims.filter(c=>c.vin===vin);const orph=all.orphans.filter(o=>o.vin===vin)
+  let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
+  const inv=S.inv.find(i=>i.vin===vin)
+  const totAcc=claims.reduce((s,c)=>s+c.accepted,0)+orph.reduce((s,o)=>s+o.accepted,0)
+  const totInv=claims.reduce((s,c)=>s+c.invoiced,0)
+  bg.innerHTML=`<div class="bmw-modal"><div class="bmw-modal-h"><div class="bmw-modal-icon">🚗</div>
+    <div class="bmw-modal-title" style="flex:1"><h3>${esc(inv?.model||claims[0]?.make||'BMW')}</h3><p>${esc(vin)}</p></div>
+    <button class="bmw-modal-x" onclick="closeModal()">✕</button></div><div class="bmw-modal-body">
+    <div class="vin-summary">
+      <div class="vin-stat"><div class="vin-stat-l">📋 Claims</div><div class="vin-stat-v" style="color:var(--bmw)">${claims.length+orph.length}</div></div>
+      <div class="vin-stat"><div class="vin-stat-l">🧾 Invoiced</div><div class="vin-stat-v">€${f(totInv)}</div></div>
+      <div class="vin-stat"><div class="vin-stat-l">💰 Credited</div><div class="vin-stat-v" style="color:var(--mint-d)">€${f(totAcc)}</div></div>
+      <div class="vin-stat"><div class="vin-stat-l">⏳ Pending</div><div class="vin-stat-v" style="color:var(--sun)">${claims.filter(c=>!c.answered).length}</div></div>
+    </div>
+    <div class="vin-section"><div class="vin-section-h"><span>📋 Claims for this VIN</span><span class="ct">${claims.length+orph.length}</span></div>
+      <table class="vin-mini"><thead><tr><th>Kind</th><th>Submission</th><th>Invoice</th><th>CN Date</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th>Status</th></tr></thead>
+      <tbody>${claims.map(c=>`<tr class="clickable" onclick="closeModal();openClaim('${esc(c.kind)}','${esc(c.no)}')"><td>${kindBadge(c.kind)}</td><td class="mono">${esc(c.no)}</td><td class="mono">${esc(c.doc_no||'—')}</td><td>${esc(c.cn_date||'—')}</td><td class="num">${f(c.invoiced)}</td><td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}</td></tr>`).join('')}
+      ${orph.map(o=>`<tr><td>${kindBadge(o.kind)}</td><td class="mono">${esc(o.dealer_claim_number)}*</td><td>—</td><td>${esc(o.cn_date||'—')}</td><td class="num">—</td><td class="num" style="font-weight:700">${f(o.accepted)}</td><td>${sBadge(o.status_overall)}</td></tr>`).join('')}</tbody></table>
+      ${orph.length?'<div style="font-size:10px;color:var(--faint);margin-top:6px">* credit note with no submission record in the loaded data</div>':''}
+    </div></div></div>`
+  document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
+  bg.addEventListener('click',e=>{if(e.target===bg)closeModal()});document.addEventListener('keydown',escClose)
+}
+window.openVin=openVin
 
-function closeBmwModal(){
-  const bg = document.querySelector('.bmw-modal-bg'); if (!bg) return
-  bg.classList.remove('on')
-  setTimeout(()=>bg.remove(), 280)
-  document.removeEventListener('keydown', escClose)
+// ── recovery tracking modal (reuses warranty_bmw_resub; key = kind:no)
+function openTrack(kind,no){
+  const claim=reconcile().claims.find(c=>c.kind===kind&&c.no===no);if(!claim)return
+  const key=kind+':'+no,ex=S.resub[key]||{}
+  let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
+  const fld=(id,label,val,type)=>`<div><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">${label}</label><input id="${id}" type="${type||'text'}" value="${esc(val||'')}" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit"></div>`
+  bg.innerHTML=`<div class="bmw-modal" style="max-width:560px"><div class="bmw-modal-h"><div class="bmw-modal-icon">📝</div>
+    <div class="bmw-modal-title" style="flex:1"><h3>${ex.status?'Edit':'Track'} Recovery</h3><p>${esc(no)} · ${esc(claim.make)} · ${esc(claim.vin||'')}</p></div>
+    <button class="bmw-modal-x" onclick="closeModal()">✕</button></div><div class="bmw-modal-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px">
+      <div><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Status</label>
+        <select id="tr_status" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit">
+        ${['pending','resubmitted','credited','resolved'].map(o=>`<option value="${o}"${ex.status===o?' selected':''}>${o}</option>`).join('')}</select></div>
+      ${fld('tr_newclaim','New Claim #',ex.new_claim)}
+      <div style="grid-column:1/-1">${fld('tr_reason','Reason',ex.reason).replace('<div>','').replace(/<\/div>$/,'')}</div>
+      ${fld('tr_resub_date','Resubmit Date',ex.resub_date,'date')}
+      ${fld('tr_credited','Credited (€)',ex.credited_amt,'number')}
+      <div style="grid-column:1/-1"><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Notes</label><textarea id="tr_notes" rows="2" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit;resize:vertical">${esc(ex.notes||'')}</textarea></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
+      ${ex.status?`<button class="btn btn-sm" style="color:var(--rose)" onclick="delTrack('${esc(key)}')">🗑️ Delete</button>`:''}
+      <button class="btn btn-sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-bmw btn-sm" onclick="saveTrack('${esc(kind)}','${esc(no)}')">💾 Save</button></div>
+    </div></div>`
+  document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
 }
-window.closeBmwModal = closeBmwModal
-function escClose(e){ if (e.key==='Escape') closeBmwModal() }
+window.openTrack=openTrack
+async function saveTrack(kind,no){
+  const claim=reconcile().claims.find(c=>c.kind===kind&&c.no===no);if(!claim)return
+  const key=kind+':'+no,credited=parseFloat(document.getElementById('tr_credited').value)||null
+  const payload={orig_claim:key,orig_vin:claim.vin||null,orig_brand:claim.make||null,orig_month:claim.month||null,orig_amount:claim.accepted||claim.invoiced||null,
+    new_claim:document.getElementById('tr_newclaim').value||null,reason:document.getElementById('tr_reason').value||null,
+    resub_date:document.getElementById('tr_resub_date').value||null,credited_amt:credited,
+    recovery_rate:credited!=null&&claim.accepted>0?credited/claim.accepted*100:null,
+    status:document.getElementById('tr_status').value||'pending',notes:document.getElementById('tr_notes').value||null,
+    updated_by:S.me?.id||null,updated_by_name:S.me?.name||null}
+  showLoad('Saving…');const {error}=await sb.from('warranty_bmw_resub').upsert(payload,{onConflict:'orig_claim'});hideLoad()
+  if(error){showToast('❌ '+error.message);return}
+  S.resub=await loadResub();closeModal();showToast('✅ Saved');renderPage(currentPage())
+}
+window.saveTrack=saveTrack
+async function delTrack(key){if(!confirm('Delete this recovery record?'))return;showLoad('Deleting…');const {error}=await sb.from('warranty_bmw_resub').delete().eq('orig_claim',key);hideLoad();if(error){showToast('❌ '+error.message);return}delete S.resub[key];closeModal();showToast('✅ Removed');renderPage(currentPage())}
+window.delTrack=delTrack
 
-// ══ MODAL: VIN History ═══════════════════════════════════════════
-function openVinHistory(vin){
-  if (!vin) return
-  vin = String(vin).toUpperCase().trim()
-  const claims = buildClaims().filter(c => c.vin === vin)
-  let bg = document.querySelector('.bmw-modal-bg'); if (bg) bg.remove()
-  bg = document.createElement('div'); bg.className = 'bmw-modal-bg'
-  const totalAccepted = claims.reduce((s,c)=>s+c.total_accepted, 0)
-  const totalErrors = claims.filter(c => c.status_overall==='Error').length
-  const totalWarnings = claims.filter(c => c.status_overall==='Warning').length
-  const months = new Set(claims.map(c => c.month))
-  const brand = claims[0]?.brand || ''
-  bg.innerHTML = `
-    <div class="bmw-modal">
-      <div class="bmw-modal-h">
-        <div class="bmw-modal-icon">🚗</div>
-        <div class="bmw-modal-title" style="flex:1">
-          <h3>${esc(brand) || 'BMW'}</h3>
-          <p>${esc(vin)}</p>
-        </div>
-        <button class="bmw-modal-x" onclick="closeBmwModal()">✕</button>
-      </div>
-      <div class="bmw-modal-body">
-        <div class="vin-summary">
-          <div class="vin-stat"><div class="vin-stat-l">📋 Claims</div><div class="vin-stat-v" style="color:var(--bmw)">${claims.length}</div><div class="vin-stat-l" style="text-transform:none;color:var(--faint)">in ${months.size} month${months.size===1?'':'s'}</div></div>
-          <div class="vin-stat"><div class="vin-stat-l">💰 Total Accepted</div><div class="vin-stat-v" style="color:var(--mint)">€${f(totalAccepted)}</div></div>
-          <div class="vin-stat"><div class="vin-stat-l">⚠️ Warnings</div><div class="vin-stat-v" style="color:var(--lem)">${totalWarnings}</div></div>
-          <div class="vin-stat"><div class="vin-stat-l">❌ Errors</div><div class="vin-stat-v" style="color:var(--rose)">${totalErrors}</div></div>
-        </div>
-        <div class="vin-section">
-          <div class="vin-section-h"><span>📋 Claims for this VIN</span><span class="ct">${claims.length}</span></div>
-          ${claims.length ? `
-            <table class="vin-mini">
-              <thead><tr><th>CN Date</th><th>Credit Note</th><th>Claim #</th><th>Dealer #</th><th class="num">Items</th><th class="num">Accepted €</th><th>Status</th></tr></thead>
-              <tbody>${claims.map(c => `<tr class="clickable" onclick="closeBmwModal();openClaimDetail('${esc(c.claim_no)}')">
-                <td>${esc(c.cn_date||'—')}</td>
-                <td class="mono" style="font-weight:600">${esc(c.cn_no)}</td>
-                <td class="mono">${esc(c.claim_no)}</td>
-                <td class="mono">${esc(c.dealer_claim)}</td>
-                <td class="num">${c.items_count}</td>
-                <td class="num" style="font-weight:700">${f(c.total_accepted)}</td>
-                <td>${c.status_overall==='Success'?'<span class="badge b-mint">✅ OK</span>':c.status_overall==='Warning'?'<span class="badge b-lem">⚠️ Warn</span>':'<span class="badge b-rose">❌ Err</span>'}</td>
-              </tr>`).join('')}</tbody>
-            </table>` : '<div class="vin-empty">No claims for this VIN.</div>'}
-        </div>
-      </div>
-    </div>`
-  document.body.appendChild(bg)
-  requestAnimationFrame(()=>bg.classList.add('on'))
-  bg.addEventListener('click', e => { if (e.target===bg) closeBmwModal() })
-  document.addEventListener('keydown', escClose)
-}
-window.openVinHistory = openVinHistory
+// ══ CSV ═════════════════════════════════════════════════════════
+function exportCSV(name,headers,rows){const csv=[headers.join(',')].concat(rows.map(r=>r.map(c=>{const s=String(c==null?'':c);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}).join(','))).join('\n');const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
 
-// ══ MODAL: Track Resubmission ════════════════════════════════════
-function openTrackModal(claimNo){
-  const claim = buildClaims().find(c => c.claim_no === claimNo)
-  if (!claim) return
-  const existing = S.resub[claimNo] || {}
-  let bg = document.querySelector('.bmw-modal-bg'); if (bg) bg.remove()
-  bg = document.createElement('div'); bg.className = 'bmw-modal-bg'
-  bg.innerHTML = `
-    <div class="bmw-modal" style="max-width:560px">
-      <div class="bmw-modal-h">
-        <div class="bmw-modal-icon">📝</div>
-        <div class="bmw-modal-title" style="flex:1">
-          <h3>${existing.status?'Edit':'Track'} Resubmission</h3>
-          <p>Claim ${esc(claim.claim_no)} · ${esc(claim.brand)} · ${esc(claim.vin||'')}</p>
-        </div>
-        <button class="bmw-modal-x" onclick="closeBmwModal()">✕</button>
-      </div>
-      <div class="bmw-modal-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px">
-          <div>
-            <label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Type</label>
-            <select id="tr_type" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit">
-              <option value="">— Select —</option>
-              <option value="full"${existing.rej_type==='full'?' selected':''}>Full Rejection (Error)</option>
-              <option value="partial"${existing.rej_type==='partial'?' selected':''}>Partial (Warning)</option>
-            </select>
-          </div>
-          <div>
-            <label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Status</label>
-            <select id="tr_status" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit">
-              <option value="pending"${existing.status==='pending'?' selected':''}>Pending</option>
-              <option value="resubmitted"${existing.status==='resubmitted'?' selected':''}>Resubmitted</option>
-              <option value="credited"${existing.status==='credited'?' selected':''}>Credited</option>
-              <option value="resolved"${existing.status==='resolved'?' selected':''}>Resolved (no resubmit)</option>
-            </select>
-          </div>
-          <div style="grid-column:1/-1">
-            <label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Reason</label>
-            <input id="tr_reason" type="text" value="${esc(existing.reason||'')}" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit">
-          </div>
-          <div>
-            <label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">New Claim #</label>
-            <input id="tr_newclaim" type="text" value="${esc(existing.new_claim||'')}" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit">
-          </div>
-          <div>
-            <label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Resubmit Date</label>
-            <input id="tr_resub_date" type="date" value="${existing.resub_date||''}" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit">
-          </div>
-          <div>
-            <label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Credited (€)</label>
-            <input id="tr_credited" type="number" step="0.01" value="${existing.credited_amt||''}" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit">
-          </div>
-          <div>
-            <label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Credit Date</label>
-            <input id="tr_credit_date" type="date" value="${existing.credit_date||''}" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit">
-          </div>
-          <div style="grid-column:1/-1">
-            <label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Notes</label>
-            <textarea id="tr_notes" rows="2" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit;resize:vertical">${esc(existing.notes||'')}</textarea>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
-          ${existing.status?`<button class="btn btn-sm" style="color:var(--rose)" onclick="deleteTrack('${esc(claimNo)}')">🗑️ Delete</button>`:''}
-          <button class="btn btn-sm" onclick="closeBmwModal()">Cancel</button>
-          <button class="btn btn-bmw btn-sm" onclick="saveTrack('${esc(claimNo)}')">💾 Save</button>
-        </div>
-      </div>
-    </div>`
-  document.body.appendChild(bg)
-  requestAnimationFrame(()=>bg.classList.add('on'))
-}
-window.openTrackModal = openTrackModal
-
-async function saveTrack(claimNo){
-  const claim = buildClaims().find(c => c.claim_no === claimNo)
-  if (!claim) return
-  const credited = parseFloat(document.getElementById('tr_credited').value) || null
-  const shortfall = credited != null ? (claim.total_accepted - credited) : null
-  const recoveryRate = credited != null && claim.total_accepted > 0 ? (credited / claim.total_accepted * 100) : null
-  const payload = {
-    orig_claim: claimNo,
-    orig_dealer_claim: claim.dealer_claim || null,
-    orig_vin: claim.vin || null,
-    orig_cn: claim.cn_no || null,
-    orig_brand: claim.brand || null,
-    orig_month: claim.month || null,
-    orig_amount: claim.total_accepted || null,
-    rej_type: document.getElementById('tr_type').value || null,
-    reason: document.getElementById('tr_reason').value || null,
-    new_claim: document.getElementById('tr_newclaim').value || null,
-    resub_date: document.getElementById('tr_resub_date').value || null,
-    credited_amt: credited,
-    credit_date: document.getElementById('tr_credit_date').value || null,
-    shortfall,
-    recovery_rate: recoveryRate,
-    status: document.getElementById('tr_status').value || 'pending',
-    notes: document.getElementById('tr_notes').value || null,
-    updated_by: S.me?.id || null,
-    updated_by_name: S.me?.name || null
-  }
-  showLoad('Saving…')
-  const { error } = await sb.from('warranty_bmw_resub').upsert(payload, { onConflict: 'orig_claim' })
-  hideLoad()
-  if (error){
-    showToast('❌ Save failed: ' + error.message)
-    console.error(error)
-    return
-  }
-  S.resub = await loadResubFromCloud()
-  closeBmwModal()
-  showToast('✅ Tracking saved · synced to cloud')
-  renderPage(currentPage())
-}
-window.saveTrack = saveTrack
-
-async function deleteTrack(claimNo){
-  if (!confirm('Delete this resubmission tracking record?')) return
-  showLoad('Deleting…')
-  const { error } = await sb.from('warranty_bmw_resub').delete().eq('orig_claim', claimNo)
-  hideLoad()
-  if (error){ showToast('❌ Delete failed: ' + error.message); return }
-  delete S.resub[claimNo]
-  closeBmwModal()
-  showToast('✅ Removed')
-  renderPage(currentPage())
-}
-window.deleteTrack = deleteTrack
-
-// ══ PAGE RENDERERS ════════════════════════════════════════════════
-function currentPage(){ return document.querySelector('.si.active')?.dataset.page || 'upload' }
-function renderPage(p){
-  if (p === 'claims')    rClaims()
-  if (p === 'rejections')rRej()
-  if (p === 'overview')  rOv()
-  if (p === 'trends')    rTrends()
-  if (p === 'recovery')  rRec()
-  if (p === 'brand_split') rBrand()
-  if (p === 'upload')    rUploadHist()
-}
+// ══ RENDER ══════════════════════════════════════════════════════
+function currentPage(){return document.querySelector('.si.active')?.dataset.page||'dashboard'}
+function renderPage(p){if(p==='dashboard')rDash();if(p==='pipeline')rPipe();if(p==='credits')rCredits();if(p==='rejections')rRej();if(p==='insights')rInsights();if(p==='upload')rUploadHist()}
+function monthly(claims){const m={};claims.forEach(c=>{if(!c.month)return;if(!m[c.month])m[c.month]={month:c.month,cnt:0,invoiced:0,accepted:0,answered:0,err:0,warn:0,success:0,pending:0,labor:0,parts:0,ext:0};const b=m[c.month];b.cnt++;b.invoiced+=c.invoiced;b.accepted+=c.accepted;b.labor+=c.labor;b.parts+=c.parts;b.ext+=c.ext;if(!c.answered)b.pending++;else{b.answered++;if(c.status_overall==='Error')b.err++;else if(c.status_overall==='Warning')b.warn++;else b.success++}});return Object.values(m).sort((a,b)=>a.month.localeCompare(b.month))}
 
 function updateBadges(){
-  const claims = buildClaims()
-  document.getElementById('B_BMW').textContent = claims.length
-  document.getElementById('B_REJ').textContent = claims.filter(c => c.status_overall !== 'Success').length
-  document.getElementById('lastSync').textContent = '☁️ ' + S.cred.length.toLocaleString() + ' line items · ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
-  // Refresh filter dropdowns
-  const brSel = document.getElementById('cl_brand')
-  if (brSel){
-    const brands = [...new Set(S.cred.map(r=>r.brand).filter(Boolean))].sort()
-    brSel.innerHTML = '<option value="">All</option>' + brands.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('')
-  }
-  const moSel = document.getElementById('cl_month')
-  if (moSel){
-    const months = [...new Set(S.cred.map(r=>r.month).filter(Boolean))].sort().reverse()
-    moSel.innerHTML = '<option value="">All</option>' + months.map(m=>`<option value="${esc(m)}">${esc(fmM(m))}</option>`).join('')
-  }
+  const claims=scopedClaims()
+  document.getElementById('B_pipe').textContent=f0(claims.length)
+  document.getElementById('B_rej').textContent=f0(claims.filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').length)
+  document.querySelector('#lastSync span:last-child').textContent=`${f0(S.inv.length)} inv · ${f0(S.subs.length)} sub · ${f0(S.cred.length)} cr`
+  const makes=[...new Set(reconcile().claims.map(c=>c.make).filter(Boolean))].sort()
+  const months=[...new Set(reconcile().claims.map(c=>c.month).filter(Boolean))].sort().reverse()
+  const brands=[...new Set(S.cred.map(c=>c.brand).filter(Boolean))].sort()
+  ;[['pp_make',makes],['rj_make',makes]].forEach(([id,arr])=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">All</option>'+arr.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')})
+  const cb=document.getElementById('cr_brand');if(cb)cb.innerHTML='<option value="">All</option>'+brands.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')
+  const mo=document.getElementById('pp_month');if(mo)mo.innerHTML='<option value="">All</option>'+months.map(m=>`<option value="${esc(m)}">${esc(fmM(m))}</option>`).join('')
 }
 
-function rClaims(){
-  const claims = buildClaims()
-  const brandF = document.getElementById('cl_brand').value
-  const statusF = document.getElementById('cl_status').value
-  const monthF = document.getElementById('cl_month').value
-  const q = document.getElementById('cl_search').value.toLowerCase().trim()
+function rDash(){
+  const claims=scopedClaims()
+  const invoiced=claims.reduce((s,c)=>s+c.invoiced,0),accepted=claims.reduce((s,c)=>s+c.accepted,0)
+  const answered=claims.filter(c=>c.answered).length,pending=claims.length-answered
+  const err=claims.filter(c=>c.status_overall==='Error').length,warn=claims.filter(c=>c.status_overall==='Warning').length,success=claims.filter(c=>c.status_overall==='Success').length
+  const series=monthly(claims)
+  // flow strip
+  document.getElementById('flow').innerHTML=`<div class="flow" style="margin:0">
+    <div class="flow-step"><div class="fl-t">🧾 Invoiced (incadea)</div><div class="fl-v">€${f0(invoiced)}</div><div class="fl-s">${f0(claims.length)} claims billed</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><div class="fl-t">📨 Submitted to BMW</div><div class="fl-v">${f0(claims.length)}</div><div class="fl-s">${f0(answered)} answered · ${f0(pending)} pending</div></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step"><div class="fl-t">📑 Credited by BMW</div><div class="fl-v" style="color:var(--mint-d)">€${f0(accepted)}</div><div class="fl-s">${pct(accepted,invoiced).toFixed(1)}% of invoiced</div></div>
+    <div class="flow-arrow">=</div>
+    <div class="flow-step" style="background:#fff1f2"><div class="fl-t">Δ Not Credited</div><div class="fl-v" style="color:var(--rose-d)">€${f0(invoiced-accepted)}</div><div class="fl-s">money to chase</div></div></div>`
+  document.getElementById('K_dash').innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📋 Total Claims</div><div class="kv bmw">${f0(claims.length)}</div><div class="ks">${f0(new Set(claims.map(c=>c.vin).filter(Boolean)).size)} unique VINs</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited (€)</div><div class="kv mint">${f0(accepted)}</div><div class="ks">of €${fk(invoiced)} invoiced</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">🎯 Credited Rate</div><div class="kv sky">${pct(accepted,invoiced).toFixed(1)}%</div><div class="ks">€${fk(invoiced-accepted)} gap</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending Answer</div><div class="kv sun">${f0(pending)}</div><div class="ks">submitted, awaiting BMW</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">⚠️ Needs Attention</div><div class="kv rose">${f0(err+warn)}</div><div class="ks">${err} errors · ${warn} warnings</div></div>`
+  document.getElementById('CH_trend').innerHTML=trendChart(series.map(s=>({label:fmM(s.month),short:fmMs(s.month),value:s.accepted,count:s.cnt})))
+  document.getElementById('CH_status').innerHTML=donutChart([{label:'Success',value:success,color:'#10b981'},{label:'Warning',value:warn,color:'#eab308'},{label:'Error',value:err,color:'#e11d48'},{label:'Pending',value:pending,color:'#f59e0b'}],{centerTop:f0(claims.length),centerSub:'CLAIMS'})
+  document.getElementById('CH_gap').innerHTML=groupBarChart(series.map(s=>({label:fmMs(s.month),a:s.invoiced,b:s.accepted,aLabel:'Invoiced',bLabel:'Credited'})))
+  const byMake={};claims.forEach(c=>{const k=c.make||'—';byMake[k]=(byMake[k]||0)+c.accepted})
+  const makeRows=Object.entries(byMake).map(([k,v])=>({label:k,value:v})).sort((a,b)=>b.value-a.value).slice(0,8)
+  document.getElementById('CH_make').innerHTML=hbars(makeRows,{money:true})
+  // monthly table
+  let h=`<div class="tw"><table class="t"><thead><tr><th>Month</th><th class="num">Claims</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th class="num">Cred %</th><th class="num">Gap €</th><th class="num">✅</th><th class="num">⚠️</th><th class="num">❌</th><th class="num">⏳</th></tr></thead><tbody>`
+  ;[...series].reverse().forEach(m=>{const cr=pct(m.accepted,m.invoiced);h+=`<tr><td style="font-weight:700">${fmM(m.month)}</td><td class="num">${m.cnt}</td><td class="num">${f0(m.invoiced)}</td><td class="num" style="font-weight:700">${f0(m.accepted)}</td><td class="num"><span style="font-weight:700;color:${cr>=85?'var(--mint-d)':cr>=65?'var(--lemon-d)':'var(--rose-d)'}">${cr.toFixed(0)}%</span></td><td class="num" style="color:var(--rose-d)">${f0(m.invoiced-m.accepted)}</td><td class="num" style="color:var(--mint-d)">${m.success}</td><td class="num" style="color:var(--lemon-d)">${m.warn}</td><td class="num" style="color:var(--rose-d)">${m.err}</td><td class="num" style="color:var(--sun)">${m.pending}</td></tr>`})
+  const t=series.reduce((a,m)=>({cnt:a.cnt+m.cnt,invoiced:a.invoiced+m.invoiced,accepted:a.accepted+m.accepted,success:a.success+m.success,warn:a.warn+m.warn,err:a.err+m.err,pending:a.pending+m.pending}),{cnt:0,invoiced:0,accepted:0,success:0,warn:0,err:0,pending:0})
+  h+=`</tbody><tfoot><tr><td>TOTAL</td><td class="num">${t.cnt}</td><td class="num">${f0(t.invoiced)}</td><td class="num">${f0(t.accepted)}</td><td class="num">${pct(t.accepted,t.invoiced).toFixed(0)}%</td><td class="num">${f0(t.invoiced-t.accepted)}</td><td class="num">${t.success}</td><td class="num">${t.warn}</td><td class="num">${t.err}</td><td class="num">${t.pending}</td></tr></tfoot></table></div>`
+  document.getElementById('T_monthly').innerHTML=series.length?h:'<div class="chart-empty">No data yet — upload your three files in the Upload Center.</div>'
+}
 
-  let rows = claims.filter(c => {
-    if (brandF && c.brand !== brandF) return false
-    if (statusF && c.status_overall !== statusF) return false
-    if (monthF && c.month !== monthF) return false
-    if (q && ![c.claim_no, c.dealer_claim, c.cn_no, c.vin].join('|').toLowerCase().includes(q)) return false
-    return true
-  })
-  rows = applySort(rows, 'cl', [
-    c=>c.cn_date, c=>c.cn_no, c=>c.claim_no, c=>c.dealer_claim, c=>c.brand,
-    c=>c.vin, c=>c.items_count, c=>c.labor, c=>c.parts, c=>c.ext, c=>c.total_accepted, c=>c.status_overall
-  ])
+function rPipe(){
+  const all=scopedClaims()
+  const sf=document.getElementById('pp_status').value,mk=document.getElementById('pp_make').value,mo=document.getElementById('pp_month').value,q=document.getElementById('pp_search').value.toLowerCase().trim()
+  let rows=all.filter(c=>{if(sf&&c.status_overall!==sf)return false;if(mk&&c.make!==mk)return false;if(mo&&c.month!==mo)return false;if(q&&![c.no,c.doc_no,c.vin,c.sub.last_submission,c.cn_no].join('|').toLowerCase().includes(q))return false;return true})
+  rows=applySort(rows,'pp',[c=>c.document_date,c=>c.kind,c=>c.no,c=>c.doc_no,c=>c.make,c=>c.vin,c=>c.invoiced,c=>c.accepted,c=>c.gap,c=>c.accept_ratio,c=>c.status_overall])
+  window._ppRows=rows
+  const invoiced=rows.reduce((s,c)=>s+c.invoiced,0),accepted=rows.reduce((s,c)=>s+c.accepted,0),pending=rows.filter(c=>!c.answered).length
+  document.getElementById('K_pipe').innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">🔗 Claims</div><div class="kv bmw">${f0(rows.length)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced €</div><div class="kv slate">${f0(invoiced)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">Δ Gap €</div><div class="kv rose">${f0(invoiced-accepted)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending</div><div class="kv sun">${f0(pending)}</div></div>`
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
+    ${th('Sub Date','pp',0)}${th('Kind','pp',1)}${th('Submission','pp',2)}${th('Invoice (GAR)','pp',3)}${th('Make','pp',4)}${th('VIN','pp',5)}
+    ${th('Invoiced €','pp',6,{num:1})}${th('Credited €','pp',7,{num:1})}${th('Gap €','pp',8,{num:1})}${th('Cred %','pp',9,{num:1})}${th('Outcome','pp',10)}<th>Action</th></tr></thead><tbody>`
+  rows.slice(0,700).forEach(c=>{const tr=S.resub[c.kind+':'+c.no]
+    h+=`<tr class="tr-clickable" onclick="if(!event.target.closest('button,.vin-cell'))openClaim('${esc(c.kind)}','${esc(c.no)}')">
+      <td style="font-size:10px;color:var(--muted)">${esc(c.document_date||'')}</td><td>${kindBadge(c.kind)}</td><td class="mono">${esc(c.no)}<div style="font-size:9px;color:var(--faint)">sub ${esc(c.sub.last_submission||'')}</div></td>
+      <td class="mono">${esc(c.doc_no||'—')}</td><td><span class="badge b-n">${esc(c.make||'—')}</span></td>
+      <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
+      <td class="num">${f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
+      <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c.answered?f(c.gap):'—'}</td>
+      <td class="num">${c.answered&&c.invoiced?`<span style="font-weight:700;color:${c.accept_ratio>=85?'var(--mint-d)':c.accept_ratio>=65?'var(--lemon-d)':'var(--rose-d)'}">${c.accept_ratio.toFixed(0)}%</span>`:'—'}</td>
+      <td>${sBadge(c.status_overall)}${tr?` <span class="badge b-sky">${tr.status}</span>`:''}</td>
+      <td>${(c.status_overall==='Error'||c.status_overall==='Warning')?`<button class="btn btn-sm ${tr?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr?'✏️':'+ Track'}</button>`:'<span style="color:var(--faint)">—</span>'}</td></tr>`})
+  if(rows.length>700)h+=`<tr><td colspan="12" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
+  h+=`</tbody></table></div></div>`
+  document.getElementById('T_pipe').innerHTML=h
+}
 
-  const totalAcc = rows.reduce((s,c)=>s+c.total_accepted, 0)
-  const errCount = rows.filter(c=>c.status_overall==='Error').length
-  const warnCount = rows.filter(c=>c.status_overall==='Warning').length
-  const successCount = rows.filter(c=>c.status_overall==='Success').length
-
-  document.getElementById('K_claims').innerHTML = `
-    <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📋 Claims</div><div class="kv bmw">${rows.length.toLocaleString()}</div><div class="ks">${new Set(rows.map(c=>c.vin)).size} unique VINs</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Total Accepted (€)</div><div class="kv mint">${f(totalAcc)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">✅ Success</div><div class="kv mint">${successCount}</div><div class="ks">${rows.length?((successCount/rows.length)*100).toFixed(1)+'%':''}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warnCount}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${errCount}</div></div>`
-
-  let h = `<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t">
-    <thead><tr>
-      ${th('CN Date','cl',0)}${th('Credit Note','cl',1)}${th('Claim #','cl',2)}${th('Dealer #','cl',3)}${th('Brand','cl',4)}
-      ${th('VIN','cl',5)}${th('Items','cl',6,{num:1})}
-      ${th('Labor (€)','cl',7,{num:1})}${th('Parts (€)','cl',8,{num:1})}${th('Ext (€)','cl',9,{num:1})}${th('Total Accepted','cl',10,{num:1})}
-      ${th('Status','cl',11)}<th>Action</th>
-    </tr></thead><tbody>`
-  rows.slice(0, 600).forEach(c => {
-    const isErr = c.status_overall === 'Error'
-    const isWarn = c.status_overall === 'Warning'
-    const tr = S.resub[c.claim_no]
-    h += `<tr class="tr-clickable" onclick="if(!event.target.closest('button,.vin-cell'))openClaimDetail('${esc(c.claim_no)}')">
-      <td style="font-size:10px;color:var(--muted)">${esc(c.cn_date||'')}</td>
-      <td class="mono" style="font-weight:600">${esc(c.cn_no)}</td>
-      <td class="mono">${esc(c.claim_no)}</td>
-      <td class="mono">${esc(c.dealer_claim)}</td>
-      <td><span class="badge b-bmw">${esc(c.brand)}</span></td>
-      <td class="mono vin-cell" onclick="event.stopPropagation();openVinHistory('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
-      <td class="num">${c.items_count}</td>
-      <td class="num">${f(c.labor)}</td>
-      <td class="num">${f(c.parts)}</td>
-      <td class="num" style="${c.ext>0.01?'color:var(--sky);font-weight:600':'color:var(--faint)'}">${c.ext>0.01?f(c.ext):'—'}</td>
-      <td class="num" style="font-weight:700">${f(c.total_accepted)}</td>
-      <td>${isErr?'<span class="badge b-rose">❌ Error</span>':isWarn?'<span class="badge b-lem">⚠️ Warning</span>':'<span class="badge b-mint">✅ Success</span>'}${tr?` <span class="badge b-sky">${tr.status}</span>`:''}</td>
-      <td>${(isErr||isWarn)?`<button class="btn btn-sm ${tr?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrackModal('${esc(c.claim_no)}')">${tr?'✏️':'+ Track'}</button>`:'<span style="color:var(--faint)">—</span>'}</td>
-    </tr>`
-  })
-  if (rows.length > 600) h += `<tr><td colspan="13" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-600} more — narrow with filters 🔍</td></tr>`
-  h += `</tbody></table></div></div>`
-  document.getElementById('T_claims').innerHTML = h
+function rCredits(){
+  const {claims,orphans}=reconcile()
+  // build per-credit-note-line grouped by credit note number for detail; but show claim-level list
+  const list=[...claims.filter(c=>c.answered&&inScope(c)),...orphans.filter(inScope)]
+  const sf=document.getElementById('cr_status').value,bf=document.getElementById('cr_brand').value,lf=document.getElementById('cr_link').value,q=document.getElementById('cr_search').value.toLowerCase().trim()
+  let rows=list.filter(c=>{if(sf&&c.status_overall!==sf)return false;if(bf&&(c.credits[0]?.brand||'')!==bf)return false
+    if(lf==='linked'&&c.orphan)return false;if(lf==='orphan'&&!c.orphan)return false
+    if(q&&![c.cn_no,c.vin,c.dealer_claim_number||c.sub?.last_submission||'',c.no||''].join('|').toLowerCase().includes(q))return false;return true})
+  rows.sort((a,b)=>(b.cn_date||'').localeCompare(a.cn_date||''))
+  const accepted=rows.reduce((s,c)=>s+c.accepted,0),err=rows.filter(c=>c.status_overall==='Error').length,warn=rows.filter(c=>c.status_overall==='Warning').length
+  document.getElementById('K_cr').innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📑 Credit Notes</div><div class="kv bmw">${f0(new Set(S.cred.filter(c=>S.scope==='all'||c.credit_type===S.scope).map(c=>c.credit_note_number)).size)}</div><div class="ks">${f0(rows.length)} answered claims</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🔗 No Submission</div><div class="kv slate">${f0(orphans.filter(inScope).length)}</div><div class="ks">credits w/o 2026 submission</div></div>`
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>CN Date</th><th>Credit Note</th><th>Kind</th><th>Dealer Claim</th><th>Brand</th><th>VIN</th><th class="num">Lines</th><th class="num">Credited €</th><th>Status</th><th>Link</th></tr></thead><tbody>`
+  rows.slice(0,700).forEach(c=>{h+=`<tr class="tr-clickable" onclick="${c.orphan?`openVin('${esc(c.vin)}')`:`openClaim('${esc(c.kind)}','${esc(c.no)}')`}">
+    <td style="font-size:10px;color:var(--muted)">${esc(c.cn_date||'')}</td><td class="mono" style="font-weight:600">${esc(c.cn_no||'')}</td><td>${kindBadge(c.kind)}</td>
+    <td class="mono">${esc(c.dealer_claim_number||c.sub?.last_submission||'—')}</td><td><span class="badge b-n">${esc(c.credits[0]?.brand||'—')}</span></td>
+    <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td><td class="num">${c.items_count}</td>
+    <td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}</td>
+    <td>${c.orphan?'<span class="badge b-sun">no submission</span>':'<span class="badge b-mint">linked</span>'}</td></tr>`})
+  if(rows.length>700)h+=`<tr><td colspan="10" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
+  h+=`</tbody></table></div></div>`
+  document.getElementById('T_cr').innerHTML=h
 }
 
 function rRej(){
-  const claims = buildClaims().filter(c => c.status_overall !== 'Success')
-  const f1 = document.getElementById('rj_status').value
-  let rows = claims.filter(c => {
-    if (f1 === 'Error' && c.status_overall !== 'Error') return false
-    if (f1 === 'Warning' && c.status_overall !== 'Warning') return false
-    if (f1 === 'tracked' && !S.resub[c.claim_no]) return false
-    if (f1 === 'untracked' && S.resub[c.claim_no]) return false
-    return true
-  })
-  rows = applySort(rows, 'rj', [
-    c=>c.cn_date, c=>c.claim_no, c=>c.dealer_claim, c=>c.brand, c=>c.vin,
-    c=>c.total_accepted, c=>c.status_overall, c=>(S.resub[c.claim_no]||{}).status,
-    c=>(S.resub[c.claim_no]||{}).new_claim, c=>(S.resub[c.claim_no]||{}).credited_amt
-  ])
-  const errCount = rows.filter(c=>c.status_overall==='Error').length
-  const warnCount = rows.filter(c=>c.status_overall==='Warning').length
-  const tracked = rows.filter(c=>S.resub[c.claim_no]).length
-  const totalAtRisk = rows.reduce((s,c)=>s+c.total_accepted, 0)
-  const totalCredited = rows.reduce((s,c)=>s+(S.resub[c.claim_no]?.credited_amt||0), 0)
-
-  document.getElementById('K_rej').innerHTML = `
-    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${errCount}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warnCount}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💰 Amount at Risk (€)</div><div class="kv sun">${f(totalAtRisk)}</div></div>
+  const claims=scopedClaims().filter(c=>c.status_overall==='Error'||c.status_overall==='Warning')
+  const sf=document.getElementById('rj_status').value,mk=document.getElementById('rj_make').value,q=document.getElementById('rj_search').value.toLowerCase().trim()
+  let rows=claims.filter(c=>{const tr=S.resub[c.kind+':'+c.no]
+    if(sf==='Error'&&c.status_overall!=='Error')return false;if(sf==='Warning'&&c.status_overall!=='Warning')return false
+    if(sf==='tracked'&&!tr)return false;if(sf==='untracked'&&tr)return false;if(mk&&c.make!==mk)return false
+    if(q&&![c.no,c.doc_no,c.vin,c.cn_no].join('|').toLowerCase().includes(q))return false;return true})
+  rows=applySort(rows,'rj',[c=>c.cn_date,c=>c.no,c=>c.make,c=>c.vin,c=>c.accepted,c=>c.gap,c=>c.status_overall])
+  const err=rows.filter(c=>c.status_overall==='Error').length,warn=rows.filter(c=>c.status_overall==='Warning').length
+  const tracked=rows.filter(c=>S.resub[c.kind+':'+c.no]).length
+  const atRisk=rows.reduce((s,c)=>s+c.gap,0),credited=rows.reduce((s,c)=>s+(S.resub[c.kind+':'+c.no]?.credited_amt||0),0)
+  document.getElementById('K_rej').innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💰 Gap at Risk €</div><div class="kv sun">${f0(atRisk)}</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kl">✅ Tracked</div><div class="kv" style="color:var(--blue)">${tracked}</div><div class="ks">of ${rows.length}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💚 Credited (€)</div><div class="kv mint">${f(totalCredited)}</div></div>`
-
-  let h = `<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t">
-    <thead><tr>
-      ${th('CN Date','rj',0)}${th('Claim #','rj',1)}${th('Dealer #','rj',2)}${th('Brand','rj',3)}${th('VIN','rj',4)}
-      ${th('Accepted (€)','rj',5,{num:1})}${th('Issue','rj',6)}
-      ${th('Track Status','rj',7)}${th('New Claim','rj',8)}${th('Credited (€)','rj',9,{num:1})}
-      <th>Action</th>
-    </tr></thead><tbody>`
-  rows.forEach(c => {
-    const tr = S.resub[c.claim_no] || {}
-    h += `<tr class="tr-clickable" onclick="if(!event.target.closest('button,.vin-cell'))openClaimDetail('${esc(c.claim_no)}')">
-      <td style="font-size:10px;color:var(--muted)">${esc(c.cn_date||'')}</td>
-      <td class="mono">${esc(c.claim_no)}</td>
-      <td class="mono">${esc(c.dealer_claim)}</td>
-      <td><span class="badge b-bmw">${esc(c.brand)}</span></td>
-      <td class="mono vin-cell" onclick="event.stopPropagation();openVinHistory('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
-      <td class="num" style="font-weight:700">${f(c.total_accepted)}</td>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💚 Recovered €</div><div class="kv mint">${f0(credited)}</div></div>`
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
+    ${th('CN Date','rj',0)}${th('Submission','rj',1)}${th('Make','rj',2)}${th('VIN','rj',3)}${th('Credited €','rj',4,{num:1})}${th('Gap €','rj',5,{num:1})}${th('Issue','rj',6)}<th>Track</th><th>Recovered €</th><th>Action</th></tr></thead><tbody>`
+  rows.forEach(c=>{const tr=S.resub[c.kind+':'+c.no]||{}
+    h+=`<tr class="tr-clickable" onclick="if(!event.target.closest('button,.vin-cell'))openClaim('${esc(c.kind)}','${esc(c.no)}')">
+      <td style="font-size:10px;color:var(--muted)">${esc(c.cn_date||'')}</td><td class="mono">${esc(c.no)}</td><td><span class="badge b-n">${esc(c.make||'—')}</span></td>
+      <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
+      <td class="num" style="font-weight:700">${f(c.accepted)}</td><td class="num" style="color:var(--rose-d);font-weight:600">${f(c.gap)}</td>
       <td>${c.status_overall==='Error'?'<span class="badge b-rose">❌ Error</span>':'<span class="badge b-lem">⚠️ Warning</span>'} <span class="badge b-n">${c.statuses.Error}E ${c.statuses.Warning}W</span></td>
       <td>${tr.status?`<span class="badge ${tr.status==='credited'?'b-mint':tr.status==='resubmitted'?'b-sky':'b-n'}">${tr.status}</span>`:'<span style="color:var(--faint)">untracked</span>'}</td>
-      <td class="mono">${tr.new_claim?`<span class="badge b-mint">${tr.new_claim}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
       <td class="num">${tr.credited_amt?'€'+f(tr.credited_amt):'<span style="color:var(--faint)">—</span>'}</td>
-      <td><button class="btn btn-sm ${tr.status?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrackModal('${esc(c.claim_no)}')">${tr.status?'✏️ Edit':'+ Track'}</button></td>
-    </tr>`
-  })
-  h += `</tbody></table></div></div>`
-  document.getElementById('T_rej').innerHTML = h
+      <td><button class="btn btn-sm ${tr.status?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr.status?'✏️ Edit':'+ Track'}</button></td></tr>`})
+  if(!rows.length)h+=`<tr><td colspan="10" style="padding:32px;text-align:center;color:var(--faint)">No rejections match these filters. 🎉</td></tr>`
+  h+=`</tbody></table></div></div>`
+  document.getElementById('T_rej').innerHTML=h
 }
 
-function rOv(){
-  const claims = buildClaims()
-  const totalAcc = claims.reduce((s,c)=>s+c.total_accepted, 0)
-  const errCount = claims.filter(c=>c.status_overall==='Error').length
-  const warnCount = claims.filter(c=>c.status_overall==='Warning').length
-  const successCount = claims.filter(c=>c.status_overall==='Success').length
-  const totalLab = claims.reduce((s,c)=>s+c.labor, 0)
-  const totalParts = claims.reduce((s,c)=>s+c.parts, 0)
-  const totalExt = claims.reduce((s,c)=>s+c.ext, 0)
-  document.getElementById('K_ov').innerHTML = `
-    <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📋 Total Claims</div><div class="kv bmw">${claims.length.toLocaleString()}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Total Accepted (€)</div><div class="kv mint">${f(totalAcc)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">✅ Success Rate</div><div class="kv mint">${claims.length?((successCount/claims.length)*100).toFixed(1):'0'}%</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Error Rate</div><div class="kv rose">${claims.length?((errCount/claims.length)*100).toFixed(1):'0'}%</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">🚗 Unique VINs</div><div class="kv pur">${new Set(claims.map(c=>c.vin)).size.toLocaleString()}</div></div>`
-  // Monthly breakdown table
-  const byM = {}
-  claims.forEach(c => {
-    if (!c.month) return
-    if (!byM[c.month]) byM[c.month] = {month:c.month, cnt:0, total:0, lab:0, parts:0, ext:0, err:0, warn:0, success:0}
-    const b = byM[c.month]
-    b.cnt++
-    b.total += c.total_accepted; b.lab += c.labor; b.parts += c.parts; b.ext += c.ext
-    if (c.status_overall === 'Error') b.err++
-    else if (c.status_overall === 'Warning') b.warn++
-    else b.success++
-  })
-  const months = Object.values(byM).sort((a,b)=>a.month.localeCompare(b.month))
-  let h = `<div class="card"><div class="ct">📅 Monthly subtotals</div><div class="tw"><table class="t">
-    <thead><tr><th>Month</th><th class="num">Claims</th><th class="num">Total (€)</th><th class="num">Labor</th><th class="num">Parts</th><th class="num">External</th><th class="num">Success</th><th class="num">Warn</th><th class="num">Error</th></tr></thead><tbody>`
-  months.forEach(m => {
-    h += `<tr><td style="font-weight:600">${fmM(m.month)}</td><td class="num">${m.cnt}</td><td class="num" style="font-weight:700">${f(m.total)}</td><td class="num">${f(m.lab)}</td><td class="num">${f(m.parts)}</td><td class="num">${f(m.ext)}</td><td class="num" style="color:var(--mint)">${m.success}</td><td class="num" style="color:#a16207">${m.warn}</td><td class="num" style="color:var(--rose)">${m.err}</td></tr>`
-  })
-  h += `</tbody></table></div></div>`
-  document.getElementById('T_ov').innerHTML = h
-}
+function rInsights(){
+  document.querySelectorAll('#insSeg button').forEach(b=>b.classList.toggle('on',b.dataset.ins===S.insTab))
+  const claims=scopedClaims(),body=document.getElementById('INS_body')
+  if(!S.subs.length&&!S.cred.length){body.innerHTML='<div class="card"><div class="chart-empty">No data yet — upload your files to unlock insights.</div></div>';return}
 
-function rTrends(){
-  const claims = buildClaims()
-  const byM = {}
-  claims.forEach(c => {
-    if (!c.month) return
-    if (!byM[c.month]) byM[c.month] = {month:c.month, total:0, claims:0}
-    byM[c.month].total += c.total_accepted
-    byM[c.month].claims++
-  })
-  const months = Object.values(byM).sort((a,b)=>a.month.localeCompare(b.month))
-  if (months.length === 0){
-    document.getElementById('T_trends').innerHTML = '<div class="card vin-empty" style="padding:38px">No data yet — upload a Credit Notes file first.</div>'
-    return
+  if(S.insTab==='pending'){
+    const pend=claims.filter(c=>!c.answered)
+    const today=new Date()
+    pend.forEach(c=>c._age=c.document_date?days(c.document_date,today.toISOString().slice(0,10)):null)
+    pend.sort((a,b)=>(b._age||0)-(a._age||0))
+    const overdue=pend.filter(c=>c._age!=null&&c._age>60).length
+    const pendVal=pend.reduce((s,c)=>s+c.invoiced,0)
+    let tbl=`<div class="tw"><table class="t"><thead><tr><th>Kind</th><th>Submission</th><th>Invoice</th><th>Make</th><th>VIN</th><th>Sub Date</th><th>Status</th><th class="num">Invoiced €</th><th class="num">Days Waiting</th></tr></thead><tbody>`
+    pend.slice(0,200).forEach(c=>{tbl+=`<tr class="tr-clickable" onclick="openClaim('${esc(c.kind)}','${esc(c.no)}')"><td>${kindBadge(c.kind)}</td><td class="mono">${esc(c.no)}</td><td class="mono">${esc(c.doc_no||'—')}</td><td><span class="badge b-n">${esc(c.make||'—')}</span></td><td class="mono">${esc(c.vin||'—')}</td><td>${esc(c.document_date||'—')}</td><td><span class="badge b-n">${esc(c.sub_status||'—')}</span></td><td class="num" style="font-weight:700">${f(c.invoiced)}</td><td class="num" style="font-weight:700;color:${c._age>60?'var(--rose-d)':c._age>30?'var(--lemon-d)':'var(--muted)'}">${c._age!=null?c._age:'—'}</td></tr>`})
+    if(!pend.length)tbl+=`<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--faint)">No pending claims — BMW has answered everything. 🎉</td></tr>`
+    tbl+=`</tbody></table></div>`
+    body.innerHTML=`<div class="kpis">
+      <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending Answer</div><div class="kv sun">${f0(pend.length)}</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">🐌 Overdue (>60d)</div><div class="kv rose">${f0(overdue)}</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">💰 Invoiced & Waiting €</div><div class="kv slate">${f0(pendVal)}</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📨 Answer Rate</div><div class="kv bmw">${pct(claims.length-pend.length,claims.length).toFixed(1)}%</div></div></div>
+      <div class="card"><div class="card-h"><div><div class="ct">⏳ Submitted, Awaiting BMW Credit Note</div><div class="ct-sub">Sorted by days waiting — chase the oldest</div></div></div>${tbl}</div>`
   }
-  const max = Math.max(...months.map(m=>m.total))
-  let h = `<div class="card"><div class="ct">📈 Monthly accepted amount trend</div>
-    <div style="display:flex;align-items:flex-end;gap:8px;height:240px;padding:14px 0">`
-  months.forEach(m => {
-    const ht = max>0 ? (m.total/max*100) : 0
-    h += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
-      <div style="font-size:9px;font-weight:700;color:var(--bmw)">€${f(m.total)}</div>
-      <div style="background:linear-gradient(180deg,var(--bmw),#0F4FA8);width:100%;height:${ht}%;border-radius:8px 8px 0 0;min-height:3px" title="${m.claims} claims"></div>
-      <div style="font-size:9px;color:var(--muted);font-weight:600;writing-mode:vertical-rl;transform:rotate(180deg);margin-top:4px">${fmM(m.month)}</div>
-    </div>`
-  })
-  h += `</div></div>`
-  document.getElementById('T_trends').innerHTML = h
-}
-
-function rRec(){
-  const tracked = Object.values(S.resub)
-  const credited = tracked.filter(t => t.credited_amt != null)
-  const totalCredited = credited.reduce((s,t) => s+(t.credited_amt||0), 0)
-  const totalAtRisk = tracked.reduce((s,t) => s+(t.orig_amount||0), 0)
-  const recoveryRate = totalAtRisk>0 ? (totalCredited/totalAtRisk*100) : 0
-  const avgRecov = credited.length ? credited.reduce((s,t)=>s+(t.recovery_rate||0),0)/credited.length : 0
-  document.getElementById('K_rec').innerHTML = `
-    <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kl">📋 Tracked</div><div class="kv" style="color:var(--blue)">${tracked.length}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💚 Credited Back (€)</div><div class="kv mint">${f(totalCredited)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💰 At Risk (€)</div><div class="kv sun">${f(totalAtRisk)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">📊 Recovery Rate</div><div class="kv pur">${recoveryRate.toFixed(1)}%</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">📈 Avg per claim</div><div class="kv mint">${avgRecov.toFixed(1)}%</div></div>`
-  let h = `<div class="card"><div class="ct">🔄 Resubmissions</div><div class="tw"><table class="t">
-    <thead><tr><th>Claim #</th><th>VIN</th><th>Brand</th><th class="num">Original (€)</th><th>Type</th><th>New Claim</th><th>Resub Date</th><th class="num">Credited (€)</th><th class="num">Recovery %</th><th>Status</th><th>Action</th></tr></thead><tbody>`
-  tracked.forEach(t => {
-    h += `<tr class="tr-clickable" onclick="if(!event.target.closest('button'))openClaimDetail('${esc(t.orig_claim)}')">
-      <td class="mono">${esc(t.orig_claim)}</td>
-      <td class="mono">${esc(t.orig_vin||'—')}</td>
-      <td><span class="badge b-bmw">${esc(t.orig_brand||'—')}</span></td>
-      <td class="num" style="font-weight:700">${f(t.orig_amount||0)}</td>
-      <td>${t.rej_type==='full'?'<span class="badge b-rose">Full</span>':'<span class="badge b-lem">Partial</span>'}</td>
-      <td class="mono">${t.new_claim?`<span class="badge b-mint">${esc(t.new_claim)}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
-      <td>${t.resub_date||'<span style="color:var(--faint)">—</span>'}</td>
-      <td class="num" style="color:var(--mint);font-weight:600">${t.credited_amt?'€'+f(t.credited_amt):'<span style="color:var(--faint)">—</span>'}</td>
-      <td class="num">${t.recovery_rate!=null?t.recovery_rate.toFixed(1)+'%':'<span style="color:var(--faint)">—</span>'}</td>
-      <td><span class="badge ${t.status==='credited'?'b-mint':t.status==='resubmitted'?'b-sky':'b-n'}">${t.status||'pending'}</span></td>
-      <td><button class="btn btn-sm" onclick="event.stopPropagation();openTrackModal('${esc(t.orig_claim)}')">✏️ Edit</button></td>
-    </tr>`
-  })
-  if (tracked.length === 0) h += `<tr><td colspan="11" style="padding:32px;text-align:center;color:var(--faint)">No resubmissions tracked yet. Track an Error or Warning claim to begin.</td></tr>`
-  h += `</tbody></table></div></div>`
-  document.getElementById('T_recovery').innerHTML = h
-}
-
-function rBrand(){
-  const claims = buildClaims()
-  const byB = {}
-  claims.forEach(c => {
-    if (!byB[c.brand]) byB[c.brand] = {brand:c.brand, cnt:0, total:0, err:0, warn:0, success:0}
-    const b = byB[c.brand]
-    b.cnt++; b.total += c.total_accepted
-    if (c.status_overall === 'Error') b.err++
-    else if (c.status_overall === 'Warning') b.warn++
-    else b.success++
-  })
-  const brands = Object.values(byB).sort((a,b) => b.total - a.total)
-  let h = `<div class="card"><div class="ct">🚗 Per-brand breakdown</div><div class="tw"><table class="t">
-    <thead><tr><th>Brand</th><th class="num">Claims</th><th class="num">Total Accepted (€)</th><th class="num">Avg per Claim</th><th class="num">Success</th><th class="num">Warn</th><th class="num">Error</th><th class="num">Error Rate</th></tr></thead><tbody>`
-  brands.forEach(b => {
-    h += `<tr><td><span class="badge b-bmw" style="font-size:11px">${esc(b.brand)}</span></td>
-      <td class="num" style="font-weight:600">${b.cnt}</td>
-      <td class="num" style="font-weight:700">${f(b.total)}</td>
-      <td class="num">${b.cnt?f(b.total/b.cnt):'—'}</td>
-      <td class="num" style="color:var(--mint)">${b.success}</td>
-      <td class="num" style="color:#a16207">${b.warn}</td>
-      <td class="num" style="color:var(--rose)">${b.err}</td>
-      <td class="num">${b.cnt?((b.err/b.cnt)*100).toFixed(1)+'%':'—'}</td></tr>`
-  })
-  h += `</tbody></table></div></div>`
-  document.getElementById('T_brand').innerHTML = h
+  else if(S.insTab==='gap'){
+    const series=monthly(claims),invoiced=claims.reduce((s,c)=>s+c.invoiced,0),accepted=claims.reduce((s,c)=>s+c.accepted,0),gap=invoiced-accepted
+    const worst=[...claims].filter(c=>c.answered&&c.gap>0.5).sort((a,b)=>b.gap-a.gap).slice(0,25)
+    let tbl=`<div class="tw"><table class="t"><thead><tr><th>Submission</th><th>Make</th><th>VIN</th><th>Month</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th class="num">Gap €</th><th class="num">Cred %</th><th>Status</th></tr></thead><tbody>`
+    worst.forEach(c=>{tbl+=`<tr class="tr-clickable" onclick="openClaim('${esc(c.kind)}','${esc(c.no)}')"><td class="mono">${esc(c.no)}</td><td><span class="badge b-n">${esc(c.make)}</span></td><td class="mono">${esc(c.vin||'—')}</td><td>${fmMs(c.month)}</td><td class="num">${f(c.invoiced)}</td><td class="num" style="font-weight:700">${f(c.accepted)}</td><td class="num" style="font-weight:700;color:var(--rose-d)">${f(c.gap)}</td><td class="num">${c.accept_ratio.toFixed(0)}%</td><td>${sBadge(c.status_overall)}</td></tr>`})
+    if(!worst.length)tbl+=`<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--faint)">No gaps — everything invoiced was credited. 🎉</td></tr>`
+    tbl+=`</tbody></table></div>`
+    body.innerHTML=`<div class="kpis">
+      <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced €</div><div class="kv slate">${f0(invoiced)}</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">💸 Not Credited €</div><div class="kv rose">${f0(gap)}</div><div class="ks">${pct(gap,invoiced).toFixed(1)}% of invoiced</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">🎯 Credited Rate</div><div class="kv bmw">${pct(accepted,invoiced).toFixed(1)}%</div></div></div>
+      <div class="card"><div class="card-h"><div><div class="ct">💶 Invoiced vs Credited by Month</div></div></div>${groupBarChart(series.map(s=>({label:fmMs(s.month),a:s.invoiced,b:s.accepted,aLabel:'Invoiced',bLabel:'Credited'})))}</div>
+      <div class="card"><div class="card-h"><div><div class="ct">🔻 Biggest Gaps</div><div class="ct-sub">Top 25 answered claims by uncredited value</div></div></div>${tbl}</div>`
+  }
+  else if(S.insTab==='defects'){
+    const creds=S.cred.filter(c=>S.scope==='all'||c.credit_type===S.scope)
+    const byD={};creds.forEach(r=>{const code=r.defect_code||'—';if(!byD[code])byD[code]={code,text:r.defect_text||'',cnt:0,value:0,err:0};const d=byD[code];d.cnt++;d.value+=Number(r.accepted_price_incl_hc)||0;if(r.crediting_item_status==='Error')d.err++;if(!d.text&&r.defect_text)d.text=r.defect_text})
+    const defects=Object.values(byD).sort((a,b)=>b.value-a.value),top=defects.slice(0,10)
+    top.forEach((d,i)=>d.color=PALETTE[i%PALETTE.length])
+    let tbl=`<div class="tw"><table class="t"><thead><tr><th>Defect Code</th><th>Description</th><th class="num">Lines</th><th class="num">Credited €</th><th class="num">Item Errors</th></tr></thead><tbody>`
+    defects.slice(0,40).forEach(d=>{tbl+=`<tr><td class="mono" style="font-weight:700">${esc(d.code)}</td><td style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.text)}">${esc(d.text||'—')}</td><td class="num">${d.cnt}</td><td class="num" style="font-weight:700">${f(d.value)}</td><td class="num" style="color:${d.err?'var(--rose-d)':'var(--faint)'}">${d.err||'—'}</td></tr>`})
+    tbl+=`</tbody></table></div>`
+    body.innerHTML=`<div class="grid-2"><div class="card"><div class="card-h"><div><div class="ct">🔧 Top Defect Codes by Credited €</div></div></div>${hbars(top.map(d=>({label:d.code,value:d.value,color:d.color})),{money:true})}</div>
+      <div class="card"><div class="card-h"><div><div class="ct">📊 Summary</div></div></div><div class="vin-summary" style="margin:0">
+        <div class="vin-stat"><div class="vin-stat-l">Distinct Defects</div><div class="vin-stat-v" style="color:var(--bmw)">${defects.length}</div></div>
+        <div class="vin-stat"><div class="vin-stat-l">Top Share</div><div class="vin-stat-v" style="color:var(--pur)">${defects.length?pct(defects[0].value,defects.reduce((s,d)=>s+d.value,0)).toFixed(0):0}%</div></div></div></div></div>
+      <div class="card"><div class="card-h"><div><div class="ct">🔧 All Defects</div><div class="ct-sub">Top 40 by credited value</div></div></div>${tbl}</div>`
+  }
+  else if(S.insTab==='dealers'){
+    const byC={};claims.forEach(c=>{const k=c.inv?.sell_to_customer_name||c.inv?.bill_to_name||c.sub?.sell_to_customer_no||'—';if(!byC[k])byC[k]={name:k,cnt:0,invoiced:0,accepted:0,err:0,warn:0,vins:new Set()};const d=byC[k];d.cnt++;d.invoiced+=c.invoiced;d.accepted+=c.accepted;if(c.status_overall==='Error')d.err++;else if(c.status_overall==='Warning')d.warn++;if(c.vin)d.vins.add(c.vin)})
+    const cust=Object.values(byC).map(d=>({...d,vins:d.vins.size,errRate:pct(d.err,d.cnt)})).sort((a,b)=>b.accepted-a.accepted),top=cust.slice(0,10)
+    top.forEach((d,i)=>d.color=PALETTE[i%PALETTE.length])
+    let tbl=`<div class="tw"><table class="t"><thead><tr><th>Customer / Account</th><th class="num">Claims</th><th class="num">VINs</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th class="num">Cred %</th><th class="num">Err</th><th class="num">Warn</th></tr></thead><tbody>`
+    cust.forEach(d=>{tbl+=`<tr><td style="font-weight:700;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.name)}">${esc(d.name)}</td><td class="num">${d.cnt}</td><td class="num">${d.vins}</td><td class="num">${f(d.invoiced)}</td><td class="num" style="font-weight:700">${f(d.accepted)}</td><td class="num"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><div class="mbar"><span style="width:${Math.min(pct(d.accepted,d.invoiced),100)}%;background:${pct(d.accepted,d.invoiced)>=85?'var(--mint)':'var(--sun)'}"></span></div><b>${pct(d.accepted,d.invoiced).toFixed(0)}%</b></div></td><td class="num" style="color:var(--rose-d)">${d.err}</td><td class="num" style="color:var(--lemon-d)">${d.warn}</td></tr>`})
+    tbl+=`</tbody></table></div>`
+    body.innerHTML=`<div class="card"><div class="card-h"><div><div class="ct">🏬 Top Accounts by Credited €</div></div></div>${hbars(top.map(d=>({label:d.name.length>18?d.name.slice(0,18)+'…':d.name,value:d.accepted,color:d.color})),{money:true})}</div>
+      <div class="card"><div class="card-h"><div><div class="ct">🏬 Account Performance</div></div></div>${tbl}</div>`
+  }
+  else if(S.insTab==='timing'){
+    const withLag=claims.filter(c=>c.lag_days!=null&&c.lag_days>=0)
+    const avg=withLag.length?withLag.reduce((s,c)=>s+c.lag_days,0)/withLag.length:0
+    const sorted=[...withLag].sort((a,b)=>a.lag_days-b.lag_days),median=sorted.length?sorted[Math.floor(sorted.length/2)].lag_days:0
+    const bk=[{l:'0–30 d',min:0,max:30,c:'#10b981'},{l:'31–60 d',min:31,max:60,c:'#0EA5E9'},{l:'61–90 d',min:61,max:90,c:'#f59e0b'},{l:'91–180 d',min:91,max:180,c:'#f97316'},{l:'180+ d',min:181,max:1e9,c:'#e11d48'}]
+    bk.forEach(b=>b.n=withLag.filter(c=>c.lag_days>=b.min&&c.lag_days<=b.max).length)
+    const slow=[...withLag].sort((a,b)=>b.lag_days-a.lag_days).slice(0,25)
+    let tbl=`<div class="tw"><table class="t"><thead><tr><th>Submission</th><th>Make</th><th>VIN</th><th>Repair Date</th><th>CN Date</th><th class="num">Days</th><th class="num">Credited €</th></tr></thead><tbody>`
+    slow.forEach(c=>{tbl+=`<tr class="tr-clickable" onclick="openClaim('${esc(c.kind)}','${esc(c.no)}')"><td class="mono">${esc(c.no)}</td><td><span class="badge b-n">${esc(c.make)}</span></td><td class="mono">${esc(c.vin||'—')}</td><td>${esc(c.repair_date||'—')}</td><td>${esc(c.cn_date||'—')}</td><td class="num" style="font-weight:700;color:${c.lag_days>90?'var(--rose-d)':'var(--txt)'}">${c.lag_days}</td><td class="num" style="font-weight:700">${f(c.accepted)}</td></tr>`})
+    if(!withLag.length)tbl+=`<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--faint)">No repair/credit dates to compute timing.</td></tr>`
+    tbl+=`</tbody></table></div>`
+    body.innerHTML=`<div class="kpis">
+      <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">⏱️ Avg Days (repair→credit)</div><div class="kv bmw">${avg.toFixed(0)}</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📊 Median Days</div><div class="kv sky">${median}</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">✅ Within 60d</div><div class="kv mint">${pct(withLag.filter(c=>c.lag_days<=60).length,withLag.length).toFixed(0)}%</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">🐌 Over 90d</div><div class="kv rose">${withLag.filter(c=>c.lag_days>90).length}</div></div></div>
+      <div class="grid-2"><div class="card"><div class="card-h"><div><div class="ct">⏱️ Processing Time Distribution</div><div class="ct-sub">${withLag.length} claims with dates</div></div></div>${donutChart(bk.map(b=>({label:b.l,value:b.n,color:b.c})),{centerTop:Math.round(avg)+'d',centerSub:'AVG'})}</div>
+      <div class="card"><div class="card-h"><div><div class="ct">🐌 Slowest to Credit</div></div></div><div style="max-height:300px;overflow:auto">${tbl}</div></div></div>`
+  }
 }
 
 async function rUploadHist(){
-  const { data, error } = await sb.from('warranty_uploads')
-    .select('*').eq('file_type','bmw').order('uploaded_at', {ascending:false}).limit(50)
-  if (error){ document.getElementById('upHist').innerHTML = '⚠️ Could not load: ' + error.message; return }
-  if (!data || !data.length){ document.getElementById('upHist').innerHTML = '<div class="vin-empty">No uploads yet — drop a file above to begin.</div>'; return }
-  let h = `<div class="tw"><table class="t">
-    <thead><tr><th>Date</th><th>File</th><th>Period</th><th class="num">Rows</th><th>Uploaded by</th></tr></thead><tbody>`
-  data.forEach(u => {
-    h += `<tr><td>${new Date(u.uploaded_at).toLocaleString('en-GB')}</td>
-      <td class="mono" style="font-weight:600">${esc(u.file_name)}</td>
-      <td>${esc(u.period_label||'—')}</td>
-      <td class="num" style="font-weight:600">${u.row_count}</td>
-      <td>${esc(u.uploaded_by_name||'—')}</td></tr>`
-  })
-  h += `</tbody></table></div>`
-  document.getElementById('upHist').innerHTML = h
+  const {data,error}=await sb.from('warranty_uploads').select('*').in('file_type',['bmw_incadea','bmw_submission','bmw_credits']).order('uploaded_at',{ascending:false}).limit(60)
+  if(error){document.getElementById('upHist').innerHTML='⚠️ '+error.message;return}
+  if(!data||!data.length){document.getElementById('upHist').innerHTML='<div class="vin-empty">No uploads yet — drop files above to begin.</div>';return}
+  const lbl={bmw_incadea:'🧾 incadea',bmw_submission:'📨 Submission',bmw_credits:'📑 Credit Notes'}
+  let h=`<div class="tw"><table class="t"><thead><tr><th>Date</th><th>Type</th><th>File</th><th class="num">Rows</th><th>By</th></tr></thead><tbody>`
+  data.forEach(u=>{h+=`<tr><td>${new Date(u.uploaded_at).toLocaleString('en-GB')}</td><td>${lbl[u.file_type]||u.file_type}</td><td class="mono" style="font-weight:600">${esc(u.file_name)}</td><td class="num" style="font-weight:600">${u.row_count}</td><td>${esc(u.uploaded_by_name||'—')}</td></tr>`})
+  h+=`</tbody></table></div>`;document.getElementById('upHist').innerHTML=h
 }
 
-// Filter listeners
-;['cl_brand','cl_status','cl_month','cl_search'].forEach(id => {
-  document.getElementById(id).addEventListener('input', () => rClaims())
-  document.getElementById(id).addEventListener('change', () => rClaims())
-})
-document.getElementById('rj_status').addEventListener('change', () => rRej())
+// ── listeners
+;['pp_status','pp_make','pp_month','pp_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rPipe);e.addEventListener('change',rPipe)})
+;['cr_status','cr_brand','cr_link','cr_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rCredits);e.addEventListener('change',rCredits)})
+;['rj_status','rj_make','rj_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rRej);e.addEventListener('change',rRej)})
+document.querySelectorAll('#insSeg button').forEach(b=>b.addEventListener('click',()=>{S.insTab=b.dataset.ins;rInsights()}))
+document.getElementById('pp_export').addEventListener('click',()=>{const rows=(window._ppRows||[]).map(c=>[c.kind,c.no,c.sub.last_submission,c.doc_no,c.make,c.vin,c.document_date,c.invoiced.toFixed(2),c.answered?c.accepted.toFixed(2):'',c.gap.toFixed(2),c.status_overall,c.cn_no]);exportCSV('bmw_pipeline.csv',['Kind','Submission','SubNo','Invoice','Make','VIN','SubDate','Invoiced','Credited','Gap','Outcome','CreditNotes'],rows);showToast('⬇ Exported '+rows.length+' claims')})
 
 // ══ INIT ════════════════════════════════════════════════════════
-;(async () => {
-  await whoami()
-  setupDropzone()
-  showLoad('Loading from cloud…')
-  try {
-    S.cred = await loadCreditsFromCloud()
-    S.resub = await loadResubFromCloud()
-    console.log('[BMW init] credits:', S.cred.length, 'resubmissions:', Object.keys(S.resub).length)
-  } catch (e){
-    console.error('[BMW init] failed:', e)
-    showToast('⚠️ Cloud load failed: ' + e.message)
-  }
-  hideLoad()
-  updateBadges()
-  rUploadHist()
-  if (S.cred.length > 0){
-    showToast('☁️ Synced ' + S.cred.length.toLocaleString() + ' line items from cloud', 3000)
-  }
+;(async()=>{
+  await whoami();setupDropzone();showLoad('Loading from cloud…')
+  try{await refreshData();console.log('[BMW] inv',S.inv.length,'sub',S.subs.length,'cred',S.cred.length)}
+  catch(e){console.error(e);showToast('⚠️ Cloud load failed: '+e.message)}
+  hideLoad();updateBadges();rDash();rUploadHist()
+  const tot=S.inv.length+S.subs.length+S.cred.length
+  if(tot>0)showToast('☁️ Synced '+f0(S.inv.length)+' invoices · '+f0(S.subs.length)+' submissions · '+f0(S.cred.length)+' credit lines',3500)
+  else showToast('👋 No data yet — open Upload Center and drop your 3 files',4500)
 })()
 </script>
 </body>
