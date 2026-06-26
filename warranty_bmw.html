@@ -175,6 +175,14 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
 .card.drill:hover{border-color:var(--bmw);box-shadow:var(--shadow-lg)}
 .card.drill .ct::after{content:" ⤢";font-size:11px;color:var(--faint);font-weight:600}
 /* ── help center + chatbot ── */
+.vin-search-box{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.vin-search-box input{border:none;padding:7px 11px;font-size:11.5px;font-family:inherit;width:172px;outline:none;color:var(--txt)}
+.vin-search-box button{border:none;background:var(--bmw);color:#fff;padding:7px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.vin-search-box button:hover{background:var(--bmw-d)}
+/* universal sortable headers (skip the data-level "sortable" ones, which style themselves) */
+.t th:not(.sortable),.vin-mini th{cursor:pointer;user-select:none}
+.t th:not(.sortable)[data-sdir=asc]::after,.vin-mini th[data-sdir=asc]::after{content:" ▲";font-size:8px;color:var(--bmw)}
+.t th:not(.sortable)[data-sdir=desc]::after,.vin-mini th[data-sdir=desc]::after{content:" ▼";font-size:8px;color:var(--bmw)}
 .help-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid var(--line);background:#fff;border-radius:10px;font-size:11.5px;font-weight:700;color:var(--bmw);cursor:pointer;font-family:inherit;transition:all .15s}
 .help-btn:hover{background:rgba(28,105,212,.07);border-color:var(--bmw)}
 .help-search{width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:11px;font-size:12.5px;font-family:inherit;margin-bottom:6px}
@@ -275,7 +283,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
     <div class="si" data-page="statement"><span class="si-icon">💶</span><span>BMW Statement</span></div>
     <div class="nav-sec">Data</div>
     <div class="si" data-page="upload"><span class="si-icon">📤</span><span>Upload Center</span></div>
-    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v3.7</div>
+    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v3.9</div>
   </aside>
 
   <main class="main">
@@ -291,7 +299,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
           <button data-scope="warranty">Warranty</button>
           <button data-scope="bsi">BSI</button>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <div class="vin-search-box"><input id="vinSearch" placeholder="🔍 Search VIN history…" autocomplete="off" onkeydown="if(event.key==='Enter')vinSearch()"><button onclick="vinSearch()" title="Open VIN history">Go</button></div>
           <button class="help-btn" onclick="openHelp()" title="How are these figures calculated?">❓ Help &amp; Guide</button>
           <div class="sync-pill" id="lastSync"><span class="sync-dot"></span><span>—</span></div>
         </div>
@@ -738,27 +747,89 @@ function openVin(vin){
   const all=reconcile();const claims=all.claims.filter(c=>c.vin===vin);const orph=all.orphans.filter(o=>o.vin===vin)
   let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
   const inv=S.inv.find(i=>i.vin===vin)
+  const vinInvs=S.inv.filter(i=>String(i.vin||'').toUpperCase()===vin).sort((a,b)=>String(a.posting_date||'').localeCompare(String(b.posting_date||'')))
+  const usedDoc=new Set(claims.map(c=>c.doc_no).filter(Boolean))
+  // best-effort: link the incadea invoices that have no submission row to the orphan
+  // credit notes for this VIN, by closest amount (date-independent, as requested).
+  const pool=vinInvs.filter(i=>!usedDoc.has(i.doc_no)).slice()
+  const orphInv={}
+  ;[...orph].sort((a,b)=>b.accepted-a.accepted).forEach(o=>{if(!pool.length)return;let bi=0,bd=Infinity;pool.forEach((i,idx)=>{const d=Math.abs((Number(i.total_invoiced)||0)-o.accepted);if(d<bd){bd=d;bi=idx}});orphInv[o.sub_key]=pool[bi];pool.splice(bi,1)})
   const totAcc=claims.reduce((s,c)=>s+c.accepted,0)+orph.reduce((s,o)=>s+o.accepted,0)
-  const totInv=claims.reduce((s,c)=>s+c.invoiced,0)
+  const totInv=vinInvs.reduce((s,i)=>s+(Number(i.total_invoiced)||0),0)
+  const unlinked=vinInvs.filter(i=>!usedDoc.has(i.doc_no)).length
   bg.innerHTML=`<div class="bmw-modal"><div class="bmw-modal-h"><div class="bmw-modal-icon">🚗</div>
     <div class="bmw-modal-title" style="flex:1"><h3>${esc(inv?.model||claims[0]?.make||'BMW')}</h3><p>${esc(vin)}</p></div>
     <button class="bmw-modal-x" onclick="closeModal()">✕</button></div><div class="bmw-modal-body">
     <div class="vin-summary">
       <div class="vin-stat"><div class="vin-stat-l">📋 Claims</div><div class="vin-stat-v" style="color:var(--bmw)">${claims.length+orph.length}</div></div>
-      <div class="vin-stat"><div class="vin-stat-l">🧾 Invoiced</div><div class="vin-stat-v">€${f(totInv)}</div></div>
+      <div class="vin-stat"><div class="vin-stat-l">🧾 Invoiced (incadea)</div><div class="vin-stat-v">€${f(totInv)}</div><div class="vin-stat-l" style="margin-top:2px;text-transform:none;font-weight:600">${vinInvs.length} invoice${vinInvs.length===1?'':'s'} on file</div></div>
       <div class="vin-stat"><div class="vin-stat-l">💰 Credited</div><div class="vin-stat-v" style="color:var(--mint-d)">€${f(totAcc)}</div></div>
       <div class="vin-stat"><div class="vin-stat-l">⏳ Pending</div><div class="vin-stat-v" style="color:var(--sun)">${claims.filter(c=>!c.answered).length}</div></div>
     </div>
+    ${vinInvs.length?`<div class="vin-section"><div class="vin-section-h"><span>🧾 incadea invoices for this VIN</span><span class="ct">${vinInvs.length}</span></div>
+      <table class="vin-mini"><thead><tr><th>Invoice (GAR)</th><th>Posting Date</th><th>Model</th><th class="num">Invoiced €</th><th>Link</th></tr></thead>
+      <tbody>${vinInvs.map(i=>`<tr><td class="mono" style="font-weight:600">${esc(i.doc_no)}</td><td>${esc(i.posting_date||'—')}</td><td>${esc(i.model||'—')}</td><td class="num" style="font-weight:700">${f(i.total_invoiced)}</td><td>${usedDoc.has(i.doc_no)?'<span class="badge b-mint">linked</span>':'<span class="badge b-sun">no submission</span>'}</td></tr>`).join('')}</tbody></table>
+      ${unlinked?`<div style="font-size:10px;color:var(--faint);margin-top:6px">${unlinked} invoice${unlinked===1?'':'s'} exist in incadea but have no submission row loaded — upload the matching submission file to link them by claim number.</div>`:''}
+    </div>`:''}
     <div class="vin-section"><div class="vin-section-h"><span>📋 Claims for this VIN</span><span class="ct">${claims.length+orph.length}</span></div>
       <table class="vin-mini"><thead><tr><th>Kind</th><th>Submission</th><th>Invoice</th><th>CN Date</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th>Status</th></tr></thead>
       <tbody>${claims.map(c=>`<tr class="clickable" onclick="closeModal();openClaim('${esc(c.kind)}','${esc(c.no)}')"><td>${kindBadge(c.kind)}</td><td class="mono">${esc(c.no)}</td><td class="mono">${esc(c.doc_no||'—')}</td><td>${esc(c.cn_date||'—')}</td><td class="num">${f(c.invoiced)}</td><td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}</td></tr>`).join('')}
-      ${orph.map(o=>`<tr><td>${kindBadge(o.kind)}</td><td class="mono">${esc(o.dealer_claim_number)}*</td><td>—</td><td>${esc(o.cn_date||'—')}</td><td class="num">—</td><td class="num" style="font-weight:700">${f(o.accepted)}</td><td>${sBadge(o.status_overall)}</td></tr>`).join('')}</tbody></table>
-      ${orph.length?'<div style="font-size:10px;color:var(--faint);margin-top:6px">* credit note with no submission record in the loaded data</div>':''}
+      ${orph.map(o=>{const mi=orphInv[o.sub_key];return `<tr><td>${kindBadge(o.kind)}</td><td class="mono">${esc(o.dealer_claim_number)}*</td><td class="mono">${mi?`<span title="Inferred from incadea by VIN + amount — verify against the submission file">≈ ${esc(mi.doc_no)}</span>`:'—'}</td><td>${esc(o.cn_date||'—')}</td><td class="num">${mi?'<span style="color:var(--muted)" title="from the inferred invoice">≈ '+f(mi.total_invoiced)+'</span>':'—'}</td><td class="num" style="font-weight:700">${f(o.accepted)}</td><td>${sBadge(o.status_overall)}</td></tr>`}).join('')}</tbody></table>
+      ${orph.length?'<div style="font-size:10px;color:var(--faint);margin-top:6px">* credit note with no submission record loaded. <b>≈</b> = invoice inferred from incadea by VIN + amount (date-independent) — verify before relying on it; upload the submission file for an exact link.</div>':''}
     </div></div></div>`
   document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
   bg.addEventListener('click',e=>{if(e.target===bg)closeModal()});document.addEventListener('keydown',escClose)
 }
 window.openVin=openVin
+
+// ══ GLOBAL VIN SEARCH ═══════════════════════════════════════════
+// Look up any VIN and open its combined history (invoices + submissions
+// + credit notes) regardless of which page you are on.
+function allVins(){const s=new Set();S.inv.forEach(i=>i.vin&&s.add(i.vin));S.subs.forEach(x=>x.vin&&s.add(x.vin));S.cred.forEach(c=>c.vin&&s.add(c.vin));return[...s]}
+function vinSearch(){
+  const q=(document.getElementById('vinSearch')?.value||'').toUpperCase().trim();if(!q)return
+  const hits=allVins().filter(v=>v.includes(q)).sort()
+  if(!hits.length){showToast('No VIN matches “'+q+'”');return}
+  if(hits.length===1){openVin(hits[0]);return}
+  let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
+  bg.innerHTML=`<div class="bmw-modal" style="max-width:520px"><div class="bmw-modal-h"><div class="bmw-modal-icon">🚗</div>
+    <div class="bmw-modal-title" style="flex:1"><h3>${hits.length} VINs match “${esc(q)}”</h3><p>pick a vehicle to see its full history</p></div>
+    <button class="bmw-modal-x" onclick="closeModal()">✕</button></div><div class="bmw-modal-body">
+    <div style="display:flex;flex-direction:column;gap:6px">${hits.slice(0,60).map(v=>`<div class="vin-stat drill" style="display:flex;justify-content:space-between;align-items:center" onclick="closeModal();openVin('${esc(v)}')"><span class="mono" style="font-weight:700">${esc(v)}</span><span style="font-size:10px;color:var(--muted)">${f0(S.cred.filter(c=>c.vin===v).length)} credit lines →</span></div>`).join('')}</div>
+    ${hits.length>60?`<div style="font-size:10px;color:var(--faint);margin-top:8px">… ${hits.length-60} more — type more of the VIN to narrow.</div>`:''}
+    </div></div>`
+  document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
+  bg.addEventListener('click',e=>{if(e.target===bg)closeModal()});document.addEventListener('keydown',escClose)
+}
+window.vinSearch=vinSearch
+
+// ══ UNIVERSAL COLUMN SORT (A–Z / Z–A on every table, all pages) ══
+// Click any column header to sort the rows. Headers already wired to the
+// data-level sorter (class "sortable") are left to that logic.
+function _cellSortVal(td){const t=(td?.textContent||'').trim();if(t===''||t==='—'||t==='–')return{s:'',e:1}
+  if(/^[€$\s]*-?[\d.,]+\s*%?$/.test(t)){const n=parseFloat(t.replace(/[^0-9.\-]/g,''));if(!isNaN(n))return{n}}
+  return{s:t.toLowerCase()}}
+function sortTableDom(table,idx,th){
+  const tb=table.tBodies[0];if(!tb)return
+  const rows=[...tb.rows].filter(r=>r.cells.length>idx&&!r.querySelector('td[colspan]'))
+  if(rows.length<2)return
+  const dir=th._sd===1?-1:1;th._sd=dir
+  ;[...th.parentElement.children].forEach(h=>{if(h!==th){h.removeAttribute('data-sdir');delete h._sd}})
+  th.setAttribute('data-sdir',dir===1?'asc':'desc')
+  rows.sort((a,b)=>{const va=_cellSortVal(a.cells[idx]),vb=_cellSortVal(b.cells[idx])
+    if('n'in va&&'n'in vb)return(va.n-vb.n)*dir
+    if('e'in va&&!('e'in vb))return 1;if('e'in vb&&!('e'in va))return -1
+    const sa='s'in va?va.s:String(va.n),sb='s'in vb?vb.s:String(vb.n);return sa.localeCompare(sb,undefined,{numeric:true})*dir})
+  rows.forEach(r=>tb.appendChild(r))
+}
+document.addEventListener('click',e=>{
+  const th=e.target.closest('th');if(!th)return
+  const table=th.closest('table');if(!table)return
+  if(!table.classList.contains('t')&&!table.classList.contains('vin-mini'))return
+  if(th.classList.contains('sortable')||th.hasAttribute('onclick'))return
+  const idx=[...th.parentElement.children].indexOf(th);if(idx<0)return
+  sortTableDom(table,idx,th)
+})
 
 // ══ METRIC DRILL-DOWN ═══════════════════════════════════════════
 // Reusable: any KPI / flow value can be pressed to reveal the exact
