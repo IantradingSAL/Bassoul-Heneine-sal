@@ -283,7 +283,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
     <div class="si" data-page="statement"><span class="si-icon">💶</span><span>BMW Statement</span></div>
     <div class="nav-sec">Data</div>
     <div class="si" data-page="upload"><span class="si-icon">📤</span><span>Upload Center</span></div>
-    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v3.9</div>
+    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v4.0</div>
   </aside>
 
   <main class="main">
@@ -688,6 +688,18 @@ function reconcile(){
       status_overall:st.Error>0?'Error':st.Warning>0?'Warning':'Success',statuses:st,cn_no:[...cnNos].join(', '),
       defect_codes:[...defects],lag_days:days(repairDate,cnDate)}
   })
+  // best-effort inferred invoice for orphan credits: match the incadea invoices
+  // that have no submission row to the orphan credit notes of the same VIN, by
+  // closest amount (date-independent). Display only — does NOT change any totals.
+  const usedDoc=new Set(claims.map(c=>c.doc_no).filter(Boolean))
+  const poolByVin={}
+  S.inv.forEach(i=>{const v=String(i.vin||'').toUpperCase();if(!v||usedDoc.has(i.doc_no))return;(poolByVin[v]=poolByVin[v]||[]).push(i)})
+  const orphByVin={}
+  orphans.forEach(o=>{const v=String(o.vin||'').toUpperCase();if(!v)return;(orphByVin[v]=orphByVin[v]||[]).push(o)})
+  Object.entries(orphByVin).forEach(([v,os])=>{const pool=(poolByVin[v]||[]).slice()
+    ;[...os].sort((a,b)=>b.accepted-a.accepted).forEach(o=>{if(!pool.length)return;let bi=0,bd=Infinity
+      pool.forEach((i,idx)=>{const d=Math.abs((Number(i.total_invoiced)||0)-o.accepted);if(d<bd){bd=d;bi=idx}})
+      o.inferred_inv=pool[bi];pool.splice(bi,1)})})
   return {claims,orphans}
 }
 function inScope(x){return S.scope==='all'||x.kind===S.scope}
@@ -749,11 +761,6 @@ function openVin(vin){
   const inv=S.inv.find(i=>i.vin===vin)
   const vinInvs=S.inv.filter(i=>String(i.vin||'').toUpperCase()===vin).sort((a,b)=>String(a.posting_date||'').localeCompare(String(b.posting_date||'')))
   const usedDoc=new Set(claims.map(c=>c.doc_no).filter(Boolean))
-  // best-effort: link the incadea invoices that have no submission row to the orphan
-  // credit notes for this VIN, by closest amount (date-independent, as requested).
-  const pool=vinInvs.filter(i=>!usedDoc.has(i.doc_no)).slice()
-  const orphInv={}
-  ;[...orph].sort((a,b)=>b.accepted-a.accepted).forEach(o=>{if(!pool.length)return;let bi=0,bd=Infinity;pool.forEach((i,idx)=>{const d=Math.abs((Number(i.total_invoiced)||0)-o.accepted);if(d<bd){bd=d;bi=idx}});orphInv[o.sub_key]=pool[bi];pool.splice(bi,1)})
   const totAcc=claims.reduce((s,c)=>s+c.accepted,0)+orph.reduce((s,o)=>s+o.accepted,0)
   const totInv=vinInvs.reduce((s,i)=>s+(Number(i.total_invoiced)||0),0)
   const unlinked=vinInvs.filter(i=>!usedDoc.has(i.doc_no)).length
@@ -774,7 +781,7 @@ function openVin(vin){
     <div class="vin-section"><div class="vin-section-h"><span>📋 Claims for this VIN</span><span class="ct">${claims.length+orph.length}</span></div>
       <table class="vin-mini"><thead><tr><th>Kind</th><th>Submission</th><th>Invoice</th><th>CN Date</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th>Status</th></tr></thead>
       <tbody>${claims.map(c=>`<tr class="clickable" onclick="closeModal();openClaim('${esc(c.kind)}','${esc(c.no)}')"><td>${kindBadge(c.kind)}</td><td class="mono">${esc(c.no)}</td><td class="mono">${esc(c.doc_no||'—')}</td><td>${esc(c.cn_date||'—')}</td><td class="num">${f(c.invoiced)}</td><td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}</td></tr>`).join('')}
-      ${orph.map(o=>{const mi=orphInv[o.sub_key];return `<tr><td>${kindBadge(o.kind)}</td><td class="mono">${esc(o.dealer_claim_number)}*</td><td class="mono">${mi?`<span title="Inferred from incadea by VIN + amount — verify against the submission file">≈ ${esc(mi.doc_no)}</span>`:'—'}</td><td>${esc(o.cn_date||'—')}</td><td class="num">${mi?'<span style="color:var(--muted)" title="from the inferred invoice">≈ '+f(mi.total_invoiced)+'</span>':'—'}</td><td class="num" style="font-weight:700">${f(o.accepted)}</td><td>${sBadge(o.status_overall)}</td></tr>`}).join('')}</tbody></table>
+      ${orph.map(o=>{const mi=o.inferred_inv;return `<tr><td>${kindBadge(o.kind)}</td><td class="mono">${esc(o.dealer_claim_number)}*</td><td class="mono">${mi?`<span title="Inferred from incadea by VIN + amount — verify against the submission file">≈ ${esc(mi.doc_no)}</span>`:'—'}</td><td>${esc(o.cn_date||'—')}</td><td class="num">${mi?'<span style="color:var(--muted)" title="from the inferred invoice">≈ '+f(mi.total_invoiced)+'</span>':'—'}</td><td class="num" style="font-weight:700">${f(o.accepted)}</td><td>${sBadge(o.status_overall)}</td></tr>`}).join('')}</tbody></table>
       ${orph.length?'<div style="font-size:10px;color:var(--faint);margin-top:6px">* credit note with no submission record loaded. <b>≈</b> = invoice inferred from incadea by VIN + amount (date-independent) — verify before relying on it; upload the submission file for an exact link.</div>':''}
     </div></div></div>`
   document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
@@ -851,7 +858,7 @@ const SRC={
 const MCOLS=[
   {h:'Kind',cell:c=>kindBadge(c.kind),csv:c=>c.kind},
   {h:'Claim No.',cell:c=>`<span class="mono" style="font-weight:600">${esc(c.no||'—')}</span>`,csv:c=>c.no},
-  {h:'Invoice',cell:c=>`<span class="mono">${esc(c.doc_no||'—')}</span>`,csv:c=>c.doc_no},
+  {h:'Invoice',cell:c=>c.doc_no?`<span class="mono">${esc(c.doc_no)}</span>`:(c.inferred_inv?`<span class="mono" title="inferred from incadea by VIN + amount — verify">≈ ${esc(c.inferred_inv.doc_no)}</span>`:'<span class="mono">—</span>'),csv:c=>c.doc_no||(c.inferred_inv?'≈'+c.inferred_inv.doc_no:'')},
   {h:'Make',cell:c=>`<span class="badge b-n">${esc(c.make||'—')}</span>`,csv:c=>c.make},
   {h:'VIN',cell:c=>`<span class="mono">${esc(c.vin||'—')}</span>`,csv:c=>c.vin},
   {h:'Date',cell:c=>`<span style="color:var(--muted)">${esc(c.cn_date||c.document_date||fmM(c.month)||'—')}</span>`,csv:c=>c.cn_date||c.document_date||c.month||''},
@@ -1340,9 +1347,9 @@ function rPipe(){
   rows.slice(0,700).forEach(c=>{const tr=S.resub[c.kind+':'+c.no]
     h+=`<tr class="tr-clickable" onclick="if(!event.target.closest('button,.vin-cell'))openClaim('${esc(c.kind)}','${esc(c.no)}')">
       <td style="font-size:10px;color:var(--muted)">${esc(c.document_date||'')}</td><td>${kindBadge(c.kind)}</td><td class="mono" style="font-weight:600">${esc(c.no)}<div style="font-size:9px;font-weight:400">${c.noSubmission?'<span style="color:var(--sun)">no submission file</span>':'<span style="color:var(--faint)">'+(c.kind==='bsi'?'contract ':'rec ')+esc(c.record_no||'')+'</span>'}</div></td>
-      <td class="mono">${esc(c.doc_no||'—')}</td><td><span class="badge b-n">${esc(c.make||'—')}</span></td>
+      <td class="mono">${c.doc_no?esc(c.doc_no):(c.inferred_inv?`<span title="inferred from incadea by VIN + amount — verify">≈ ${esc(c.inferred_inv.doc_no)}</span>`:'—')}</td><td><span class="badge b-n">${esc(c.make||'—')}</span></td>
       <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
-      <td class="num">${c.noSubmission?'<span style="color:var(--faint)">—</span>':f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
+      <td class="num">${c.noSubmission?(c.inferred_inv?`<span style="color:var(--muted)" title="from the inferred invoice">≈ ${f(c.inferred_inv.total_invoiced)}</span>`:'<span style="color:var(--faint)">—</span>'):f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
       <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c.noSubmission?'<span style="color:var(--faint)">—</span>':(c.answered?f(c.gap):'—')}</td>
       <td class="num">${c.answered&&c.invoiced?`<span style="font-weight:700;color:${c.accept_ratio>=85?'var(--mint-d)':c.accept_ratio>=65?'var(--lemon-d)':'var(--rose-d)'}">${c.accept_ratio.toFixed(0)}%</span>`:'—'}</td>
       <td>${sBadge(c.status_overall)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${tr?` <span class="badge b-sky">${tr.status}</span>`:''}</td>
@@ -1369,14 +1376,16 @@ function rCredits(){
     <div class="kpi drill" onclick="openMetric('cr_warn')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
     <div class="kpi drill" onclick="openMetric('cr_err')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
     <div class="kpi drill" onclick="openMetric('cr_nosub')"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 Credited · No Submission</div><div class="kv pur">${f0(orphans.filter(inScope).length)}</div><div class="ks">submission file not loaded</div></div>`
-  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>CN Date</th><th>Credit Note</th><th>Kind</th><th>Dealer Claim</th><th>Brand</th><th>VIN</th><th class="num">Lines</th><th class="num">Credited €</th><th>Status</th><th>Link</th></tr></thead><tbody>`
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>CN Date</th><th>Credit Note</th><th>Kind</th><th>Dealer Claim</th><th>Invoice</th><th>Brand</th><th>VIN</th><th class="num">Lines</th><th class="num">Credited €</th><th>Status</th><th>Link</th></tr></thead><tbody>`
   rows.slice(0,700).forEach(c=>{h+=`<tr class="tr-clickable" onclick="${c.orphan?`openVin('${esc(c.vin)}')`:`openClaim('${esc(c.kind)}','${esc(c.no)}')`}">
     <td style="font-size:10px;color:var(--muted)">${esc(c.cn_date||'')}</td><td class="mono" style="font-weight:600">${esc(c.cn_no||'')}</td><td>${kindBadge(c.kind)}</td>
-    <td class="mono">${esc(c.dealer_claim_number||c.sub?.last_submission||'—')}</td><td><span class="badge b-n">${esc(c.credits[0]?.brand||'—')}</span></td>
+    <td class="mono">${esc(c.dealer_claim_number||c.sub?.last_submission||'—')}</td>
+    <td class="mono">${c.doc_no?esc(c.doc_no):(c.inferred_inv?`<span title="inferred from incadea by VIN + amount — verify">≈ ${esc(c.inferred_inv.doc_no)}</span>`:'—')}</td>
+    <td><span class="badge b-n">${esc(c.credits[0]?.brand||'—')}</span></td>
     <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td><td class="num">${c.items_count}</td>
     <td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}</td>
     <td>${c.orphan?'<span class="badge b-pur" title="BMW credited this, but no matching submission row is loaded">credited · no sub</span>':'<span class="badge b-mint">linked</span>'}</td></tr>`})
-  if(rows.length>700)h+=`<tr><td colspan="10" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
+  if(rows.length>700)h+=`<tr><td colspan="11" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
   document.getElementById('T_cr').innerHTML=h
 }
