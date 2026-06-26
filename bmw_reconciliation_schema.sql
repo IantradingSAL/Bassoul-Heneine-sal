@@ -88,6 +88,7 @@ create table if not exists public.bmw_rec_credits (
   claim_item_position     text,                       -- Labor Value / Spare Part… / External
   claim_item_type         text,                       -- FR / MAT / 00
   claim_item_description  text,
+  manufacturer_no         text,                       -- part / manufacturer number (Spare Part lines)
   accepted_price_excl_hc  numeric default 0,
   hc                      numeric default 0,
   tax                     numeric default 0,
