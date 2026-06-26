@@ -169,6 +169,11 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
 .vin-mini td.foc,.vin-mini th.foc{background:rgba(28,105,212,.06)}
 .vin-mini th.foc{color:var(--bmw)}
 .metric-hint{font-size:10.5px;color:var(--faint);font-weight:600;margin-top:10px}
+.vin-stat.drill{transition:border-color .15s,background .15s}
+.vin-stat.drill:hover{border-color:var(--bmw);background:rgba(28,105,212,.04)}
+.card.drill{transition:border-color .15s,box-shadow .15s}
+.card.drill:hover{border-color:var(--bmw);box-shadow:var(--shadow-lg)}
+.card.drill .ct::after{content:" ⤢";font-size:11px;color:var(--faint);font-weight:600}
 .toast{position:fixed;bottom:24px;right:24px;background:#0f172a;color:#fff;padding:12px 17px;border-radius:12px;font-size:12px;font-weight:600;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:900;opacity:0;transform:translateY(8px);transition:all .25s;max-width:440px}
 .toast.on{opacity:1;transform:translateY(0)}
 .lo{position:fixed;inset:0;background:rgba(246,248,252,.85);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:800}
@@ -735,6 +740,37 @@ const MCOLS=[
   {h:'Cred %',num:1,cell:c=>c.answered&&c.invoiced?`${c.accept_ratio.toFixed(0)}%`:'<span style="color:var(--faint)">—</span>',csv:c=>c.answered&&c.invoiced?c.accept_ratio.toFixed(1):''},
   {h:'Status',cell:c=>sBadge(c.status_overall),csv:c=>c.status_overall},
 ]
+// custom column models for non-standard (aggregated / timing) metrics
+const TCOLS=[
+  {h:'Kind',cell:c=>kindBadge(c.kind),csv:c=>c.kind},
+  {h:'Claim No.',cell:c=>`<span class="mono" style="font-weight:600">${esc(c.no||'—')}</span>`,csv:c=>c.no},
+  {h:'Make',cell:c=>`<span class="badge b-n">${esc(c.make||'—')}</span>`,csv:c=>c.make},
+  {h:'VIN',cell:c=>`<span class="mono">${esc(c.vin||'—')}</span>`,csv:c=>c.vin},
+  {h:'Repair Date',cell:c=>`<span style="color:var(--muted)">${esc(c.repair_date||'—')}</span>`,csv:c=>c.repair_date},
+  {h:'CN Date',cell:c=>`<span style="color:var(--muted)">${esc(c.cn_date||'—')}</span>`,csv:c=>c.cn_date},
+  {h:'Days',num:1,cell:c=>`<span style="font-weight:700;color:${c.lag_days>90?'var(--rose-d)':c.lag_days>60?'var(--lemon-d)':'var(--txt)'}">${c.lag_days}</span>`,csv:c=>c.lag_days},
+  {h:'Credited €',num:1,cell:c=>`<span style="font-weight:700">${f(c.accepted)}</span>`,csv:c=>c.accepted},
+]
+const DCOLS=[
+  {h:'Defect Code',cell:d=>`<span class="mono" style="font-weight:700">${esc(d.code)}</span>`,csv:d=>d.code},
+  {h:'Description',cell:d=>`<span title="${esc(d.text)}">${esc(d.text||'—')}</span>`,csv:d=>d.text},
+  {h:'Lines',num:1,cell:d=>f0(d.cnt),csv:d=>d.cnt},
+  {h:'Credited €',num:1,cell:d=>`<span style="font-weight:700">${f(d.value)}</span>`,csv:d=>d.value},
+  {h:'Item Errors',num:1,cell:d=>d.err?`<span style="color:var(--rose-d)">${d.err}</span>`:'<span style="color:var(--faint)">—</span>',csv:d=>d.err},
+]
+const ACOLS=[
+  {h:'Customer / Account',cell:d=>`<span style="font-weight:700">${esc(d.name)}</span>`,csv:d=>d.name},
+  {h:'Claims',num:1,cell:d=>f0(d.cnt),csv:d=>d.cnt},
+  {h:'VINs',num:1,cell:d=>f0(d.vins),csv:d=>d.vins},
+  {h:'Invoiced €',num:1,cell:d=>f(d.invoiced),csv:d=>d.invoiced},
+  {h:'Credited €',num:1,cell:d=>`<span style="font-weight:700">${f(d.accepted)}</span>`,csv:d=>d.accepted},
+  {h:'Cred %',num:1,cell:d=>pct(d.accepted,d.invoiced).toFixed(0)+'%',csv:d=>pct(d.accepted,d.invoiced).toFixed(1)},
+  {h:'Err',num:1,cell:d=>d.err?`<span style="color:var(--rose-d)">${d.err}</span>`:'—',csv:d=>d.err},
+  {h:'Warn',num:1,cell:d=>d.warn?`<span style="color:var(--lemon-d)">${d.warn}</span>`:'—',csv:d=>d.warn},
+]
+// builders shared with the Insights tab renderers
+const _defectAgg=()=>{const creds=S.cred.filter(c=>S.scope==='all'||c.credit_type===S.scope);const byD={};creds.forEach(r=>{const code=r.defect_code||'—';if(!byD[code])byD[code]={code,text:r.defect_text||'',cnt:0,value:0,err:0};const d=byD[code];d.cnt++;d.value+=Number(r.accepted_price_incl_hc)||0;if(r.crediting_item_status==='Error')d.err++;if(!d.text&&r.defect_text)d.text=r.defect_text});return Object.values(byD).sort((a,b)=>b.value-a.value)}
+const _dealerAgg=()=>{const byC={};scopedClaims().forEach(c=>{const k=c.inv?.sell_to_customer_name||c.inv?.bill_to_name||c.sub?.sell_to_customer_no||'—';if(!byC[k])byC[k]={name:k,cnt:0,invoiced:0,accepted:0,err:0,warn:0,_vins:new Set()};const d=byC[k];d.cnt++;d.invoiced+=c.invoiced;d.accepted+=c.accepted;if(c.status_overall==='Error')d.err++;else if(c.status_overall==='Warning')d.warn++;if(c.vin)d._vins.add(c.vin)});return Object.values(byC).map(d=>({...d,vins:d._vins.size})).sort((a,b)=>b.accepted-a.accepted)}
 const METRIC_DEFS={
   invoiced:{icon:'🧾',title:'Invoiced (incadea)',accent:'var(--bmw)',sub:'Every claim billed through incadea',src:['inv'],focus:'Invoiced €',
     rows:()=>scopedClaims().filter(c=>c.invoiced>0).sort((a,b)=>b.invoiced-a.invoiced),
@@ -812,22 +848,43 @@ const METRIC_DEFS={
   ins_overdue:{icon:'🐌',title:'Insights · Overdue Pending (>60d)',accent:'var(--rose-d)',sub:'Submitted over 60 days ago, still no credit note',src:['sub'],focus:'Status',
     rows:()=>{const t=new Date().toISOString().slice(0,10);return scopedClaims().filter(c=>!c.answered).map(c=>({...c,_age:c.document_date?days(c.document_date,t):null})).filter(c=>c._age!=null&&c._age>60).sort((a,b)=>(b._age||0)-(a._age||0))},
     stats:r=>[['Overdue',f0(r.length)],['Invoiced & waiting €','€'+f0(_sum(r,'invoiced'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
+  // ── INSIGHTS · Timing tab (custom Days column) ──
+  tm_lag:{icon:'⏱️',title:'Processing Time · repair → credit',accent:'var(--bmw)',sub:'Every claim with repair & credit dates, slowest first',src:['cred'],focus:'Days',cols:TCOLS,
+    rows:()=>scopedClaims().filter(c=>c.lag_days!=null&&c.lag_days>=0).sort((a,b)=>b.lag_days-a.lag_days),
+    stats:r=>[['Claims',f0(r.length)],['Avg days',(r.length?_sum(r,'lag_days')/r.length:0).toFixed(0)],['Within 60d',pct(r.filter(c=>c.lag_days<=60).length,r.length).toFixed(0)+'%'],['Over 90d',f0(r.filter(c=>c.lag_days>90).length)]]},
+  tm_within60:{icon:'✅',title:'Credited Within 60 Days',accent:'var(--mint-d)',sub:'Fast turnarounds — repair to credit ≤ 60 days',src:['cred'],focus:'Days',cols:TCOLS,
+    rows:()=>scopedClaims().filter(c=>c.lag_days!=null&&c.lag_days>=0&&c.lag_days<=60).sort((a,b)=>a.lag_days-b.lag_days),
+    stats:r=>[['Claims',f0(r.length)],['Avg days',(r.length?_sum(r,'lag_days')/r.length:0).toFixed(0)],['Credited €','€'+f0(_sum(r,'accepted'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
+  tm_over90:{icon:'🐌',title:'Over 90 Days to Credit',accent:'var(--rose-d)',sub:'Slow turnarounds — repair to credit > 90 days',src:['cred'],focus:'Days',cols:TCOLS,
+    rows:()=>scopedClaims().filter(c=>c.lag_days!=null&&c.lag_days>90).sort((a,b)=>b.lag_days-a.lag_days),
+    stats:r=>[['Claims',f0(r.length)],['Avg days',(r.length?_sum(r,'lag_days')/r.length:0).toFixed(0)],['Credited €','€'+f0(_sum(r,'accepted'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
+  // ── INSIGHTS · Defects tab (aggregated by defect code, no per-claim row) ──
+  defects_all:{icon:'🔧',title:'Defect Codes',accent:'var(--bmw)',sub:'Credited lines grouped by defect code',src:['cred'],focus:'Credited €',cols:DCOLS,rowClick:false,
+    rows:_defectAgg,
+    stats:r=>[['Distinct defects',f0(r.length)],['Credited €','€'+f0(_sum(r,'value'))],['Lines',f0(_sum(r,'cnt'))],['Top share',r.length?pct(r[0].value,_sum(r,'value')).toFixed(0)+'%':'0%']]},
+  // ── INSIGHTS · Dealers tab (aggregated by account, no per-claim row) ──
+  dealers_all:{icon:'🏬',title:'Accounts / Customers',accent:'var(--bmw)',sub:'Claims grouped by selling account',src:['inv','cred'],focus:'Credited €',cols:ACOLS,rowClick:false,
+    rows:_dealerAgg,
+    stats:r=>[['Accounts',f0(r.length)],['Credited €','€'+f0(_sum(r,'accepted'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Top share',r.length?pct(r[0].accepted,_sum(r,'accepted')).toFixed(0)+'%':'0%']]},
 }
 function openMetric(id){
   const def=METRIC_DEFS[id];if(!def){showToast('No detail available');return}
-  const rows=def.rows();window._mDef=def;window._mRows=rows;window._mId=id
-  const stats=def.stats(rows),fidx=MCOLS.findIndex(c=>c.h===def.focus)
+  const cols=def.cols||MCOLS,rowClick=def.rowClick!==false
+  const rows=def.rows();window._mDef=def;window._mRows=rows;window._mId=id;window._mCols=cols
+  const stats=def.stats(rows),fidx=cols.findIndex(c=>c.h===def.focus)
   let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
   const srcCards=def.src.map(k=>{const s=SRC[k];return `<div class="src"><h4>${s.icon} ${esc(s.name)}</h4><p>${esc(s.desc)}</p><div class="cnt">${f0(s.n())}</div></div>`}).join('')
-  const head=MCOLS.map((c,i)=>`<th class="${c.num?'num':''}${i===fidx?' foc':''}">${c.h}</th>`).join('')
+  const head=cols.map((c,i)=>`<th class="${c.num?'num':''}${i===fidx?' foc':''}">${c.h}</th>`).join('')
   const cap=600
   const body=rows.slice(0,cap).map(c=>{
+    const tds=cols.map((col,i)=>`<td class="${col.num?'num':''}${i===fidx?' foc':''}">${col.cell(c)}</td>`).join('')
+    if(!rowClick)return `<tr>${tds}</tr>`
     const click=c.orphan?`openVin('${esc(c.vin)}')`:`openClaim('${esc(c.kind)}','${esc(c.no)}')`
-    const tds=MCOLS.map((col,i)=>`<td class="${col.num?'num':''}${i===fidx?' foc':''}">${col.cell(c)}</td>`).join('')
     return `<tr class="clickable" onclick="closeModal();${click}">${tds}</tr>`
   }).join('')
-  const more=rows.length>cap?`<tr><td colspan="${MCOLS.length}" style="text-align:center;padding:12px;color:var(--muted)">… ${f0(rows.length-cap)} more rows — export CSV for the full list</td></tr>`:''
+  const more=rows.length>cap?`<tr><td colspan="${cols.length}" style="text-align:center;padding:12px;color:var(--muted)">… ${f0(rows.length-cap)} more rows — export CSV for the full list</td></tr>`:''
   const scopeLbl=S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty'
+  const hint=rowClick?'💡 Click any row to open the full claim · figures respect the current All / Warranty / BSI scope.':'💡 Figures respect the current All / Warranty / BSI scope · use Export CSV for the full breakdown.'
   bg.innerHTML=`<div class="bmw-modal"><div class="bmw-modal-h"><div class="bmw-modal-icon">${def.icon}</div>
     <div class="bmw-modal-title" style="flex:1"><h3>${esc(def.title)}</h3><p>${esc(def.sub)} · scope: ${esc(scopeLbl)}</p></div>
     <button class="bmw-modal-x" onclick="closeModal()">✕</button></div>
@@ -837,15 +894,15 @@ function openMetric(id){
       <div class="vin-section"><div class="vin-section-h"><span>📄 Source records</span><span class="ct">${f0(rows.length)}</span>
         <button class="btn btn-sm" style="margin-left:auto" onclick="exportMetric()">⬇️ Export CSV</button></div>
         ${rows.length?`<div class="tw"><table class="vin-mini"><thead><tr>${head}</tr></thead><tbody>${body}${more}</tbody></table></div>`:'<div class="vin-empty">No records for this metric in the current scope.</div>'}
-        <div class="metric-hint">💡 Click any row to open the full claim · figures respect the current All / Warranty / BSI scope.</div>
+        <div class="metric-hint">${hint}</div>
       </div>
     </div></div>`
   document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
   bg.addEventListener('click',e=>{if(e.target===bg)closeModal()});document.addEventListener('keydown',escClose)
 }
 window.openMetric=openMetric
-function exportMetric(){const def=window._mDef,rows=window._mRows;if(!def||!rows)return
-  exportCSV(`bmw-${window._mId}.csv`,MCOLS.map(c=>c.h),rows.map(c=>MCOLS.map(col=>col.csv(c))))}
+function exportMetric(){const def=window._mDef,rows=window._mRows,cols=window._mCols||MCOLS;if(!def||!rows)return
+  exportCSV(`bmw-${window._mId}.csv`,cols.map(c=>c.h),rows.map(c=>cols.map(col=>col.csv(c))))}
 window.exportMetric=exportMetric
 
 // ── recovery tracking modal (reuses warranty_bmw_resub; key = kind:no)
@@ -1090,10 +1147,10 @@ function rInsights(){
     let tbl=`<div class="tw"><table class="t"><thead><tr><th>Defect Code</th><th>Description</th><th class="num">Lines</th><th class="num">Credited €</th><th class="num">Item Errors</th></tr></thead><tbody>`
     defects.slice(0,40).forEach(d=>{tbl+=`<tr><td class="mono" style="font-weight:700">${esc(d.code)}</td><td style="max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.text)}">${esc(d.text||'—')}</td><td class="num">${d.cnt}</td><td class="num" style="font-weight:700">${f(d.value)}</td><td class="num" style="color:${d.err?'var(--rose-d)':'var(--faint)'}">${d.err||'—'}</td></tr>`})
     tbl+=`</tbody></table></div>`
-    body.innerHTML=`<div class="grid-2"><div class="card"><div class="card-h"><div><div class="ct">🔧 Top Defect Codes by Credited €</div></div></div>${hbars(top.map(d=>({label:d.code,value:d.value,color:d.color})),{money:true})}</div>
+    body.innerHTML=`<div class="grid-2"><div class="card drill" onclick="openMetric('defects_all')"><div class="card-h"><div><div class="ct">🔧 Top Defect Codes by Credited €</div></div></div>${hbars(top.map(d=>({label:d.code,value:d.value,color:d.color})),{money:true})}</div>
       <div class="card"><div class="card-h"><div><div class="ct">📊 Summary</div></div></div><div class="vin-summary" style="margin:0">
-        <div class="vin-stat"><div class="vin-stat-l">Distinct Defects</div><div class="vin-stat-v" style="color:var(--bmw)">${defects.length}</div></div>
-        <div class="vin-stat"><div class="vin-stat-l">Top Share</div><div class="vin-stat-v" style="color:var(--pur)">${defects.length?pct(defects[0].value,defects.reduce((s,d)=>s+d.value,0)).toFixed(0):0}%</div></div></div></div></div>
+        <div class="vin-stat drill" onclick="openMetric('defects_all')"><div class="vin-stat-l">Distinct Defects</div><div class="vin-stat-v" style="color:var(--bmw)">${defects.length}</div></div>
+        <div class="vin-stat drill" onclick="openMetric('defects_all')"><div class="vin-stat-l">Top Share</div><div class="vin-stat-v" style="color:var(--pur)">${defects.length?pct(defects[0].value,defects.reduce((s,d)=>s+d.value,0)).toFixed(0):0}%</div></div></div></div></div>
       <div class="card"><div class="card-h"><div><div class="ct">🔧 All Defects</div><div class="ct-sub">Top 40 by credited value</div></div></div>${tbl}</div>`
   }
   else if(S.insTab==='dealers'){
@@ -1103,7 +1160,7 @@ function rInsights(){
     let tbl=`<div class="tw"><table class="t"><thead><tr><th>Customer / Account</th><th class="num">Claims</th><th class="num">VINs</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th class="num">Cred %</th><th class="num">Err</th><th class="num">Warn</th></tr></thead><tbody>`
     cust.forEach(d=>{tbl+=`<tr><td style="font-weight:700;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.name)}">${esc(d.name)}</td><td class="num">${d.cnt}</td><td class="num">${d.vins}</td><td class="num">${f(d.invoiced)}</td><td class="num" style="font-weight:700">${f(d.accepted)}</td><td class="num"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><div class="mbar"><span style="width:${Math.min(pct(d.accepted,d.invoiced),100)}%;background:${pct(d.accepted,d.invoiced)>=85?'var(--mint)':'var(--sun)'}"></span></div><b>${pct(d.accepted,d.invoiced).toFixed(0)}%</b></div></td><td class="num" style="color:var(--rose-d)">${d.err}</td><td class="num" style="color:var(--lemon-d)">${d.warn}</td></tr>`})
     tbl+=`</tbody></table></div>`
-    body.innerHTML=`<div class="card"><div class="card-h"><div><div class="ct">🏬 Top Accounts by Credited €</div></div></div>${hbars(top.map(d=>({label:d.name.length>18?d.name.slice(0,18)+'…':d.name,value:d.accepted,color:d.color})),{money:true})}</div>
+    body.innerHTML=`<div class="card drill" onclick="openMetric('dealers_all')"><div class="card-h"><div><div class="ct">🏬 Top Accounts by Credited €</div></div></div>${hbars(top.map(d=>({label:d.name.length>18?d.name.slice(0,18)+'…':d.name,value:d.accepted,color:d.color})),{money:true})}</div>
       <div class="card"><div class="card-h"><div><div class="ct">🏬 Account Performance</div></div></div>${tbl}</div>`
   }
   else if(S.insTab==='timing'){
@@ -1118,10 +1175,10 @@ function rInsights(){
     if(!withLag.length)tbl+=`<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--faint)">No repair/credit dates to compute timing.</td></tr>`
     tbl+=`</tbody></table></div>`
     body.innerHTML=`<div class="kpis">
-      <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">⏱️ Avg Days (repair→credit)</div><div class="kv bmw">${avg.toFixed(0)}</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📊 Median Days</div><div class="kv sky">${median}</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">✅ Within 60d</div><div class="kv mint">${pct(withLag.filter(c=>c.lag_days<=60).length,withLag.length).toFixed(0)}%</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">🐌 Over 90d</div><div class="kv rose">${withLag.filter(c=>c.lag_days>90).length}</div></div></div>
+      <div class="kpi drill" onclick="openMetric('tm_lag')"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">⏱️ Avg Days (repair→credit)</div><div class="kv bmw">${avg.toFixed(0)}</div></div>
+      <div class="kpi drill" onclick="openMetric('tm_lag')"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">📊 Median Days</div><div class="kv sky">${median}</div></div>
+      <div class="kpi drill" onclick="openMetric('tm_within60')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">✅ Within 60d</div><div class="kv mint">${pct(withLag.filter(c=>c.lag_days<=60).length,withLag.length).toFixed(0)}%</div></div>
+      <div class="kpi drill" onclick="openMetric('tm_over90')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">🐌 Over 90d</div><div class="kv rose">${withLag.filter(c=>c.lag_days>90).length}</div></div></div>
       <div class="grid-2"><div class="card"><div class="card-h"><div><div class="ct">⏱️ Processing Time Distribution</div><div class="ct-sub">${withLag.length} claims with dates</div></div></div>${donutChart(bk.map(b=>({label:b.l,value:b.n,color:b.c})),{centerTop:Math.round(avg)+'d',centerSub:'AVG'})}</div>
       <div class="card"><div class="card-h"><div><div class="ct">🐌 Slowest to Credit</div></div></div><div style="max-height:300px;overflow:auto">${tbl}</div></div></div>`
   }
