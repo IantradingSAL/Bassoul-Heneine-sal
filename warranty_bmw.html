@@ -174,6 +174,51 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
 .card.drill{transition:border-color .15s,box-shadow .15s}
 .card.drill:hover{border-color:var(--bmw);box-shadow:var(--shadow-lg)}
 .card.drill .ct::after{content:" ⤢";font-size:11px;color:var(--faint);font-weight:600}
+/* ── help center + chatbot ── */
+.help-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid var(--line);background:#fff;border-radius:10px;font-size:11.5px;font-weight:700;color:var(--bmw);cursor:pointer;font-family:inherit;transition:all .15s}
+.help-btn:hover{background:rgba(28,105,212,.07);border-color:var(--bmw)}
+.help-search{width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:11px;font-size:12.5px;font-family:inherit;margin-bottom:6px}
+.help-search:focus{outline:none;border-color:var(--bmw);box-shadow:0 0 0 3px rgba(28,105,212,.1)}
+.help-tabs{display:inline-flex;background:var(--surf2);border-radius:11px;padding:3px;gap:2px;margin-bottom:14px}
+.help-tabs button{border:none;background:none;padding:7px 16px;border-radius:9px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit}
+.help-tabs button.on{background:#fff;color:var(--bmw);box-shadow:var(--shadow)}
+.help-sech{font-size:11px;font-weight:800;color:var(--bmw);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+.help-sech:first-child{margin-top:0}
+.help-topic{border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden;background:#fff}
+.help-topic>summary{padding:11px 14px;cursor:pointer;font-size:12.5px;font-weight:700;list-style:none;display:flex;align-items:center;gap:9px}
+.help-topic>summary::-webkit-details-marker{display:none}
+.help-topic>summary::after{content:"▾";margin-left:auto;color:var(--faint);transition:transform .2s}
+.help-topic[open]>summary{background:var(--surf3);border-bottom:1px solid var(--line)}
+.help-topic[open]>summary::after{transform:rotate(180deg)}
+.help-topic .hbody{padding:12px 14px;font-size:12px;line-height:1.6;color:var(--txt)}
+.help-topic .hbody p{margin:0 0 9px}
+.help-topic .hlbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:block;margin:0 0 3px}
+.help-formula{background:#0f172a;color:#e2e8f0;font-family:var(--mono);font-size:11px;padding:9px 12px;border-radius:9px;margin:0 0 10px;white-space:pre-wrap;line-height:1.5}
+.help-src{display:inline-block;font-size:10px;font-weight:700;background:rgba(28,105,212,.1);color:var(--bmw);padding:2px 9px;border-radius:999px;margin:0 5px 5px 0}
+.calc-box{border:1px solid var(--line);border-radius:12px;margin:4px 0 16px;background:var(--surf3);overflow:hidden}
+.calc-box>summary{padding:10px 14px;cursor:pointer;font-size:11.5px;font-weight:800;color:var(--bmw);list-style:none;display:flex;align-items:center;gap:8px}
+.calc-box>summary::-webkit-details-marker{display:none}
+.calc-box>summary::after{content:"▾";margin-left:auto;color:var(--faint)}
+.calc-box[open]>summary::after{content:"▴"}
+.calc-box .hbody{padding:0 14px 13px}
+.chat-launch{position:fixed;bottom:22px;right:22px;z-index:560;width:54px;height:54px;border-radius:50%;background:var(--bmw);color:#fff;border:none;cursor:pointer;font-size:24px;box-shadow:0 10px 28px rgba(28,105,212,.4);transition:transform .15s}
+.chat-launch:hover{transform:scale(1.07)}
+.chat-wrap{display:flex;flex-direction:column;height:440px;max-height:60vh}
+.chat-msgs{flex:1;overflow-y:auto;padding:6px 2px;display:flex;flex-direction:column;gap:10px}
+.chat-msg{max-width:84%;padding:10px 13px;border-radius:14px;font-size:12.5px;line-height:1.55}
+.chat-msg.bot{background:var(--surf3);border:1px solid var(--line);border-bottom-left-radius:4px;align-self:flex-start}
+.chat-msg.user{background:var(--bmw);color:#fff;border-bottom-right-radius:4px;align-self:flex-end}
+.chat-msg .cm-v{font-weight:800;font-size:15px;display:block;margin:5px 0}
+.chat-msg .help-formula{margin-top:8px}
+.chat-msg .cm-link{display:inline-block;margin-top:8px;font-size:11px;font-weight:700;color:var(--bmw);cursor:pointer;text-decoration:underline}
+.chat-msg.user .cm-link{color:#fff}
+.chat-chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+.chat-chip{font-size:11px;font-weight:600;background:#fff;border:1px solid var(--line);color:var(--bmw);padding:5px 10px;border-radius:999px;cursor:pointer}
+.chat-chip:hover{background:rgba(28,105,212,.07)}
+.chat-form{display:flex;gap:8px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+.chat-form input{flex:1;padding:10px 13px;border:1px solid var(--line);border-radius:11px;font-size:12.5px;font-family:inherit}
+.chat-form input:focus{outline:none;border-color:var(--bmw);box-shadow:0 0 0 3px rgba(28,105,212,.1)}
+.chat-form button{padding:0 16px;background:var(--bmw);color:#fff;border:none;border-radius:11px;font-weight:700;cursor:pointer;font-family:inherit}
 .toast{position:fixed;bottom:24px;right:24px;background:#0f172a;color:#fff;padding:12px 17px;border-radius:12px;font-size:12px;font-weight:600;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:900;opacity:0;transform:translateY(8px);transition:all .25s;max-width:440px}
 .toast.on{opacity:1;transform:translateY(0)}
 .lo{position:fixed;inset:0;background:rgba(246,248,252,.85);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:800}
@@ -230,7 +275,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
     <div class="si" data-page="statement"><span class="si-icon">💶</span><span>BMW Statement</span></div>
     <div class="nav-sec">Data</div>
     <div class="si" data-page="upload"><span class="si-icon">📤</span><span>Upload Center</span></div>
-    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v3.4</div>
+    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v3.5</div>
   </aside>
 
   <main class="main">
@@ -246,7 +291,10 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
           <button data-scope="warranty">Warranty</button>
           <button data-scope="bsi">BSI</button>
         </div>
-        <div class="sync-pill" id="lastSync"><span class="sync-dot"></span><span>—</span></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="help-btn" onclick="openHelp()" title="How are these figures calculated?">❓ Help &amp; Guide</button>
+          <div class="sync-pill" id="lastSync"><span class="sync-dot"></span><span>—</span></div>
+        </div>
       </div>
     </div>
 
@@ -354,6 +402,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
 
 <div class="lo" id="loadingOverlay"><div class="lo-spin"></div><div class="lo-msg" id="loadingMsg">Loading…</div></div>
 <div class="toast" id="toast"></div>
+<button class="chat-launch" onclick="openHelp('chat')" title="Ask the assistant">💬</button>
 
 <script type="module">
 import { SUPABASE_CONFIG } from './config.js'
@@ -885,11 +934,14 @@ function openMetric(id){
   const more=rows.length>cap?`<tr><td colspan="${cols.length}" style="text-align:center;padding:12px;color:var(--muted)">… ${f0(rows.length-cap)} more rows — export CSV for the full list</td></tr>`:''
   const scopeLbl=S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty'
   const hint=rowClick?'💡 Click any row to open the full claim · figures respect the current All / Warranty / BSI scope.':'💡 Figures respect the current All / Warranty / BSI scope · use Export CSV for the full breakdown.'
+  const topic=helpFor(id)
+  const calc=topic?`<details class="calc-box"><summary>ⓘ How is this calculated?</summary>${topicBody(topic,true)}</details>`:''
   bg.innerHTML=`<div class="bmw-modal"><div class="bmw-modal-h"><div class="bmw-modal-icon">${def.icon}</div>
     <div class="bmw-modal-title" style="flex:1"><h3>${esc(def.title)}</h3><p>${esc(def.sub)} · scope: ${esc(scopeLbl)}</p></div>
     <button class="bmw-modal-x" onclick="closeModal()">✕</button></div>
     <div class="bmw-modal-body">
       <div class="vin-summary">${stats.map(([l,v],i)=>`<div class="vin-stat"><div class="vin-stat-l">${esc(l)}</div><div class="vin-stat-v" style="${i===0?'color:'+def.accent:''}">${v}</div></div>`).join('')}</div>
+      ${calc}
       <div class="vin-section"><div class="vin-section-h"><span>🗂️ Source files behind this value</span></div><div class="src-grid" style="margin-top:0">${srcCards}</div></div>
       <div class="vin-section"><div class="vin-section-h"><span>📄 Source records</span><span class="ct">${f0(rows.length)}</span>
         <button class="btn btn-sm" style="margin-left:auto" onclick="exportMetric()">⬇️ Export CSV</button></div>
@@ -904,6 +956,196 @@ window.openMetric=openMetric
 function exportMetric(){const def=window._mDef,rows=window._mRows,cols=window._mCols||MCOLS;if(!def||!rows)return
   exportCSV(`bmw-${window._mId}.csv`,cols.map(c=>c.h),rows.map(c=>cols.map(col=>col.csv(c))))}
 window.exportMetric=exportMetric
+
+// ══ HELP CENTER + ASSISTANT ═════════════════════════════════════
+// Plain-language explanation of every figure: what it is, how it is
+// calculated (formula + source fields) and which uploaded file it comes
+// from. The same knowledge base powers the in-page chatbot.
+const HLIVE={
+  invoiced:()=>'€'+f0(_sum(scopedClaims(),'invoiced')),
+  credited:()=>'€'+f0(_sum(scopedClaims(),'accepted')+_sum(scopedOrphans(),'accepted')),
+  not_credited:()=>{const c=scopedClaims();return '€'+f0(_sum(c,'invoiced')-_sum(c,'accepted'))},
+  credited_rate:()=>{const c=scopedClaims();return pct(_sum(c,'accepted'),_sum(c,'invoiced')).toFixed(1)+'%'},
+  total_claims:()=>f0(scopedClaims().length+scopedOrphans().length),
+  submitted:()=>f0(scopedClaims().length),
+  pending:()=>f0(scopedClaims().filter(c=>!c.answered).length),
+  attention:()=>f0(scopedClaims().concat(scopedOrphans()).filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').length),
+  no_submission:()=>f0(scopedOrphans().length),
+  outstanding:()=>{const r=scopedClaims();const pend=r.filter(c=>!c.answered).reduce((s,c)=>s+c.invoiced,0);const sf=r.reduce((s,c)=>s+(c.answered?Math.max(c.invoiced-c.accepted,0):0),0);return '€'+f0(pend+sf)},
+  shortfall:()=>'€'+f0(scopedClaims().reduce((s,c)=>s+(c.answered?Math.max(c.invoiced-c.accepted,0):0),0)),
+  gap_at_risk:()=>'€'+f0(scopedClaims().concat(scopedOrphans()).filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').reduce((s,c)=>s+c.gap,0)),
+  processing:()=>{const w=scopedClaims().filter(c=>c.lag_days!=null&&c.lag_days>=0);return (w.length?_sum(w,'lag_days')/w.length:0).toFixed(0)+' days avg'},
+  recovery:()=>'€'+f0(Object.values(S.resub).reduce((s,r)=>s+(Number(r.credited_amt)||0),0)),
+}
+const HELP_SECTIONS=[
+  {sec:'Getting started',topics:[
+    {id:'reconciliation',icon:'🔗',q:'How does the reconciliation work?',kw:['reconcile','match','link','how works','engine','overview'],
+      what:'Each claim links three files end-to-end. The BMW submission is the spine: it is matched to its incadea invoice by the invoice / GAR number, and to BMW credit notes by the dealer-claim key. That single linked record is what every figure is built from.',
+      formula:'submission ──(Invoice/GAR no.)── incadea invoice\n          └──(dealer-claim key)── BMW credit note lines',src:['inv','sub','cred']},
+    {id:'sources',icon:'🗂️',q:'What are the three source files?',kw:['file','upload','source','incadea','submission','credit note','data'],
+      what:'incadea invoices = what we billed internally per repair order. BMW submissions = the claims we sent to BMW. BMW credit notes = what BMW actually accepted and paid, line by line. Upload all three in the Upload Center to get a complete picture.',
+      formula:'incadea  → bmw_rec_invoices  (total_invoiced)\nsubmissions → bmw_rec_submissions\ncredit notes → bmw_rec_credits (accepted_price_incl_hc)',src:['inv','sub','cred']},
+    {id:'claim',icon:'📋',q:'What counts as one claim?',kw:['claim','what is claim','row','unit','count'],
+      what:'One claim = one BMW submission (de-duplicated). A claim can carry several credit-note lines (labour, parts, external). BSI claims that appear twice in the file are merged into one.',
+      formula:'1 claim = 1 unique submission (kind + claim number)',src:['sub'],metric:'total_claims',live:'total_claims'},
+    {id:'scope',icon:'🎚️',q:'What does the All / Warranty / BSI toggle do?',kw:['scope','filter','all','warranty','bsi','toggle'],
+      what:'It filters every figure on every page by claim type. "All" shows Warranty + BSI together; the other two narrow to one programme. All values, charts and detail tables respect the active scope.',
+      formula:'shown = claims where (scope = "All" OR claim.kind = scope)',src:['sub']},
+    {id:'status',icon:'🚦',q:'What do the claim statuses mean?',kw:['status','error','warning','success','pending','outcome'],
+      what:'Pending = sent to BMW but no credit note received yet. Success = credited with no issues. Warning = credited but at least one line flagged. Error = at least one line rejected. The worst line decides the claim status.',
+      formula:'no credit note      → Pending\nany line Error      → Error\nany line Warning    → Warning\notherwise           → Success',src:['cred']},
+    {id:'drilldown',icon:'⤢',q:'How do I see the numbers behind a value?',kw:['drill','click','detail','press','source records','breakdown'],
+      what:'Press any figure — a flow step, a KPI card, a chart title. A panel opens with the summary, the source files behind it, every underlying record, and an Export CSV button. This works on all pages.',
+      formula:'click value → detail panel → source records + CSV',src:[]},
+  ]},
+  {sec:'Core figures (Dashboard & Pipeline)',topics:[
+    {id:'invoiced',icon:'🧾',q:'How is "Invoiced (incadea)" calculated?',kw:['invoiced','incadea','billed','gar','invoice amount'],
+      what:'The total we billed through incadea for the claims in scope. It is taken straight from the incadea invoice matched to each claim — not from BMW. This is the "asking" amount we expect BMW to credit.',
+      formula:'Invoiced = Σ incadea_invoice.total_invoiced\n          (one invoice per claim, matched by Invoice/GAR no.)',src:['inv'],metric:'invoiced',live:'invoiced'},
+    {id:'submitted',icon:'📨',q:'What is "Submitted to BMW"?',kw:['submitted','sent','submission count'],
+      what:'The number of claims sent to BMW for credit. "Answered" are those with a credit note back; "pending" are still awaiting BMW.',
+      formula:'Submitted = count of claims in scope',src:['sub'],metric:'submitted',live:'submitted'},
+    {id:'credited',icon:'📑',q:'How is "Credited by BMW" calculated?',kw:['credited','accepted','paid','bmw paid','credit amount'],
+      what:'The total BMW actually accepted, summed from every credit-note line of the claims in scope. Uses the accepted price including handling charges — the real money received.',
+      formula:'Credited = Σ credit_line.accepted_price_incl_hc',src:['cred'],metric:'credited',live:'credited'},
+    {id:'not_credited',icon:'Δ',q:'How is "Not Credited / Gap" calculated?',kw:['not credited','gap','money to chase','difference','owed','shortfall','delta'],
+      what:'The difference between what we invoiced and what BMW credited — the money still to chase. A positive gap means BMW credited less than we billed (or has not answered yet).',
+      formula:'Not Credited = Invoiced − Credited\n            = Σ(claim.invoiced) − Σ(claim.accepted)',src:['inv','cred'],metric:'not_credited',live:'not_credited'},
+    {id:'credited_rate',icon:'🎯',q:'How is "Credited Rate" calculated?',kw:['rate','percent','percentage','acceptance','cred %','ratio'],
+      what:'The share of invoiced value that BMW credited. Higher is better — 100% means BMW paid everything we billed.',
+      formula:'Credited Rate = Credited ÷ Invoiced × 100',src:['inv','cred'],metric:'credited_rate',live:'credited_rate'},
+    {id:'total_claims',icon:'📋',q:'What is "Total Claims"?',kw:['total claims','how many','number of claims','unique vins'],
+      what:'Every reconciled claim in scope, including credited-no-submission ones. The sub-line counts the distinct vehicles (VINs) behind them.',
+      formula:'Total Claims = claims + credited-no-submission\nUnique VINs  = distinct claim.vin',src:['sub','cred'],metric:'total_claims',live:'total_claims'},
+    {id:'pending',icon:'⏳',q:'What is "Pending Answer"?',kw:['pending','awaiting','waiting','no answer'],
+      what:'Claims submitted to BMW that have no credit note yet. These are amounts in limbo — money neither credited nor rejected.',
+      formula:'Pending = claims with zero credit-note lines',src:['sub'],metric:'pending',live:'pending'},
+    {id:'attention',icon:'⚠️',q:'What is "Needs Attention"?',kw:['attention','errors','warnings','problem','rejected','issues'],
+      what:'Claims BMW answered but flagged — at least one line came back as a Warning or Error. These are the claims worth reviewing or resubmitting.',
+      formula:'Needs Attention = claims with status Error or Warning',src:['cred'],metric:'attention',live:'attention'},
+    {id:'no_submission',icon:'💳',q:'What is "Credited · No Submission"?',kw:['no submission','orphan','credited no sub','missing submission'],
+      what:'BMW credit notes that have no matching submission row in the loaded data — usually because the submission file for that period is not uploaded. The money is real, but the link is missing.',
+      formula:'Orphan = credit note whose key matches no submission',src:['cred'],metric:'no_submission',live:'no_submission'},
+  ]},
+  {sec:'Receivables (Statement)',topics:[
+    {id:'outstanding',icon:'📌',q:'How is "Outstanding" calculated?',kw:['outstanding','owed','receivable','bmw owes','total owed'],
+      what:'Everything BMW still owes us: the full invoiced value of claims not yet answered, plus the underpaid portion of answered claims.',
+      formula:'Outstanding = Pending € + Shortfall €',src:['inv','cred'],live:'outstanding'},
+    {id:'shortfall',icon:'🔻',q:'What is "Shortfall"?',kw:['shortfall','underpaid','short','less than invoiced'],
+      what:'On claims BMW has answered, the part of the invoice BMW did not credit. Only counted when positive (BMW paid less than billed).',
+      formula:'Shortfall = Σ max(invoiced − credited, 0)  on answered claims',src:['inv','cred'],live:'shortfall'},
+  ]},
+  {sec:'Rejections & recovery',topics:[
+    {id:'gap_at_risk',icon:'💰',q:'What is "Gap at Risk"?',kw:['gap at risk','risk','rejection value','at risk'],
+      what:'The uncredited value sitting on claims that came back with an Error or Warning — the money most likely to be lost unless you act (resubmit, dispute).',
+      formula:'Gap at Risk = Σ claim.gap  on Error/Warning claims',src:['inv','cred'],live:'gap_at_risk'},
+    {id:'recovery',icon:'💚',q:'What are "Tracked" and "Recovered"?',kw:['tracked','recovered','recovery','resubmit','chase','track'],
+      what:'When you press "+ Track" on a rejection you log a recovery effort (resubmission, dispute, credited amount). "Tracked" counts those records; "Recovered" sums the € you logged as credited back.',
+      formula:'Recovered = Σ recovery.credited_amt  (your tracked records)',src:['cred'],live:'recovery'},
+  ]},
+  {sec:'Insights',topics:[
+    {id:'processing',icon:'⏱️',q:'How is "Processing Time" measured?',kw:['processing','days','lag','turnaround','time to credit','speed'],
+      what:'How long BMW took from the repair to issuing the credit note, in days. Used to spot slow-paying periods and chase overdue claims.',
+      formula:'Days = credit_note_date − repair_date',src:['cred'],metric:'tm_lag',live:'processing'},
+    {id:'defects',icon:'🔧',q:'How are "Defect Codes" grouped?',kw:['defect','defect code','fault','grouped by defect'],
+      what:'Credit-note lines grouped by their defect code, ranked by credited value. Shows which fault types drive the most credit and where item errors cluster.',
+      formula:'per defect code: Credited € = Σ line.accepted_price_incl_hc',src:['cred'],metric:'defects_all'},
+    {id:'dealers',icon:'🏬',q:'How are "Accounts" grouped?',kw:['dealer','account','customer','grouped by account','by customer'],
+      what:'Claims grouped by the selling account/customer from the incadea invoice, ranked by credited value, with acceptance rate and error/warning counts per account.',
+      formula:'per account: Credited € = Σ claim.accepted',src:['inv','cred'],metric:'dealers_all'},
+  ]},
+]
+const HELP_BY_ID={};HELP_SECTIONS.forEach(s=>s.topics.forEach(t=>{HELP_BY_ID[t.id]=t}))
+// map any metric id (incl. page-prefixed) → a help topic
+function helpFor(metricId){
+  if(HELP_BY_ID[metricId])return HELP_BY_ID[metricId]
+  const base=metricId.replace(/^(pp|cr|rj|st|tm|ins)_/,'')
+  const map={claims:'total_claims',invoiced:'invoiced',credited:'credited',pending:'pending',nosub:'no_submission',notes:'credited',
+    warn:'attention',err:'attention',gap:'not_credited',tracked:'recovery',recovered:'recovery',outstanding:'outstanding',
+    shortfall:'shortfall',overdue:'pending',lag:'processing',within60:'processing',over90:'processing',
+    defects_all:'defects',dealers_all:'dealers',not_credited:'not_credited',credited_rate:'credited_rate',
+    total_claims:'total_claims',attention:'attention',no_submission:'no_submission',submitted:'submitted'}
+  return HELP_BY_ID[map[base]]||null
+}
+function topicBody(t,hideDetail){
+  const live=t.live&&HLIVE[t.live]?`<p><span class="hlbl">Right now (${esc(S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty')} scope)</span><b style="font-size:15px;color:var(--bmw)">${HLIVE[t.live]()}</b></p>`:''
+  const srcs=(t.src||[]).map(k=>SRC[k]?`<span class="help-src">${SRC[k].icon} ${esc(SRC[k].name)}</span>`:'').join('')
+  const det=(t.metric&&!hideDetail)?`<button class="cm-link" style="background:none;border:none;padding:0;font-family:inherit" onclick="closeModal();openMetric('${t.metric}')">⤢ View the records behind this</button>`:''
+  return `<div class="hbody"><p>${t.what}</p>${t.formula?`<span class="hlbl">How it's calculated</span><div class="help-formula">${t.formula}</div>`:''}${live}${srcs?`<div style="margin-top:4px">${srcs}</div>`:''}${det}</div>`
+}
+function openHelp(tab){
+  S._helpTab=tab||S._helpTab||'guide'
+  let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
+  bg.innerHTML=`<div class="bmw-modal" style="max-width:760px"><div class="bmw-modal-h"><div class="bmw-modal-icon">📖</div>
+    <div class="bmw-modal-title" style="flex:1"><h3>Help &amp; Guide</h3><p>How every figure is calculated · ask the assistant anything</p></div>
+    <button class="bmw-modal-x" onclick="closeModal()">✕</button></div>
+    <div class="bmw-modal-body">
+      <div class="help-tabs"><button data-htab="guide">📚 Guide</button><button data-htab="chat">💬 Assistant</button></div>
+      <div id="helpPane"></div>
+    </div></div>`
+  document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
+  bg.addEventListener('click',e=>{if(e.target===bg)closeModal()});document.addEventListener('keydown',escClose)
+  bg.querySelectorAll('.help-tabs button').forEach(b=>b.addEventListener('click',()=>{S._helpTab=b.dataset.htab;renderHelpPane()}))
+  renderHelpPane()
+}
+window.openHelp=openHelp
+function renderHelpPane(){
+  const pane=document.getElementById('helpPane');if(!pane)return
+  document.querySelectorAll('.help-tabs button').forEach(b=>b.classList.toggle('on',b.dataset.htab===S._helpTab))
+  if(S._helpTab==='chat'){pane.innerHTML=chatHTML();const inp=document.getElementById('chatInput');if(inp)inp.focus();const m=document.getElementById('chatMsgs');if(m)m.scrollTop=m.scrollHeight;return}
+  const q=(S._helpQ||'').toLowerCase().trim()
+  const secs=HELP_SECTIONS.map(s=>{
+    const tops=s.topics.filter(t=>!q||(t.q+' '+t.what+' '+(t.kw||[]).join(' ')).toLowerCase().includes(q))
+    if(!tops.length)return ''
+    return `<div class="help-sech">${esc(s.sec)}</div>`+tops.map(t=>`<details class="help-topic"><summary>${t.icon} ${esc(t.q)}</summary>${topicBody(t)}</details>`).join('')
+  }).join('')
+  pane.innerHTML=`<input class="help-search" id="helpSearch" placeholder="🔍 Search the guide — e.g. gap, credited, pending…" value="${esc(S._helpQ||'')}">`+(secs||'<div class="vin-empty">No topics match — try the Assistant tab.</div>')
+  const si=document.getElementById('helpSearch');if(si){si.addEventListener('input',e=>{S._helpQ=e.target.value;const p=window.scrollY;renderHelpPane()});si.focus();si.setSelectionRange(si.value.length,si.value.length)}
+}
+// ── chatbot: local retrieval over the help knowledge base ──
+function chatHTML(){
+  const msgs=(S._chat&&S._chat.length?S._chat:[{role:'bot',html:chatGreeting()}])
+  const chips=['What is the gap?','How is credited calculated?','What does pending mean?','How is outstanding worked out?','Explain the credited rate']
+  return `<div class="chat-wrap">
+    <div class="chat-msgs" id="chatMsgs">${msgs.map(m=>`<div class="chat-msg ${m.role}">${m.html}</div>`).join('')}
+      <div class="chat-chips">${chips.map(c=>`<span class="chat-chip" onclick="chatAsk('${esc(c).replace(/'/g,"\\'")}')">${esc(c)}</span>`).join('')}</div>
+    </div>
+    <form class="chat-form" onsubmit="event.preventDefault();chatSend()">
+      <input id="chatInput" placeholder="Ask about any figure…" autocomplete="off">
+      <button type="submit">Send</button>
+    </form></div>`
+}
+function chatGreeting(){return `👋 Hi! I explain how the figures here are calculated. Ask me things like <i>"how is the gap worked out?"</i> or <i>"what is credited rate?"</i> — or tap a suggestion below.`}
+function chatScore(query,t){
+  const ql=query.toLowerCase();const toks=ql.split(/[^a-z0-9€%]+/).filter(w=>w.length>2)
+  let s=0;const kw=(t.kw||[]).join(' ').toLowerCase(),q=t.q.toLowerCase(),w=t.what.toLowerCase()
+  ;(t.kw||[]).forEach(k=>{if(ql.includes(k.toLowerCase()))s+=4})
+  toks.forEach(tk=>{if(kw.includes(tk))s+=3;if(q.includes(tk))s+=2;if(w.includes(tk))s+=1})
+  return s
+}
+function chatAnswerHTML(query){
+  const ql=query.toLowerCase()
+  if(/\b(hi|hello|hey|thanks|thank you)\b/.test(ql))return chatGreeting()
+  if(/\bupload|import|add (file|data)|load (file|data)\b/.test(ql))return `Go to the <b>Upload Center</b> (left menu) and drop your three files — incadea invoices, BMW submissions and BMW credit notes. The page detects each file type automatically and refreshes all figures.`
+  let best=null,bestScore=0
+  HELP_SECTIONS.forEach(s=>s.topics.forEach(t=>{const sc=chatScore(query,t);if(sc>bestScore){bestScore=sc;best=t}}))
+  if(!best||bestScore<3){
+    return `I'm not sure which figure you mean. I can explain: <b>Invoiced</b>, <b>Credited</b>, <b>Not Credited / Gap</b>, <b>Credited Rate</b>, <b>Pending</b>, <b>Needs Attention</b>, <b>Outstanding</b>, <b>Shortfall</b>, <b>Gap at Risk</b>, <b>Recovered</b>, <b>Processing Time</b>, <b>Defects</b> or <b>Accounts</b>. Try naming one — or open the <b>Guide</b> tab.`
+  }
+  const live=best.live&&HLIVE[best.live]?`<span class="cm-v">${HLIVE[best.live]()}<span style="font-size:10px;font-weight:600;color:var(--muted)"> · ${esc(S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty')} scope</span></span>`:''
+  const formula=best.formula?`<div class="help-formula">${best.formula}</div>`:''
+  const srcs=(best.src||[]).map(k=>SRC[k]?`<span class="help-src">${SRC[k].icon} ${esc(SRC[k].name)}</span>`:'').join('')
+  const det=best.metric?`<span class="cm-link" onclick="closeModal();openMetric('${best.metric}')">⤢ View the records behind this</span>`:''
+  const title=best.q.replace(/^(How is|How are|How does|What is|What are|What counts as|What do|What does)\s+/i,'').replace(/\s*(calculated|measured|grouped|work|works|worked out|mean)\s*\??$/i,'').replace(/[?"]/g,'').trim()
+  return `<b>${best.icon} ${esc(title.charAt(0).toUpperCase()+title.slice(1))}</b><br>${best.what}${live}${formula}${srcs?`<div style="margin-top:6px">${srcs}</div>`:''}${det?`<br>${det}`:''}`
+}
+function chatPush(role,html){if(!S._chat)S._chat=[{role:'bot',html:chatGreeting()}];S._chat.push({role,html});renderHelpPane()}
+function chatAsk(q){chatPush('user',esc(q));chatPush('bot',chatAnswerHTML(q))}
+window.chatAsk=chatAsk
+function chatSend(){const i=document.getElementById('chatInput');if(!i)return;const v=i.value.trim();if(!v)return;i.value='';chatAsk(v)}
+window.chatSend=chatSend
+function navTo(p){const el=document.querySelector('.si[data-page="'+p+'"]');if(el)el.click()}
+window.navTo=navTo
 
 // ── recovery tracking modal (reuses warranty_bmw_resub; key = kind:no)
 function openTrack(kind,no){
