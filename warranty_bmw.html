@@ -711,6 +711,9 @@ window.openVin=openVin
 // METRIC_DEFS, then mark the value with class="drill" onclick="openMetric('id')".
 const _sum=(a,k)=>a.reduce((s,x)=>s+(Number(x[k])||0),0)
 const _uniq=(a,k)=>new Set(a.map(x=>x[k]).filter(Boolean)).size
+// shared summary-stat shapes reused by the filter-aware page metrics
+const ST_CIV=r=>[['Claims',f0(r.length)],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Credited €','€'+f0(_sum(r,'accepted'))],['Unique VINs',f0(_uniq(r,'vin'))]]
+const ST_REJ=r=>[['Claims',f0(r.length)],['Gap at risk €','€'+f0(_sum(r,'gap'))],['Tracked',f0(r.filter(c=>S.resub[c.kind+':'+c.no]).length)],['Recovered €','€'+f0(r.reduce((s,c)=>s+(S.resub[c.kind+':'+c.no]?.credited_amt||0),0))]]
 // the three uploaded source files every metric is traced back to
 const SRC={
   inv:{icon:'🧾',name:'incadea invoices',desc:'Billed € per repair order',n:()=>S.inv.length},
@@ -759,6 +762,40 @@ const METRIC_DEFS={
   no_submission:{icon:'💳',title:'Credited · No Submission',accent:'var(--pur)',sub:'BMW credited these, but no submission row is loaded',src:['cred'],focus:'Credited €',
     rows:()=>scopedOrphans().sort((a,b)=>b.accepted-a.accepted),
     stats:r=>[['Claims',f0(r.length)],['Credited €','€'+f0(_sum(r,'accepted'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
+  // ── PIPELINE page (reads the live filtered row set → counts always match the table) ──
+  pp_claims:{icon:'🔗',title:'Pipeline · Claims',accent:'var(--bmw)',sub:'Matches the current Pipeline filters',src:['inv','sub','cred'],focus:'Status',
+    rows:()=>(window._ppRows||[]),stats:ST_CIV},
+  pp_invoiced:{icon:'🧾',title:'Pipeline · Invoiced €',accent:'var(--slate)',sub:'Matches the current Pipeline filters',src:['inv'],focus:'Invoiced €',
+    rows:()=>(window._ppRows||[]).filter(c=>c.invoiced>0).sort((a,b)=>b.invoiced-a.invoiced),stats:ST_CIV},
+  pp_credited:{icon:'💰',title:'Pipeline · Credited €',accent:'var(--mint-d)',sub:'Matches the current Pipeline filters',src:['cred'],focus:'Credited €',
+    rows:()=>(window._ppRows||[]).filter(c=>c.accepted>0).sort((a,b)=>b.accepted-a.accepted),stats:ST_CIV},
+  pp_pending:{icon:'⏳',title:'Pipeline · Pending',accent:'var(--sun)',sub:'Matches the current Pipeline filters',src:['sub'],focus:'Status',
+    rows:()=>(window._ppRows||[]).filter(c=>!c.answered),stats:ST_CIV},
+  pp_nosub:{icon:'💳',title:'Pipeline · No Submission',accent:'var(--pur)',sub:'Credited, submission file not loaded · current filters',src:['cred'],focus:'Credited €',
+    rows:()=>(window._ppRows||[]).filter(c=>c.noSubmission).sort((a,b)=>b.accepted-a.accepted),stats:ST_CIV},
+  // ── CREDITS page ──
+  cr_notes:{icon:'📑',title:'Credits · Answered Claims',accent:'var(--bmw)',sub:'Matches the current Credits filters',src:['cred'],focus:'Status',
+    rows:()=>(window._crRows||[]),
+    stats:r=>[['Answered claims',f0(r.length)],['Credited €','€'+f0(_sum(r,'accepted'))],['Errors',f0(r.filter(c=>c.status_overall==='Error').length)],['Warnings',f0(r.filter(c=>c.status_overall==='Warning').length)]]},
+  cr_credited:{icon:'💰',title:'Credits · Credited €',accent:'var(--mint-d)',sub:'Matches the current Credits filters',src:['cred'],focus:'Credited €',
+    rows:()=>(window._crRows||[]).filter(c=>c.accepted>0).sort((a,b)=>b.accepted-a.accepted),stats:ST_CIV},
+  cr_warn:{icon:'⚠️',title:'Credits · Warnings',accent:'var(--lemon-d)',sub:'Matches the current Credits filters',src:['cred'],focus:'Status',
+    rows:()=>(window._crRows||[]).filter(c=>c.status_overall==='Warning'),stats:ST_CIV},
+  cr_err:{icon:'❌',title:'Credits · Errors',accent:'var(--rose-d)',sub:'Matches the current Credits filters',src:['cred'],focus:'Status',
+    rows:()=>(window._crRows||[]).filter(c=>c.status_overall==='Error'),stats:ST_CIV},
+  cr_nosub:{icon:'💳',title:'Credits · No Submission',accent:'var(--pur)',sub:'Credited, submission file not loaded · current filters',src:['cred'],focus:'Credited €',
+    rows:()=>(window._crRows||[]).filter(c=>c.orphan).sort((a,b)=>b.accepted-a.accepted),stats:ST_CIV},
+  // ── REJECTIONS page ──
+  rj_err:{icon:'❌',title:'Rejections · Errors',accent:'var(--rose-d)',sub:'Matches the current Rejections filters',src:['cred'],focus:'Status',
+    rows:()=>(window._rjRows||[]).filter(c=>c.status_overall==='Error'),stats:ST_REJ},
+  rj_warn:{icon:'⚠️',title:'Rejections · Warnings',accent:'var(--lemon-d)',sub:'Matches the current Rejections filters',src:['cred'],focus:'Status',
+    rows:()=>(window._rjRows||[]).filter(c=>c.status_overall==='Warning'),stats:ST_REJ},
+  rj_gap:{icon:'💰',title:'Rejections · Gap at Risk €',accent:'var(--sun)',sub:'Matches the current Rejections filters',src:['inv','cred'],focus:'Gap €',
+    rows:()=>(window._rjRows||[]).slice().sort((a,b)=>b.gap-a.gap),stats:ST_REJ},
+  rj_tracked:{icon:'✅',title:'Rejections · Tracked',accent:'var(--blue)',sub:'Rejections with a recovery record · current filters',src:['cred'],focus:'Status',
+    rows:()=>(window._rjRows||[]).filter(c=>S.resub[c.kind+':'+c.no]),stats:ST_REJ},
+  rj_recovered:{icon:'💚',title:'Rejections · Recovered €',accent:'var(--mint-d)',sub:'Rejections with a credited recovery · current filters',src:['cred'],focus:'Gap €',
+    rows:()=>(window._rjRows||[]).filter(c=>S.resub[c.kind+':'+c.no]?.credited_amt>0).sort((a,b)=>(S.resub[b.kind+':'+b.no]?.credited_amt||0)-(S.resub[a.kind+':'+a.no]?.credited_amt||0)),stats:ST_REJ},
 }
 function openMetric(id){
   const def=METRIC_DEFS[id];if(!def){showToast('No detail available');return}
@@ -905,11 +942,11 @@ function rPipe(){
   window._ppRows=rows
   const invoiced=rows.reduce((s,c)=>s+c.invoiced,0),accepted=rows.reduce((s,c)=>s+c.accepted,0),pending=rows.filter(c=>!c.answered).length,noSub=rows.filter(c=>c.noSubmission).length
   document.getElementById('K_pipe').innerHTML=`
-    <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">🔗 Claims</div><div class="kv bmw">${f0(rows.length)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced €</div><div class="kv slate">${f0(invoiced)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending</div><div class="kv sun">${f0(pending)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 No Submission</div><div class="kv pur">${f0(noSub)}</div><div class="ks">credited, file not loaded</div></div>`
+    <div class="kpi drill" onclick="openMetric('pp_claims')"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">🔗 Claims</div><div class="kv bmw">${f0(rows.length)}</div></div>
+    <div class="kpi drill" onclick="openMetric('pp_invoiced')"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced €</div><div class="kv slate">${f0(invoiced)}</div></div>
+    <div class="kpi drill" onclick="openMetric('pp_credited')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
+    <div class="kpi drill" onclick="openMetric('pp_pending')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending</div><div class="kv sun">${f0(pending)}</div></div>
+    <div class="kpi drill" onclick="openMetric('pp_nosub')"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 No Submission</div><div class="kv pur">${f0(noSub)}</div><div class="ks">credited, file not loaded</div></div>`
   let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
     ${th('Sub Date','pp',0)}${th('Kind','pp',1)}${th('Claim No.','pp',2)}${th('Invoice (GAR)','pp',3)}${th('Make','pp',4)}${th('VIN','pp',5)}
     ${th('Invoiced €','pp',6,{num:1})}${th('Credited €','pp',7,{num:1})}${th('Gap €','pp',8,{num:1})}${th('Cred %','pp',9,{num:1})}${th('Outcome','pp',10)}<th>Action</th></tr></thead><tbody>`
@@ -937,13 +974,14 @@ function rCredits(){
     if(lf==='linked'&&c.orphan)return false;if(lf==='orphan'&&!c.orphan)return false
     if(q&&![c.cn_no,c.vin,c.dealer_claim_number||c.sub?.last_submission||'',c.no||''].join('|').toLowerCase().includes(q))return false;return true})
   rows.sort((a,b)=>(b.cn_date||'').localeCompare(a.cn_date||''))
+  window._crRows=rows
   const accepted=rows.reduce((s,c)=>s+c.accepted,0),err=rows.filter(c=>c.status_overall==='Error').length,warn=rows.filter(c=>c.status_overall==='Warning').length
   document.getElementById('K_cr').innerHTML=`
-    <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📑 Credit Notes</div><div class="kv bmw">${f0(new Set(S.cred.filter(c=>S.scope==='all'||c.credit_type===S.scope).map(c=>c.credit_note_number)).size)}</div><div class="ks">${f0(rows.length)} answered claims</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 Credited · No Submission</div><div class="kv pur">${f0(orphans.filter(inScope).length)}</div><div class="ks">submission file not loaded</div></div>`
+    <div class="kpi drill" onclick="openMetric('cr_notes')"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📑 Credit Notes</div><div class="kv bmw">${f0(new Set(S.cred.filter(c=>S.scope==='all'||c.credit_type===S.scope).map(c=>c.credit_note_number)).size)}</div><div class="ks">${f0(rows.length)} answered claims</div></div>
+    <div class="kpi drill" onclick="openMetric('cr_credited')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
+    <div class="kpi drill" onclick="openMetric('cr_warn')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
+    <div class="kpi drill" onclick="openMetric('cr_err')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
+    <div class="kpi drill" onclick="openMetric('cr_nosub')"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 Credited · No Submission</div><div class="kv pur">${f0(orphans.filter(inScope).length)}</div><div class="ks">submission file not loaded</div></div>`
   let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>CN Date</th><th>Credit Note</th><th>Kind</th><th>Dealer Claim</th><th>Brand</th><th>VIN</th><th class="num">Lines</th><th class="num">Credited €</th><th>Status</th><th>Link</th></tr></thead><tbody>`
   rows.slice(0,700).forEach(c=>{h+=`<tr class="tr-clickable" onclick="${c.orphan?`openVin('${esc(c.vin)}')`:`openClaim('${esc(c.kind)}','${esc(c.no)}')`}">
     <td style="font-size:10px;color:var(--muted)">${esc(c.cn_date||'')}</td><td class="mono" style="font-weight:600">${esc(c.cn_no||'')}</td><td>${kindBadge(c.kind)}</td>
@@ -964,15 +1002,16 @@ function rRej(){
     if(sf==='tracked'&&!tr)return false;if(sf==='untracked'&&tr)return false;if(mk&&c.make!==mk)return false
     if(q&&![c.no,c.record_no,c.doc_no,c.vin,c.cn_no].join('|').toLowerCase().includes(q))return false;return true})
   rows=applySort(rows,'rj',[c=>c.cn_date,c=>c.no,c=>c.make,c=>c.vin,c=>c.accepted,c=>c.gap,c=>c.status_overall])
+  window._rjRows=rows
   const err=rows.filter(c=>c.status_overall==='Error').length,warn=rows.filter(c=>c.status_overall==='Warning').length
   const tracked=rows.filter(c=>S.resub[c.kind+':'+c.no]).length
   const atRisk=rows.reduce((s,c)=>s+c.gap,0),credited=rows.reduce((s,c)=>s+(S.resub[c.kind+':'+c.no]?.credited_amt||0),0)
   document.getElementById('K_rej').innerHTML=`
-    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💰 Gap at Risk €</div><div class="kv sun">${f0(atRisk)}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kl">✅ Tracked</div><div class="kv" style="color:var(--blue)">${tracked}</div><div class="ks">of ${rows.length}</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💚 Recovered €</div><div class="kv mint">${f0(credited)}</div></div>`
+    <div class="kpi drill" onclick="openMetric('rj_err')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
+    <div class="kpi drill" onclick="openMetric('rj_warn')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
+    <div class="kpi drill" onclick="openMetric('rj_gap')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💰 Gap at Risk €</div><div class="kv sun">${f0(atRisk)}</div></div>
+    <div class="kpi drill" onclick="openMetric('rj_tracked')"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kl">✅ Tracked</div><div class="kv" style="color:var(--blue)">${tracked}</div><div class="ks">of ${rows.length}</div></div>
+    <div class="kpi drill" onclick="openMetric('rj_recovered')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💚 Recovered €</div><div class="kv mint">${f0(credited)}</div></div>`
   let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
     ${th('CN Date','rj',0)}${th('Submission','rj',1)}${th('Make','rj',2)}${th('VIN','rj',3)}${th('Credited €','rj',4,{num:1})}${th('Gap €','rj',5,{num:1})}${th('Issue','rj',6)}<th>Track</th><th>Recovered €</th><th>Action</th></tr></thead><tbody>`
   rows.forEach(c=>{const tr=S.resub[c.kind+':'+c.no]||{}
