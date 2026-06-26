@@ -714,6 +714,7 @@ const _uniq=(a,k)=>new Set(a.map(x=>x[k]).filter(Boolean)).size
 // shared summary-stat shapes reused by the filter-aware page metrics
 const ST_CIV=r=>[['Claims',f0(r.length)],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Credited €','€'+f0(_sum(r,'accepted'))],['Unique VINs',f0(_uniq(r,'vin'))]]
 const ST_REJ=r=>[['Claims',f0(r.length)],['Gap at risk €','€'+f0(_sum(r,'gap'))],['Tracked',f0(r.filter(c=>S.resub[c.kind+':'+c.no]).length)],['Recovered €','€'+f0(r.reduce((s,c)=>s+(S.resub[c.kind+':'+c.no]?.credited_amt||0),0))]]
+const ST_OWED=r=>[['Claims',f0(r.length)],['Outstanding €','€'+f0(_sum(r,'_owed'))],['Pending €','€'+f0(r.filter(c=>c._pending).reduce((s,c)=>s+c.invoiced,0))],['Shortfall €','€'+f0(_sum(r,'_shortfall'))]]
 // the three uploaded source files every metric is traced back to
 const SRC={
   inv:{icon:'🧾',name:'incadea invoices',desc:'Billed € per repair order',n:()=>S.inv.length},
@@ -796,6 +797,21 @@ const METRIC_DEFS={
     rows:()=>(window._rjRows||[]).filter(c=>S.resub[c.kind+':'+c.no]),stats:ST_REJ},
   rj_recovered:{icon:'💚',title:'Rejections · Recovered €',accent:'var(--mint-d)',sub:'Rejections with a credited recovery · current filters',src:['cred'],focus:'Gap €',
     rows:()=>(window._rjRows||[]).filter(c=>S.resub[c.kind+':'+c.no]?.credited_amt>0).sort((a,b)=>(S.resub[b.kind+':'+b.no]?.credited_amt||0)-(S.resub[a.kind+':'+a.no]?.credited_amt||0)),stats:ST_REJ},
+  // ── STATEMENT page (reads the live filtered receivables row set) ──
+  st_invoiced:{icon:'🧾',title:'Statement · Invoiced €',accent:'var(--slate)',sub:'Matches the current Statement filters',src:['inv'],focus:'Invoiced €',
+    rows:()=>(window._stRows||[]).filter(c=>c.invoiced>0).sort((a,b)=>b.invoiced-a.invoiced),stats:ST_OWED},
+  st_credited:{icon:'💰',title:'Statement · Credited €',accent:'var(--mint-d)',sub:'Matches the current Statement filters',src:['cred'],focus:'Credited €',
+    rows:()=>(window._stRows||[]).filter(c=>c.accepted>0).sort((a,b)=>b.accepted-a.accepted),stats:ST_OWED},
+  st_outstanding:{icon:'📌',title:'Statement · Outstanding €',accent:'var(--rose-d)',sub:'Everything BMW still owes · current filters',src:['inv','cred'],focus:'Gap €',
+    rows:()=>(window._stRows||[]).filter(c=>c._owed>0.5).sort((a,b)=>b._owed-a._owed),stats:ST_OWED},
+  st_pending:{icon:'⏳',title:'Statement · Pending €',accent:'var(--sun)',sub:'Submitted, awaiting BMW answer · current filters',src:['sub'],focus:'Status',
+    rows:()=>(window._stRows||[]).filter(c=>c._pending).sort((a,b)=>b.invoiced-a.invoiced),stats:ST_OWED},
+  st_shortfall:{icon:'🔻',title:'Statement · Shortfall €',accent:'var(--lemon-d)',sub:'Answered but underpaid by BMW · current filters',src:['cred'],focus:'Gap €',
+    rows:()=>(window._stRows||[]).filter(c=>c._shortfall>0.5).sort((a,b)=>b._shortfall-a._shortfall),stats:ST_OWED},
+  // ── INSIGHTS · Pending tab (same scopedClaims as dashboard → counts match) ──
+  ins_overdue:{icon:'🐌',title:'Insights · Overdue Pending (>60d)',accent:'var(--rose-d)',sub:'Submitted over 60 days ago, still no credit note',src:['sub'],focus:'Status',
+    rows:()=>{const t=new Date().toISOString().slice(0,10);return scopedClaims().filter(c=>!c.answered).map(c=>({...c,_age:c.document_date?days(c.document_date,t):null})).filter(c=>c._age!=null&&c._age>60).sort((a,b)=>(b._age||0)-(a._age||0))},
+    stats:r=>[['Overdue',f0(r.length)],['Invoiced & waiting €','€'+f0(_sum(r,'invoiced'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
 }
 function openMetric(id){
   const def=METRIC_DEFS[id];if(!def){showToast('No detail available');return}
@@ -1045,10 +1061,10 @@ function rInsights(){
     if(!pend.length)tbl+=`<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--faint)">No pending claims — BMW has answered everything. 🎉</td></tr>`
     tbl+=`</tbody></table></div>`
     body.innerHTML=`<div class="kpis">
-      <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending Answer</div><div class="kv sun">${f0(pend.length)}</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">🐌 Overdue (>60d)</div><div class="kv rose">${f0(overdue)}</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">💰 Invoiced & Waiting €</div><div class="kv slate">${f0(pendVal)}</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📨 Answer Rate</div><div class="kv bmw">${pct(claims.length-pend.length,claims.length).toFixed(1)}%</div></div></div>
+      <div class="kpi drill" onclick="openMetric('pending')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending Answer</div><div class="kv sun">${f0(pend.length)}</div></div>
+      <div class="kpi drill" onclick="openMetric('ins_overdue')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">🐌 Overdue (>60d)</div><div class="kv rose">${f0(overdue)}</div></div>
+      <div class="kpi drill" onclick="openMetric('pending')"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">💰 Invoiced & Waiting €</div><div class="kv slate">${f0(pendVal)}</div></div>
+      <div class="kpi drill" onclick="openMetric('submitted')"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📨 Answer Rate</div><div class="kv bmw">${pct(claims.length-pend.length,claims.length).toFixed(1)}%</div></div></div>
       <div class="card"><div class="card-h"><div><div class="ct">⏳ Submitted, Awaiting BMW Credit Note</div><div class="ct-sub">Sorted by days waiting — chase the oldest</div></div></div>${tbl}</div>`
   }
   else if(S.insTab==='gap'){
@@ -1059,10 +1075,10 @@ function rInsights(){
     if(!worst.length)tbl+=`<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--faint)">No gaps — everything invoiced was credited. 🎉</td></tr>`
     tbl+=`</tbody></table></div>`
     body.innerHTML=`<div class="kpis">
-      <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced €</div><div class="kv slate">${f0(invoiced)}</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">💸 Not Credited €</div><div class="kv rose">${f0(gap)}</div><div class="ks">${pct(gap,invoiced).toFixed(1)}% of invoiced</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">🎯 Credited Rate</div><div class="kv bmw">${pct(accepted,invoiced).toFixed(1)}%</div></div></div>
+      <div class="kpi drill" onclick="openMetric('invoiced')"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced €</div><div class="kv slate">${f0(invoiced)}</div></div>
+      <div class="kpi drill" onclick="openMetric('credited')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
+      <div class="kpi drill" onclick="openMetric('not_credited')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">💸 Not Credited €</div><div class="kv rose">${f0(gap)}</div><div class="ks">${pct(gap,invoiced).toFixed(1)}% of invoiced</div></div>
+      <div class="kpi drill" onclick="openMetric('credited_rate')"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">🎯 Credited Rate</div><div class="kv bmw">${pct(accepted,invoiced).toFixed(1)}%</div></div></div>
       <div class="card"><div class="card-h"><div><div class="ct">💶 Invoiced vs Credited by Month</div></div></div>${groupBarChart(series.map(s=>({label:fmMs(s.month),a:s.invoiced,b:s.accepted,aLabel:'Invoiced',bLabel:'Credited'})))}</div>
       <div class="card"><div class="card-h"><div><div class="ct">🔻 Biggest Gaps</div><div class="ct-sub">Top 25 answered claims by uncredited value</div></div></div>${tbl}</div>`
   }
@@ -1133,11 +1149,11 @@ function rStatement(){
       <div class="co"><div class="stmt-co-name">Bassoul, Heneine SAL</div>Generated ${esc(today)}<br>${f0(rows.length)} claims${document.getElementById('st_out').checked?' (outstanding)':''}</div>
     </div>
     <div class="kpis" style="margin-bottom:16px">
-      <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced (€)</div><div class="kv slate">${f0(invoiced)}</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited (€)</div><div class="kv mint">${f0(credited)}</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">📌 Outstanding (€)</div><div class="kv rose">${f0(outstanding)}</div><div class="ks">total BMW owes</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending (€)</div><div class="kv sun">${f0(pendingVal)}</div><div class="ks">awaiting BMW answer</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔻 Shortfall (€)</div><div class="kv lem">${f0(shortfallVal)}</div><div class="ks">answered &amp; underpaid</div></div>
+      <div class="kpi drill" onclick="openMetric('st_invoiced')"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced (€)</div><div class="kv slate">${f0(invoiced)}</div></div>
+      <div class="kpi drill" onclick="openMetric('st_credited')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited (€)</div><div class="kv mint">${f0(credited)}</div></div>
+      <div class="kpi drill" onclick="openMetric('st_outstanding')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">📌 Outstanding (€)</div><div class="kv rose">${f0(outstanding)}</div><div class="ks">total BMW owes</div></div>
+      <div class="kpi drill" onclick="openMetric('st_pending')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending (€)</div><div class="kv sun">${f0(pendingVal)}</div><div class="ks">awaiting BMW answer</div></div>
+      <div class="kpi drill" onclick="openMetric('st_shortfall')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔻 Shortfall (€)</div><div class="kv lem">${f0(shortfallVal)}</div><div class="ks">answered &amp; underpaid</div></div>
     </div>
     <div class="tw"><table class="t"><thead><tr><th>#</th><th>Invoice (GAR)</th><th>Kind</th><th>Make</th><th>VIN</th><th>Sub Date</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th>Status</th><th class="num">Owed €</th></tr></thead><tbody>`
   rows.slice(0,800).forEach((c,i)=>{const ob=c._otype==='pending'?'<span class="badge b-sun">⏳ Pending</span>':c._otype==='shortfall'?'<span class="badge b-lem">🔻 Shortfall</span>':'<span class="badge b-mint">✅ Settled</span>'
