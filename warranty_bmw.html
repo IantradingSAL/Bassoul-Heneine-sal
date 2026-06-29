@@ -461,11 +461,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.6'
+const APP_VERSION='v5.7'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.7',date:'2026-06-29',items:[
+    {t:'feat',d:'Gap is now split into two: Rejected (claimed minus paid - the money to chase) and Pricing Difference (incadea rate vs BMW rate - not a rejection). New KPIs on the Dashboard and Rejections page, a breakdown on each claim, and drill-downs with an Invoiced - Claimed - Paid table. Exact where Claimed Price is on the credit note, otherwise split by status.'}]},
   {v:'v5.6',date:'2026-06-29',items:[
     {t:'fix',d:'Fixed a stray character in the v5.5 release note that stopped the whole page from loading (the freeze).'},
     {t:'feat',d:'Performance: the reconciliation engine is now cached and recomputed only when data changes, so large datasets stay fast (no more freezing while typing or switching pages).'}]},
@@ -749,6 +751,7 @@ async function refreshData(){
 // ══ RECONCILIATION ENGINE (validated on real data) ══════════════
 let _recCache=null
 function invalidateReconcile(){_recCache=null}
+window.invalidateReconcile=invalidateReconcile
 function reconcile(){
   if(_recCache)return _recCache
   const invByDoc={};S.inv.forEach(i=>invByDoc[i.doc_no]=i)
@@ -782,11 +785,16 @@ function reconcile(){
     const corrected=cnNos.size>1
     const status_overall=!answered?'Pending':useS.Error>0?'Error':useS.Warning>0?'Warning':'Success'
     const invoiced=inv?Number(inv.total_invoiced)||0:0
+    // ── gap decomposition: rejection (claimed − paid) vs pricing difference (invoiced − claimed) ──
+    const gapVal=invoiced-accepted,hasClaimed=claimedPrice>0.5
+    let rejected=0
+    if(answered){if(hasClaimed)rejected=Math.max(claimedPrice-accepted,0);else if(status_overall==='Error')rejected=Math.max(gapVal,0)}
+    const pricing_diff=answered?gapVal-rejected:0
     return {kind:s.claim_kind,no:s.last_submission||s.no,record_no:s.no,sub:s,inv,credits:cr,vin:s.vin||inv?.vin||(cr[0]?.vin)||'',make:s.make_code||inv?.make_code||'',
       brand:cr[0]?.brand||'',model:inv?.model||'',month:s.month||(cnDate?cnDate.slice(0,7):''),
       doc_no:s.doc_no,sub_key:s.sub_key,sub_status:s.status||'',document_date:s.document_date,cn_date:cnDate,repair_date:repairDate,
       items_count:cr.length,answered,status_overall,statuses:st,corrected,labor,parts,ext,
-      invoiced,accepted,claimed_price:claimedPrice,gap:invoiced-accepted,accept_ratio:pct(accepted,invoiced),
+      invoiced,accepted,claimed_price:claimedPrice,gap:gapVal,rejected,pricing_diff,claim_basis:hasClaimed?'claimed':'status',accept_ratio:pct(accepted,invoiced),
       cn_no:[...cnNos].join(', '),defect_codes:[...defects],lag_days:days(repairDate,cnDate)}
   })
   // orphan credits: keys present in credits but not in any submission
@@ -805,7 +813,7 @@ function reconcile(){
       no:cr[0].dealer_claim_number,record_no:'',sub_key:key,dealer_claim_number:cr[0].dealer_claim_number,credits:cr,
       vin:cr[0].vin||'',brand:cr[0].brand||'',make:cr[0].brand||'',model:'',sub_status:'(no submission on file)',document_date:null,
       month:cnDate?cnDate.slice(0,7):'',cn_date:cnDate,repair_date:repairDate,items_count:cr.length,answered:true,
-      accepted,invoiced:0,claimed_price:claimedPrice,gap:0,accept_ratio:0,labor,parts,ext,corrected:cnNos.size>1,
+      accepted,invoiced:0,claimed_price:claimedPrice,gap:0,rejected:claimedPrice>0.5?Math.max(claimedPrice-accepted,0):0,pricing_diff:0,claim_basis:claimedPrice>0.5?'claimed':'status',accept_ratio:0,labor,parts,ext,corrected:cnNos.size>1,
       status_overall:(()=>{const sL={Success:0,Warning:0,Error:0};cr.forEach(c=>{if(c.credit_note_date===cnDate&&c.crediting_item_status)sL[c.crediting_item_status]=(sL[c.crediting_item_status]||0)+1});const u=(sL.Success+sL.Warning+sL.Error)>0?sL:st;return u.Error>0?'Error':u.Warning>0?'Warning':'Success'})(),statuses:st,cn_no:[...cnNos].join(', '),
       defect_codes:[...defects],lag_days:days(repairDate,cnDate)}
   })
@@ -855,6 +863,10 @@ function openClaim(kind,no){
         <div class="flow-arrow">=</div>
         <div class="flow-step" style="background:${claim.gap>0.5?'#fff1f2':'#f0fdf4'}"><div class="fl-t">Δ Gap</div><div class="fl-v" style="color:${claim.gap>0.5?'var(--rose-d)':'var(--mint-d)'}">€${f(claim.gap)}</div><div class="fl-s">${claim.invoiced?claim.accept_ratio.toFixed(0)+'% credited':''}</div></div>
       </div>
+      ${claim.answered&&(Math.abs(claim.pricing_diff||0)>0.5||claim.rejected>0.5)?`<div class="vin-summary" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+        <div class="vin-stat"><div class="vin-stat-l">🔧 Pricing difference (invoiced − claimed)</div><div class="vin-stat-v" style="color:var(--lemon-d)">€${f(claim.pricing_diff)}</div></div>
+        <div class="vin-stat"><div class="vin-stat-l">❌ Rejected (claimed − paid)</div><div class="vin-stat-v" style="color:var(--rose-d)">€${f(claim.rejected)}</div></div>
+        <div style="grid-column:1/-1;font-size:10px;color:var(--faint)">${claim.claim_basis==='claimed'?'Exact — from the Claimed Price on the credit note.':'Estimated from the claim status (Claimed Price not in the file). '+(claim.claimed_price>0.5?'':'Claimed €'+f(claim.claimed_price))}</div></div>`:''}
       ${claim.answered?`<div class="vin-section"><div class="vin-section-h"><span>📑 Credit lines</span><span class="ct">${items.length}</span></div>
         <table class="vin-mini"><thead><tr><th>Credit Note</th><th>Position</th><th>Claim Item No.</th><th>Description</th><th>Defect</th><th class="num">Qty</th><th class="num">Accepted €</th><th>Status</th></tr></thead>
         <tbody>${items.map(it=>`<tr><td class="mono">${esc(it.credit_note_number)}</td><td>${esc(it.claim_item_position||'')}</td>
@@ -1018,6 +1030,19 @@ const ACOLS=[
   {h:'Err',num:1,cell:d=>d.err?`<span style="color:var(--rose-d)">${d.err}</span>`:'—',csv:d=>d.err},
   {h:'Warn',num:1,cell:d=>d.warn?`<span style="color:var(--lemon-d)">${d.warn}</span>`:'—',csv:d=>d.warn},
 ]
+// columns for the gap-decomposition drill-downs (Invoiced → Claimed → Paid)
+const RCOLS=[
+  {h:'Kind',cell:c=>kindBadge(c.kind),csv:c=>c.kind},
+  {h:'Claim No.',cell:c=>`<span class="mono" style="font-weight:600">${esc(c.no||'—')}</span>`,csv:c=>c.no},
+  {h:'VIN',cell:c=>`<span class="mono">${esc(c.vin||'—')}</span>`,csv:c=>c.vin},
+  {h:'Invoiced €',num:1,cell:c=>c.invoiced?f(c.invoiced):'<span style="color:var(--faint)">—</span>',csv:c=>c.invoiced||''},
+  {h:'Claimed €',num:1,cell:c=>c.claim_basis==='claimed'?f(c.claimed_price):'<span style="color:var(--faint)" title="Claimed price not in the file — split by status">—</span>',csv:c=>c.claim_basis==='claimed'?c.claimed_price:''},
+  {h:'Paid €',num:1,cell:c=>`<span style="font-weight:700">${f(c.accepted)}</span>`,csv:c=>c.accepted},
+  {h:'Pricing diff €',num:1,cell:c=>Math.abs(c.pricing_diff||0)>0.005?`<span style="color:var(--lemon-d)">${f(c.pricing_diff)}</span>`:'—',csv:c=>c.pricing_diff},
+  {h:'Rejected €',num:1,cell:c=>c.rejected>0.005?`<span style="color:var(--rose-d);font-weight:700">${f(c.rejected)}</span>`:'—',csv:c=>c.rejected},
+  {h:'Basis',cell:c=>c.claim_basis==='claimed'?'<span class="badge b-mint">exact</span>':'<span class="badge b-n">status</span>',csv:c=>c.claim_basis},
+  {h:'Status',cell:c=>sBadge(c.status_overall),csv:c=>c.status_overall},
+]
 // builders shared with the Insights tab renderers
 const _defectAgg=()=>{const creds=S.cred.filter(c=>S.scope==='all'||c.credit_type===S.scope);const byD={};creds.forEach(r=>{const code=r.defect_code||'—';if(!byD[code])byD[code]={code,text:r.defect_text||'',cnt:0,value:0,err:0};const d=byD[code];d.cnt++;d.value+=Number(r.accepted_price_incl_hc)||0;if(r.crediting_item_status==='Error')d.err++;if(!d.text&&r.defect_text)d.text=r.defect_text});return Object.values(byD).sort((a,b)=>b.value-a.value)}
 const _dealerAgg=()=>{const byC={};scopedClaims().forEach(c=>{const k=c.inv?.sell_to_customer_name||c.inv?.bill_to_name||c.sub?.sell_to_customer_no||'—';if(!byC[k])byC[k]={name:k,cnt:0,invoiced:0,accepted:0,err:0,warn:0,_vins:new Set()};const d=byC[k];d.cnt++;d.invoiced+=c.invoiced;d.accepted+=c.accepted;if(c.status_overall==='Error')d.err++;else if(c.status_overall==='Warning')d.warn++;if(c.vin)d._vins.add(c.vin)});return Object.values(byC).map(d=>({...d,vins:d._vins.size})).sort((a,b)=>b.accepted-a.accepted)}
@@ -1116,6 +1141,13 @@ const METRIC_DEFS={
   dealers_all:{icon:'🏬',title:'Accounts / Customers',accent:'var(--bmw)',sub:'Claims grouped by selling account',src:['inv','cred'],focus:'Credited €',cols:ACOLS,rowClick:false,
     rows:_dealerAgg,
     stats:r=>[['Accounts',f0(r.length)],['Credited €','€'+f0(_sum(r,'accepted'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Top share',r.length?pct(r[0].accepted,_sum(r,'accepted')).toFixed(0)+'%':'0%']]},
+  // ── GAP DECOMPOSITION: rejection vs pricing difference ──
+  rejected_gap:{icon:'❌',title:'Rejected — money to chase',accent:'var(--rose-d)',sub:'BMW paid less than we claimed (claimed − paid; where claimed price is missing, the gap on rejected claims)',src:['cred','inv'],focus:'Rejected €',cols:RCOLS,
+    rows:()=>scopedClaims().concat(scopedOrphans()).filter(c=>c.rejected>0.5).sort((a,b)=>b.rejected-a.rejected),
+    stats:r=>[['Claims',f0(r.length)],['Rejected €','€'+f0(_sum(r,'rejected'))],['Exact (claimed price)',f0(r.filter(c=>c.claim_basis==='claimed').length)],['By status',f0(r.filter(c=>c.claim_basis!=='claimed').length)]]},
+  pricing_gap:{icon:'🔧',title:'Pricing Difference',accent:'var(--lemon-d)',sub:'incadea rate vs BMW rate (invoiced − claimed; where claimed price is missing, the gap on accepted claims)',src:['inv','cred'],focus:'Pricing diff €',cols:RCOLS,
+    rows:()=>scopedClaims().filter(c=>Math.abs(c.pricing_diff)>0.5).sort((a,b)=>b.pricing_diff-a.pricing_diff),
+    stats:r=>[['Claims',f0(r.length)],['Pricing diff €','€'+f0(_sum(r,'pricing_diff'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Paid €','€'+f0(_sum(r,'accepted'))]]},
 }
 function openMetric(id){
   const def=METRIC_DEFS[id];if(!def){showToast('No detail available');return}
@@ -1255,6 +1287,14 @@ const HELP_SECTIONS=[
       what:'Claims grouped by the selling account/customer from the incadea invoice, ranked by credited value, with acceptance rate and error/warning counts per account.',
       formula:'per account: Credited € = Σ claim.accepted',src:['inv','cred'],metric:'dealers_all'},
   ]},
+  {sec:'Gap breakdown',topics:[
+    {id:'rejected',icon:'❌',q:'What is "Rejected" (to chase)?',kw:['rejected','rejection','refused','to chase','claimed minus paid','recover'],
+      what:'The part of the gap BMW actually cut — what we claimed minus what BMW paid. This is the real money to chase or dispute. Where the Claimed Price is on the credit note it is exact; otherwise it is the gap on claims BMW rejected (Error).',
+      formula:'Rejected = max(Claimed − Paid, 0)\n         = gap on Error claims when Claimed Price is missing',src:['cred','inv'],metric:'rejected_gap'},
+    {id:'pricing',icon:'🔧',q:'What is the "Pricing Difference"?',kw:['pricing','price difference','rate','incadea vs bmw','rate card'],
+      what:'The part of the gap caused by incadea billing a different rate than BMW pays — not a rejection, just a rate-card difference. It is the rest of the gap once the rejected part is removed.',
+      formula:'Pricing difference = (Invoiced − Paid) − Rejected\n                   = Invoiced − Claimed',src:['inv','cred'],metric:'pricing_gap'},
+  ]},
 ]
 const HELP_BY_ID={};HELP_SECTIONS.forEach(s=>s.topics.forEach(t=>{HELP_BY_ID[t.id]=t}))
 // map any metric id (incl. page-prefixed) → a help topic
@@ -1265,7 +1305,8 @@ function helpFor(metricId){
     warn:'attention',err:'attention',gap:'not_credited',tracked:'recovery',recovered:'recovery',outstanding:'outstanding',
     shortfall:'shortfall',overdue:'pending',lag:'processing',within60:'processing',over90:'processing',
     defects_all:'defects',dealers_all:'dealers',not_credited:'not_credited',credited_rate:'credited_rate',
-    total_claims:'total_claims',attention:'attention',no_submission:'no_submission',submitted:'submitted'}
+    total_claims:'total_claims',attention:'attention',no_submission:'no_submission',submitted:'submitted',
+    rejected_gap:'rejected',pricing_gap:'pricing'}
   return HELP_BY_ID[map[base]]||null
 }
 function topicBody(t,hideDetail){
@@ -1462,6 +1503,7 @@ function rDash(){
   renderFreshness()
   const claims=scopedClaims()
   const invoiced=claims.reduce((s,c)=>s+c.invoiced,0),accepted=claims.reduce((s,c)=>s+c.accepted,0)
+  const totRejected=claims.reduce((s,c)=>s+(c.rejected||0),0),totPricing=claims.reduce((s,c)=>s+(c.pricing_diff||0),0)
   const answered=claims.filter(c=>c.answered).length,pending=claims.length-answered
   const err=claims.filter(c=>c.status_overall==='Error').length,warn=claims.filter(c=>c.status_overall==='Warning').length,success=claims.filter(c=>c.status_overall==='Success').length
   const series=monthly(claims)
@@ -1481,7 +1523,9 @@ function rDash(){
     <div class="kpi drill" onclick="openMetric('credited')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited (€)</div><div class="kv mint">${f0(accepted)}</div><div class="ks">of €${fk(invoiced)} invoiced</div></div>
     <div class="kpi drill" onclick="openMetric('credited_rate')"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">🎯 Credited Rate</div><div class="kv sky">${pct(accepted,invoiced).toFixed(1)}%</div><div class="ks">€${fk(invoiced-accepted)} gap</div></div>
     <div class="kpi drill" onclick="openMetric('pending')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending Answer</div><div class="kv sun">${f0(pending)}</div><div class="ks">submitted, awaiting BMW</div></div>
-    <div class="kpi drill" onclick="openMetric('attention')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">⚠️ Needs Attention</div><div class="kv rose">${f0(err+warn)}</div><div class="ks">${err} errors · ${warn} warnings</div></div>`+offCard
+    <div class="kpi drill" onclick="openMetric('attention')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">⚠️ Needs Attention</div><div class="kv rose">${f0(err+warn)}</div><div class="ks">${err} errors · ${warn} warnings</div></div>
+    <div class="kpi drill" onclick="openMetric('rejected_gap')"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">❌ Rejected (to chase)</div><div class="kv" style="color:var(--rose-d)">${f0(totRejected)}</div><div class="ks">BMW cut what we claimed</div></div>
+    <div class="kpi drill" onclick="openMetric('pricing_gap')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔧 Pricing Difference</div><div class="kv lem">${f0(totPricing)}</div><div class="ks">incadea rate vs BMW rate</div></div>`+offCard
   document.getElementById('CH_trend').innerHTML=trendChart(series.map(s=>({label:fmM(s.month),short:fmMs(s.month),value:s.accepted,count:s.cnt})))
   document.getElementById('CH_status').innerHTML=donutChart([{label:'Success',value:success,color:'#10b981'},{label:'Warning',value:warn,color:'#eab308'},{label:'Error',value:err,color:'#e11d48'},{label:'Pending',value:pending,color:'#f59e0b'}],{centerTop:f0(claims.length),centerSub:'CLAIMS'})
   document.getElementById('CH_gap').innerHTML=groupBarChart(series.map(s=>({label:fmMs(s.month),a:s.invoiced,b:s.accepted,aLabel:'Invoiced',bLabel:'Credited'})))
@@ -1570,9 +1614,11 @@ function rRej(){
   const err=rows.filter(c=>c.status_overall==='Error').length,warn=rows.filter(c=>c.status_overall==='Warning').length
   const tracked=rows.filter(c=>S.resub[c.kind+':'+c.no]).length
   const atRisk=rows.reduce((s,c)=>s+c.gap,0),credited=rows.reduce((s,c)=>s+(S.resub[c.kind+':'+c.no]?.credited_amt||0),0)
+  const rejAmt=rows.reduce((s,c)=>s+(c.rejected||0),0)
   document.getElementById('K_rej').innerHTML=`
     <div class="kpi drill" onclick="openMetric('rj_err')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
     <div class="kpi drill" onclick="openMetric('rj_warn')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
+    <div class="kpi drill" onclick="openMetric('rejected_gap')"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">❌ Rejected € (to chase)</div><div class="kv" style="color:var(--rose-d)">${f0(rejAmt)}</div><div class="ks">claimed − paid</div></div>
     <div class="kpi drill" onclick="openMetric('rj_gap')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💰 Gap at Risk €</div><div class="kv sun">${f0(atRisk)}</div></div>
     <div class="kpi drill" onclick="openMetric('rj_tracked')"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kl">✅ Tracked</div><div class="kv" style="color:var(--blue)">${tracked}</div><div class="ks">of ${rows.length}</div></div>
     <div class="kpi drill" onclick="openMetric('rj_recovered')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💚 Recovered €</div><div class="kv mint">${f0(credited)}</div></div>`
