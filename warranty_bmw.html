@@ -450,11 +450,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v4.9'
+const APP_VERSION='v5.0'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.0',date:'2026-06-29',items:[
+    {t:'fix',d:'Corrected/resubmitted claims now read their outcome from the LATEST credit note — a claim that was rejected then re-credited shows ✅ Success (with a "✎ corrected" badge), not ❌ Error.'}]},
   {v:'v4.9',date:'2026-06-29',items:[
     {t:'feat',d:'Changelog now goes all the way back to the start (v3.0, the first reconciliation build on 22 Jun).'}]},
   {v:'v4.8',date:'2026-06-29',items:[
@@ -734,12 +736,17 @@ function reconcile(){
       if(c.credit_note_date&&(!cnDate||c.credit_note_date>cnDate))cnDate=c.credit_note_date
       if(c.repair_date&&!repairDate)repairDate=c.repair_date})
     const answered=cr.length>0
-    const status_overall=!answered?'Pending':st.Error>0?'Error':st.Warning>0?'Warning':'Success'
+    // a corrected/resubmitted claim gets a NEWER credit note that supersedes the earlier
+    // (rejected) one — base the outcome on the latest credit note, not all lines aggregated.
+    const stL={Success:0,Warning:0,Error:0};cr.forEach(c=>{if(c.credit_note_date===cnDate&&c.crediting_item_status)stL[c.crediting_item_status]=(stL[c.crediting_item_status]||0)+1})
+    const useS=(stL.Success+stL.Warning+stL.Error)>0?stL:st
+    const corrected=cnNos.size>1
+    const status_overall=!answered?'Pending':useS.Error>0?'Error':useS.Warning>0?'Warning':'Success'
     const invoiced=inv?Number(inv.total_invoiced)||0:0
     return {kind:s.claim_kind,no:s.last_submission||s.no,record_no:s.no,sub:s,inv,credits:cr,vin:s.vin||inv?.vin||(cr[0]?.vin)||'',make:s.make_code||inv?.make_code||'',
       brand:cr[0]?.brand||'',model:inv?.model||'',month:s.month||(cnDate?cnDate.slice(0,7):''),
       doc_no:s.doc_no,sub_key:s.sub_key,sub_status:s.status||'',document_date:s.document_date,cn_date:cnDate,repair_date:repairDate,
-      items_count:cr.length,answered,status_overall,statuses:st,labor,parts,ext,
+      items_count:cr.length,answered,status_overall,statuses:st,corrected,labor,parts,ext,
       invoiced,accepted,claimed_price:claimedPrice,gap:invoiced-accepted,accept_ratio:pct(accepted,invoiced),
       cn_no:[...cnNos].join(', '),defect_codes:[...defects],lag_days:days(repairDate,cnDate)}
   })
@@ -759,8 +766,8 @@ function reconcile(){
       no:cr[0].dealer_claim_number,record_no:'',sub_key:key,dealer_claim_number:cr[0].dealer_claim_number,credits:cr,
       vin:cr[0].vin||'',brand:cr[0].brand||'',make:cr[0].brand||'',model:'',sub_status:'(no submission on file)',document_date:null,
       month:cnDate?cnDate.slice(0,7):'',cn_date:cnDate,repair_date:repairDate,items_count:cr.length,answered:true,
-      accepted,invoiced:0,claimed_price:claimedPrice,gap:0,accept_ratio:0,labor,parts,ext,
-      status_overall:st.Error>0?'Error':st.Warning>0?'Warning':'Success',statuses:st,cn_no:[...cnNos].join(', '),
+      accepted,invoiced:0,claimed_price:claimedPrice,gap:0,accept_ratio:0,labor,parts,ext,corrected:cnNos.size>1,
+      status_overall:(()=>{const sL={Success:0,Warning:0,Error:0};cr.forEach(c=>{if(c.credit_note_date===cnDate&&c.crediting_item_status)sL[c.crediting_item_status]=(sL[c.crediting_item_status]||0)+1});const u=(sL.Success+sL.Warning+sL.Error)>0?sL:st;return u.Error>0?'Error':u.Warning>0?'Warning':'Success'})(),statuses:st,cn_no:[...cnNos].join(', '),
       defect_codes:[...defects],lag_days:days(repairDate,cnDate)}
   })
   // best-effort inferred invoice for orphan credits: match the incadea invoices
@@ -787,6 +794,7 @@ window.sortClick=sortClick
 function applySort(rows,k,acc){const st=S.sortState[k];if(!st||st.col<0||!acc[st.col])return rows;const a=acc[st.col],d=st.dir==='desc'?-1:1;return[...rows].sort((x,y)=>{const va=a(x),vb=a(y);if(va==null&&vb==null)return 0;if(va==null)return 1;if(vb==null)return -1;if(typeof va==='number'&&typeof vb==='number')return(va-vb)*d;return String(va).localeCompare(String(vb))*d})}
 function th(l,k,i,o){o=o||{};const st=S.sortState[k]||{};const cls=['sortable'];if(o.num)cls.push('num');if(st.col===i)cls.push(st.dir==='desc'?'sort-desc':'sort-asc');return `<th class="${cls.join(' ')}" onclick="sortClick('${k}',${i})">${l}</th>`}
 const sBadge=s=>s==='Error'?'<span class="badge b-rose">❌ Error</span>':s==='Warning'?'<span class="badge b-lem">⚠️ Warning</span>':s==='Pending'?'<span class="badge b-sun">⏳ Pending</span>':'<span class="badge b-mint">✅ Success</span>'
+const corrBadge=c=>c&&c.corrected?' <span class="badge b-sky" title="Resubmitted &amp; corrected — outcome reflects the latest credit note">✎ corrected</span>':''
 const kindBadge=k=>k==='bsi'?'<span class="badge b-sky">BSI</span>':'<span class="badge b-bmw">Warranty</span>'
 
 // ══ MODAL ═══════════════════════════════════════════════════════
@@ -804,7 +812,7 @@ function openClaim(kind,no){
         <div class="flow-arrow">→</div>
         <div class="flow-step"><div class="fl-t">📨 Submitted</div><div class="fl-v" style="font-size:13px">${esc(claim.sub_status||'—')}</div><div class="fl-s">${esc(claim.document_date||'')}</div></div>
         <div class="flow-arrow">→</div>
-        <div class="flow-step"><div class="fl-t">📑 BMW Answer</div><div class="fl-v">${claim.answered?'€'+f(claim.accepted):'—'}</div><div class="fl-s">${claim.answered?sBadge(claim.status_overall):'⏳ no credit note yet'}</div></div>
+        <div class="flow-step"><div class="fl-t">📑 BMW Answer</div><div class="fl-v">${claim.answered?'€'+f(claim.accepted):'—'}</div><div class="fl-s">${claim.answered?sBadge(claim.status_overall)+corrBadge(claim):'⏳ no credit note yet'}</div></div>
         <div class="flow-arrow">=</div>
         <div class="flow-step" style="background:${claim.gap>0.5?'#fff1f2':'#f0fdf4'}"><div class="fl-t">Δ Gap</div><div class="fl-v" style="color:${claim.gap>0.5?'var(--rose-d)':'var(--mint-d)'}">€${f(claim.gap)}</div><div class="fl-s">${claim.invoiced?claim.accept_ratio.toFixed(0)+'% credited':''}</div></div>
       </div>
@@ -855,7 +863,7 @@ function openVin(vin){
     </div>`:''}
     <div class="vin-section"><div class="vin-section-h"><span>📋 Claims for this VIN</span><span class="ct">${claims.length+orph.length}</span></div>
       <table class="vin-mini"><thead><tr><th>Kind</th><th>Submission</th><th>Invoice</th><th>CN Date</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th>Status</th></tr></thead>
-      <tbody>${claims.map(c=>`<tr class="clickable" onclick="closeModal();openClaim('${esc(c.kind)}','${esc(c.no)}')"><td>${kindBadge(c.kind)}</td><td class="mono">${esc(c.no)}</td><td class="mono">${esc(c.doc_no||'—')}</td><td>${esc(c.cn_date||'—')}</td><td class="num">${f(c.invoiced)}</td><td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}</td></tr>`).join('')}
+      <tbody>${claims.map(c=>`<tr class="clickable" onclick="closeModal();openClaim('${esc(c.kind)}','${esc(c.no)}')"><td>${kindBadge(c.kind)}</td><td class="mono">${esc(c.no)}</td><td class="mono">${esc(c.doc_no||'—')}</td><td>${esc(c.cn_date||'—')}</td><td class="num">${f(c.invoiced)}</td><td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}${corrBadge(c)}</td></tr>`).join('')}
       ${orph.map(o=>{const mi=o.inferred_inv;return `<tr><td>${kindBadge(o.kind)}</td><td class="mono">${esc(o.dealer_claim_number)}*</td><td class="mono">${mi?`<span title="Inferred from incadea by VIN + amount — verify against the submission file">≈ ${esc(mi.doc_no)}</span>`:'—'}</td><td>${esc(o.cn_date||'—')}</td><td class="num">${mi?'<span style="color:var(--muted)" title="from the inferred invoice">≈ '+f(mi.total_invoiced)+'</span>':'—'}</td><td class="num" style="font-weight:700">${f(o.accepted)}</td><td>${sBadge(o.status_overall)}</td></tr>`}).join('')}</tbody></table>
       ${orph.length?'<div style="font-size:10px;color:var(--faint);margin-top:6px">* credit note with no submission record loaded. <b>≈</b> = invoice inferred from incadea by VIN + amount (date-independent) — verify before relying on it; upload the submission file for an exact link.</div>':''}
     </div></div></div>`
@@ -1461,7 +1469,7 @@ function rPipe(){
       <td class="num">${c.noSubmission?(c.inferred_inv?`<span style="color:var(--muted)" title="from the inferred invoice">≈ ${f(c.inferred_inv.total_invoiced)}</span>`:'<span style="color:var(--faint)">—</span>'):f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
       <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c.noSubmission?'<span style="color:var(--faint)">—</span>':(c.answered?f(c.gap):'—')}</td>
       <td class="num">${c.answered&&c.invoiced?`<span style="font-weight:700;color:${c.accept_ratio>=85?'var(--mint-d)':c.accept_ratio>=65?'var(--lemon-d)':'var(--rose-d)'}">${c.accept_ratio.toFixed(0)}%</span>`:'—'}</td>
-      <td>${sBadge(c.status_overall)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${tr?` <span class="badge b-sky">${tr.status}</span>`:''}</td>
+      <td>${sBadge(c.status_overall)}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${tr?` <span class="badge b-sky">${tr.status}</span>`:''}</td>
       <td>${(c.status_overall==='Error'||c.status_overall==='Warning')?`<button class="btn btn-sm ${tr?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr?'✏️':'+ Track'}</button>`:'<span style="color:var(--faint)">—</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="12" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
@@ -1492,7 +1500,7 @@ function rCredits(){
     <td class="mono">${c.doc_no?esc(c.doc_no):(c.inferred_inv?`<span title="inferred from incadea by VIN + amount — verify">≈ ${esc(c.inferred_inv.doc_no)}</span>`:'—')}</td>
     <td><span class="badge b-n">${esc(c.credits[0]?.brand||'—')}</span></td>
     <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td><td class="num">${c.items_count}</td>
-    <td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}</td>
+    <td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}${corrBadge(c)}</td>
     <td>${c.orphan?'<span class="badge b-pur" title="BMW credited this, but no matching submission row is loaded">credited · no sub</span>':'<span class="badge b-mint">linked</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="11" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
