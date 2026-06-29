@@ -175,6 +175,14 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
 .card.drill:hover{border-color:var(--bmw);box-shadow:var(--shadow-lg)}
 .card.drill .ct::after{content:" ⤢";font-size:11px;color:var(--faint);font-weight:600}
 /* ── help center + chatbot ── */
+.fresh{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:11px;margin-bottom:16px}
+.fresh-item{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--line);border-left-width:4px;border-radius:13px;padding:11px 14px;box-shadow:var(--shadow)}
+.fresh-item.ok{border-left-color:var(--mint)}.fresh-item.warn{border-left-color:var(--sun)}.fresh-item.bad{border-left-color:var(--rose)}
+.fresh-ic{font-size:22px;line-height:1}
+.fresh-l{font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.fresh-v{font-size:13px;font-weight:800;margin-top:2px}
+.fresh-s{font-size:10.5px;font-weight:700;margin-top:2px}
+.fresh-s.ok{color:var(--mint-d)}.fresh-s.warn{color:#a16207}.fresh-s.bad{color:var(--rose-d)}
 .vin-search-box{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
 .vin-search-box input{border:none;padding:7px 11px;font-size:11.5px;font-family:inherit;width:172px;outline:none;color:var(--txt)}
 .vin-search-box button{border:none;background:var(--bmw);color:#fff;padding:7px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit}
@@ -283,7 +291,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
     <div class="si" data-page="statement"><span class="si-icon">💶</span><span>BMW Statement</span></div>
     <div class="nav-sec">Data</div>
     <div class="si" data-page="upload"><span class="si-icon">📤</span><span>Upload Center</span></div>
-    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v4.2</div>
+    <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v4.3</div>
   </aside>
 
   <main class="main">
@@ -309,6 +317,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
 
     <!-- DASHBOARD -->
     <div class="page active" id="P_dashboard">
+      <div id="freshness"></div>
       <div class="card" id="flowCard" style="padding:16px 20px"><div id="flow"></div></div>
       <div class="kpis" id="K_dash"></div>
       <div class="grid-2">
@@ -1292,7 +1301,25 @@ function updateBadges(){
   const mo=document.getElementById('pp_month');if(mo)mo.innerHTML='<option value="">All</option>'+months.map(m=>`<option value="${esc(m)}">${esc(fmM(m))}</option>`).join('')
 }
 
+function renderFreshness(){
+  const el=document.getElementById('freshness');if(!el)return
+  const today=new Date().toISOString().slice(0,10)
+  const fmtD=iso=>{if(!iso)return '—';const[y,m,d]=iso.split('-');return d+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]+' '+y}
+  const maxD=(arr,k)=>arr.reduce((m,x)=>{const v=x[k];return v&&v>m?v:m},'')
+  const files=[
+    {ic:'🧾',l:'incadea invoices',date:maxD(S.inv,'posting_date'),n:S.inv.length},
+    {ic:'📨',l:'BMW submissions',date:maxD(S.subs,'document_date'),n:S.subs.length},
+    {ic:'📑',l:'BMW credit notes',date:maxD(S.cred,'credit_note_date'),n:S.cred.length},
+  ]
+  el.innerHTML='<div class="fresh">'+files.map(fl=>{
+    const ago=fl.date?days(fl.date,today):null
+    const cls=!fl.date?'bad':ago>21?'bad':ago>8?'warn':'ok'
+    const s=!fl.date?'not loaded — upload it':ago<=0?'latest is today':ago===1?'latest 1 day ago':'latest '+ago+' days ago'
+    return `<div class="fresh-item ${cls}"><div class="fresh-ic">${fl.ic}</div><div style="flex:1"><div class="fresh-l">${fl.l} · ${f0(fl.n)} rows</div><div class="fresh-v">${fmtD(fl.date)}</div><div class="fresh-s ${cls}">${cls==='ok'?'✓ ':cls==='warn'?'⚠️ ':'⛔ '}${s}</div></div></div>`
+  }).join('')+'</div>'
+}
 function rDash(){
+  renderFreshness()
   const claims=scopedClaims()
   const invoiced=claims.reduce((s,c)=>s+c.invoiced,0),accepted=claims.reduce((s,c)=>s+c.accepted,0)
   const answered=claims.filter(c=>c.answered).length,pending=claims.length-answered
