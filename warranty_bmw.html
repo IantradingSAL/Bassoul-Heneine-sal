@@ -452,11 +452,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.1'
+const APP_VERSION='v5.2'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.2',date:'2026-06-29',items:[
+    {t:'feat',d:'Manual claim-number overrides: a correction table (bmw_claim_overrides) remaps a claim key at load time, surviving re-uploads. First entry: 070074 → 070062 (this claim was entered manually in BMW AG as 070062), so its submission and credit now reconcile under 70062.'}]},
   {v:'v5.1',date:'2026-06-29',items:[
     {t:'feat',d:'Real Excel (.xlsx) export on every page — Credits, Rejections, Pipeline, Statement, the Dashboard monthly table and every drill-down panel. Exports respect the current filters.'}]},
   {v:'v5.0',date:'2026-06-29',items:[
@@ -706,9 +708,16 @@ async function handleFiles(files){
   updateBadges();renderPage(currentPage());rUploadHist()
 }
 
+async function loadOverrides(){try{const {data,error}=await sb.from('bmw_claim_overrides').select('old_key,new_key');if(error)return{};const m={};(data||[]).forEach(o=>{const k=subkey(o.old_key);if(k)m[k]=subkey(o.new_key)});return m}catch(e){return{}}}
+// apply manual claim-number corrections (e.g. a claim re-keyed by hand in BMW AG)
+// at load time, so they survive re-uploads and remap both the submission and credit sides.
+function applyOverrides(ovr){if(!ovr||!Object.keys(ovr).length)return
+  S.subs.forEach(s=>{const k=s.sub_key||subkey(s.last_submission)||subkey(s.no);if(ovr[k]){s._origKey=k;s.sub_key=ovr[k];s.last_submission=ovr[k]}})
+  S.cred.forEach(c=>{if(ovr[c.dcn_key]){c._origKey=c.dcn_key;c.dealer_claim_number=ovr[c.dcn_key];c.dcn_key=ovr[c.dcn_key]}})}
 async function refreshData(){
-  const [inv,subs,cred,resub]=await Promise.all([loadAll('bmw_rec_invoices','posting_date'),loadAll('bmw_rec_submissions','document_date'),loadAll('bmw_rec_credits','credit_note_date'),loadResub()])
-  S.inv=inv;S.subs=subs;S.cred=cred;S.resub=resub
+  const [inv,subs,cred,resub,ovr]=await Promise.all([loadAll('bmw_rec_invoices','posting_date'),loadAll('bmw_rec_submissions','document_date'),loadAll('bmw_rec_credits','credit_note_date'),loadResub(),loadOverrides()])
+  S.inv=inv;S.subs=subs;S.cred=cred;S.resub=resub;S.ovr=ovr
+  applyOverrides(ovr)
   document.getElementById('cnt_inv').textContent=f0(inv.length)
   document.getElementById('cnt_sub').textContent=f0(subs.length)
   document.getElementById('cnt_cr').textContent=f0(cred.length)
