@@ -461,13 +461,16 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.5'
+const APP_VERSION='v5.6'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.6',date:'2026-06-29',items:[
+    {t:'fix',d:'Fixed a stray character in the v5.5 release note that stopped the whole page from loading (the freeze).'},
+    {t:'feat',d:'Performance: the reconciliation engine is now cached and recomputed only when data changes, so large datasets stay fast (no more freezing while typing or switching pages).'}]},
   {v:'v5.5',date:'2026-06-29',items:[
-    {t:'fix',d:'Credits page no longer shows a blank Dealer Claim for linked claims — it now falls back to the credit note's dealer claim number (and the claim number). Fixed in the table, Excel export and search.'}]},
+    {t:'fix',d:'Credits page no longer shows a blank Dealer Claim for linked claims — it now falls back to the dealer claim number on the credit note (and the claim number). Fixed in the table, Excel export and search.'}]},
   {v:'v5.4',date:'2026-06-29',items:[
     {t:'fix',d:'Uploads no longer fail with "ON CONFLICT … cannot affect row a second time" — duplicate keys within a file (e.g. the same claim No. listed twice) are now de-duplicated before saving.'}]},
   {v:'v5.3',date:'2026-06-29',items:[
@@ -737,13 +740,17 @@ async function refreshData(){
   const [inv,subs,cred,resub,ovr]=await Promise.all([loadAll('bmw_rec_invoices','posting_date'),loadAll('bmw_rec_submissions','document_date'),loadAll('bmw_rec_credits','credit_note_date'),loadResub(),loadOverrides()])
   S.inv=inv;S.subs=subs;S.cred=cred;S.resub=resub;S.ovr=ovr
   applyOverrides(ovr)
+  invalidateReconcile()
   document.getElementById('cnt_inv').textContent=f0(inv.length)
   document.getElementById('cnt_sub').textContent=f0(subs.length)
   document.getElementById('cnt_cr').textContent=f0(cred.length)
 }
 
 // ══ RECONCILIATION ENGINE (validated on real data) ══════════════
+let _recCache=null
+function invalidateReconcile(){_recCache=null}
 function reconcile(){
+  if(_recCache)return _recCache
   const invByDoc={};S.inv.forEach(i=>invByDoc[i.doc_no]=i)
   const credByKey={};S.cred.forEach(c=>{(credByKey[c.dcn_key]=credByKey[c.dcn_key]||[]).push(c)})
   // dedupe submissions to one row per (kind, claim-number); BSI claims can appear twice
@@ -814,7 +821,7 @@ function reconcile(){
     ;[...os].sort((a,b)=>b.accepted-a.accepted).forEach(o=>{if(!pool.length)return;let bi=0,bd=Infinity
       pool.forEach((i,idx)=>{const d=Math.abs((Number(i.total_invoiced)||0)-o.accepted);if(d<bd){bd=d;bi=idx}})
       o.inferred_inv=pool[bi];pool.splice(bi,1)})})
-  return {claims,orphans}
+  _recCache={claims,orphans};return _recCache
 }
 function inScope(x){return S.scope==='all'||x.kind===S.scope}
 function scopedClaims(){return reconcile().claims.filter(inScope)}
