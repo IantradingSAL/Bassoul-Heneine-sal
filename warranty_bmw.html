@@ -176,6 +176,16 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
 .card.drill .ct::after{content:" ⤢";font-size:11px;color:var(--faint);font-weight:600}
 /* ── help center + chatbot ── */
 .ver-chip{display:inline-flex;align-items:center;font-size:11px;font-weight:800;color:var(--bmw);background:rgba(28,105,212,.1);border:1px solid rgba(28,105,212,.25);border-radius:999px;padding:5px 11px;letter-spacing:.02em}
+.ver-chip:hover{background:rgba(28,105,212,.18)}
+.cl-rel{padding:12px 0;border-bottom:1px solid var(--line)}
+.cl-rel:last-child{border-bottom:none}
+.cl-h{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.cl-v{font-size:14px;font-weight:800;color:var(--bmw)}
+.cl-d{font-size:10.5px;color:var(--muted);font-weight:600}
+.cl-item{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.5;margin-bottom:6px}
+.cl-tag{flex:none;font-size:8.5px;font-weight:800;padding:2px 7px;border-radius:999px;letter-spacing:.04em;margin-top:1px}
+.cl-tag.feat{background:rgba(28,105,212,.13);color:var(--bmw)}
+.cl-tag.fix{background:rgba(16,185,129,.15);color:#047857}
 .fresh{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:11px;margin-bottom:16px}
 .fresh-item{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--line);border-left-width:4px;border-radius:13px;padding:11px 14px;box-shadow:var(--shadow)}
 .fresh-item.ok{border-left-color:var(--mint)}.fresh-item.warn{border-left-color:var(--sun)}.fresh-item.bad{border-left-color:var(--rose)}
@@ -440,9 +450,48 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v4.7'
-;(()=>{const vc=document.getElementById('verChip');if(vc)vc.textContent=APP_VERSION
+const APP_VERSION='v4.8'
+;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
+// ── change history (newest first). type: 'fix' | 'feat' ──
+const CHANGELOG=[
+  {v:'v4.8',date:'2026-06-29',items:[
+    {t:'fix',d:'Submission matching now keys by the BMW claim number ("Last Submission"); the internal "No." is ignored. Fixes claims that wrongly showed "no submission" when their submission was actually loaded.'},
+    {t:'feat',d:'This Changelog page — full history of every change (click the version chip any time).'}]},
+  {v:'v4.7',date:'2026-06-29',items:[{t:'feat',d:'Each data-freshness card shows the upload time separately from the newest-record date.'}]},
+  {v:'v4.6',date:'2026-06-29',items:[
+    {t:'fix',d:'Support the real BMW submission export (sheet "Warranty " with a trailing space; "Claim No." column) — it used to load 0 rows.'},
+    {t:'fix',d:'Upload History always shows what is actually loaded, even when the upload log is blocked.'}]},
+  {v:'v4.5',date:'2026-06-29',items:[{t:'feat',d:'Always-visible version chip in the header, driven by one constant.'}]},
+  {v:'v4.4',date:'2026-06-29',items:[{t:'feat',d:'Stale-data nudge: a toast on load when a file is more than 7 days behind the others.'}]},
+  {v:'v4.3',date:'2026-06-29',items:[{t:'feat',d:'Dashboard data-freshness banner: latest date + row count per source, colour-coded.'}]},
+  {v:'v4.2',date:'2026-06-29',items:[{t:'fix',d:'No-Submission Gaps labels corrected after verifying none of the 284 gaps are key mismatches.'}]},
+  {v:'v4.1',date:'2026-06-29',items:[{t:'feat',d:'No-Submission Gaps diagnostic (Insights tab): every credit note missing its submission, with CSV export.'}]},
+  {v:'v4.0',date:'2026-06-29',items:[{t:'feat',d:'Inferred invoices (≈ GAR…) surfaced on Pipeline and Credits, plus the drill-downs.'}]},
+  {v:'v3.9',date:'2026-06-29',items:[
+    {t:'feat',d:'Global VIN history search in the header.'},
+    {t:'feat',d:'Universal A–Z / Z–A column sort — click any header on any table.'}]},
+  {v:'v3.8',date:'2026-06-29',items:[{t:'feat',d:'VIN view lists every incadea invoice for the car; orphan rows get a best-effort inferred invoice.'}]},
+  {v:'v3.7',date:'2026-06-29',items:[{t:'feat',d:'Credit Lines show the Claim Item Number.'}]},
+  {v:'v3.6',date:'2026-06-29',items:[{t:'feat',d:'Added a part-number column to credit lines (later switched to Claim Item Number).'}]},
+  {v:'v3.5',date:'2026-06-29',items:[{t:'feat',d:'Help & Guide centre explaining how every figure is calculated, plus an in-app assistant chatbot.'}]},
+  {v:'v3.4',date:'2026-06-29',items:[
+    {t:'feat',d:'Press-to-drill: every value (flow strip, KPI cards, charts) opens a detail panel with source files, the underlying records and CSV export.'},
+    {t:'feat',d:'Drill-down rolled out across Dashboard, Pipeline, Credits, Rejections, Statement and Insights, filter-aware.'}]},
+  {v:'v3.3',date:'2026-06-22',items:[{t:'feat',d:'Baseline before this work — reconciliation engine, dashboard, pipeline, credits, rejections, statement, insights, upload centre.'}]},
+]
+function openChangelog(){
+  let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
+  const body=CHANGELOG.map(rel=>`<div class="cl-rel"><div class="cl-h"><span class="cl-v">${esc(rel.v)}</span><span class="cl-d">${esc(rel.date)}</span>${rel.v===APP_VERSION?'<span class="badge b-mint">you are here</span>':''}</div>
+    ${rel.items.map(it=>`<div class="cl-item"><span class="cl-tag ${it.t}">${it.t==='fix'?'FIX':'NEW'}</span><span>${it.d}</span></div>`).join('')}</div>`).join('')
+  bg.innerHTML=`<div class="bmw-modal" style="max-width:680px"><div class="bmw-modal-h"><div class="bmw-modal-icon">📜</div>
+    <div class="bmw-modal-title" style="flex:1"><h3>Changelog</h3><p>every change, newest first · you are on ${esc(APP_VERSION)}</p></div>
+    <button class="bmw-modal-x" onclick="closeModal()">✕</button></div>
+    <div class="bmw-modal-body">${body}</div></div>`
+  document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
+  bg.addEventListener('click',e=>{if(e.target===bg)closeModal()});document.addEventListener('keydown',escClose)
+}
+window.openChangelog=openChangelog
 
 async function whoami(){ try{ const {data:{user}}=await sb.auth.getUser(); if(user){ const {data}=await sb.from('employees').select('id,name').eq('auth_user_id',user.id).maybeSingle(); if(data)S.me=data } }catch{} }
 
@@ -557,9 +606,9 @@ function parseSubmissions(wb){
     const ws=wb.Sheets[wb.SheetNames.find(s=>s.trim().toLowerCase()===sn.toLowerCase())]
     if(!ws)continue
     sheetRows(ws).forEach(r=>{const no=String(r['No.']||'').trim();if(!no)return
-      const ls=String(r['Last Submission']||r['Last Submission No.']||r['Claim No.']||r['Claim Number']||'').trim(),dd=toIso(r['Document Date'])
+      const ls=String(r['Last Submission']||r['Last Submission No.']||'').trim(),claimOrig=String(r['Claim No.']||r['Claim Number']||'').trim(),dd=toIso(r['Document Date'])
       out.push({id:kind+':'+no,claim_kind:kind,no:no,make_code:String(r['Make Code']||'').trim()||null,status:String(r['Status']||'').trim()||null,
-        last_submission:ls||null,sub_key:(kind==='bsi'?(subkey(ls)||subkey(no)):subkey(ls)),vin:String(r['VIN']||'').trim().toUpperCase()||null,license_no:String(r['License No.']||'').trim()||null,
+        last_submission:ls||null,sub_key:(subkey(ls)||subkey(no)),vin:String(r['VIN']||'').trim().toUpperCase()||null,license_no:String(r['License No.']||'').trim()||null,
         doc_no:String(r['Document No.']||'').trim()||null,service_order_no:String(r['Service Order No.']||'').trim()||null,
         document_date:dd,dealer_status:String(r['Dealer Status']||'').trim()||null,dealer_claim_submitted_date:toIso(r['Dealer Claim Submitted Date']||r['Dealer Claim Submitted D']),
         warranty_type:String(r['Warranty Type']||'').trim()||null,bill_to_customer_no:String(r['Bill-to Customer No.']||'').trim()||null,
