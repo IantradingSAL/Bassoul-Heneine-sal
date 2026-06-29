@@ -461,11 +461,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.3'
+const APP_VERSION='v5.4'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.4',date:'2026-06-29',items:[
+    {t:'fix',d:'Uploads no longer fail with "ON CONFLICT … cannot affect row a second time" — duplicate keys within a file (e.g. the same claim No. listed twice) are now de-duplicated before saving.'}]},
   {v:'v5.3',date:'2026-06-29',items:[
     {t:'feat',d:'Self-service Claim Number Corrections panel in the Upload Center — add or remove old→new claim remaps yourself (no database access needed); applied instantly across all pages.'}]},
   {v:'v5.2',date:'2026-06-29',items:[
@@ -678,7 +680,11 @@ async function loadAll(table,order){
 }
 async function loadResub(){const {data,error}=await sb.from('warranty_bmw_resub').select('*').limit(8000);if(error){console.warn('resub:',error.message);return{}}const m={};(data||[]).forEach(r=>{if(r.orig_claim)m[r.orig_claim]=r});return m}
 async function upsertChunked(table,rows,conflict,label){
-  if(!rows.length)return 0;const cs=300;let done=0
+  if(!rows.length)return 0
+  // collapse duplicate conflict keys (e.g. the same claim No. twice in one file) —
+  // Postgres rejects a batch that updates the same row twice. Last occurrence wins.
+  if(conflict){const m=new Map();rows.forEach(r=>{if(r[conflict]!=null)m.set(r[conflict],r)});rows=[...m.values()]}
+  const cs=300;let done=0
   for(let i=0;i<rows.length;i+=cs){showLoad(`${label}: ${i+1}–${Math.min(i+cs,rows.length)} of ${rows.length}…`)
     const {error}=await sb.from(table).upsert(rows.slice(i,i+cs),{onConflict:conflict});if(error)throw new Error(table+': '+error.message);done+=Math.min(cs,rows.length-i)}
   return done
