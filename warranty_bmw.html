@@ -461,11 +461,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.4'
+const APP_VERSION='v5.5'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.5',date:'2026-06-29',items:[
+    {t:'fix',d:'Credits page no longer shows a blank Dealer Claim for linked claims — it now falls back to the credit note's dealer claim number (and the claim number). Fixed in the table, Excel export and search.'}]},
   {v:'v5.4',date:'2026-06-29',items:[
     {t:'fix',d:'Uploads no longer fail with "ON CONFLICT … cannot affect row a second time" — duplicate keys within a file (e.g. the same claim No. listed twice) are now de-duplicated before saving.'}]},
   {v:'v5.3',date:'2026-06-29',items:[
@@ -1525,7 +1527,7 @@ function rCredits(){
   const sf=document.getElementById('cr_status').value,bf=document.getElementById('cr_brand').value,lf=document.getElementById('cr_link').value,q=document.getElementById('cr_search').value.toLowerCase().trim()
   let rows=list.filter(c=>{if(sf&&c.status_overall!==sf)return false;if(bf&&(c.credits[0]?.brand||'')!==bf)return false
     if(lf==='linked'&&c.orphan)return false;if(lf==='orphan'&&!c.orphan)return false
-    if(q&&![c.cn_no,c.vin,c.dealer_claim_number||c.sub?.last_submission||'',c.no||''].join('|').toLowerCase().includes(q))return false;return true})
+    if(q&&![c.cn_no,c.vin,c.dealer_claim_number||c.sub?.last_submission||'',c.credits?.[0]?.dealer_claim_number||'',c.no||''].join('|').toLowerCase().includes(q))return false;return true})
   rows.sort((a,b)=>(b.cn_date||'').localeCompare(a.cn_date||''))
   window._crRows=rows
   const accepted=rows.reduce((s,c)=>s+c.accepted,0),err=rows.filter(c=>c.status_overall==='Error').length,warn=rows.filter(c=>c.status_overall==='Warning').length
@@ -1538,7 +1540,7 @@ function rCredits(){
   let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>CN Date</th><th>Credit Note</th><th>Kind</th><th>Dealer Claim</th><th>Invoice</th><th>Brand</th><th>VIN</th><th class="num">Lines</th><th class="num">Credited €</th><th>Status</th><th>Link</th></tr></thead><tbody>`
   rows.slice(0,700).forEach(c=>{h+=`<tr class="tr-clickable" onclick="${c.orphan?`openVin('${esc(c.vin)}')`:`openClaim('${esc(c.kind)}','${esc(c.no)}')`}">
     <td style="font-size:10px;color:var(--muted)">${esc(c.cn_date||'')}</td><td class="mono" style="font-weight:600">${esc(c.cn_no||'')}</td><td>${kindBadge(c.kind)}</td>
-    <td class="mono">${esc(c.dealer_claim_number||c.sub?.last_submission||'—')}</td>
+    <td class="mono">${esc(c.dealer_claim_number||c.credits?.[0]?.dealer_claim_number||c.no||c.sub?.last_submission||'—')}</td>
     <td class="mono">${c.doc_no?esc(c.doc_no):(c.inferred_inv?`<span title="inferred from incadea by VIN + amount — verify">≈ ${esc(c.inferred_inv.doc_no)}</span>`:'—')}</td>
     <td><span class="badge b-n">${esc(c.credits[0]?.brand||'—')}</span></td>
     <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td><td class="num">${c.items_count}</td>
@@ -1794,7 +1796,7 @@ window.delOverride=delOverride
 ;['rj_status','rj_make','rj_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rRej);e.addEventListener('change',rRej)})
 document.querySelectorAll('#insSeg button').forEach(b=>b.addEventListener('click',()=>{S.insTab=b.dataset.ins;rInsights()}))
 document.getElementById('pp_export').addEventListener('click',()=>{const rows=(window._ppRows||[]).map(c=>[c.kind,c.no,c.record_no,c.doc_no||(c.inferred_inv?'≈'+c.inferred_inv.doc_no:''),c.make,c.vin,c.document_date,c.invoiced,c.answered?c.accepted:'',c.gap,c.accept_ratio?c.accept_ratio.toFixed(0)+'%':'',c.status_overall,c.corrected?'corrected':'',c.cn_no]);exportXlsx('bmw_pipeline',['Kind','Claim No','Record No','Invoice','Make','VIN','Sub Date','Invoiced €','Credited €','Gap €','Cred %','Outcome','Corrected','Credit Notes'],rows);showToast('⬇ Exported '+rows.length+' claims to Excel')})
-document.getElementById('cr_xlsx').addEventListener('click',()=>{const rows=(window._crRows||[]).map(c=>[c.cn_date,c.cn_no,c.kind,c.dealer_claim_number||c.sub?.last_submission||'',c.doc_no||(c.inferred_inv?'≈'+c.inferred_inv.doc_no:''),c.credits[0]?.brand||'',c.vin,c.items_count,c.accepted,c.status_overall,c.corrected?'corrected':'',c.orphan?'no submission':'linked']);exportXlsx('bmw_credits',['CN Date','Credit Note','Kind','Dealer Claim','Invoice','Brand','VIN','Lines','Credited €','Status','Corrected','Link'],rows);showToast('⬇ Exported '+rows.length+' credit rows to Excel')})
+document.getElementById('cr_xlsx').addEventListener('click',()=>{const rows=(window._crRows||[]).map(c=>[c.cn_date,c.cn_no,c.kind,c.dealer_claim_number||c.credits?.[0]?.dealer_claim_number||c.no||c.sub?.last_submission||'',c.doc_no||(c.inferred_inv?'≈'+c.inferred_inv.doc_no:''),c.credits[0]?.brand||'',c.vin,c.items_count,c.accepted,c.status_overall,c.corrected?'corrected':'',c.orphan?'no submission':'linked']);exportXlsx('bmw_credits',['CN Date','Credit Note','Kind','Dealer Claim','Invoice','Brand','VIN','Lines','Credited €','Status','Corrected','Link'],rows);showToast('⬇ Exported '+rows.length+' credit rows to Excel')})
 document.getElementById('rj_xlsx').addEventListener('click',()=>{const rows=(window._rjRows||[]).map(c=>{const tr=S.resub[c.kind+':'+c.no]||{};return [c.cn_date,c.no,c.make,c.vin,c.accepted,c.gap,c.status_overall,c.statuses?.Error||0,c.statuses?.Warning||0,tr.status||'untracked',tr.credited_amt||'']});exportXlsx('bmw_rejections',['CN Date','Submission','Make','VIN','Credited €','Gap €','Issue','Errors','Warnings','Tracked','Recovered €'],rows);showToast('⬇ Exported '+rows.length+' rejections to Excel')})
 document.getElementById('dash_xlsx').addEventListener('click',()=>{const series=monthly(scopedClaims());const rows=series.map(m=>[fmM(m.month),m.cnt,m.invoiced,m.accepted,pct(m.accepted,m.invoiced).toFixed(0)+'%',m.invoiced-m.accepted,m.success,m.warn,m.err,m.pending]);exportXlsx('bmw_monthly',['Month','Claims','Invoiced €','Credited €','Cred %','Gap €','Success','Warning','Error','Pending'],rows);showToast('⬇ Exported '+rows.length+' months to Excel')})
 ;['st_make','st_out'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('change',rStatement)})
