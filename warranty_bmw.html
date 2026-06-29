@@ -439,7 +439,7 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v4.5'
+const APP_VERSION='v4.6'
 ;(()=>{const vc=document.getElementById('verChip');if(vc)vc.textContent=APP_VERSION
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 
@@ -524,7 +524,7 @@ function sheetRows(ws,lastCols){
   return out
 }
 function detectKind(wb){
-  const names=wb.SheetNames.map(s=>s.toLowerCase())
+  const names=wb.SheetNames.map(s=>s.trim().toLowerCase())
   if(names.includes('incadea'))return 'incadea'
   if(wb.SheetNames.find(s=>/sap document export|credit note/i.test(s)))return 'credits'
   if(names.includes('warranty')||names.includes('bsi'))return 'submission'
@@ -532,7 +532,7 @@ function detectKind(wb){
   for(const sn of wb.SheetNames){const r=sheetRows(wb.Sheets[sn]);if(!r.length)continue;const keys=Object.keys(r[0]||{}).map(k=>k.toLowerCase())
     if(keys.includes('reference vin')&&keys.includes('service order no.'))return 'incadea'
     if(keys.includes('dealer claim number')&&keys.includes('credit note number'))return 'credits'
-    if(keys.includes('document no.')&&(keys.includes('last submission')||keys.includes('last submission no.')))return 'submission'}
+    if(keys.includes('document no.')&&(keys.includes('last submission')||keys.includes('last submission no.')||keys.includes('claim no.')))return 'submission'}
   return null
 }
 function parseIncadea(wb){
@@ -553,10 +553,10 @@ function parseSubmissions(wb){
   const out=[]
   const sheetsToDo=[['Warranty','warranty'],['BSI','bsi']]
   for(const [sn,kind] of sheetsToDo){
-    const ws=wb.Sheets[wb.SheetNames.find(s=>s.toLowerCase()===sn.toLowerCase())]
+    const ws=wb.Sheets[wb.SheetNames.find(s=>s.trim().toLowerCase()===sn.toLowerCase())]
     if(!ws)continue
     sheetRows(ws).forEach(r=>{const no=String(r['No.']||'').trim();if(!no)return
-      const ls=String(r['Last Submission']||r['Last Submission No.']||'').trim(),dd=toIso(r['Document Date'])
+      const ls=String(r['Last Submission']||r['Last Submission No.']||r['Claim No.']||r['Claim Number']||'').trim(),dd=toIso(r['Document Date'])
       out.push({id:kind+':'+no,claim_kind:kind,no:no,make_code:String(r['Make Code']||'').trim()||null,status:String(r['Status']||'').trim()||null,
         last_submission:ls||null,sub_key:(kind==='bsi'?(subkey(ls)||subkey(no)):subkey(ls)),vin:String(r['VIN']||'').trim().toUpperCase()||null,license_no:String(r['License No.']||'').trim()||null,
         doc_no:String(r['Document No.']||'').trim()||null,service_order_no:String(r['Service Order No.']||'').trim()||null,
@@ -1625,13 +1625,25 @@ function rStatement(){
 }
 
 async function rUploadHist(){
-  const {data,error}=await sb.from('warranty_uploads').select('*').in('file_type',['bmw_incadea','bmw_submission','bmw_credits']).order('uploaded_at',{ascending:false}).limit(60)
-  if(error){document.getElementById('upHist').innerHTML='⚠️ '+error.message;return}
-  if(!data||!data.length){document.getElementById('upHist').innerHTML='<div class="vin-empty">No uploads yet — drop files above to begin.</div>';return}
-  const lbl={bmw_incadea:'🧾 incadea',bmw_submission:'📨 Submission',bmw_credits:'📑 Credit Notes'}
-  let h=`<div class="tw"><table class="t"><thead><tr><th>Date</th><th>Type</th><th>File</th><th class="num">Rows</th><th>By</th></tr></thead><tbody>`
-  data.forEach(u=>{h+=`<tr><td>${new Date(u.uploaded_at).toLocaleString('en-GB')}</td><td>${lbl[u.file_type]||u.file_type}</td><td class="mono" style="font-weight:600">${esc(u.file_name)}</td><td class="num" style="font-weight:600">${u.row_count}</td><td>${esc(u.uploaded_by_name||'—')}</td></tr>`})
-  h+=`</tbody></table></div>`;document.getElementById('upHist').innerHTML=h
+  const el=document.getElementById('upHist');if(!el)return
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  const maxD=(a,k)=>a.reduce((m,x)=>{const v=x[k];return v&&v>m?v:m},'')
+  const fmtD=iso=>{if(!iso)return '—';const[y,m,d]=iso.split('-');return d+' '+MN[+m-1]+' '+y}
+  // always show what is actually loaded (source of truth = the data tables)
+  const cur=`<div class="vin-section"><div class="vin-section-h"><span>📦 Currently loaded in the system</span></div>
+    <table class="vin-mini"><thead><tr><th>Source</th><th class="num">Rows</th><th>Latest date</th></tr></thead><tbody>
+      <tr><td>🧾 incadea invoices</td><td class="num" style="font-weight:700">${f0(S.inv.length)}</td><td>${fmtD(maxD(S.inv,'posting_date'))}</td></tr>
+      <tr><td>📨 BMW submissions</td><td class="num" style="font-weight:700">${f0(S.subs.length)}</td><td>${fmtD(maxD(S.subs,'document_date'))}</td></tr>
+      <tr><td>📑 BMW credit notes</td><td class="num" style="font-weight:700">${f0(S.cred.length)}</td><td>${fmtD(maxD(S.cred,'credit_note_date'))}</td></tr>
+    </tbody></table></div>`
+  let log=''
+  try{const {data,error}=await sb.from('warranty_uploads').select('*').in('file_type',['bmw_incadea','bmw_submission','bmw_credits']).order('uploaded_at',{ascending:false}).limit(60)
+    if(!error&&data&&data.length){const lbl={bmw_incadea:'🧾 incadea',bmw_submission:'📨 Submission',bmw_credits:'📑 Credit Notes'}
+      log=`<div class="vin-section"><div class="vin-section-h"><span>🕒 Upload log</span></div><div class="tw"><table class="t"><thead><tr><th>Date</th><th>Type</th><th>File</th><th class="num">Rows</th><th>By</th></tr></thead><tbody>`+
+        data.map(u=>`<tr><td>${new Date(u.uploaded_at).toLocaleString('en-GB')}</td><td>${lbl[u.file_type]||u.file_type}</td><td class="mono" style="font-weight:600">${esc(u.file_name)}</td><td class="num" style="font-weight:600">${u.row_count}</td><td>${esc(u.uploaded_by_name||'—')}</td></tr>`).join('')+`</tbody></table></div></div>`
+    }else{log='<div class="vin-empty" style="margin-top:12px">Upload log not available — the counts above reflect exactly what is loaded.</div>'}
+  }catch(e){log='<div class="vin-empty" style="margin-top:12px">Upload log not available — the counts above reflect exactly what is loaded.</div>'}
+  el.innerHTML=cur+log
 }
 
 // ── listeners
