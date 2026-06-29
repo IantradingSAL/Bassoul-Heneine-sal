@@ -450,11 +450,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v4.8'
+const APP_VERSION='v4.9'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v4.9',date:'2026-06-29',items:[
+    {t:'feat',d:'Changelog now goes all the way back to the start (v3.0, the first reconciliation build on 22 Jun).'}]},
   {v:'v4.8',date:'2026-06-29',items:[
     {t:'fix',d:'Submission matching now keys by the BMW claim number ("Last Submission"); the internal "No." is ignored. Fixes claims that wrongly showed "no submission" when their submission was actually loaded.'},
     {t:'feat',d:'This Changelog page — full history of every change (click the version chip any time).'}]},
@@ -478,7 +480,13 @@ const CHANGELOG=[
   {v:'v3.4',date:'2026-06-29',items:[
     {t:'feat',d:'Press-to-drill: every value (flow strip, KPI cards, charts) opens a detail panel with source files, the underlying records and CSV export.'},
     {t:'feat',d:'Drill-down rolled out across Dashboard, Pipeline, Credits, Rejections, Statement and Insights, filter-aware.'}]},
-  {v:'v3.3',date:'2026-06-22',items:[{t:'feat',d:'Baseline before this work — reconciliation engine, dashboard, pipeline, credits, rejections, statement, insights, upload centre.'}]},
+  {v:'v3.3',date:'2026-06-22',items:[{t:'fix',d:'Claim row clicks and the All / Warranty / BSI scope filter (by claim_kind).'}]},
+  {v:'v3.2',date:'2026-06-22',items:[{t:'fix',d:'BSI claim linking — fall back to claim No. and de-duplicate rows.'}]},
+  {v:'v3.1',date:'2026-06-22',items:[{t:'feat',d:'Surfaced orphan credits as "Credited – no submission on file"; first publish to GitHub Pages.'}]},
+  {v:'v3.0',date:'2026-06-22',items:[
+    {t:'feat',d:'Genesis — redesigned BMW Warranty into a 3-source reconciliation system: incadea invoices + BMW Warranty/BSI submissions + BMW credit notes, linked end-to-end.'},
+    {t:'feat',d:'Adopted "Last Submission" as the canonical claim number across Warranty and BSI.'},
+    {t:'feat',d:'Built the Dashboard, Pipeline, Credits, Rejections, Statement, Insights and Upload Center.'}]},
 ]
 function openChangelog(){
   let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
