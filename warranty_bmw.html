@@ -430,6 +430,15 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         </div>
       </div>
       <div class="card"><div class="card-h"><div class="ct">📚 Upload History</div></div><div id="upHist" style="font-size:11.5px;color:var(--muted)">Loading…</div></div>
+      <div class="card"><div class="card-h"><div><div class="ct">🔧 Claim Number Corrections</div><div class="ct-sub">When BMW AG re-keys a claim by hand, map the old number to the corrected one. Applied on every load — survives re-uploads.</div></div></div>
+        <div class="filters" style="margin-bottom:12px">
+          <input id="ov_old" placeholder="Old claim no. (e.g. 070074)" style="width:190px">
+          <span class="fl-l">→</span>
+          <input id="ov_new" placeholder="New claim no. (e.g. 070062)" style="width:190px">
+          <input id="ov_note" placeholder="Note (optional)" style="flex:1;min-width:160px">
+          <button class="btn btn-sm btn-bmw" id="ov_add">+ Add correction</button>
+        </div>
+        <div id="ovList" style="font-size:11.5px;color:var(--muted)">Loading…</div></div>
     </div>
   </main>
 </div>
@@ -452,11 +461,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.2'
+const APP_VERSION='v5.3'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.3',date:'2026-06-29',items:[
+    {t:'feat',d:'Self-service Claim Number Corrections panel in the Upload Center — add or remove old→new claim remaps yourself (no database access needed); applied instantly across all pages.'}]},
   {v:'v5.2',date:'2026-06-29',items:[
     {t:'feat',d:'Manual claim-number overrides: a correction table (bmw_claim_overrides) remaps a claim key at load time, surviving re-uploads. First entry: 070074 → 070062 (this claim was entered manually in BMW AG as 070062), so its submission and credit now reconcile under 70062.'}]},
   {v:'v5.1',date:'2026-06-29',items:[
@@ -1739,7 +1750,37 @@ async function rUploadHist(){
     }else{log='<div class="vin-empty" style="margin-top:12px">Upload log not available — the counts above reflect exactly what is loaded.</div>'}
   }catch(e){log='<div class="vin-empty" style="margin-top:12px">Upload log not available — the counts above reflect exactly what is loaded.</div>'}
   el.innerHTML=cur+log
+  renderOverridesAdmin()
 }
+async function renderOverridesAdmin(){
+  const el=document.getElementById('ovList');if(!el)return
+  try{const {data,error}=await sb.from('bmw_claim_overrides').select('*').order('created_at',{ascending:false})
+    if(error){el.innerHTML='⚠️ '+esc(error.message);return}
+    if(!data||!data.length){el.innerHTML='<div class="vin-empty">No corrections yet — add one above when BMW re-keys a claim.</div>';return}
+    el.innerHTML='<div class="tw"><table class="t"><thead><tr><th>Old claim no.</th><th>New claim no.</th><th>Note</th><th>Added</th><th>Action</th></tr></thead><tbody>'+
+      data.map(o=>`<tr><td class="mono">${esc(o.old_key)}</td><td class="mono" style="font-weight:700;color:var(--bmw)">${esc(o.new_key)}</td><td>${esc(o.note||'—')}</td><td style="color:var(--muted)">${o.created_at?new Date(o.created_at).toLocaleDateString('en-GB'):''}</td><td><button class="btn btn-sm" style="color:var(--rose)" onclick="delOverride('${esc(o.id)}')">🗑️ Remove</button></td></tr>`).join('')+
+      '</tbody></table></div>'
+  }catch(e){el.innerHTML='⚠️ '+esc(e.message)}
+}
+async function addOverride(){
+  const oldK=subkey(document.getElementById('ov_old').value),newK=subkey(document.getElementById('ov_new').value),note=document.getElementById('ov_note').value.trim()
+  if(!oldK||!newK){showToast('Enter both the old and new claim numbers');return}
+  if(oldK===newK){showToast('Old and new numbers are the same');return}
+  showLoad('Saving correction…')
+  const {error}=await sb.from('bmw_claim_overrides').insert({old_key:oldK,new_key:newK,note:note||null});hideLoad()
+  if(error){showToast('❌ '+error.message);return}
+  document.getElementById('ov_old').value='';document.getElementById('ov_new').value='';document.getElementById('ov_note').value=''
+  showToast('✅ Correction added — '+oldK+' → '+newK)
+  await refreshData();updateBadges();renderPage(currentPage());renderOverridesAdmin()
+}
+window.addOverride=addOverride
+async function delOverride(id){
+  if(!confirm('Remove this claim-number correction?'))return
+  showLoad('Removing…');const {error}=await sb.from('bmw_claim_overrides').delete().eq('id',id);hideLoad()
+  if(error){showToast('❌ '+error.message);return}
+  showToast('✅ Removed');await refreshData();updateBadges();renderPage(currentPage());renderOverridesAdmin()
+}
+window.delOverride=delOverride
 
 // ── listeners
 ;['pp_status','pp_make','pp_month','pp_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rPipe);e.addEventListener('change',rPipe)})
@@ -1753,6 +1794,8 @@ document.getElementById('dash_xlsx').addEventListener('click',()=>{const series=
 ;['st_make','st_out'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('change',rStatement)})
 document.getElementById('st_csv').addEventListener('click',()=>{const rows=(window._stRows||[]).map(c=>[c.doc_no,c.kind,c.make,c.vin,c.document_date,c.invoiced,c.answered?c.accepted:'',c._otype,c._owed]);exportXlsx('bmw_statement',['Invoice','Kind','Make','VIN','Sub Date','Invoiced €','Credited €','Type','Owed €'],rows);showToast('⬇ Exported statement — '+rows.length+' rows to Excel')})
 document.getElementById('st_print').addEventListener('click',()=>window.print())
+document.getElementById('ov_add').addEventListener('click',addOverride)
+;['ov_old','ov_new','ov_note'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')addOverride()}))
 
 // ══ INIT ════════════════════════════════════════════════════════
 ;(async()=>{
