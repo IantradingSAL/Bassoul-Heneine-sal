@@ -184,6 +184,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
 .fresh-v{font-size:13px;font-weight:800;margin-top:2px}
 .fresh-s{font-size:10.5px;font-weight:700;margin-top:2px}
 .fresh-s.ok{color:var(--mint-d)}.fresh-s.warn{color:#a16207}.fresh-s.bad{color:var(--rose-d)}
+.fresh-up{font-size:9.5px;font-weight:600;color:var(--faint);margin-top:3px}
 .vin-search-box{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
 .vin-search-box input{border:none;padding:7px 11px;font-size:11.5px;font-family:inherit;width:172px;outline:none;color:var(--txt)}
 .vin-search-box button{border:none;background:var(--bmw);color:#fff;padding:7px 12px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit}
@@ -439,7 +440,7 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v4.6'
+const APP_VERSION='v4.7'
 ;(()=>{const vc=document.getElementById('verChip');if(vc)vc.textContent=APP_VERSION
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 
@@ -1311,18 +1312,22 @@ function updateBadges(){
 function renderFreshness(){
   const el=document.getElementById('freshness');if(!el)return
   const today=new Date().toISOString().slice(0,10)
-  const fmtD=iso=>{if(!iso)return '—';const[y,m,d]=iso.split('-');return d+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]+' '+y}
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  const fmtD=iso=>{if(!iso)return '—';const[y,m,d]=iso.split('-');return d+' '+MN[+m-1]+' '+y}
+  const relDays=iso=>{if(!iso)return '';const a=days(iso.slice(0,10),today);return a==null?'':a<=0?'today':a===1?'1 day ago':a+' days ago'}
   const maxD=(arr,k)=>arr.reduce((m,x)=>{const v=x[k];return v&&v>m?v:m},'')
+  const fmtUp=iso=>{if(!iso)return '';const d=new Date(iso);if(isNaN(d))return '';const dd=d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}),tt=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});const rel=relDays(iso);return dd+' '+tt+(rel?' · '+rel:'')}
   const files=[
-    {ic:'🧾',l:'incadea invoices',date:maxD(S.inv,'posting_date'),n:S.inv.length},
-    {ic:'📨',l:'BMW submissions',date:maxD(S.subs,'document_date'),n:S.subs.length},
-    {ic:'📑',l:'BMW credit notes',date:maxD(S.cred,'credit_note_date'),n:S.cred.length},
+    {ic:'🧾',l:'incadea invoices',date:maxD(S.inv,'posting_date'),n:S.inv.length,up:maxD(S.inv,'uploaded_at')},
+    {ic:'📨',l:'BMW submissions',date:maxD(S.subs,'document_date'),n:S.subs.length,up:maxD(S.subs,'uploaded_at')},
+    {ic:'📑',l:'BMW credit notes',date:maxD(S.cred,'credit_note_date'),n:S.cred.length,up:maxD(S.cred,'uploaded_at')},
   ]
   el.innerHTML='<div class="fresh">'+files.map(fl=>{
     const ago=fl.date?days(fl.date,today):null
     const cls=!fl.date?'bad':ago>21?'bad':ago>8?'warn':'ok'
-    const s=!fl.date?'not loaded — upload it':ago<=0?'latest is today':ago===1?'latest 1 day ago':'latest '+ago+' days ago'
-    return `<div class="fresh-item ${cls}"><div class="fresh-ic">${fl.ic}</div><div style="flex:1"><div class="fresh-l">${fl.l} · ${f0(fl.n)} rows</div><div class="fresh-v">${fmtD(fl.date)}</div><div class="fresh-s ${cls}">${cls==='ok'?'✓ ':cls==='warn'?'⚠️ ':'⛔ '}${s}</div></div></div>`
+    const s=!fl.date?'not loaded — upload it':'newest record · '+relDays(fl.date)
+    const up=fmtUp(fl.up)
+    return `<div class="fresh-item ${cls}"><div class="fresh-ic">${fl.ic}</div><div style="flex:1"><div class="fresh-l">${fl.l} · ${f0(fl.n)} rows</div><div class="fresh-v">${fmtD(fl.date)}</div><div class="fresh-s ${cls}">${cls==='ok'?'✓ ':cls==='warn'?'⚠️ ':'⛔ '}${s}</div>${up?`<div class="fresh-up">⬆ uploaded ${up}</div>`:''}</div></div>`
   }).join('')+'</div>'
 }
 function freshnessNudge(){
