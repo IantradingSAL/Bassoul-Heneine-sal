@@ -484,11 +484,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.15'
+const APP_VERSION='v5.16'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.16',date:'2026-06-30',items:[
+    {t:'fix',d:'Major data-loading fix: the app loaded invoices, submissions and credits in pages of 1000 sorted by date. Because many rows share the same date, the database could return them in a different order per page and SKIP some rows — so a few credits never loaded and their claims wrongly showed Pending (e.g. claim 71232, whose credit shares a date with 304 others). Now paginated by the unique primary key, so every row loads. This also makes all totals fully reliable.'}]},
   {v:'v5.15',date:'2026-06-30',items:[
     {t:'fix',d:'Added no-cache headers so the browser always loads the latest version of the app instead of a stale cached copy (which could make an already-credited claim still look Pending). If a claim looks wrong, check the version chip top-right matches the latest — if not, the page was cached.'}]},
   {v:'v5.14',date:'2026-06-30',items:[
@@ -719,10 +721,13 @@ function parseCredits(wb){
 }
 
 // ══ CLOUD I/O ═══════════════════════════════════════════════════
-async function loadAll(table,order){
+async function loadAll(table,keyCol){
+  // paginate by a UNIQUE key (primary key). Ordering by a non-unique column (e.g. a date)
+  // makes range pagination skip/duplicate rows when many rows share the same value — which
+  // silently dropped some credits and made already-credited claims look Pending.
   let all=[],from=0;const step=1000
-  while(true){let q=sb.from(table).select('*').range(from,from+step-1);if(order)q=q.order(order,{ascending:false})
-    const {data,error}=await q;if(error){console.warn(table+' load failed:',error.message);break}
+  while(true){let q=sb.from(table).select('*').range(from,from+step-1);if(keyCol)q=q.order(keyCol,{ascending:true})
+    const {data,error}=await q;if(error){console.warn(table+' load failed:',error.message);showToast('⚠️ '+table+' did not fully load — refresh');break}
     if(!data||!data.length)break;all=all.concat(data);if(data.length<step)break;from+=step}
   return all
 }
@@ -780,7 +785,7 @@ function applyOverrides(ovr){if(!ovr||!Object.keys(ovr).length)return
   S.subs.forEach(s=>{const k=s.sub_key||subkey(s.last_submission)||subkey(s.no);if(ovr[k]){s._origKey=k;s.sub_key=ovr[k];s.last_submission=ovr[k]}})
   S.cred.forEach(c=>{if(ovr[c.dcn_key]){c._origKey=c.dcn_key;c.dealer_claim_number=ovr[c.dcn_key];c.dcn_key=ovr[c.dcn_key]}})}
 async function refreshData(){
-  const [inv,subs,cred,resub,ovr]=await Promise.all([loadAll('bmw_rec_invoices','posting_date'),loadAll('bmw_rec_submissions','document_date'),loadAll('bmw_rec_credits','credit_note_date'),loadResub(),loadOverrides()])
+  const [inv,subs,cred,resub,ovr]=await Promise.all([loadAll('bmw_rec_invoices','doc_no'),loadAll('bmw_rec_submissions','id'),loadAll('bmw_rec_credits','id'),loadResub(),loadOverrides()])
   S.inv=inv;S.subs=subs;S.cred=cred;S.resub=resub;S.ovr=ovr
   applyOverrides(ovr)
   invalidateReconcile()
