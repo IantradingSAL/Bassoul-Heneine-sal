@@ -484,11 +484,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.19'
+const APP_VERSION='v5.20'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.20',date:'2026-06-30',items:[
+    {t:'fix',d:'Removed the "Claimed €" column from the Rejected / Pricing-Difference drill-downs — BMW rarely fills a reliable claimed price, so the column was almost always empty. The split still shows Invoiced, Paid, Pricing difference and Rejected, with a Basis tag (exact vs estimated).'}]},
   {v:'v5.19',date:'2026-06-30',items:[
     {t:'fix',d:'"Claimed €" no longer shows a single sublet line as the whole claim. BMW often fills the Claimed Price on just one line (e.g. the sublet 0.98) while labor and parts come through as 0, so a fully-credited claim could show Claimed 0.98 vs Paid 747.93 and a misleading EXACT tag. The Claimed total is now only used (and shown as EXACT) when it is at least what BMW paid; otherwise it falls back to the status estimate and shows — . The Rejected/Pricing split was already correct here; this fixes the displayed Claimed value and basis.'}]},
   {v:'v5.18',date:'2026-06-30',items:[
@@ -955,9 +957,9 @@ function openClaim(kind,no){
         <div class="flow-step" style="background:${claim.gap>0.5?'#fff1f2':'#f0fdf4'}"><div class="fl-t">Δ Gap</div><div class="fl-v" style="color:${claim.gap>0.5?'var(--rose-d)':'var(--mint-d)'}">€${f(claim.gap)}</div><div class="fl-s">${claim.invoiced?claim.accept_ratio.toFixed(0)+'% credited':''}</div></div>
       </div>
       ${claim.answered&&(Math.abs(claim.pricing_diff||0)>0.5||claim.rejected>0.5)?`<div class="vin-summary" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
-        <div class="vin-stat"><div class="vin-stat-l">🔧 Pricing difference (invoiced − claimed)</div><div class="vin-stat-v" style="color:var(--lemon-d)">€${f(claim.pricing_diff)}</div></div>
-        <div class="vin-stat"><div class="vin-stat-l">❌ Rejected (claimed − paid)</div><div class="vin-stat-v" style="color:var(--rose-d)">€${f(claim.rejected)}</div></div>
-        <div style="grid-column:1/-1;font-size:10px;color:var(--faint)">${claim.claim_basis==='claimed'?'Exact — from the Claimed Price on the credit note.':'Estimated from the claim status (Claimed Price not in the file). '+(claim.claimed_price>0.5?'':'Claimed €'+f(claim.claimed_price))}</div></div>`:''}
+        <div class="vin-stat"><div class="vin-stat-l">🔧 Pricing difference (incadea rate vs BMW rate)</div><div class="vin-stat-v" style="color:var(--lemon-d)">€${f(claim.pricing_diff)}</div></div>
+        <div class="vin-stat"><div class="vin-stat-l">❌ Rejected (money to chase)</div><div class="vin-stat-v" style="color:var(--rose-d)">€${f(claim.rejected)}</div></div>
+        <div style="grid-column:1/-1;font-size:10px;color:var(--faint)">${claim.claim_basis==='claimed'?'Exact — measured from the claimed price on the credit note.':'Estimated from the claim status (a reliable claimed price is not in the file).'}</div></div>`:''}
       ${claim.answered?`<div class="vin-section"><div class="vin-section-h"><span>📑 Credit lines</span><span class="ct">${items.length}</span></div>
         <table class="vin-mini"><thead><tr><th>Credit Note</th><th>Position</th><th>Claim Item No.</th><th>Description</th><th>Defect</th><th class="num">Qty</th><th class="num">Accepted €</th><th>Status</th></tr></thead>
         <tbody>${items.map(it=>`<tr><td class="mono">${esc(it.credit_note_number)}</td><td>${esc(it.claim_item_position||'')}</td>
@@ -1127,7 +1129,6 @@ const RCOLS=[
   {h:'Claim No.',cell:c=>`<span class="mono" style="font-weight:600">${esc(c.no||'—')}</span>`,csv:c=>c.no},
   {h:'VIN',cell:c=>`<span class="mono">${esc(c.vin||'—')}</span>`,csv:c=>c.vin},
   {h:'Invoiced €',num:1,cell:c=>c.invoiced?f(c.invoiced):'<span style="color:var(--faint)">—</span>',csv:c=>c.invoiced||''},
-  {h:'Claimed €',num:1,cell:c=>c.claim_basis==='claimed'?f(c.claimed_price):'<span style="color:var(--faint)" title="Claimed price not in the file — split by status">—</span>',csv:c=>c.claim_basis==='claimed'?c.claimed_price:''},
   {h:'Paid €',num:1,cell:c=>`<span style="font-weight:700">${f(c.accepted)}</span>`,csv:c=>c.accepted},
   {h:'Pricing diff €',num:1,cell:c=>Math.abs(c.pricing_diff||0)>0.005?`<span style="color:var(--lemon-d)">${f(c.pricing_diff)}</span>`:'—',csv:c=>c.pricing_diff},
   {h:'Rejected €',num:1,cell:c=>c.rejected>0.005?`<span style="color:var(--rose-d);font-weight:700">${f(c.rejected)}</span>`:'—',csv:c=>c.rejected},
