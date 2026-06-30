@@ -484,11 +484,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.16'
+const APP_VERSION='v5.17'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.17',date:'2026-06-30',items:[
+    {t:'fix',d:'A claim marked as Duplicate no longer also shows "Pending" — it now reads "🔁 Duplicate · closed" (greyed out, excluded from all reports), so it is clearly closed rather than open.'}]},
   {v:'v5.16',date:'2026-06-30',items:[
     {t:'fix',d:'Major data-loading fix: the app loaded invoices, submissions and credits in pages of 1000 sorted by date. Because many rows share the same date, the database could return them in a different order per page and SKIP some rows — so a few credits never loaded and their claims wrongly showed Pending (e.g. claim 71232, whose credit shares a date with 304 others). Now paginated by the unique primary key, so every row loads. This also makes all totals fully reliable.'}]},
   {v:'v5.15',date:'2026-06-30',items:[
@@ -902,7 +904,9 @@ const MAN_TERMINAL={rejected:'Error',credited:'Success',resolved:'Success'}
 function manStatus(c){const t=S.resub[c.kind+':'+c.no];return t&&t.status&&t.status!=='pending'?t.status:null}
 function effKey(c){if(c.answered)return c.status_overall;const s=manStatus(c);return s&&MAN_TERMINAL[s]?MAN_TERMINAL[s]:'Pending'}
 function effPending(c){return effKey(c)==='Pending'}
-function manBadge(c){const s=manStatus(c);if(!s)return '';const col=s==='rejected'?'b-rose':(s==='credited'||s==='resolved')?'b-mint':s==='duplicate'?'b-n':'b-sky';const ic=s==='rejected'?'❌':(s==='credited'||s==='resolved')?'✅':'🔁';return ` <span class="badge ${col}" title="Manually set status ✎">${ic} ${esc(s)} ✎</span>`}
+function manBadge(c){const s=manStatus(c);if(!s)return ''
+  if(s==='duplicate')return ` <span class="badge b-n" title="Duplicate — excluded from all reports (closed)">🔁 Duplicate · closed ✎</span>`
+  const col=s==='rejected'?'b-rose':(s==='credited'||s==='resolved')?'b-mint':'b-sky';const ic=s==='rejected'?'❌':(s==='credited'||s==='resolved')?'✅':'🔁';return ` <span class="badge ${col}" title="Manually set status ✎">${ic} ${esc(s)} ✎</span>`}
 // a claim manually flagged as a duplicate (sent twice) is excluded from every report/total
 function isDuplicate(c){return manStatus(c)==='duplicate'}
 function scopedDuplicates(){return reconcile().claims.concat(reconcile().orphans).filter(inScope).filter(isDuplicate)}
@@ -912,7 +916,7 @@ function fuBadge(c){const r=S.resub[c.kind+':'+c.no];if(!r||!r.follow_up_date)re
   return ` <span class="badge ${col}" style="cursor:pointer" title="${esc(r.follow_up_note||'')} — click to open follow-up" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${ic} ${esc(lbl)}</span>`}
 // effective status label (includes manual statuses: duplicate / resubmitted / rejected / credited / resolved)
 function effStatusLabel(c){const m=manStatus(c);if(m)return m.charAt(0).toUpperCase()+m.slice(1);return c.answered?c.status_overall:'Pending'}
-function statusCell(c){const base=c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):sBadge(effKey(c)));return base+manBadge(c)+fuBadge(c)}
+function statusCell(c){const base=isDuplicate(c)?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):sBadge(effKey(c))));return base+manBadge(c)+fuBadge(c)}
 const kindBadge=k=>k==='bsi'?'<span class="badge b-sky">BSI</span>':'<span class="badge b-bmw">Warranty</span>'
 
 // ══ MODAL ═══════════════════════════════════════════════════════
@@ -1730,7 +1734,7 @@ function rPipe(){
       <td class="num">${c.noSubmission?(c.inferred_inv?`<span style="color:var(--muted)" title="from the inferred invoice">≈ ${f(c.inferred_inv.total_invoiced)}</span>`:'<span style="color:var(--faint)">—</span>'):f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
       <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c.noSubmission?'<span style="color:var(--faint)">—</span>':(c.answered?f(c.gap):'—')}</td>
       <td class="num">${c.answered&&c.invoiced?`<span style="font-weight:700;color:${c.accept_ratio>=85?'var(--mint-d)':c.accept_ratio>=65?'var(--lemon-d)':'var(--rose-d)'}">${c.accept_ratio.toFixed(0)}%</span>`:'—'}</td>
-      <td>${c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):'')}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${manBadge(c)}${fuBadge(c)}</td>
+      <td>${isDuplicate(c)?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):''))}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${manBadge(c)}${fuBadge(c)}</td>
       <td>${(c.status_overall==='Error'||c.status_overall==='Warning'||!c.answered)?`<button class="btn btn-sm ${tr?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr?'✏️':(c.answered?'+ Track':'⚙ Status')}</button>`:'<span style="color:var(--faint)">—</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="12" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
