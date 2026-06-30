@@ -484,11 +484,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.18'
+const APP_VERSION='v5.19'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.19',date:'2026-06-30',items:[
+    {t:'fix',d:'"Claimed €" no longer shows a single sublet line as the whole claim. BMW often fills the Claimed Price on just one line (e.g. the sublet 0.98) while labor and parts come through as 0, so a fully-credited claim could show Claimed 0.98 vs Paid 747.93 and a misleading EXACT tag. The Claimed total is now only used (and shown as EXACT) when it is at least what BMW paid; otherwise it falls back to the status estimate and shows — . The Rejected/Pricing split was already correct here; this fixes the displayed Claimed value and basis.'}]},
   {v:'v5.18',date:'2026-06-30',items:[
     {t:'fix',d:'Fixed the Rejected vs Pricing-Difference split for fully-rejected claims. When BMW pays €0 (e.g. claim submission time exceeded), the whole invoiced amount is now counted as Rejected (money to chase) instead of being mostly labelled a pricing difference. Before, if one line of a rejected claim (such as a sublet) still carried a Claimed Price, only that small amount was treated as rejected and the rest wrongly showed as a pricing difference. A claim is part + labor + sublet, and all of it is now handled together.'}]},
   {v:'v5.17',date:'2026-06-30',items:[
@@ -843,7 +845,12 @@ function reconcile(){
     // A pricing difference can only exist when BMW actually PAID something. If BMW paid €0
     // (claim fully rejected, e.g. "submission time exceeded"), the whole gap is Rejected —
     // even if one line (e.g. a sublet) still carries a Claimed Price.
-    const gapVal=invoiced-accepted2,hasClaimed=claimedPrice>0.5
+    const gapVal=invoiced-accepted2
+    // The Claimed Price column is only trustworthy when it covers what BMW paid — you cannot be
+    // paid more than you claimed. BMW's export often fills it on a single line only (e.g. the
+    // sublet), so a fully-credited claim can show Claimed 0.98 vs Paid 747.93. Treat such a
+    // claimed total as missing (fall back to the status estimate, do not show it as "Claimed").
+    const hasClaimed=claimedPrice>0.5&&claimedPrice>=accepted2-0.5
     let rejected=0,_basis='status'
     if(answered2&&!manualCredited){
       if(accepted2>0.5&&hasClaimed){rejected=Math.max(claimedPrice-accepted2,0);_basis='claimed'}
