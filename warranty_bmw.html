@@ -69,6 +69,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
 .btn-sm{padding:5px 10px;font-size:10px}
 .btn-sun{background:var(--sun);color:#fff;border-color:var(--sun)}.btn-sun:hover{filter:brightness(.93)}
 .btn-ghost{background:#fff;color:var(--muted)}
+.btn-mint{background:var(--mint);color:#fff;border-color:var(--mint)}.btn-mint:hover{filter:brightness(.93)}
 .tw{overflow-x:auto;border-radius:12px}
 .t{width:100%;border-collapse:collapse;font-size:11.5px}
 .t th{text-align:left;padding:10px 12px;font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:var(--surf3);white-space:nowrap;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1}
@@ -305,6 +306,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
     <div class="si" data-page="rejections"><span class="si-icon">⚠️</span><span>Rejections</span><span class="si-badge" id="B_rej" style="background:var(--rose)">0</span></div>
     <div class="si" data-page="insights"><span class="si-icon">🔍</span><span>Insights</span></div>
     <div class="si" data-page="statement"><span class="si-icon">💶</span><span>BMW Statement</span></div>
+    <div class="si" data-page="followups"><span class="si-icon">📅</span><span>Follow-ups</span><span class="si-badge" id="B_follow" style="background:var(--sun)">0</span></div>
     <div class="nav-sec">Data</div>
     <div class="si" data-page="upload"><span class="si-icon">📤</span><span>Upload Center</span></div>
     <div id="verFoot" style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL</div>
@@ -334,6 +336,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
 
     <!-- DASHBOARD -->
     <div class="page active" id="P_dashboard">
+      <div id="fuReminder"></div>
       <div id="freshness"></div>
       <div class="card" id="flowCard" style="padding:16px 20px"><div id="flow"></div></div>
       <div class="kpis" id="K_dash"></div>
@@ -414,6 +417,19 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
       <div id="T_statement"></div>
     </div>
 
+    <!-- FOLLOW-UPS -->
+    <div class="page" id="P_followups">
+      <div class="al al-i">📅 Schedule a follow-up date on any claim (open a claim → 📅 Follow-up / status). This page lists every reminder so nothing slips — overdue ones are flagged red.</div>
+      <div class="kpis" id="K_follow"></div>
+      <div class="card"><div class="filters">
+        <span class="fl-l">Show</span>
+        <select id="fu_filter"><option value="open">⏳ Open (not done)</option><option value="overdue">🔴 Overdue</option><option value="today">📅 Due today</option><option value="all">All</option><option value="done">✅ Done</option></select>
+        <span style="flex:1"></span>
+        <button class="btn btn-sm btn-bmw" id="fu_export">⬇ Excel</button>
+      </div></div>
+      <div id="T_follow"></div>
+    </div>
+
     <!-- UPLOAD -->
     <div class="page" id="P_upload">
       <div class="al al-i">📤 Drop all three files together — incadea, the Warranty/BSI submissions, and the SAP credit notes. The system auto-detects each file type, de-duplicates, and re-links the chain.</div>
@@ -465,11 +481,14 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.10'
+const APP_VERSION='v5.11'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.11',date:'2026-06-30',items:[
+    {t:'feat',d:'New Follow-ups page with reminders. Open any claim → 📅 Follow-up / status, set a follow-up date and a note (what to check). The new Follow-ups page in the sidebar lists every reminder sorted by date, with Overdue / Due today / Upcoming / Done counters, a red flag on overdue items, and a one-click "✓ Done". A reminder banner appears on the dashboard and a badge on the sidebar when something is overdue or due today.'},
+    {t:'feat',d:'A Credited (€) amount you type into the status box now counts toward the Credited € totals (dashboard, pipeline, gap) for a still-pending claim — so you can record money you know was credited before the credit-note file arrives. Once the real credit note loads, it takes over.'}]},
   {v:'v5.10',date:'2026-06-30',items:[
     {t:'feat',d:'Duplicates now stay VISIBLE in the Pipeline (greyed out, marked 🔁) instead of being hidden — they are still excluded from every total, count and report. The Pipeline Claims card shows "+N duplicates shown, not counted", a Duplicate option was added to the status filter, and a Duplicates KPI appears on the Pipeline. Use this when the same repair was submitted twice, even under different claim numbers. Marking a pending claim credited/resolved/rejected shows that status on the main row and the report numbers adjust accordingly.'}]},
   {v:'v5.9',date:'2026-06-30',items:[
@@ -796,16 +815,20 @@ function reconcile(){
     const corrected=cnNos.size>1
     const status_overall=!answered?'Pending':useS.Error>0?'Error':useS.Warning>0?'Warning':'Success'
     const invoiced=inv?Number(inv.total_invoiced)||0:0
+    // a manually-entered credited amount on a still-pending claim counts toward credited € totals
+    const _claimNo=s.last_submission||s.no,_mr=S.resub[s.claim_kind+':'+_claimNo]
+    let accepted2=accepted,answered2=answered,status2=status_overall,manualCredited=false
+    if(_mr&&!answered&&(_mr.status==='credited'||_mr.status==='resolved')){const ma=Number(_mr.credited_amt)||0;if(ma>0){accepted2=accepted+ma;answered2=true;status2='Success';manualCredited=true}}
     // ── gap decomposition: rejection (claimed − paid) vs pricing difference (invoiced − claimed) ──
-    const gapVal=invoiced-accepted,hasClaimed=claimedPrice>0.5
+    const gapVal=invoiced-accepted2,hasClaimed=claimedPrice>0.5
     let rejected=0
-    if(answered){if(hasClaimed)rejected=Math.max(claimedPrice-accepted,0);else if(status_overall==='Error')rejected=Math.max(gapVal,0)}
-    const pricing_diff=answered?gapVal-rejected:0
+    if(answered2&&!manualCredited){if(hasClaimed)rejected=Math.max(claimedPrice-accepted2,0);else if(status2==='Error')rejected=Math.max(gapVal,0)}
+    const pricing_diff=(answered2&&!manualCredited)?gapVal-rejected:0
     return {kind:s.claim_kind,no:s.last_submission||s.no,record_no:s.no,sub:s,inv,credits:cr,vin:s.vin||inv?.vin||(cr[0]?.vin)||'',make:s.make_code||inv?.make_code||'',
       brand:cr[0]?.brand||'',model:inv?.model||'',month:s.month||(cnDate?cnDate.slice(0,7):''),
       doc_no:s.doc_no,sub_key:s.sub_key,sub_status:s.status||'',document_date:s.document_date,cn_date:cnDate,repair_date:repairDate,
-      items_count:cr.length,answered,status_overall,statuses:st,corrected,labor,parts,ext,
-      invoiced,accepted,claimed_price:claimedPrice,gap:gapVal,rejected,pricing_diff,claim_basis:hasClaimed?'claimed':'status',accept_ratio:pct(accepted,invoiced),
+      items_count:cr.length,answered:answered2,status_overall:status2,manual_credited:manualCredited,statuses:st,corrected,labor,parts,ext,
+      invoiced,accepted:accepted2,claimed_price:claimedPrice,gap:gapVal,rejected,pricing_diff,claim_basis:hasClaimed?'claimed':'status',accept_ratio:pct(accepted2,invoiced),
       cn_no:[...cnNos].join(', '),defect_codes:[...defects],lag_days:days(repairDate,cnDate)}
   })
   // orphan credits: keys present in credits but not in any submission
@@ -903,7 +926,7 @@ function openClaim(kind,no){
         :'<div class="vin-empty">⏳ This claim was submitted to BMW but no credit note has been received yet.</div>'}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
         ${claim.vin?`<button class="btn btn-bmw btn-sm" onclick="closeModal();openVin('${esc(claim.vin)}')">🚗 Full VIN history</button>`:''}
-        ${(claim.status_overall==='Error'||claim.status_overall==='Warning'||!claim.answered)?`<button class="btn btn-sun btn-sm" onclick="closeModal();openTrack('${esc(claim.kind)}','${esc(claim.no)}')">${S.resub[claim.kind+':'+claim.no]?'✏️ Edit':(claim.answered?'+ Track recovery':'⚙ Set status')}</button>`:''}
+        ${(()=>{const tr=S.resub[claim.kind+':'+claim.no];const lbl=tr?'✏️ Edit tracking & follow-up':(claim.status_overall==='Error'||claim.status_overall==='Warning')?'+ Track recovery':!claim.answered?'⚙ Set status / 📅 follow-up':'📅 Follow-up / notes';return `<button class="btn btn-sun btn-sm" onclick="closeModal();openTrack('${esc(claim.kind)}','${esc(claim.no)}')">${lbl}</button>`})()}
       </div>
     </div></div>`
   document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
@@ -1470,6 +1493,14 @@ function openTrack(kind,no){
       ${fld('tr_resub_date','Resubmit Date',ex.resub_date,'date')}
       ${fld('tr_credited','Credited (€)',ex.credited_amt,'number')}
       <div style="grid-column:1/-1"><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Notes</label><textarea id="tr_notes" rows="2" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit;resize:vertical">${esc(ex.notes||'')}</textarea></div>
+      <div style="grid-column:1/-1;border-top:1px solid var(--line2);margin-top:4px;padding-top:10px">
+        <div style="font-weight:800;color:var(--bmw);font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">📅 Follow-up reminder</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end">
+          ${fld('tr_fudate','Follow-up date',ex.follow_up_date,'date')}
+          <label style="display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;padding-bottom:8px"><input type="checkbox" id="tr_fudone" ${ex.follow_up_done?'checked':''} style="width:15px;height:15px"> Done / handled</label>
+        </div>
+        <div style="margin-top:10px">${fld('tr_funote','Follow-up note (what to check)',ex.follow_up_note).replace('<div>','').replace(/<\/div>$/,'')}</div>
+      </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
       ${ex.status?`<button class="btn btn-sm" style="color:var(--rose)" onclick="delTrack('${esc(key)}')">🗑️ Delete</button>`:''}
@@ -1487,14 +1518,57 @@ async function saveTrack(kind,no){
     resub_date:document.getElementById('tr_resub_date').value||null,credited_amt:credited,
     recovery_rate:credited!=null&&claim.accepted>0?credited/claim.accepted*100:null,
     status:document.getElementById('tr_status').value||'pending',notes:document.getElementById('tr_notes').value||null,
+    follow_up_date:document.getElementById('tr_fudate').value||null,follow_up_note:document.getElementById('tr_funote').value||null,follow_up_done:document.getElementById('tr_fudone').checked,
     updated_by:S.me?.id||null,updated_by_name:S.me?.name||null}
   showLoad('Saving…');const {error}=await sb.from('warranty_bmw_resub').upsert(payload,{onConflict:'orig_claim'});hideLoad()
   if(error){showToast('❌ '+error.message);return}
-  S.resub=await loadResub();closeModal();showToast('✅ Saved');renderPage(currentPage())
+  S.resub=await loadResub();invalidateReconcile();closeModal();showToast('✅ Saved');updateBadges();renderPage(currentPage())
 }
 window.saveTrack=saveTrack
-async function delTrack(key){if(!confirm('Delete this recovery record?'))return;showLoad('Deleting…');const {error}=await sb.from('warranty_bmw_resub').delete().eq('orig_claim',key);hideLoad();if(error){showToast('❌ '+error.message);return}delete S.resub[key];closeModal();showToast('✅ Removed');renderPage(currentPage())}
+async function delTrack(key){if(!confirm('Delete this recovery record?'))return;showLoad('Deleting…');const {error}=await sb.from('warranty_bmw_resub').delete().eq('orig_claim',key);hideLoad();if(error){showToast('❌ '+error.message);return}delete S.resub[key];invalidateReconcile();closeModal();showToast('✅ Removed');updateBadges();renderPage(currentPage())}
 window.delTrack=delTrack
+
+// ══ FOLLOW-UPS / REMINDERS ══════════════════════════════════════════
+function _today(){return new Date().toISOString().slice(0,10)}
+function followups(){const today=_today(),byKey={}
+  reconcile().claims.concat(reconcile().orphans).forEach(c=>{byKey[c.kind+':'+c.no]=c})
+  const out=[]
+  Object.values(S.resub).forEach(r=>{if(!r.follow_up_date)return
+    const k=r.orig_claim||'',parts=k.split(':'),c=byKey[k]||{kind:parts[0]||'',no:parts.slice(1).join(':'),vin:r.orig_vin||'',make:r.orig_brand||'',month:r.orig_month||''}
+    out.push({...c,fu_key:k,fu_date:r.follow_up_date,fu_note:r.follow_up_note||'',fu_done:!!r.follow_up_done,fu_status:r.status||'',
+      _overdue:!r.follow_up_done&&r.follow_up_date<today,_due:!r.follow_up_done&&r.follow_up_date===today,_days:days(today,r.follow_up_date)})})
+  return out.sort((a,b)=>String(a.fu_date).localeCompare(String(b.fu_date)))}
+function followCount(){return followups().filter(f=>f._overdue||f._due).length}
+async function fuDone(key){showLoad('Saving…');const {error}=await sb.from('warranty_bmw_resub').update({follow_up_done:true}).eq('orig_claim',key);hideLoad();if(error){showToast('❌ '+error.message);return}if(S.resub[key])S.resub[key].follow_up_done=true;showToast('✅ Follow-up done');updateBadges();rFollowups();renderFuReminder()}
+window.fuDone=fuDone
+function renderFuReminder(){const el=document.getElementById('fuReminder');if(!el)return;const all=followups(),od=all.filter(f=>f._overdue).length,td=all.filter(f=>f._due).length
+  if(!od&&!td){el.innerHTML='';return}
+  el.innerHTML=`<div class="al" style="background:${od?'#fef2f2':'#fffbeb'};border:1px solid ${od?'var(--rose)':'var(--sun)'};display:flex;align-items:center;gap:10px;cursor:pointer" onclick="document.querySelector('.si[data-page=&quot;followups&quot;]').click()">
+    <span style="font-size:18px">${od?'🔴':'📅'}</span><span style="font-weight:700;font-size:12px">${od?`${od} follow-up${od>1?'s':''} overdue`:''}${od&&td?' · ':''}${td?`${td} due today`:''}</span>
+    <span style="margin-left:auto;font-size:11px;color:var(--bmw);font-weight:700">Open Follow-ups →</span></div>`}
+const FU_COLS=['Follow-up','When','Kind','Claim','VIN','Make','Status','Note','']
+function rFollowups(){
+  const all=followups(),today=_today()
+  const fsel=document.getElementById('fu_filter')?.value||'open'
+  let rows=fsel==='overdue'?all.filter(f=>f._overdue):fsel==='today'?all.filter(f=>f._due):fsel==='done'?all.filter(f=>f.fu_done):fsel==='all'?all:all.filter(f=>!f.fu_done)
+  const overdue=all.filter(f=>f._overdue).length,due=all.filter(f=>f._due).length,upcoming=all.filter(f=>!f.fu_done&&!f._overdue&&!f._due).length,done=all.filter(f=>f.fu_done).length
+  document.getElementById('K_follow').innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">🔴 Overdue</div><div class="kv rose">${f0(overdue)}</div><div class="ks">past their date</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">📅 Due today</div><div class="kv sun">${f0(due)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">⏭️ Upcoming</div><div class="kv sky">${f0(upcoming)}</div><div class="ks">scheduled ahead</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">✅ Done</div><div class="kv mint">${f0(done)}</div></div>`
+  if(!rows.length){document.getElementById('T_follow').innerHTML='<div class="card"><div class="chart-empty">No follow-ups here. Open any claim and set a 📅 follow-up date to add one.</div></div>';return}
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>${FU_COLS.map(c=>`<th${c==='When'?' class="num"':''}>${c}</th>`).join('')}</tr></thead><tbody>`
+  rows.forEach(f=>{const when=f.fu_done?'<span class="badge b-mint">✅ done</span>':f._overdue?`<span class="badge b-rose">${Math.abs(f._days)}d overdue</span>`:f._due?'<span class="badge b-sun">today</span>':`<span class="badge b-sky">in ${f._days}d</span>`
+    h+=`<tr class="tr-clickable" ${f.fu_done?'style="opacity:.55"':''} onclick="if(!event.target.closest('button'))openClaim('${esc(f.kind)}','${esc(f.no)}')">
+      <td style="font-weight:700">${esc(f.fu_date)}</td><td class="num">${when}</td><td>${kindBadge(f.kind)}</td>
+      <td class="mono" style="font-weight:600">${esc(f.no)}</td><td class="mono">${esc(f.vin||'—')}</td><td><span class="badge b-n">${esc(f.make||'—')}</span></td>
+      <td>${f.fu_status?`<span class="badge b-n">${esc(f.fu_status)}</span>`:'—'}</td>
+      <td style="max-width:240px;font-size:10.5px;color:var(--muted)">${esc(f.fu_note||'')}</td>
+      <td style="white-space:nowrap">${f.fu_done?'':`<button class="btn btn-sm btn-mint" onclick="event.stopPropagation();fuDone('${esc(f.fu_key)}')">✓ Done</button> `}<button class="btn btn-sm" onclick="event.stopPropagation();openTrack('${esc(f.kind)}','${esc(f.no)}')">✏️</button></td></tr>`})
+  h+=`</tbody></table></div></div>`
+  document.getElementById('T_follow').innerHTML=h
+}
 
 // ══ CSV ═════════════════════════════════════════════════════════
 function exportCSV(name,headers,rows){const csv=[headers.join(',')].concat(rows.map(r=>r.map(c=>{const s=String(c==null?'':c);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}).join(','))).join('\n');const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
@@ -1513,13 +1587,14 @@ function exportXlsx(name,headers,rows){
 
 // ══ RENDER ══════════════════════════════════════════════════════
 function currentPage(){return document.querySelector('.si.active')?.dataset.page||'dashboard'}
-function renderPage(p){if(p==='dashboard')rDash();if(p==='pipeline')rPipe();if(p==='credits')rCredits();if(p==='rejections')rRej();if(p==='insights')rInsights();if(p==='statement')rStatement();if(p==='upload')rUploadHist()}
+function renderPage(p){if(p==='dashboard')rDash();if(p==='pipeline')rPipe();if(p==='credits')rCredits();if(p==='rejections')rRej();if(p==='insights')rInsights();if(p==='statement')rStatement();if(p==='followups')rFollowups();if(p==='upload')rUploadHist()}
 function monthly(claims){const m={};claims.forEach(c=>{if(!c.month)return;if(!m[c.month])m[c.month]={month:c.month,cnt:0,invoiced:0,accepted:0,answered:0,err:0,warn:0,success:0,pending:0,labor:0,parts:0,ext:0};const b=m[c.month];b.cnt++;b.invoiced+=c.invoiced;b.accepted+=c.accepted;b.labor+=c.labor;b.parts+=c.parts;b.ext+=c.ext;const k=effKey(c);if(k==='Pending')b.pending++;else{b.answered++;if(k==='Error')b.err++;else if(k==='Warning')b.warn++;else b.success++}});return Object.values(m).sort((a,b)=>a.month.localeCompare(b.month))}
 
 function updateBadges(){
   const claims=scopedClaims()
   document.getElementById('B_pipe').textContent=f0(claims.length)
   document.getElementById('B_rej').textContent=f0(claims.filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').length)
+  const fb=document.getElementById('B_follow');if(fb){const fc=followCount();fb.textContent=f0(fc);fb.style.display=fc?'':'none'}
   document.querySelector('#lastSync span:last-child').textContent=`${f0(S.inv.length)} inv · ${f0(S.subs.length)} sub · ${f0(S.cred.length)} cr`
   const makes=[...new Set(reconcile().claims.map(c=>c.make).filter(Boolean))].sort()
   const months=[...new Set(reconcile().claims.map(c=>c.month).filter(Boolean))].sort().reverse()
@@ -1563,7 +1638,7 @@ function freshnessNudge(){
 }
 window.freshnessNudge=freshnessNudge
 function rDash(){
-  renderFreshness()
+  renderFreshness();renderFuReminder()
   const claims=scopedClaims()
   const invoiced=claims.reduce((s,c)=>s+c.invoiced,0),accepted=claims.reduce((s,c)=>s+c.accepted,0)
   const totRejected=claims.reduce((s,c)=>s+(c.rejected||0),0),totPricing=claims.reduce((s,c)=>s+(c.pricing_diff||0),0)
@@ -1915,6 +1990,8 @@ window.delOverride=delOverride
 ;['cr_status','cr_brand','cr_link','cr_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rCredits);e.addEventListener('change',rCredits)})
 ;['rj_status','rj_make','rj_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rRej);e.addEventListener('change',rRej)})
 document.querySelectorAll('#insSeg button').forEach(b=>b.addEventListener('click',()=>{S.insTab=b.dataset.ins;rInsights()}))
+;(()=>{const e=document.getElementById('fu_filter');if(e)e.addEventListener('change',rFollowups)})()
+;(()=>{const e=document.getElementById('fu_export');if(e)e.addEventListener('click',()=>{const rows=followups().map(f=>[f.fu_date,f._overdue?'overdue':f._due?'today':f.fu_done?'done':'upcoming',f.kind,f.no,f.vin,f.make,f.fu_status,f.fu_note]);exportXlsx('bmw_followups',['Follow-up date','When','Kind','Claim','VIN','Make','Status','Note'],rows);showToast('⬇ Exported '+rows.length+' follow-ups to Excel')})})()
 document.getElementById('pp_export').addEventListener('click',()=>{const rows=(window._ppRows||[]).map(c=>[c.kind,c.no,c.record_no,c.doc_no||(c.inferred_inv?'≈'+c.inferred_inv.doc_no:''),c.make,c.vin,c.document_date,c.invoiced,c.answered?c.accepted:'',c.gap,c.accept_ratio?c.accept_ratio.toFixed(0)+'%':'',c.status_overall,c.corrected?'corrected':'',c.cn_no]);exportXlsx('bmw_pipeline',['Kind','Claim No','Record No','Invoice','Make','VIN','Sub Date','Invoiced €','Credited €','Gap €','Cred %','Outcome','Corrected','Credit Notes'],rows);showToast('⬇ Exported '+rows.length+' claims to Excel')})
 document.getElementById('cr_xlsx').addEventListener('click',()=>{const rows=(window._crRows||[]).map(c=>[c.cn_date,c.cn_no,c.kind,c.dealer_claim_number||c.credits?.[0]?.dealer_claim_number||c.no||c.sub?.last_submission||'',c.doc_no||(c.inferred_inv?'≈'+c.inferred_inv.doc_no:''),c.credits[0]?.brand||'',c.vin,c.items_count,c.accepted,c.status_overall,c.corrected?'corrected':'',c.orphan?'no submission':'linked']);exportXlsx('bmw_credits',['CN Date','Credit Note','Kind','Dealer Claim','Invoice','Brand','VIN','Lines','Credited €','Status','Corrected','Link'],rows);showToast('⬇ Exported '+rows.length+' credit rows to Excel')})
 document.getElementById('rj_xlsx').addEventListener('click',()=>{const rows=(window._rjRows||[]).map(c=>{const tr=S.resub[c.kind+':'+c.no]||{};return [c.cn_date,c.no,c.make,c.vin,c.accepted,c.gap,c.status_overall,c.statuses?.Error||0,c.statuses?.Warning||0,tr.status||'untracked',tr.credited_amt||'']});exportXlsx('bmw_rejections',['CN Date','Submission','Make','VIN','Credited €','Gap €','Issue','Errors','Warnings','Tracked','Recovered €'],rows);showToast('⬇ Exported '+rows.length+' rejections to Excel')})
