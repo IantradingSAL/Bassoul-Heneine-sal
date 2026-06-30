@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <title>BMW Warranty — Bassoul, Heneine SAL</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='10' fill='%231C69D4'/><text x='12' y='17' font-size='12' text-anchor='middle' fill='white' font-weight='800' font-family='Arial'>B</text></svg>">
@@ -481,11 +484,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.14'
+const APP_VERSION='v5.15'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.15',date:'2026-06-30',items:[
+    {t:'fix',d:'Added no-cache headers so the browser always loads the latest version of the app instead of a stale cached copy (which could make an already-credited claim still look Pending). If a claim looks wrong, check the version chip top-right matches the latest — if not, the page was cached.'}]},
   {v:'v5.14',date:'2026-06-30',items:[
     {t:'feat',d:'The clickable 📅 follow-up chip now also shows next to the status inside every drill-down (Not credited, Pending, etc.) — assign a follow-up to a pending claim and you can see and open it straight from the Source-records table.'}]},
   {v:'v5.13',date:'2026-06-30',items:[
