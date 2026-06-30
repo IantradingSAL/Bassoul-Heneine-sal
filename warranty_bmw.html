@@ -375,8 +375,10 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         <span class="fl-l">Status</span>
         <select id="cr_status"><option value="">All</option><option value="Success">Success</option><option value="Warning">Warning</option><option value="Error">Error</option></select>
         <span class="fl-l">Brand</span><select id="cr_brand"><option value="">All</option></select>
+        <span class="fl-l">Month</span><select id="cr_month"><option value="">All</option></select>
+        <span class="fl-l">Credit Note</span><select id="cr_cn"><option value="">All</option></select>
         <span class="fl-l">Link</span><select id="cr_link"><option value="">All</option><option value="linked">Linked to submission</option><option value="orphan">No submission record</option></select>
-        <input type="text" id="cr_search" placeholder="Search VIN, credit note IWE…, dealer claim…" style="flex:1;min-width:220px">
+        <input type="text" id="cr_search" placeholder="Search VIN, credit note IWE…, dealer claim…" style="flex:1;min-width:200px">
         <button class="btn btn-sm btn-bmw" id="cr_xlsx">⬇ Excel</button>
       </div></div>
       <div id="T_cr"></div>
@@ -484,11 +486,14 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.22'
+const APP_VERSION='v5.23'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.23',date:'2026-06-30',items:[
+    {t:'fix',d:'Credited / resolved / resubmitted claims are removed from the open Rejections list too (they are no longer rejections). They stay visible under the "Tracked only" filter, and the Tracked / Recovered totals still count them so completed recoveries remain visible.'},
+    {t:'feat',d:'Credit Notes page: added Month and Credit Note filters, and a new "Invoiced € (incadea)" header card next to Credited € showing the total sent for the listed claims plus the Δ vs credited — so you can see the bulk difference between what was sent and what BMW credited for any filter (month, credit note, brand, etc.).'}]},
   {v:'v5.22',date:'2026-06-30',items:[
     {t:'fix',d:'Resubmitted / credited / resolved claims are now also removed from the BMW Statement — Shortfall, Outstanding and the Outstanding € figure — so a claim being recovered through a new claim is not still counted as owed. They show their manual status (e.g. 📤 Resubmitted) in the statement instead of Shortfall.'}]},
   {v:'v5.21',date:'2026-06-30',items:[
@@ -1207,10 +1212,10 @@ const METRIC_DEFS={
     rows:()=>(window._rjRows||[]).filter(c=>c.status_overall==='Warning'),stats:ST_REJ},
   rj_gap:{icon:'💰',title:'Rejections · Gap at Risk €',accent:'var(--sun)',sub:'Matches the current Rejections filters',src:['inv','cred'],focus:'Gap €',
     rows:()=>(window._rjRows||[]).slice().sort((a,b)=>b.gap-a.gap),stats:ST_REJ},
-  rj_tracked:{icon:'✅',title:'Rejections · Tracked',accent:'var(--blue)',sub:'Rejections with a recovery record · current filters',src:['cred'],focus:'Status',
-    rows:()=>(window._rjRows||[]).filter(c=>S.resub[c.kind+':'+c.no]),stats:ST_REJ},
-  rj_recovered:{icon:'💚',title:'Rejections · Recovered €',accent:'var(--mint-d)',sub:'Rejections with a credited recovery · current filters',src:['cred'],focus:'Gap €',
-    rows:()=>(window._rjRows||[]).filter(c=>S.resub[c.kind+':'+c.no]?.credited_amt>0).sort((a,b)=>(S.resub[b.kind+':'+b.no]?.credited_amt||0)-(S.resub[a.kind+':'+a.no]?.credited_amt||0)),stats:ST_REJ},
+  rj_tracked:{icon:'✅',title:'Rejections · Tracked',accent:'var(--blue)',sub:'Every rejection with a recovery record (incl. credited / resolved / resubmitted)',src:['cred'],focus:'Status',
+    rows:()=>(window._rjAll||[]).filter(c=>S.resub[c.kind+':'+c.no]),stats:ST_REJ},
+  rj_recovered:{icon:'💚',title:'Rejections · Recovered €',accent:'var(--mint-d)',sub:'Every rejection with a credited recovery',src:['cred'],focus:'Gap €',
+    rows:()=>(window._rjAll||[]).filter(c=>S.resub[c.kind+':'+c.no]?.credited_amt>0).sort((a,b)=>(S.resub[b.kind+':'+b.no]?.credited_amt||0)-(S.resub[a.kind+':'+a.no]?.credited_amt||0)),stats:ST_REJ},
   // ── STATEMENT page (reads the live filtered receivables row set) ──
   st_invoiced:{icon:'🧾',title:'Statement · Invoiced €',accent:'var(--slate)',sub:'Matches the current Statement filters',src:['inv'],focus:'Invoiced €',
     rows:()=>(window._stRows||[]).filter(c=>c.invoiced>0).sort((a,b)=>b.invoiced-a.invoiced),stats:ST_OWED},
@@ -1645,7 +1650,7 @@ function monthly(claims){const m={};claims.forEach(c=>{if(!c.month)return;if(!m[
 function updateBadges(){
   const claims=scopedClaims()
   document.getElementById('B_pipe').textContent=f0(claims.length)
-  document.getElementById('B_rej').textContent=f0(claims.filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').length)
+  document.getElementById('B_rej').textContent=f0(claims.filter(c=>(c.status_overall==='Error'||c.status_overall==='Warning')&&!isHandled(c)).length)
   const fb=document.getElementById('B_follow');if(fb){const fc=followCount();fb.textContent=f0(fc);fb.style.display=fc?'':'none'}
   document.querySelector('#lastSync span:last-child').textContent=`${f0(S.inv.length)} inv · ${f0(S.subs.length)} sub · ${f0(S.cred.length)} cr`
   const makes=[...new Set(reconcile().claims.map(c=>c.make).filter(Boolean))].sort()
@@ -1654,6 +1659,10 @@ function updateBadges(){
   ;[['pp_make',makes],['rj_make',makes],['st_make',makes]].forEach(([id,arr])=>{const el=document.getElementById(id);if(el){const cur=el.value;el.innerHTML='<option value="">All</option>'+arr.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');el.value=cur}})
   const cb=document.getElementById('cr_brand');if(cb)cb.innerHTML='<option value="">All</option>'+brands.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')
   const mo=document.getElementById('pp_month');if(mo)mo.innerHTML='<option value="">All</option>'+months.map(m=>`<option value="${esc(m)}">${esc(fmM(m))}</option>`).join('')
+  const crMonths=[...new Set(S.cred.map(c=>c.month).filter(Boolean))].sort().reverse()
+  const cm=document.getElementById('cr_month');if(cm){const cur=cm.value;cm.innerHTML='<option value="">All</option>'+crMonths.map(m=>`<option value="${esc(m)}">${esc(fmM(m))}</option>`).join('');cm.value=cur}
+  const cns=[...new Set(S.cred.map(c=>c.credit_note_number).filter(Boolean))].sort()
+  const ccn=document.getElementById('cr_cn');if(ccn){const cur=ccn.value;ccn.innerHTML='<option value="">All</option>'+cns.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');ccn.value=cur}
 }
 
 function renderFreshness(){
@@ -1770,15 +1779,20 @@ function rCredits(){
   // build per-credit-note-line grouped by credit note number for detail; but show claim-level list
   const list=[...claims.filter(c=>c.answered&&inScope(c)&&!isDuplicate(c)),...orphans.filter(c=>inScope(c)&&!isDuplicate(c))]
   const sf=document.getElementById('cr_status').value,bf=document.getElementById('cr_brand').value,lf=document.getElementById('cr_link').value,q=document.getElementById('cr_search').value.toLowerCase().trim()
+  const mo=document.getElementById('cr_month')?.value||'',cn=document.getElementById('cr_cn')?.value||''
   let rows=list.filter(c=>{if(sf&&c.status_overall!==sf)return false;if(bf&&(c.credits[0]?.brand||'')!==bf)return false
     if(lf==='linked'&&c.orphan)return false;if(lf==='orphan'&&!c.orphan)return false
+    if(mo&&c.month!==mo)return false;if(cn&&!String(c.cn_no||'').split(', ').includes(cn))return false
     if(q&&![c.cn_no,c.vin,c.dealer_claim_number||c.sub?.last_submission||'',c.credits?.[0]?.dealer_claim_number||'',c.no||''].join('|').toLowerCase().includes(q))return false;return true})
   rows.sort((a,b)=>(b.cn_date||'').localeCompare(a.cn_date||''))
   window._crRows=rows
   const accepted=rows.reduce((s,c)=>s+c.accepted,0),err=rows.filter(c=>c.status_overall==='Error').length,warn=rows.filter(c=>c.status_overall==='Warning').length
+  const invoiced=rows.reduce((s,c)=>s+(c.invoiced||c.inferred_inv?.total_invoiced||0),0),crGap=invoiced-accepted
+  const filtered=!!(sf||bf||lf||mo||cn||q)
   document.getElementById('K_cr').innerHTML=`
     <div class="kpi drill" onclick="openMetric('cr_notes')"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📑 Credit Notes</div><div class="kv bmw">${f0(new Set(S.cred.filter(c=>S.scope==='all'||c.credit_type===S.scope).map(c=>c.credit_note_number)).size)}</div><div class="ks">${f0(rows.length)} answered claims</div></div>
-    <div class="kpi drill" onclick="openMetric('cr_credited')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced € (incadea)${filtered?' · filtered':''}</div><div class="kv slate">${f0(invoiced)}</div><div class="ks">what we sent for these claims</div></div>
+    <div class="kpi drill" onclick="openMetric('cr_credited')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div><div class="ks">Δ €${f0(crGap)} vs invoiced</div></div>
     <div class="kpi drill" onclick="openMetric('cr_warn')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
     <div class="kpi drill" onclick="openMetric('cr_err')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
     <div class="kpi drill" onclick="openMetric('cr_nosub')"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 Credited · No Submission</div><div class="kv pur">${f0(orphans.filter(inScope).length)}</div><div class="ks">submission file not loaded</div></div>`
@@ -1800,21 +1814,23 @@ function rRej(){
   const claims=scopedClaims().concat(scopedOrphans()).filter(c=>c.status_overall==='Error'||c.status_overall==='Warning')
   const sf=document.getElementById('rj_status').value,mk=document.getElementById('rj_make').value,q=document.getElementById('rj_search').value.toLowerCase().trim()
   let rows=claims.filter(c=>{const tr=S.resub[c.kind+':'+c.no]
+    if(isHandled(c)&&sf!=='tracked')return false  // credited/resolved/resubmitted are no longer open rejections (still visible under "Tracked only")
     if(sf==='Error'&&c.status_overall!=='Error')return false;if(sf==='Warning'&&c.status_overall!=='Warning')return false
     if(sf==='tracked'&&!tr)return false;if(sf==='untracked'&&tr)return false;if(mk&&c.make!==mk)return false
     if(q&&![c.no,c.record_no,c.doc_no,c.vin,c.cn_no].join('|').toLowerCase().includes(q))return false;return true})
   rows=applySort(rows,'rj',[c=>c.cn_date,c=>c.no,c=>c.make,c=>c.vin,c=>c.accepted,c=>c.gap,c=>c.status_overall])
-  window._rjRows=rows
+  window._rjRows=rows;window._rjAll=claims
   const err=rows.filter(c=>c.status_overall==='Error').length,warn=rows.filter(c=>c.status_overall==='Warning').length
-  const tracked=rows.filter(c=>S.resub[c.kind+':'+c.no]).length
-  const atRisk=rows.reduce((s,c)=>s+c.gap,0),credited=rows.reduce((s,c)=>s+(S.resub[c.kind+':'+c.no]?.credited_amt||0),0)
+  // Tracked / Recovered count the whole rejection universe (incl. handled), so completed recoveries stay visible
+  const tracked=claims.filter(c=>S.resub[c.kind+':'+c.no]).length
+  const atRisk=rows.reduce((s,c)=>s+c.gap,0),credited=claims.reduce((s,c)=>s+(S.resub[c.kind+':'+c.no]?.credited_amt||0),0)
   const rejAmt=rows.reduce((s,c)=>s+(c.rejected||0),0)
   document.getElementById('K_rej').innerHTML=`
     <div class="kpi drill" onclick="openMetric('rj_err')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
     <div class="kpi drill" onclick="openMetric('rj_warn')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
     <div class="kpi drill" onclick="openMetric('rejected_gap')"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">❌ Rejected € (to chase)</div><div class="kv" style="color:var(--rose-d)">${f0(rejAmt)}</div><div class="ks">claimed − paid</div></div>
     <div class="kpi drill" onclick="openMetric('rj_gap')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💰 Gap at Risk €</div><div class="kv sun">${f0(atRisk)}</div></div>
-    <div class="kpi drill" onclick="openMetric('rj_tracked')"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kl">✅ Tracked</div><div class="kv" style="color:var(--blue)">${tracked}</div><div class="ks">of ${rows.length}</div></div>
+    <div class="kpi drill" onclick="openMetric('rj_tracked')"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kl">✅ Tracked</div><div class="kv" style="color:var(--blue)">${tracked}</div><div class="ks">of ${claims.length}</div></div>
     <div class="kpi drill" onclick="openMetric('rj_recovered')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💚 Recovered €</div><div class="kv mint">${f0(credited)}</div></div>`
   let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
     ${th('CN Date','rj',0)}${th('Submission','rj',1)}${th('Make','rj',2)}${th('VIN','rj',3)}${th('Credited €','rj',4,{num:1})}${th('Gap €','rj',5,{num:1})}${th('Issue','rj',6)}<th>Track</th><th>Recovered €</th><th>Action</th></tr></thead><tbody>`
@@ -2042,7 +2058,7 @@ window.delOverride=delOverride
 
 // ── listeners
 ;['pp_status','pp_make','pp_month','pp_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rPipe);e.addEventListener('change',rPipe)})
-;['cr_status','cr_brand','cr_link','cr_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rCredits);e.addEventListener('change',rCredits)})
+;['cr_status','cr_brand','cr_month','cr_cn','cr_link','cr_search'].forEach(id=>{const e=document.getElementById(id);if(e){e.addEventListener('input',rCredits);e.addEventListener('change',rCredits)}})
 ;['rj_status','rj_make','rj_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rRej);e.addEventListener('change',rRej)})
 document.querySelectorAll('#insSeg button').forEach(b=>b.addEventListener('click',()=>{S.insTab=b.dataset.ins;rInsights()}))
 ;(()=>{const e=document.getElementById('fu_filter');if(e)e.addEventListener('change',rFollowups)})()
