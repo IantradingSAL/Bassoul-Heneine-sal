@@ -481,11 +481,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.11'
+const APP_VERSION='v5.12'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.12',date:'2026-06-30',items:[
+    {t:'feat',d:'When a claim has a follow-up scheduled, a clickable 📅 chip now appears right next to its status on the Pipeline, Credit Notes and Rejections lists (red 🔴 if overdue, ✅ if done). Click the chip — or the banner shown at the top of the claim view — to jump straight to that claim follow-up and edit it.'}]},
   {v:'v5.11',date:'2026-06-30',items:[
     {t:'feat',d:'New Follow-ups page with reminders. Open any claim → 📅 Follow-up / status, set a follow-up date and a note (what to check). The new Follow-ups page in the sidebar lists every reminder sorted by date, with Overdue / Due today / Upcoming / Done counters, a red flag on overdue items, and a one-click "✓ Done". A reminder banner appears on the dashboard and a badge on the sidebar when something is overdue or due today.'},
     {t:'feat',d:'A Credited (€) amount you type into the status box now counts toward the Credited € totals (dashboard, pipeline, gap) for a still-pending claim — so you can record money you know was credited before the credit-note file arrives. Once the real credit note loads, it takes over.'}]},
@@ -890,6 +892,10 @@ function manBadge(c){const s=manStatus(c);if(!s)return '';const col=s==='rejecte
 // a claim manually flagged as a duplicate (sent twice) is excluded from every report/total
 function isDuplicate(c){return manStatus(c)==='duplicate'}
 function scopedDuplicates(){return reconcile().claims.concat(reconcile().orphans).filter(inScope).filter(isDuplicate)}
+// clickable follow-up chip shown next to a claim's status — opens that claim's follow-up
+function fuBadge(c){const r=S.resub[c.kind+':'+c.no];if(!r||!r.follow_up_date)return '';const today=new Date().toISOString().slice(0,10),done=!!r.follow_up_done,overdue=!done&&r.follow_up_date<today,due=!done&&r.follow_up_date===today
+  const col=done?'b-mint':overdue?'b-rose':due?'b-sun':'b-sky',ic=done?'✅':overdue?'🔴':'📅',lbl=done?'follow-up done':overdue?'follow-up overdue':due?'follow-up today':r.follow_up_date
+  return ` <span class="badge ${col}" style="cursor:pointer" title="${esc(r.follow_up_note||'')} — click to open follow-up" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${ic} ${esc(lbl)}</span>`}
 const kindBadge=k=>k==='bsi'?'<span class="badge b-sky">BSI</span>':'<span class="badge b-bmw">Warranty</span>'
 
 // ══ MODAL ═══════════════════════════════════════════════════════
@@ -902,6 +908,7 @@ function openClaim(kind,no){
     <p>${esc(claim.make)} · ${esc(claim.vin||'no VIN')} · invoice ${esc(claim.doc_no||'—')} · ${claim.kind==='bsi'?'contract':'rec'} ${esc(claim.record_no||'—')}</p></div>
     <button class="bmw-modal-x" onclick="closeModal()">✕</button></div>
     <div class="bmw-modal-body">
+      ${(()=>{const r=S.resub[claim.kind+':'+claim.no];if(!r||!r.follow_up_date)return '';const today=new Date().toISOString().slice(0,10),done=!!r.follow_up_done,overdue=!done&&r.follow_up_date<today;return `<div class="al" style="background:${done?'#f0fdf4':overdue?'#fef2f2':'#eff6ff'};border:1px solid ${done?'var(--mint)':overdue?'var(--rose)':'var(--sky)'};display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer" onclick="closeModal();openTrack('${esc(claim.kind)}','${esc(claim.no)}')"><span style="font-size:15px">${done?'✅':overdue?'🔴':'📅'}</span><span style="font-weight:700;font-size:11.5px">Follow-up ${done?'done ·':overdue?'overdue ·':'·'} ${esc(r.follow_up_date)}${r.follow_up_note?' — '+esc(r.follow_up_note):''}</span><span style="margin-left:auto;font-size:10.5px;color:var(--bmw);font-weight:700">Edit →</span></div>`})()}
       <div class="flow">
         <div class="flow-step"><div class="fl-t">🧾 Invoiced (incadea)</div><div class="fl-v">€${f(claim.invoiced)}</div><div class="fl-s">${claim.inv?esc(claim.inv.model||''):'no invoice row'}</div></div>
         <div class="flow-arrow">→</div>
@@ -1706,7 +1713,7 @@ function rPipe(){
       <td class="num">${c.noSubmission?(c.inferred_inv?`<span style="color:var(--muted)" title="from the inferred invoice">≈ ${f(c.inferred_inv.total_invoiced)}</span>`:'<span style="color:var(--faint)">—</span>'):f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
       <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c.noSubmission?'<span style="color:var(--faint)">—</span>':(c.answered?f(c.gap):'—')}</td>
       <td class="num">${c.answered&&c.invoiced?`<span style="font-weight:700;color:${c.accept_ratio>=85?'var(--mint-d)':c.accept_ratio>=65?'var(--lemon-d)':'var(--rose-d)'}">${c.accept_ratio.toFixed(0)}%</span>`:'—'}</td>
-      <td>${c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):'')}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${manBadge(c)}</td>
+      <td>${c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):'')}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${manBadge(c)}${fuBadge(c)}</td>
       <td>${(c.status_overall==='Error'||c.status_overall==='Warning'||!c.answered)?`<button class="btn btn-sm ${tr?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr?'✏️':(c.answered?'+ Track':'⚙ Status')}</button>`:'<span style="color:var(--faint)">—</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="12" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
@@ -1737,7 +1744,7 @@ function rCredits(){
     <td class="mono">${c.doc_no?esc(c.doc_no):(c.inferred_inv?`<span title="inferred from incadea by VIN + amount — verify">≈ ${esc(c.inferred_inv.doc_no)}</span>`:'—')}</td>
     <td><span class="badge b-n">${esc(c.credits[0]?.brand||'—')}</span></td>
     <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td><td class="num">${c.items_count}</td>
-    <td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}${corrBadge(c)}</td>
+    <td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}${corrBadge(c)}${fuBadge(c)}</td>
     <td>${c.orphan?'<span class="badge b-pur" title="BMW credited this, but no matching submission row is loaded">credited · no sub</span>':'<span class="badge b-mint">linked</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="11" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
@@ -1771,7 +1778,7 @@ function rRej(){
       <td style="font-size:10px;color:var(--muted)">${esc(c.cn_date||'')}</td><td class="mono">${esc(c.no)}</td><td><span class="badge b-n">${esc(c.make||'—')}</span></td>
       <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
       <td class="num" style="font-weight:700">${f(c.accepted)}</td><td class="num" style="color:var(--rose-d);font-weight:600">${f(c.gap)}</td>
-      <td>${c.status_overall==='Error'?'<span class="badge b-rose">❌ Error</span>':'<span class="badge b-lem">⚠️ Warning</span>'} <span class="badge b-n">${c.statuses.Error}E ${c.statuses.Warning}W</span></td>
+      <td>${c.status_overall==='Error'?'<span class="badge b-rose">❌ Error</span>':'<span class="badge b-lem">⚠️ Warning</span>'} <span class="badge b-n">${c.statuses.Error}E ${c.statuses.Warning}W</span>${fuBadge(c)}</td>
       <td>${tr.status?`<span class="badge ${tr.status==='credited'?'b-mint':tr.status==='resubmitted'?'b-sky':'b-n'}">${tr.status}</span>`:'<span style="color:var(--faint)">untracked</span>'}</td>
       <td class="num">${tr.credited_amt?'€'+f(tr.credited_amt):'<span style="color:var(--faint)">—</span>'}</td>
       <td><button class="btn btn-sm ${tr.status?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr.status?'✏️ Edit':'+ Track'}</button></td></tr>`})
