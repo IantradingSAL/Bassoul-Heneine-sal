@@ -353,7 +353,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
       <div class="kpis" id="K_pipe"></div>
       <div class="card"><div class="filters">
         <span class="fl-l">Outcome</span>
-        <select id="pp_status"><option value="">All</option><option value="Pending">⏳ Pending answer</option><option value="Success">✅ Success</option><option value="Warning">⚠️ Warning</option><option value="Error">❌ Error</option></select>
+        <select id="pp_status"><option value="">All</option><option value="Pending">⏳ Pending answer</option><option value="Success">✅ Success</option><option value="Warning">⚠️ Warning</option><option value="Error">❌ Error</option><option value="Duplicate">🔁 Duplicate</option></select>
         <span class="fl-l">Make</span><select id="pp_make"><option value="">All</option></select>
         <span class="fl-l">Month</span><select id="pp_month"><option value="">All</option></select>
         <input type="text" id="pp_search" placeholder="Search VIN, invoice GAR…, submission #, claim…" style="flex:1;min-width:220px">
@@ -465,13 +465,15 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.9'
+const APP_VERSION='v5.10'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.10',date:'2026-06-30',items:[
+    {t:'feat',d:'Duplicates now stay VISIBLE in the Pipeline (greyed out, marked 🔁) instead of being hidden — they are still excluded from every total, count and report. The Pipeline Claims card shows "+N duplicates shown, not counted", a Duplicate option was added to the status filter, and a Duplicates KPI appears on the Pipeline. Use this when the same repair was submitted twice, even under different claim numbers. Marking a pending claim credited/resolved/rejected shows that status on the main row and the report numbers adjust accordingly.'}]},
   {v:'v5.9',date:'2026-06-30',items:[
-    {t:'feat',d:'New "duplicate" status for claims that were sent to BMW twice. Set a claim status to "duplicate (exclude from report)" and it is removed from every total, count, KPI and report so it no longer double-counts. The excluded duplicates are listed separately in a new "🔁 Duplicates (excluded)" card on the dashboard — click it to review them or change the status back.'}]},
+    {t:'feat',d:'New "duplicate" status for claims that were sent to BMW twice — excluded from totals and surfaced in a dedicated Duplicates card/drill.'}]},
   {v:'v5.8',date:'2026-06-30',items:[
     {t:'feat',d:'Pending claims can now be given a manual status: a Set status button appears on pending rows (Pipeline and the claim view) so you can mark them resubmitted, rejected, credited or resolved while you wait for the credit note. Marking a claim rejected, credited or resolved now actually moves it OUT of Pending everywhere — the Pipeline row, the Pending counts, the dashboard donut and the status filter all reflect the manual status (rejected counts toward Needs Attention, credited/resolved as success). Resubmitted stays pending but shows its badge. Money figures are unchanged.'},
     {t:'feat',d:'Every drill-down detail view (Source records) now has a filter box under each column header — dropdowns for Kind, Make and Status, and type-to-filter for the rest. Number columns accept >100 or <50. Clickable headers still sort A to Z or Z to A, and Export Excel respects the active filters, so what you see is what you export.'}]},
@@ -843,6 +845,9 @@ function reconcile(){
 function inScope(x){return S.scope==='all'||x.kind===S.scope}
 function scopedClaims(){return reconcile().claims.filter(inScope).filter(c=>!isDuplicate(c))}
 function scopedOrphans(){return reconcile().orphans.filter(inScope).filter(c=>!isDuplicate(c))}
+// "All" variants INCLUDE duplicates — used only where duplicates should stay visible (e.g. the Pipeline list)
+function scopedClaimsAll(){return reconcile().claims.filter(inScope)}
+function scopedOrphansAll(){return reconcile().orphans.filter(inScope)}
 
 // ══ SORT helpers ════════════════════════════════════════════════
 function sortClick(k,c){const cur=S.sortState[k]||{col:-1,dir:'asc'};let dir='asc';if(cur.col===c&&cur.dir==='asc')dir='desc';S.sortState[k]={col:c,dir};renderPage(currentPage())}
@@ -1601,23 +1606,25 @@ function rDash(){
 }
 
 function rPipe(){
-  const all=scopedClaims().concat(scopedOrphans())
+  const all=scopedClaimsAll().concat(scopedOrphansAll())
   const sf=document.getElementById('pp_status').value,mk=document.getElementById('pp_make').value,mo=document.getElementById('pp_month').value,q=document.getElementById('pp_search').value.toLowerCase().trim()
-  let rows=all.filter(c=>{if(sf&&effKey(c)!==sf)return false;if(mk&&c.make!==mk)return false;if(mo&&c.month!==mo)return false;if(q&&![c.no,c.record_no,c.doc_no,c.vin,c.cn_no].join('|').toLowerCase().includes(q))return false;return true})
+  let rows=all.filter(c=>{if(sf&&(sf==='Duplicate'?!isDuplicate(c):(isDuplicate(c)||effKey(c)!==sf)))return false;if(mk&&c.make!==mk)return false;if(mo&&c.month!==mo)return false;if(q&&![c.no,c.record_no,c.doc_no,c.vin,c.cn_no].join('|').toLowerCase().includes(q))return false;return true})
   rows=applySort(rows,'pp',[c=>c.document_date,c=>c.kind,c=>c.no,c=>c.doc_no,c=>c.make,c=>c.vin,c=>c.invoiced,c=>c.accepted,c=>c.gap,c=>c.accept_ratio,c=>c.status_overall])
-  window._ppRows=rows
-  const invoiced=rows.reduce((s,c)=>s+c.invoiced,0),accepted=rows.reduce((s,c)=>s+c.accepted,0),pending=rows.filter(effPending).length,noSub=rows.filter(c=>c.noSubmission).length
+  // duplicates stay VISIBLE in the list but are excluded from the counted figures
+  const counted=rows.filter(c=>!isDuplicate(c)),dupCount=rows.length-counted.length
+  window._ppRows=counted
+  const invoiced=counted.reduce((s,c)=>s+c.invoiced,0),accepted=counted.reduce((s,c)=>s+c.accepted,0),pending=counted.filter(effPending).length,noSub=counted.filter(c=>c.noSubmission).length
   document.getElementById('K_pipe').innerHTML=`
-    <div class="kpi drill" onclick="openMetric('pp_claims')"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">🔗 Claims</div><div class="kv bmw">${f0(rows.length)}</div></div>
+    <div class="kpi drill" onclick="openMetric('pp_claims')"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">🔗 Claims</div><div class="kv bmw">${f0(counted.length)}</div>${dupCount?`<div class="ks">+${f0(dupCount)} duplicate${dupCount>1?'s':''} shown, not counted</div>`:''}</div>
     <div class="kpi drill" onclick="openMetric('pp_invoiced')"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced €</div><div class="kv slate">${f0(invoiced)}</div></div>
     <div class="kpi drill" onclick="openMetric('pp_credited')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div></div>
     <div class="kpi drill" onclick="openMetric('pp_pending')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending</div><div class="kv sun">${f0(pending)}</div></div>
-    <div class="kpi drill" onclick="openMetric('pp_nosub')"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 No Submission</div><div class="kv pur">${f0(noSub)}</div><div class="ks">credited, file not loaded</div></div>`
+    ${dupCount?`<div class="kpi drill" onclick="openMetric('duplicates')"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🔁 Duplicates</div><div class="kv slate">${f0(dupCount)}</div><div class="ks">excluded from totals</div></div>`:`<div class="kpi drill" onclick="openMetric('pp_nosub')"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 No Submission</div><div class="kv pur">${f0(noSub)}</div><div class="ks">credited, file not loaded</div></div>`}`
   let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr>
     ${th('Sub Date','pp',0)}${th('Kind','pp',1)}${th('Claim No.','pp',2)}${th('Invoice (GAR)','pp',3)}${th('Make','pp',4)}${th('VIN','pp',5)}
     ${th('Invoiced €','pp',6,{num:1})}${th('Credited €','pp',7,{num:1})}${th('Gap €','pp',8,{num:1})}${th('Cred %','pp',9,{num:1})}${th('Outcome','pp',10)}<th>Action</th></tr></thead><tbody>`
-  rows.slice(0,700).forEach(c=>{const tr=S.resub[c.kind+':'+c.no]
-    h+=`<tr class="tr-clickable" onclick="if(!event.target.closest('button,.vin-cell'))openClaim('${esc(c.kind)}','${esc(c.no)}')">
+  rows.slice(0,700).forEach(c=>{const tr=S.resub[c.kind+':'+c.no],dup=isDuplicate(c)
+    h+=`<tr class="tr-clickable" ${dup?'style="opacity:.5" title="Duplicate — excluded from all totals"':''} onclick="if(!event.target.closest('button,.vin-cell'))openClaim('${esc(c.kind)}','${esc(c.no)}')">
       <td style="font-size:10px;color:var(--muted)">${esc(c.document_date||'')}</td><td>${kindBadge(c.kind)}</td><td class="mono" style="font-weight:600">${esc(c.no)}<div style="font-size:9px;font-weight:400">${c.noSubmission?'<span style="color:var(--sun)">no submission file</span>':'<span style="color:var(--faint)">'+(c.kind==='bsi'?'contract ':'rec ')+esc(c.record_no||'')+'</span>'}</div></td>
       <td class="mono">${c.doc_no?esc(c.doc_no):(c.inferred_inv?`<span title="inferred from incadea by VIN + amount — verify">≈ ${esc(c.inferred_inv.doc_no)}</span>`:'—')}</td><td><span class="badge b-n">${esc(c.make||'—')}</span></td>
       <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
@@ -1634,7 +1641,7 @@ function rPipe(){
 function rCredits(){
   const {claims,orphans}=reconcile()
   // build per-credit-note-line grouped by credit note number for detail; but show claim-level list
-  const list=[...claims.filter(c=>c.answered&&inScope(c)),...orphans.filter(inScope)]
+  const list=[...claims.filter(c=>c.answered&&inScope(c)&&!isDuplicate(c)),...orphans.filter(c=>inScope(c)&&!isDuplicate(c))]
   const sf=document.getElementById('cr_status').value,bf=document.getElementById('cr_brand').value,lf=document.getElementById('cr_link').value,q=document.getElementById('cr_search').value.toLowerCase().trim()
   let rows=list.filter(c=>{if(sf&&c.status_overall!==sf)return false;if(bf&&(c.credits[0]?.brand||'')!==bf)return false
     if(lf==='linked'&&c.orphan)return false;if(lf==='orphan'&&!c.orphan)return false
