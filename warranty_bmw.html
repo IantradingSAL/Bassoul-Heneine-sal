@@ -484,11 +484,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.20'
+const APP_VERSION='v5.21'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.21',date:'2026-06-30',items:[
+    {t:'fix',d:'Resubmitted / credited / resolved claims are no longer counted in the Rejected and Pricing-Difference totals or drill-downs — once a rejected claim has been resubmitted (or credited/resolved) it is being recovered through its new claim, so counting both double-counted the loss (e.g. 71202 resubmitted as 71341). Their status badge now shows the manual status (e.g. 📤 Resubmitted) instead of the original Error, since the claim is no longer simply rejected.'}]},
   {v:'v5.20',date:'2026-06-30',items:[
     {t:'fix',d:'Removed the "Claimed €" column from the Rejected / Pricing-Difference drill-downs — BMW rarely fills a reliable claimed price, so the column was almost always empty. The split still shows Invoiced, Paid, Pricing difference and Rejected, with a Basis tag (exact vs estimated).'}]},
   {v:'v5.19',date:'2026-06-30',items:[
@@ -921,9 +923,13 @@ const MAN_TERMINAL={rejected:'Error',credited:'Success',resolved:'Success'}
 function manStatus(c){const t=S.resub[c.kind+':'+c.no];return t&&t.status&&t.status!=='pending'?t.status:null}
 function effKey(c){if(c.answered)return c.status_overall;const s=manStatus(c);return s&&MAN_TERMINAL[s]?MAN_TERMINAL[s]:'Pending'}
 function effPending(c){return effKey(c)==='Pending'}
+// a claim that has been actioned (resubmitted / credited / resolved) is no longer "to chase" —
+// it must drop out of the Rejected/Pricing totals so it is not double-counted with its new claim
+const MAN_HANDLED=new Set(['resubmitted','credited','resolved'])
+function isHandled(c){return MAN_HANDLED.has(manStatus(c))}
 function manBadge(c){const s=manStatus(c);if(!s)return ''
   if(s==='duplicate')return ` <span class="badge b-n" title="Duplicate — excluded from all reports (closed)">🔁 Duplicate · closed ✎</span>`
-  const col=s==='rejected'?'b-rose':(s==='credited'||s==='resolved')?'b-mint':'b-sky';const ic=s==='rejected'?'❌':(s==='credited'||s==='resolved')?'✅':'🔁';return ` <span class="badge ${col}" title="Manually set status ✎">${ic} ${esc(s)} ✎</span>`}
+  const col=s==='rejected'?'b-rose':(s==='credited'||s==='resolved')?'b-mint':'b-sky';const ic=s==='rejected'?'❌':(s==='credited'||s==='resolved')?'✅':s==='resubmitted'?'📤':'🔁';return ` <span class="badge ${col}" title="Manually set status ✎">${ic} ${esc(s)} ✎</span>`}
 // a claim manually flagged as a duplicate (sent twice) is excluded from every report/total
 function isDuplicate(c){return manStatus(c)==='duplicate'}
 function scopedDuplicates(){return reconcile().claims.concat(reconcile().orphans).filter(inScope).filter(isDuplicate)}
@@ -933,7 +939,7 @@ function fuBadge(c){const r=S.resub[c.kind+':'+c.no];if(!r||!r.follow_up_date)re
   return ` <span class="badge ${col}" style="cursor:pointer" title="${esc(r.follow_up_note||'')} — click to open follow-up" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${ic} ${esc(lbl)}</span>`}
 // effective status label (includes manual statuses: duplicate / resubmitted / rejected / credited / resolved)
 function effStatusLabel(c){const m=manStatus(c);if(m)return m.charAt(0).toUpperCase()+m.slice(1);return c.answered?c.status_overall:'Pending'}
-function statusCell(c){const base=isDuplicate(c)?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):sBadge(effKey(c))));return base+manBadge(c)+fuBadge(c)}
+function statusCell(c){if(isDuplicate(c))return manBadge(c)+fuBadge(c);const base=manStatus(c)?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):sBadge(effKey(c))));return base+manBadge(c)+fuBadge(c)}
 const kindBadge=k=>k==='bsi'?'<span class="badge b-sky">BSI</span>':'<span class="badge b-bmw">Warranty</span>'
 
 // ══ MODAL ═══════════════════════════════════════════════════════
@@ -1238,10 +1244,10 @@ const METRIC_DEFS={
     stats:r=>[['Accounts',f0(r.length)],['Credited €','€'+f0(_sum(r,'accepted'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Top share',r.length?pct(r[0].accepted,_sum(r,'accepted')).toFixed(0)+'%':'0%']]},
   // ── GAP DECOMPOSITION: rejection vs pricing difference ──
   rejected_gap:{icon:'❌',title:'Rejected — money to chase',accent:'var(--rose-d)',sub:'BMW paid less than we claimed (claimed − paid; where claimed price is missing, the gap on rejected claims)',src:['cred','inv'],focus:'Rejected €',cols:RCOLS,
-    rows:()=>scopedClaims().concat(scopedOrphans()).filter(c=>c.rejected>0.5).sort((a,b)=>b.rejected-a.rejected),
+    rows:()=>scopedClaims().concat(scopedOrphans()).filter(c=>c.rejected>0.5&&!isHandled(c)).sort((a,b)=>b.rejected-a.rejected),
     stats:r=>[['Claims',f0(r.length)],['Rejected €','€'+f0(_sum(r,'rejected'))],['Exact (claimed price)',f0(r.filter(c=>c.claim_basis==='claimed').length)],['By status',f0(r.filter(c=>c.claim_basis!=='claimed').length)]]},
   pricing_gap:{icon:'🔧',title:'Pricing Difference',accent:'var(--lemon-d)',sub:'incadea rate vs BMW rate (invoiced − claimed; where claimed price is missing, the gap on accepted claims)',src:['inv','cred'],focus:'Pricing diff €',cols:RCOLS,
-    rows:()=>scopedClaims().filter(c=>Math.abs(c.pricing_diff)>0.5).sort((a,b)=>b.pricing_diff-a.pricing_diff),
+    rows:()=>scopedClaims().filter(c=>Math.abs(c.pricing_diff)>0.5&&!isHandled(c)).sort((a,b)=>b.pricing_diff-a.pricing_diff),
     stats:r=>[['Claims',f0(r.length)],['Pricing diff €','€'+f0(_sum(r,'pricing_diff'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Paid €','€'+f0(_sum(r,'accepted'))]]},
 }
 function openMetric(id){
@@ -1685,7 +1691,7 @@ function rDash(){
   renderFreshness();renderFuReminder()
   const claims=scopedClaims()
   const invoiced=claims.reduce((s,c)=>s+c.invoiced,0),accepted=claims.reduce((s,c)=>s+c.accepted,0)
-  const totRejected=claims.reduce((s,c)=>s+(c.rejected||0),0),totPricing=claims.reduce((s,c)=>s+(c.pricing_diff||0),0)
+  const totRejected=claims.reduce((s,c)=>s+(isHandled(c)?0:(c.rejected||0)),0),totPricing=claims.reduce((s,c)=>s+(isHandled(c)?0:(c.pricing_diff||0)),0)
   const pending=claims.filter(effPending).length,answered=claims.length-pending
   const err=claims.filter(c=>effKey(c)==='Error').length,warn=claims.filter(c=>effKey(c)==='Warning').length,success=claims.filter(c=>effKey(c)==='Success').length
   const series=monthly(claims)
@@ -1750,7 +1756,7 @@ function rPipe(){
       <td class="num">${c.noSubmission?(c.inferred_inv?`<span style="color:var(--muted)" title="from the inferred invoice">≈ ${f(c.inferred_inv.total_invoiced)}</span>`:'<span style="color:var(--faint)">—</span>'):f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
       <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c.noSubmission?'<span style="color:var(--faint)">—</span>':(c.answered?f(c.gap):'—')}</td>
       <td class="num">${c.answered&&c.invoiced?`<span style="font-weight:700;color:${c.accept_ratio>=85?'var(--mint-d)':c.accept_ratio>=65?'var(--lemon-d)':'var(--rose-d)'}">${c.accept_ratio.toFixed(0)}%</span>`:'—'}</td>
-      <td>${isDuplicate(c)?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):''))}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${manBadge(c)}${fuBadge(c)}</td>
+      <td>${isDuplicate(c)||manStatus(c)?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):''))}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${manBadge(c)}${fuBadge(c)}</td>
       <td>${(c.status_overall==='Error'||c.status_overall==='Warning'||!c.answered)?`<button class="btn btn-sm ${tr?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr?'✏️':(c.answered?'+ Track':'⚙ Status')}</button>`:'<span style="color:var(--faint)">—</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="12" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
