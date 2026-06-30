@@ -481,11 +481,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.13'
+const APP_VERSION='v5.14'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.14',date:'2026-06-30',items:[
+    {t:'feat',d:'The clickable 📅 follow-up chip now also shows next to the status inside every drill-down (Not credited, Pending, etc.) — assign a follow-up to a pending claim and you can see and open it straight from the Source-records table.'}]},
   {v:'v5.13',date:'2026-06-30',items:[
     {t:'fix',d:'The Status column in every drill-down now reflects the manual status, so the Status filter splits out all of them — Pending, Resubmitted, Rejected, Credited, Resolved and Duplicate — not just the four BMW outcomes. The status cell also shows the manual badge.'}]},
   {v:'v5.12',date:'2026-06-30',items:[
@@ -900,7 +902,7 @@ function fuBadge(c){const r=S.resub[c.kind+':'+c.no];if(!r||!r.follow_up_date)re
   return ` <span class="badge ${col}" style="cursor:pointer" title="${esc(r.follow_up_note||'')} — click to open follow-up" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${ic} ${esc(lbl)}</span>`}
 // effective status label (includes manual statuses: duplicate / resubmitted / rejected / credited / resolved)
 function effStatusLabel(c){const m=manStatus(c);if(m)return m.charAt(0).toUpperCase()+m.slice(1);return c.answered?c.status_overall:'Pending'}
-function statusCell(c){const base=c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):sBadge(effKey(c)));return base+manBadge(c)}
+function statusCell(c){const base=c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):sBadge(effKey(c)));return base+manBadge(c)+fuBadge(c)}
 const kindBadge=k=>k==='bsi'?'<span class="badge b-sky">BSI</span>':'<span class="badge b-bmw">Warranty</span>'
 
 // ══ MODAL ═══════════════════════════════════════════════════════
