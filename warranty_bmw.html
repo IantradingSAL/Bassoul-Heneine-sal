@@ -484,11 +484,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.17'
+const APP_VERSION='v5.18'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.18',date:'2026-06-30',items:[
+    {t:'fix',d:'Fixed the Rejected vs Pricing-Difference split for fully-rejected claims. When BMW pays €0 (e.g. claim submission time exceeded), the whole invoiced amount is now counted as Rejected (money to chase) instead of being mostly labelled a pricing difference. Before, if one line of a rejected claim (such as a sublet) still carried a Claimed Price, only that small amount was treated as rejected and the rest wrongly showed as a pricing difference. A claim is part + labor + sublet, and all of it is now handled together.'}]},
   {v:'v5.17',date:'2026-06-30',items:[
     {t:'fix',d:'A claim marked as Duplicate no longer also shows "Pending" — it now reads "🔁 Duplicate · closed" (greyed out, excluded from all reports), so it is clearly closed rather than open.'}]},
   {v:'v5.16',date:'2026-06-30',items:[
@@ -838,15 +840,21 @@ function reconcile(){
     let accepted2=accepted,answered2=answered,status2=status_overall,manualCredited=false
     if(_mr&&!answered&&(_mr.status==='credited'||_mr.status==='resolved')){const ma=Number(_mr.credited_amt)||0;if(ma>0){accepted2=accepted+ma;answered2=true;status2='Success';manualCredited=true}}
     // ── gap decomposition: rejection (claimed − paid) vs pricing difference (invoiced − claimed) ──
+    // A pricing difference can only exist when BMW actually PAID something. If BMW paid €0
+    // (claim fully rejected, e.g. "submission time exceeded"), the whole gap is Rejected —
+    // even if one line (e.g. a sublet) still carries a Claimed Price.
     const gapVal=invoiced-accepted2,hasClaimed=claimedPrice>0.5
-    let rejected=0
-    if(answered2&&!manualCredited){if(hasClaimed)rejected=Math.max(claimedPrice-accepted2,0);else if(status2==='Error')rejected=Math.max(gapVal,0)}
-    const pricing_diff=(answered2&&!manualCredited)?gapVal-rejected:0
+    let rejected=0,_basis='status'
+    if(answered2&&!manualCredited){
+      if(accepted2>0.5&&hasClaimed){rejected=Math.max(claimedPrice-accepted2,0);_basis='claimed'}
+      else if(status2==='Error'||accepted2<0.5){rejected=Math.max(gapVal,0)}
+    }
+    const pricing_diff=(answered2&&!manualCredited)?Math.max(gapVal-rejected,0):0
     return {kind:s.claim_kind,no:s.last_submission||s.no,record_no:s.no,sub:s,inv,credits:cr,vin:s.vin||inv?.vin||(cr[0]?.vin)||'',make:s.make_code||inv?.make_code||'',
       brand:cr[0]?.brand||'',model:inv?.model||'',month:s.month||(cnDate?cnDate.slice(0,7):''),
       doc_no:s.doc_no,sub_key:s.sub_key,sub_status:s.status||'',document_date:s.document_date,cn_date:cnDate,repair_date:repairDate,
       items_count:cr.length,answered:answered2,status_overall:status2,manual_credited:manualCredited,statuses:st,corrected,labor,parts,ext,
-      invoiced,accepted:accepted2,claimed_price:claimedPrice,gap:gapVal,rejected,pricing_diff,claim_basis:hasClaimed?'claimed':'status',accept_ratio:pct(accepted2,invoiced),
+      invoiced,accepted:accepted2,claimed_price:claimedPrice,gap:gapVal,rejected,pricing_diff,claim_basis:_basis,accept_ratio:pct(accepted2,invoiced),
       cn_no:[...cnNos].join(', '),defect_codes:[...defects],lag_days:days(repairDate,cnDate)}
   })
   // orphan credits: keys present in credits but not in any submission
@@ -1403,10 +1411,10 @@ const HELP_SECTIONS=[
   ]},
   {sec:'Gap breakdown',topics:[
     {id:'rejected',icon:'❌',q:'What is "Rejected" (to chase)?',kw:['rejected','rejection','refused','to chase','claimed minus paid','recover'],
-      what:'The part of the gap BMW actually cut — what we claimed minus what BMW paid. This is the real money to chase or dispute. Where the Claimed Price is on the credit note it is exact; otherwise it is the gap on claims BMW rejected (Error).',
-      formula:'Rejected = max(Claimed − Paid, 0)\n         = gap on Error claims when Claimed Price is missing',src:['cred','inv'],metric:'rejected_gap'},
+      what:'The part of the gap BMW actually cut — money to chase or dispute. When BMW paid something, it is Claimed − Paid (exact where the Claimed Price is on the credit note). When BMW paid €0 (claim fully rejected, e.g. submission time exceeded), the WHOLE invoiced amount is rejected — even if a single line such as a sublet still shows a claimed price.',
+      formula:'Paid €0 (fully rejected) → Rejected = Invoiced − Paid (whole claim)\nPaid > 0 → Rejected = max(Claimed − Paid, 0)',src:['cred','inv'],metric:'rejected_gap'},
     {id:'pricing',icon:'🔧',q:'What is the "Pricing Difference"?',kw:['pricing','price difference','rate','incadea vs bmw','rate card'],
-      what:'The part of the gap caused by incadea billing a different rate than BMW pays — not a rejection, just a rate-card difference. It is the rest of the gap once the rejected part is removed.',
+      what:'The part of the gap caused by incadea billing a different rate than BMW pays — not a rejection, just a rate-card difference. Only exists when BMW actually paid something; a fully rejected claim has no pricing difference (it is all Rejected).',
       formula:'Pricing difference = (Invoiced − Paid) − Rejected\n                   = Invoiced − Claimed',src:['inv','cred'],metric:'pricing_gap'},
   ]},
 ]
