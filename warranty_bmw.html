@@ -430,7 +430,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
       <div class="card"><div class="filters">
         <span class="fl-l">Payment</span><select id="ns_pay"><option value="CREDIT">Warranty (CREDIT)</option><option value="">All</option><option value="CASH">Cash (customer)</option></select>
         <span class="fl-l">Make</span><select id="ns_make"><option value="">All</option></select>
-        <input type="text" id="ns_search" placeholder="Search invoice GAR…, VIN, model…" style="flex:1;min-width:220px">
+        <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer"><input type="checkbox" id="ns_noown" checked style="width:15px;height:15px"> Hide own-sale</label>
+        <input type="text" id="ns_search" placeholder="Search invoice GAR…, VIN, model…" style="flex:1;min-width:200px">
         <button class="btn btn-sm btn-bmw" id="ns_export">⬇ Excel</button>
       </div></div>
       <div id="T_notsub"></div>
@@ -500,11 +501,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.24'
+const APP_VERSION='v5.25'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.25',date:'2026-06-30',items:[
+    {t:'feat',d:'Not Submitted page now hides own-sale invoices by default (dealer own-vehicle jobs that are usually not claimable). A "Hide own-sale" toggle lets you show them, and the Warranty € to claim figure and sidebar badge exclude own-sale so the actionable total is accurate.'}]},
   {v:'v5.24',date:'2026-06-30',items:[
     {t:'feat',d:'New "Not Submitted" page: incadea invoices that were billed but never sent to BMW as a claim — i.e. potentially missed warranty money. Defaults to Warranty (CREDIT) invoices (the ones you can still claim), with KPIs for count and € to claim, filters by payment / make / search, and Cash (customer-paid) invoices flagged separately as correctly not submitted. The sidebar shows a badge with the count of missed warranty invoices.'}]},
   {v:'v5.23',date:'2026-06-30',items:[
@@ -1668,7 +1671,7 @@ function updateBadges(){
   document.getElementById('B_pipe').textContent=f0(claims.length)
   document.getElementById('B_rej').textContent=f0(claims.filter(c=>(c.status_overall==='Error'||c.status_overall==='Warning')&&!isHandled(c)).length)
   const fb=document.getElementById('B_follow');if(fb){const fc=followCount();fb.textContent=f0(fc);fb.style.display=fc?'':'none'}
-  const nsb=document.getElementById('B_notsub');if(nsb){const nsc=notSubInvoices().filter(i=>i.payment_method_code==='CREDIT').length;nsb.textContent=f0(nsc);nsb.style.display=nsc?'':'none'}
+  const nsb=document.getElementById('B_notsub');if(nsb){const nsc=notSubInvoices().filter(i=>i.payment_method_code==='CREDIT'&&!i.own_sale).length;nsb.textContent=f0(nsc);nsb.style.display=nsc?'':'none'}
   const invMakes=[...new Set(S.inv.map(i=>i.make_code).filter(Boolean))].sort()
   const nm=document.getElementById('ns_make');if(nm){const cur=nm.value;nm.innerHTML='<option value="">All</option>'+invMakes.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');nm.value=cur}
   document.querySelector('#lastSync span:last-child').textContent=`${f0(S.inv.length)} inv · ${f0(S.subs.length)} sub · ${f0(S.cred.length)} cr`
@@ -1994,12 +1997,15 @@ function notSubInvoices(){const subDocs=new Set(S.subs.map(s=>s.doc_no).filter(B
 function rNotSub(){
   const all=notSubInvoices()
   const pay=document.getElementById('ns_pay')?.value??'CREDIT',mk=document.getElementById('ns_make')?.value||'',q=(document.getElementById('ns_search')?.value||'').toLowerCase().trim()
+  const noOwn=document.getElementById('ns_noown')?document.getElementById('ns_noown').checked:true
   let rows=all.filter(i=>{if(pay&&(i.payment_method_code||'')!==pay)return false;if(mk&&i.make_code!==mk)return false
+    if(noOwn&&i.own_sale)return false
     if(q&&![i.doc_no,i.vin,i.model,i.sell_to_customer_name].join('|').toLowerCase().includes(q))return false;return true})
   rows.sort((a,b)=>(Number(b.total_invoiced)||0)-(Number(a.total_invoiced)||0))
   window._nsRows=rows
   const tot=rows.reduce((s,i)=>s+(Number(i.total_invoiced)||0),0)
-  const credit=all.filter(i=>i.payment_method_code==='CREDIT'),creditVal=credit.reduce((s,i)=>s+(Number(i.total_invoiced)||0),0)
+  // claimable = CREDIT and (when hiding own-sale) not an own sale
+  const credit=all.filter(i=>i.payment_method_code==='CREDIT'&&!(noOwn&&i.own_sale)),creditVal=credit.reduce((s,i)=>s+(Number(i.total_invoiced)||0),0)
   const cash=all.filter(i=>i.payment_method_code==='CASH').length
   document.getElementById('K_notsub').innerHTML=`
     <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">🚩 Not Submitted</div><div class="kv sun">${f0(all.length)}</div><div class="ks">incadea invoices, no claim</div></div>
@@ -2109,7 +2115,7 @@ window.delOverride=delOverride
 ;['cr_status','cr_brand','cr_month','cr_cn','cr_link','cr_search'].forEach(id=>{const e=document.getElementById(id);if(e){e.addEventListener('input',rCredits);e.addEventListener('change',rCredits)}})
 ;['rj_status','rj_make','rj_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rRej);e.addEventListener('change',rRej)})
 document.querySelectorAll('#insSeg button').forEach(b=>b.addEventListener('click',()=>{S.insTab=b.dataset.ins;rInsights()}))
-;['ns_pay','ns_make','ns_search'].forEach(id=>{const e=document.getElementById(id);if(e){e.addEventListener('input',rNotSub);e.addEventListener('change',rNotSub)}})
+;['ns_pay','ns_make','ns_search','ns_noown'].forEach(id=>{const e=document.getElementById(id);if(e){e.addEventListener('input',rNotSub);e.addEventListener('change',rNotSub)}})
 ;(()=>{const e=document.getElementById('ns_export');if(e)e.addEventListener('click',()=>{const rows=(window._nsRows||[]).map(i=>[i.doc_no,i.posting_date,i.make_code,i.model,i.vin,i.total_invoiced,i.payment_method_code,i.own_sale?'own sale':'']);exportXlsx('bmw_not_submitted',['Invoice','Posting Date','Make','Model','VIN','Invoiced €','Payment','Own sale'],rows);showToast('⬇ Exported '+rows.length+' invoices to Excel')})})()
 ;(()=>{const e=document.getElementById('fu_filter');if(e)e.addEventListener('change',rFollowups)})()
 ;(()=>{const e=document.getElementById('fu_export');if(e)e.addEventListener('click',()=>{const rows=followups().map(f=>[f.fu_date,f._overdue?'overdue':f._due?'today':f.fu_done?'done':'upcoming',f.kind,f.no,f.vin,f.make,f.fu_status,f.fu_note]);exportXlsx('bmw_followups',['Follow-up date','When','Kind','Claim','VIN','Make','Status','Note'],rows);showToast('⬇ Exported '+rows.length+' follow-ups to Excel')})})()
