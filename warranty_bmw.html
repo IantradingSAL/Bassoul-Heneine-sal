@@ -465,11 +465,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.8'
+const APP_VERSION='v5.9'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.9',date:'2026-06-30',items:[
+    {t:'feat',d:'New "duplicate" status for claims that were sent to BMW twice. Set a claim status to "duplicate (exclude from report)" and it is removed from every total, count, KPI and report so it no longer double-counts. The excluded duplicates are listed separately in a new "🔁 Duplicates (excluded)" card on the dashboard — click it to review them or change the status back.'}]},
   {v:'v5.8',date:'2026-06-30',items:[
     {t:'feat',d:'Pending claims can now be given a manual status: a Set status button appears on pending rows (Pipeline and the claim view) so you can mark them resubmitted, rejected, credited or resolved while you wait for the credit note. Marking a claim rejected, credited or resolved now actually moves it OUT of Pending everywhere — the Pipeline row, the Pending counts, the dashboard donut and the status filter all reflect the manual status (rejected counts toward Needs Attention, credited/resolved as success). Resubmitted stays pending but shows its badge. Money figures are unchanged.'},
     {t:'feat',d:'Every drill-down detail view (Source records) now has a filter box under each column header — dropdowns for Kind, Make and Status, and type-to-filter for the rest. Number columns accept >100 or <50. Clickable headers still sort A to Z or Z to A, and Export Excel respects the active filters, so what you see is what you export.'}]},
@@ -839,8 +841,8 @@ function reconcile(){
   _recCache={claims,orphans};return _recCache
 }
 function inScope(x){return S.scope==='all'||x.kind===S.scope}
-function scopedClaims(){return reconcile().claims.filter(inScope)}
-function scopedOrphans(){return reconcile().orphans.filter(inScope)}
+function scopedClaims(){return reconcile().claims.filter(inScope).filter(c=>!isDuplicate(c))}
+function scopedOrphans(){return reconcile().orphans.filter(inScope).filter(c=>!isDuplicate(c))}
 
 // ══ SORT helpers ════════════════════════════════════════════════
 function sortClick(k,c){const cur=S.sortState[k]||{col:-1,dir:'asc'};let dir='asc';if(cur.col===c&&cur.dir==='asc')dir='desc';S.sortState[k]={col:c,dir};renderPage(currentPage())}
@@ -856,7 +858,10 @@ const MAN_TERMINAL={rejected:'Error',credited:'Success',resolved:'Success'}
 function manStatus(c){const t=S.resub[c.kind+':'+c.no];return t&&t.status&&t.status!=='pending'?t.status:null}
 function effKey(c){if(c.answered)return c.status_overall;const s=manStatus(c);return s&&MAN_TERMINAL[s]?MAN_TERMINAL[s]:'Pending'}
 function effPending(c){return effKey(c)==='Pending'}
-function manBadge(c){const s=manStatus(c);if(!s)return '';const col=s==='rejected'?'b-rose':(s==='credited'||s==='resolved')?'b-mint':'b-sky';const ic=s==='rejected'?'❌':(s==='credited'||s==='resolved')?'✅':'🔁';return ` <span class="badge ${col}" title="Manually set status ✎">${ic} ${esc(s)} ✎</span>`}
+function manBadge(c){const s=manStatus(c);if(!s)return '';const col=s==='rejected'?'b-rose':(s==='credited'||s==='resolved')?'b-mint':s==='duplicate'?'b-n':'b-sky';const ic=s==='rejected'?'❌':(s==='credited'||s==='resolved')?'✅':'🔁';return ` <span class="badge ${col}" title="Manually set status ✎">${ic} ${esc(s)} ✎</span>`}
+// a claim manually flagged as a duplicate (sent twice) is excluded from every report/total
+function isDuplicate(c){return manStatus(c)==='duplicate'}
+function scopedDuplicates(){return reconcile().claims.concat(reconcile().orphans).filter(inScope).filter(isDuplicate)}
 const kindBadge=k=>k==='bsi'?'<span class="badge b-sky">BSI</span>':'<span class="badge b-bmw">Warranty</span>'
 
 // ══ MODAL ═══════════════════════════════════════════════════════
@@ -1086,6 +1091,9 @@ const METRIC_DEFS={
   attention:{icon:'⚠️',title:'Needs Attention',accent:'var(--rose)',sub:'Claims with an error/warning, or manually marked rejected',src:['cred'],focus:'Status',
     rows:()=>scopedClaims().concat(scopedOrphans()).filter(c=>effKey(c)==='Error'||effKey(c)==='Warning').sort((a,b)=>b.gap-a.gap),
     stats:r=>[['Errors',f0(r.filter(c=>effKey(c)==='Error').length)],['Warnings',f0(r.filter(c=>effKey(c)==='Warning').length)],['Gap at risk €','€'+f0(_sum(r,'gap'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
+  duplicates:{icon:'🔁',title:'Duplicate Claims (excluded)',accent:'var(--slate)',sub:'Marked as sent twice — excluded from every report, total and count',src:['sub'],focus:'Status',
+    rows:()=>scopedDuplicates().sort((a,b)=>String(a.no).localeCompare(String(b.no))),
+    stats:r=>[['Duplicates',f0(r.length)],['Invoiced (not counted) €','€'+f0(_sum(r,'invoiced'))],['Credited (not counted) €','€'+f0(_sum(r,'accepted'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
   no_submission:{icon:'💳',title:'Credited · No Submission',accent:'var(--pur)',sub:'BMW credited these, but no submission row is loaded',src:['cred'],focus:'Credited €',
     rows:()=>scopedOrphans().sort((a,b)=>b.accepted-a.accepted),
     stats:r=>[['Claims',f0(r.length)],['Credited €','€'+f0(_sum(r,'accepted'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
@@ -1451,7 +1459,7 @@ function openTrack(kind,no){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px">
       <div><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Status</label>
         <select id="tr_status" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit">
-        ${['pending','resubmitted','rejected','credited','resolved'].map(o=>`<option value="${o}"${ex.status===o?' selected':''}>${o}</option>`).join('')}</select></div>
+        ${['pending','resubmitted','rejected','credited','resolved','duplicate'].map(o=>`<option value="${o}"${ex.status===o?' selected':''}>${o==='duplicate'?'duplicate (exclude from report)':o}</option>`).join('')}</select></div>
       ${fld('tr_newclaim','New Claim #',ex.new_claim)}
       <div style="grid-column:1/-1">${fld('tr_reason','Reason',ex.reason).replace('<div>','').replace(/<\/div>$/,'')}</div>
       ${fld('tr_resub_date','Resubmit Date',ex.resub_date,'date')}
@@ -1559,6 +1567,8 @@ function rDash(){
   const series=monthly(claims)
   const offCredits=scopedOrphans();const offVal=offCredits.reduce((s,c)=>s+c.accepted,0)
   const offCard=offCredits.length?`<div class="kpi drill" onclick="openMetric('no_submission')"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 Credited · No Submission</div><div class="kv pur">${f0(offVal)}</div><div class="ks">${f0(offCredits.length)} claims · submission file not loaded</div></div>`:''
+  const dupN=scopedDuplicates().length
+  const dupCard=dupN?`<div class="kpi drill" onclick="openMetric('duplicates')"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🔁 Duplicates (excluded)</div><div class="kv slate">${f0(dupN)}</div><div class="ks">sent twice · not counted in totals</div></div>`:''
   // flow strip
   document.getElementById('flow').innerHTML=`<div class="flow" style="margin:0">
     <div class="flow-step drill" onclick="openMetric('invoiced')"><div class="fl-t">🧾 Invoiced (incadea)</div><div class="fl-v">€${f0(invoiced)}</div><div class="fl-s">${f0(claims.length)} claims billed</div></div>
@@ -1575,7 +1585,7 @@ function rDash(){
     <div class="kpi drill" onclick="openMetric('pending')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending Answer</div><div class="kv sun">${f0(pending)}</div><div class="ks">submitted, awaiting BMW</div></div>
     <div class="kpi drill" onclick="openMetric('attention')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">⚠️ Needs Attention</div><div class="kv rose">${f0(err+warn)}</div><div class="ks">${err} errors · ${warn} warnings</div></div>
     <div class="kpi drill" onclick="openMetric('rejected_gap')"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">❌ Rejected (to chase)</div><div class="kv" style="color:var(--rose-d)">${f0(totRejected)}</div><div class="ks">BMW cut what we claimed</div></div>
-    <div class="kpi drill" onclick="openMetric('pricing_gap')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔧 Pricing Difference</div><div class="kv lem">${f0(totPricing)}</div><div class="ks">incadea rate vs BMW rate</div></div>`+offCard
+    <div class="kpi drill" onclick="openMetric('pricing_gap')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔧 Pricing Difference</div><div class="kv lem">${f0(totPricing)}</div><div class="ks">incadea rate vs BMW rate</div></div>`+offCard+dupCard
   document.getElementById('CH_trend').innerHTML=trendChart(series.map(s=>({label:fmM(s.month),short:fmMs(s.month),value:s.accepted,count:s.cnt})))
   document.getElementById('CH_status').innerHTML=donutChart([{label:'Success',value:success,color:'#10b981'},{label:'Warning',value:warn,color:'#eab308'},{label:'Error',value:err,color:'#e11d48'},{label:'Pending',value:pending,color:'#f59e0b'}],{centerTop:f0(claims.length),centerSub:'CLAIMS'})
   document.getElementById('CH_gap').innerHTML=groupBarChart(series.map(s=>({label:fmMs(s.month),a:s.invoiced,b:s.accepted,aLabel:'Invoiced',bLabel:'Credited'})))
