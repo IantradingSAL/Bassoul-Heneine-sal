@@ -479,6 +479,14 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
           <button class="btn btn-sm btn-bmw" id="ov_add">+ Add correction</button>
         </div>
         <div id="ovList" style="font-size:11.5px;color:var(--muted)">Loading…</div></div>
+      <div class="card"><div class="card-h"><div><div class="ct">🚫 Cancelled Invoices (credit memos)</div><div class="ct-sub">When an incadea invoice was cancelled by a credit memo (GCR…), record it here. It is then excluded from the Not Submitted "to claim" total and flagged. Applied on every load — survives re-uploads.</div></div></div>
+        <div class="filters" style="margin-bottom:12px">
+          <input id="ic_inv" placeholder="Cancelled invoice (e.g. GAR0281230)" style="width:210px">
+          <input id="ic_memo" placeholder="Credit memo (e.g. GCR06247)" style="width:190px">
+          <input id="ic_reason" placeholder="Reason (optional)" style="flex:1;min-width:160px">
+          <button class="btn btn-sm btn-bmw" id="ic_add">+ Mark cancelled</button>
+        </div>
+        <div id="icList" style="font-size:11.5px;color:var(--muted)">Loading…</div></div>
     </div>
   </main>
 </div>
@@ -501,11 +509,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.26'
+const APP_VERSION='v5.27'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.27',date:'2026-06-30',items:[
+    {t:'fix',d:'Corrected the cancelled-invoice logic. A new "Cancelled Invoices (credit memos)" panel in the Upload Center lets you record that an incadea invoice (GAR…) was cancelled by a credit memo (GCR…). Those invoices are then flagged on the Not Submitted page and excluded from the Warranty € to claim total and the sidebar badge, since a cancelled invoice was never really billed. Replaces the earlier (incorrect) attempt that guessed cancellation from BMW credit notes.'}]},
   {v:'v5.26',date:'2026-06-30',items:[
     {t:'feat',d:'Not Submitted page: own-sale invoices are now shown by default (toggle to hide), and a new Credit Note column flags invoices that, despite no submission, have a matching BMW credit note (linked by VIN + amount). Those are treated as cancelled/credited - excluded from the "Warranty € to claim" total and counted separately under "Cancelled (has credit note)", since a credited invoice is not really billed/missed.'}]},
   {v:'v5.25',date:'2026-06-30',items:[
@@ -817,14 +827,15 @@ async function handleFiles(files){
 }
 
 async function loadOverrides(){try{const {data,error}=await sb.from('bmw_claim_overrides').select('old_key,new_key');if(error)return{};const m={};(data||[]).forEach(o=>{const k=subkey(o.old_key);if(k)m[k]=subkey(o.new_key)});return m}catch(e){return{}}}
+async function loadInvoiceCancels(){try{const {data,error}=await sb.from('bmw_invoice_cancels').select('*');if(error){console.warn('cancels:',error.message);return{}}const m={};(data||[]).forEach(c=>{const k=String(c.invoice_no||'').trim().toUpperCase();if(k)m[k]={credit_memo:c.credit_memo,reason:c.reason}});return m}catch(e){return{}}}
 // apply manual claim-number corrections (e.g. a claim re-keyed by hand in BMW AG)
 // at load time, so they survive re-uploads and remap both the submission and credit sides.
 function applyOverrides(ovr){if(!ovr||!Object.keys(ovr).length)return
   S.subs.forEach(s=>{const k=s.sub_key||subkey(s.last_submission)||subkey(s.no);if(ovr[k]){s._origKey=k;s.sub_key=ovr[k];s.last_submission=ovr[k]}})
   S.cred.forEach(c=>{if(ovr[c.dcn_key]){c._origKey=c.dcn_key;c.dealer_claim_number=ovr[c.dcn_key];c.dcn_key=ovr[c.dcn_key]}})}
 async function refreshData(){
-  const [inv,subs,cred,resub,ovr]=await Promise.all([loadAll('bmw_rec_invoices','doc_no'),loadAll('bmw_rec_submissions','id'),loadAll('bmw_rec_credits','id'),loadResub(),loadOverrides()])
-  S.inv=inv;S.subs=subs;S.cred=cred;S.resub=resub;S.ovr=ovr
+  const [inv,subs,cred,resub,ovr,cancels]=await Promise.all([loadAll('bmw_rec_invoices','doc_no'),loadAll('bmw_rec_submissions','id'),loadAll('bmw_rec_credits','id'),loadResub(),loadOverrides(),loadInvoiceCancels()])
+  S.inv=inv;S.subs=subs;S.cred=cred;S.resub=resub;S.ovr=ovr;S.cancels=cancels
   applyOverrides(ovr)
   invalidateReconcile()
   document.getElementById('cnt_inv').textContent=f0(inv.length)
@@ -1673,7 +1684,7 @@ function updateBadges(){
   document.getElementById('B_pipe').textContent=f0(claims.length)
   document.getElementById('B_rej').textContent=f0(claims.filter(c=>(c.status_overall==='Error'||c.status_overall==='Warning')&&!isHandled(c)).length)
   const fb=document.getElementById('B_follow');if(fb){const fc=followCount();fb.textContent=f0(fc);fb.style.display=fc?'':'none'}
-  const nsb=document.getElementById('B_notsub');if(nsb){const cm=nsCreditMap();const nsc=notSubInvoices().filter(i=>i.payment_method_code==='CREDIT'&&!cm[i.doc_no]).length;nsb.textContent=f0(nsc);nsb.style.display=nsc?'':'none'}
+  const nsb=document.getElementById('B_notsub');if(nsb){const nsc=notSubInvoices().filter(i=>i.payment_method_code==='CREDIT'&&!cancelOf(i)).length;nsb.textContent=f0(nsc);nsb.style.display=nsc?'':'none'}
   const invMakes=[...new Set(S.inv.map(i=>i.make_code).filter(Boolean))].sort()
   const nm=document.getElementById('ns_make');if(nm){const cur=nm.value;nm.innerHTML='<option value="">All</option>'+invMakes.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');nm.value=cur}
   document.querySelector('#lastSync span:last-child').textContent=`${f0(S.inv.length)} inv · ${f0(S.subs.length)} sub · ${f0(S.cred.length)} cr`
@@ -1996,36 +2007,36 @@ function statementRows(){
 }
 // ── incadea invoices billed but never submitted to BMW (potential missed warranty money) ──
 function notSubInvoices(){const subDocs=new Set(S.subs.map(s=>s.doc_no).filter(Boolean));return S.inv.filter(i=>!subDocs.has(i.doc_no))}
-// a not-submitted invoice that nevertheless has a matching BMW credit note (orphan credit, linked
-// by VIN + amount) was effectively cancelled/credited — it is NOT missed money to claim
-function nsCreditMap(){const m={};reconcile().orphans.forEach(o=>{const d=o.inferred_inv&&o.inferred_inv.doc_no;if(d&&!m[d])m[d]={cn:o.cn_no,dcn:o.dealer_claim_number,accepted:o.accepted}});return m}
+// a not-submitted invoice that was cancelled by an incadea credit memo (GCR…) is NOT missed money.
+// Cancellations are recorded manually in the Upload Center (bmw_invoice_cancels), keyed by GAR no.
+function cancelOf(i){return (S.cancels||{})[String(i.doc_no||'').toUpperCase()]}
 function rNotSub(){
-  const all=notSubInvoices(),credMap=nsCreditMap(),hasCN=i=>!!credMap[i.doc_no]
+  const all=notSubInvoices()
   const pay=document.getElementById('ns_pay')?.value??'CREDIT',mk=document.getElementById('ns_make')?.value||'',q=(document.getElementById('ns_search')?.value||'').toLowerCase().trim()
   const noOwn=document.getElementById('ns_noown')?document.getElementById('ns_noown').checked:false
   let rows=all.filter(i=>{if(pay&&(i.payment_method_code||'')!==pay)return false;if(mk&&i.make_code!==mk)return false
     if(noOwn&&i.own_sale)return false
-    if(q&&![i.doc_no,i.vin,i.model,i.sell_to_customer_name,credMap[i.doc_no]?.cn].join('|').toLowerCase().includes(q))return false;return true})
+    if(q&&![i.doc_no,i.vin,i.model,i.sell_to_customer_name,cancelOf(i)?.credit_memo].join('|').toLowerCase().includes(q))return false;return true})
   rows.sort((a,b)=>(Number(b.total_invoiced)||0)-(Number(a.total_invoiced)||0))
-  window._nsRows=rows;window._nsCredMap=credMap
-  // claimable = CREDIT, no credit note (not cancelled). Cancelled = has a credit note.
-  const claimable=all.filter(i=>i.payment_method_code==='CREDIT'&&!hasCN(i)),claimVal=claimable.reduce((s,i)=>s+(Number(i.total_invoiced)||0),0)
-  const cancelled=all.filter(hasCN),cancVal=cancelled.reduce((s,i)=>s+(Number(i.total_invoiced)||0),0)
+  window._nsRows=rows
+  // claimable = CREDIT and not cancelled. Cancelled = has a recorded credit memo.
+  const claimable=all.filter(i=>i.payment_method_code==='CREDIT'&&!cancelOf(i)),claimVal=claimable.reduce((s,i)=>s+(Number(i.total_invoiced)||0),0)
+  const cancelled=all.filter(cancelOf),cancVal=cancelled.reduce((s,i)=>s+(Number(i.total_invoiced)||0),0)
   const cash=all.filter(i=>i.payment_method_code==='CASH').length
   document.getElementById('K_notsub').innerHTML=`
     <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">🚩 Not Submitted</div><div class="kv sun">${f0(all.length)}</div><div class="ks">incadea invoices, no claim</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">💸 Warranty € to claim</div><div class="kv" style="color:var(--rose-d)">${f0(claimVal)}</div><div class="ks">${f0(claimable.length)} CREDIT · no credit note</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">♻️ Cancelled (has credit note)</div><div class="kv slate">${f0(cancelled.length)}</div><div class="ks">€${f0(cancVal)} · don't count as billed</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">💸 Warranty € to claim</div><div class="kv" style="color:var(--rose-d)">${f0(claimVal)}</div><div class="ks">${f0(claimable.length)} CREDIT · not cancelled</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🚫 Cancelled (credit memo)</div><div class="kv slate">${f0(cancelled.length)}</div><div class="ks">€${f0(cancVal)} · not billed</div></div>
     <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💵 Cash (customer)</div><div class="kv mint">${f0(cash)}</div><div class="ks">correctly not submitted</div></div>`
-  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>Invoice (GAR)</th><th>Posting Date</th><th>Make</th><th>Model</th><th>VIN</th><th class="num">Invoiced €</th><th>Payment</th><th>Credit Note</th><th>Own sale</th></tr></thead><tbody>`
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>Invoice (GAR)</th><th>Posting Date</th><th>Make</th><th>Model</th><th>VIN</th><th class="num">Invoiced €</th><th>Payment</th><th>Credit Memo</th><th>Own sale</th></tr></thead><tbody>`
   if(!rows.length)h+=`<tr><td colspan="9" style="text-align:center;padding:16px;color:var(--muted)">Nothing here — every incadea invoice in this filter was submitted to BMW. 🎉</td></tr>`
-  rows.slice(0,700).forEach(i=>{const cn=credMap[i.doc_no]
-    h+=`<tr class="tr-clickable" ${cn?'style="opacity:.6" title="Has a BMW credit note — invoice likely cancelled/credited, not missed"':''} onclick="openVin('${esc(i.vin)}')">
+  rows.slice(0,700).forEach(i=>{const cm=cancelOf(i)
+    h+=`<tr class="tr-clickable" ${cm?'style="opacity:.55" title="Cancelled by credit memo — not billed, not missed"':''} onclick="openVin('${esc(i.vin)}')">
     <td class="mono" style="font-weight:600">${esc(i.doc_no)}</td><td style="font-size:10px;color:var(--muted)">${esc(i.posting_date||'')}</td>
     <td><span class="badge b-n">${esc(i.make_code||'—')}</span></td><td>${esc(i.model||'—')}</td><td class="mono">${esc(i.vin||'—')}</td>
     <td class="num" style="font-weight:700">${f(i.total_invoiced)}</td>
     <td>${i.payment_method_code==='CREDIT'?'<span class="badge b-sun">⚠️ Warranty</span>':i.payment_method_code==='CASH'?'<span class="badge b-mint">Cash</span>':'<span class="badge b-n">'+esc(i.payment_method_code||'—')+'</span>'}</td>
-    <td>${cn?`<span class="badge b-rose" title="≈ matched by VIN + amount — verify">♻️ ${esc(cn.cn)} (cancelled)</span>`:'<span style="color:var(--faint)">—</span>'}</td>
+    <td>${cm?`<span class="badge b-rose" title="${esc(cm.reason||'cancelled')}">🚫 ${esc(cm.credit_memo||'cancelled')}</span>`:'<span style="color:var(--faint)">—</span>'}</td>
     <td>${i.own_sale?'<span class="badge b-n">own sale</span>':'—'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="9" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
@@ -2085,7 +2096,7 @@ async function rUploadHist(){
     }else{log='<div class="vin-empty" style="margin-top:12px">Upload log not available — the counts above reflect exactly what is loaded.</div>'}
   }catch(e){log='<div class="vin-empty" style="margin-top:12px">Upload log not available — the counts above reflect exactly what is loaded.</div>'}
   el.innerHTML=cur+log
-  renderOverridesAdmin()
+  renderOverridesAdmin();renderCancelsAdmin()
 }
 async function renderOverridesAdmin(){
   const el=document.getElementById('ovList');if(!el)return
@@ -2116,6 +2127,35 @@ async function delOverride(id){
   showToast('✅ Removed');await refreshData();updateBadges();renderPage(currentPage());renderOverridesAdmin()
 }
 window.delOverride=delOverride
+async function renderCancelsAdmin(){
+  const el=document.getElementById('icList');if(!el)return
+  try{const {data,error}=await sb.from('bmw_invoice_cancels').select('*').order('created_at',{ascending:false})
+    if(error){el.innerHTML='⚠️ '+esc(error.message);return}
+    if(!data||!data.length){el.innerHTML='<div class="vin-empty">No cancelled invoices recorded — add one above when a credit memo (GCR…) cancels a GAR invoice.</div>';return}
+    el.innerHTML='<div class="tw"><table class="t"><thead><tr><th>Invoice (GAR)</th><th>Credit memo</th><th>Reason</th><th>Added</th><th>Action</th></tr></thead><tbody>'+
+      data.map(c=>`<tr><td class="mono" style="font-weight:700">${esc(c.invoice_no)}</td><td class="mono" style="color:var(--rose-d)">${esc(c.credit_memo||'—')}</td><td>${esc(c.reason||'—')}</td><td style="color:var(--muted)">${c.created_at?new Date(c.created_at).toLocaleDateString('en-GB'):''}</td><td><button class="btn btn-sm" style="color:var(--rose)" onclick="delCancel('${esc(c.invoice_no)}')">🗑️ Remove</button></td></tr>`).join('')+
+      '</tbody></table></div>'
+  }catch(e){el.innerHTML='⚠️ '+esc(e.message)}
+}
+window.renderCancelsAdmin=renderCancelsAdmin
+async function addCancel(){
+  const inv=String(document.getElementById('ic_inv').value||'').trim().toUpperCase(),memo=String(document.getElementById('ic_memo').value||'').trim(),reason=document.getElementById('ic_reason').value.trim()
+  if(!inv){showToast('Enter the cancelled invoice number');return}
+  showLoad('Saving…')
+  const {error}=await sb.from('bmw_invoice_cancels').upsert({invoice_no:inv,credit_memo:memo||null,reason:reason||null,created_by:S.me?.id||null,created_by_name:S.me?.name||null},{onConflict:'invoice_no'});hideLoad()
+  if(error){showToast('❌ '+error.message);return}
+  document.getElementById('ic_inv').value='';document.getElementById('ic_memo').value='';document.getElementById('ic_reason').value=''
+  showToast('✅ Marked cancelled — '+inv)
+  S.cancels=await loadInvoiceCancels();updateBadges();renderPage(currentPage());renderCancelsAdmin()
+}
+window.addCancel=addCancel
+async function delCancel(invoice_no){
+  if(!confirm('Remove this cancellation? The invoice will count again.'))return
+  showLoad('Removing…');const {error}=await sb.from('bmw_invoice_cancels').delete().eq('invoice_no',invoice_no);hideLoad()
+  if(error){showToast('❌ '+error.message);return}
+  showToast('✅ Removed');S.cancels=await loadInvoiceCancels();updateBadges();renderPage(currentPage());renderCancelsAdmin()
+}
+window.delCancel=delCancel
 
 // ── listeners
 ;['pp_status','pp_make','pp_month','pp_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rPipe);e.addEventListener('change',rPipe)})
@@ -2123,7 +2163,7 @@ window.delOverride=delOverride
 ;['rj_status','rj_make','rj_search'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('input',rRej);e.addEventListener('change',rRej)})
 document.querySelectorAll('#insSeg button').forEach(b=>b.addEventListener('click',()=>{S.insTab=b.dataset.ins;rInsights()}))
 ;['ns_pay','ns_make','ns_search','ns_noown'].forEach(id=>{const e=document.getElementById(id);if(e){e.addEventListener('input',rNotSub);e.addEventListener('change',rNotSub)}})
-;(()=>{const e=document.getElementById('ns_export');if(e)e.addEventListener('click',()=>{const cm=window._nsCredMap||{};const rows=(window._nsRows||[]).map(i=>[i.doc_no,i.posting_date,i.make_code,i.model,i.vin,i.total_invoiced,i.payment_method_code,cm[i.doc_no]?cm[i.doc_no].cn+' (cancelled)':'',i.own_sale?'own sale':'']);exportXlsx('bmw_not_submitted',['Invoice','Posting Date','Make','Model','VIN','Invoiced €','Payment','Credit Note','Own sale'],rows);showToast('⬇ Exported '+rows.length+' invoices to Excel')})})()
+;(()=>{const e=document.getElementById('ns_export');if(e)e.addEventListener('click',()=>{const rows=(window._nsRows||[]).map(i=>{const cm=cancelOf(i);return [i.doc_no,i.posting_date,i.make_code,i.model,i.vin,i.total_invoiced,i.payment_method_code,cm?(cm.credit_memo||'cancelled'):'',i.own_sale?'own sale':'']});exportXlsx('bmw_not_submitted',['Invoice','Posting Date','Make','Model','VIN','Invoiced €','Payment','Credit Memo','Own sale'],rows);showToast('⬇ Exported '+rows.length+' invoices to Excel')})})()
 ;(()=>{const e=document.getElementById('fu_filter');if(e)e.addEventListener('change',rFollowups)})()
 ;(()=>{const e=document.getElementById('fu_export');if(e)e.addEventListener('click',()=>{const rows=followups().map(f=>[f.fu_date,f._overdue?'overdue':f._due?'today':f.fu_done?'done':'upcoming',f.kind,f.no,f.vin,f.make,f.fu_status,f.fu_note]);exportXlsx('bmw_followups',['Follow-up date','When','Kind','Claim','VIN','Make','Status','Note'],rows);showToast('⬇ Exported '+rows.length+' follow-ups to Excel')})})()
 document.getElementById('pp_export').addEventListener('click',()=>{const rows=(window._ppRows||[]).map(c=>[c.kind,c.no,c.record_no,c.doc_no||(c.inferred_inv?'≈'+c.inferred_inv.doc_no:''),c.make,c.vin,c.document_date,c.invoiced,c.answered?c.accepted:'',c.gap,c.accept_ratio?c.accept_ratio.toFixed(0)+'%':'',c.status_overall,c.corrected?'corrected':'',c.cn_no]);exportXlsx('bmw_pipeline',['Kind','Claim No','Record No','Invoice','Make','VIN','Sub Date','Invoiced €','Credited €','Gap €','Cred %','Outcome','Corrected','Credit Notes'],rows);showToast('⬇ Exported '+rows.length+' claims to Excel')})
@@ -2134,6 +2174,7 @@ document.getElementById('dash_xlsx').addEventListener('click',()=>{const series=
 document.getElementById('st_csv').addEventListener('click',()=>{const rows=(window._stRows||[]).map(c=>[c.doc_no,c.kind,c.make,c.vin,c.document_date,c.invoiced,c.answered?c.accepted:'',c._otype,c._owed]);exportXlsx('bmw_statement',['Invoice','Kind','Make','VIN','Sub Date','Invoiced €','Credited €','Type','Owed €'],rows);showToast('⬇ Exported statement — '+rows.length+' rows to Excel')})
 document.getElementById('st_print').addEventListener('click',()=>window.print())
 document.getElementById('ov_add').addEventListener('click',addOverride)
+;(()=>{const e=document.getElementById('ic_add');if(e)e.addEventListener('click',addCancel)})()
 ;['ov_old','ov_new','ov_note'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')addOverride()}))
 
 // ══ INIT ════════════════════════════════════════════════════════
