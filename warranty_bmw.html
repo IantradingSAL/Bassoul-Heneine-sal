@@ -146,6 +146,10 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
 .vin-mini td{padding:8px 9px;border-bottom:1px solid var(--line2);font-size:11px}
 .vin-mini td.num{text-align:right;font-variant-numeric:tabular-nums}
 .vin-mini tbody tr.clickable{cursor:pointer}.vin-mini tbody tr.clickable:hover{background:#fafbff}
+.vin-mini thead tr.mfilt th{padding:4px 6px;background:#fff;border-bottom:2px solid var(--line)}
+.vin-mini tr.mfilt input,.vin-mini tr.mfilt select{width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:6px;font-size:10px;font-family:inherit;color:var(--ink);background:#fff;font-weight:500;text-transform:none}
+.vin-mini tr.mfilt input:focus,.vin-mini tr.mfilt select:focus{outline:none;border-color:var(--bmw);box-shadow:0 0 0 2px rgba(28,105,212,.12)}
+.vin-mini tr.mfilt th.num input{text-align:right}
 .vin-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-bottom:16px}
 .vin-stat{background:var(--surf3);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
 .vin-stat-l{font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
@@ -468,7 +472,7 @@ const APP_VERSION='v5.8'
 const CHANGELOG=[
   {v:'v5.8',date:'2026-06-30',items:[
     {t:'feat',d:'Pending claims can now be given a manual status: a Set status button appears on pending rows (Pipeline and the claim view) so you can mark them resubmitted, rejected, credited or resolved while you wait for the credit note. The chosen status shows as a badge on the Pipeline outcome.'},
-    {t:'feat',d:'Every drill-down detail view (Source records) now has a search box to filter the records and clickable column headers to sort A to Z or Z to A. Export Excel respects the filter, so what you see is what you export.'}]},
+    {t:'feat',d:'Every drill-down detail view (Source records) now has a filter box under each column header — dropdowns for Kind, Make and Status, and type-to-filter for the rest. Number columns accept >100 or <50. Clickable headers still sort A to Z or Z to A, and Export Excel respects the active filters, so what you see is what you export.'}]},
   {v:'v5.7',date:'2026-06-29',items:[
     {t:'feat',d:'Gap is now split into two: Rejected (claimed minus paid - the money to chase) and Pricing Difference (incadea rate vs BMW rate - not a rejection). New KPIs on the Dashboard and Rejections page, a breakdown on each claim, and drill-downs with an Invoiced - Claimed - Paid table. Exact where Claimed Price is on the credit note, otherwise split by status.'}]},
   {v:'v5.6',date:'2026-06-29',items:[
@@ -1157,11 +1161,11 @@ function openMetric(id){
   const cols=def.cols||MCOLS,rowClick=def.rowClick!==false
   const rows=def.rows();window._mDef=def;window._mRows=rows;window._mId=id;window._mCols=cols
   const stats=def.stats(rows)
-  window._mSort={col:-1,dir:'asc'};window._mQuery=''
+  window._mSort={col:-1,dir:'asc'};window._mColFilters={}
   let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
   const srcCards=def.src.map(k=>{const s=SRC[k];return `<div class="src"><h4>${s.icon} ${esc(s.name)}</h4><p>${esc(s.desc)}</p><div class="cnt">${f0(s.n())}</div></div>`}).join('')
   const scopeLbl=S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty'
-  const hint=rowClick?'💡 Click any column header to sort A→Z · type to filter · click any row to open the full claim · figures respect the current All / Warranty / BSI scope.':'💡 Click any column header to sort · type to filter · figures respect the current All / Warranty / BSI scope · Export Excel for the full breakdown.'
+  const hint=rowClick?'💡 Filter any column with the boxes under each header (numbers accept &gt;100, &lt;50) · click a header to sort A→Z · click a row to open the full claim · figures respect the All / Warranty / BSI scope.':'💡 Filter any column with the boxes under each header (numbers accept &gt;100, &lt;50) · click a header to sort · figures respect the All / Warranty / BSI scope · Export Excel for the full breakdown.'
   const topic=helpFor(id)
   const calc=topic?`<details class="calc-box"><summary>ⓘ How is this calculated?</summary>${topicBody(topic,true)}</details>`:''
   bg.innerHTML=`<div class="bmw-modal"><div class="bmw-modal-h"><div class="bmw-modal-icon">${def.icon}</div>
@@ -1172,9 +1176,8 @@ function openMetric(id){
       ${calc}
       <div class="vin-section"><div class="vin-section-h"><span>🗂️ Source files behind this value</span></div><div class="src-grid" style="margin-top:0">${srcCards}</div></div>
       <div class="vin-section"><div class="vin-section-h"><span>📄 Source records</span><span class="ct" id="mCt">${f0(rows.length)}</span>
-        <button class="btn btn-sm" style="margin-left:auto" onclick="exportMetric()">⬇️ Export Excel</button></div>
-        ${rows.length?`<input id="mSearch" class="help-search" style="margin:8px 0 0" placeholder="🔍 Filter these ${f0(rows.length)} records — VIN, claim no., make, status…" oninput="metricFilter(this.value)">
-        <div class="tw"><table class="vin-mini" id="mTbl"><thead><tr>${metricHead()}</tr></thead><tbody>${metricBody(metricRows())}</tbody></table></div>`:'<div class="vin-empty">No records for this metric in the current scope.</div>'}
+        ${rows.length?`<button class="btn btn-sm" style="margin-left:auto" onclick="metricClearFilters()">✕ Clear filters</button><button class="btn btn-sm" onclick="exportMetric()">⬇️ Export Excel</button>`:`<button class="btn btn-sm" style="margin-left:auto" onclick="exportMetric()">⬇️ Export Excel</button>`}</div>
+        ${rows.length?`<div class="tw"><table class="vin-mini" id="mTbl"><thead><tr class="mhead">${metricHead()}</tr>${metricFilterRow()}</thead><tbody>${metricBody(metricRows())}</tbody></table></div>`:'<div class="vin-empty">No records for this metric in the current scope.</div>'}
         <div class="metric-hint">${hint}</div>
       </div>
     </div></div>`
@@ -1182,27 +1185,49 @@ function openMetric(id){
   bg.addEventListener('click',e=>{if(e.target===bg)closeModal()});document.addEventListener('keydown',escClose)
 }
 window.openMetric=openMetric
-// ── drill-down "Source records" filter + A→Z sort (reuses each column's .csv accessor) ──
-function metricRows(){let rows=window._mRows||[];const cols=window._mCols||MCOLS;const q=(window._mQuery||'').trim().toLowerCase()
-  if(q)rows=rows.filter(c=>cols.some(col=>String(col.csv(c)??'').toLowerCase().includes(q)))
+// ── drill-down "Source records": per-column filters + A→Z sort (reuses each column's .csv accessor) ──
+function _mfNum(raw,q){const m=q.trim().match(/^(>=|<=|>|<|=)?\s*(-?[\d.,]+)$/);const val=parseFloat(raw)||0
+  if(!m)return String(raw??'').toLowerCase().includes(q.trim().toLowerCase())
+  const op=m[1]||'=',n=parseFloat(m[2].replace(/,/g,''))
+  if(isNaN(n))return true
+  if(op==='>')return val>n;if(op==='<')return val<n;if(op==='>=')return val>=n;if(op==='<=')return val<=n
+  return Math.abs(val-n)<0.005}
+function metricMatch(c){const cols=window._mCols||MCOLS,fl=window._mColFilters||{}
+  for(const k in fl){const q=(fl[k]||'').trim();if(!q)continue;const col=cols[k];if(!col)continue;const raw=col.csv(c)
+    if(col.num){if(!_mfNum(raw,q))return false}
+    else if(!String(raw??'').toLowerCase().includes(q.toLowerCase()))return false}
+  return true}
+function metricRows(){let rows=(window._mRows||[]).filter(metricMatch);const cols=window._mCols||MCOLS
   const st=window._mSort
   if(st&&st.col>=0&&cols[st.col]){const col=cols[st.col],d=st.dir==='desc'?-1:1
     rows=[...rows].sort((x,y)=>{let va=col.csv(x),vb=col.csv(y)
       if(col.num){va=parseFloat(va);vb=parseFloat(vb);if(isNaN(va))va=-Infinity;if(isNaN(vb))vb=-Infinity;return(va-vb)*d}
       return String(va==null?'':va).localeCompare(String(vb==null?'':vb))*d})}
   return rows}
+function metricColVals(ci){const cols=window._mCols||MCOLS,col=cols[ci];if(!col)return[];const set=new Set()
+  ;(window._mRows||[]).forEach(c=>{const v=col.csv(c);if(v!=null&&v!=='')set.add(String(v))});return[...set].sort((a,b)=>a.localeCompare(b))}
 function metricHead(){const cols=window._mCols||MCOLS,def=window._mDef,fidx=cols.findIndex(c=>c.h===def.focus),st=window._mSort||{}
   return cols.map((c,i)=>`<th class="${c.num?'num ':''}${i===fidx?'foc':''}" data-sdir="${st.col===i?st.dir:''}" onclick="metricSort(${i})">${c.h}</th>`).join('')}
+function metricFilterRow(){const cols=window._mCols||MCOLS,fl=window._mColFilters||{}
+  return '<tr class="mfilt">'+cols.map((col,i)=>{const cur=esc(fl[i]||'')
+    if(!col.num){const vals=metricColVals(i)
+      if(vals.length>1&&vals.length<=15)return `<th><select onchange="metricColFilter(${i},this.value)"><option value="">All</option>${vals.map(v=>`<option${fl[i]===v?' selected':''}>${esc(v)}</option>`).join('')}</select></th>`}
+    return `<th class="${col.num?'num':''}"><input value="${cur}" oninput="metricColFilter(${i},this.value)" placeholder="${col.num?'e.g. >100':'filter…'}"></th>`}).join('')+'</tr>'}
 function metricBody(rows){const cols=window._mCols||MCOLS,def=window._mDef,rowClick=def.rowClick!==false,fidx=cols.findIndex(c=>c.h===def.focus),cap=600
+  if(!rows.length)return `<tr><td colspan="${cols.length}" style="text-align:center;padding:14px;color:var(--muted)">No records match these filters.</td></tr>`
   const body=rows.slice(0,cap).map(c=>{const tds=cols.map((col,i)=>`<td class="${col.num?'num':''}${i===fidx?' foc':''}">${col.cell(c)}</td>`).join('')
     if(!rowClick)return `<tr>${tds}</tr>`
     const click=c.orphan?`openVin('${esc(c.vin)}')`:`openClaim('${esc(c.kind)}','${esc(c.no)}')`
     return `<tr class="clickable" onclick="closeModal();${click}">${tds}</tr>`}).join('')
   return body+(rows.length>cap?`<tr><td colspan="${cols.length}" style="text-align:center;padding:12px;color:var(--muted)">… ${f0(rows.length-cap)} more rows — Export Excel for the full list</td></tr>`:'')}
-function renderMetricTable(){const rows=metricRows(),t=document.getElementById('mTbl');if(t){t.querySelector('thead').innerHTML='<tr>'+metricHead()+'</tr>';t.querySelector('tbody').innerHTML=metricBody(rows)}const ct=document.getElementById('mCt');if(ct)ct.textContent=f0(rows.length)}
+function renderMetricTable(){const rows=metricRows(),t=document.getElementById('mTbl');if(!t)return
+  t.querySelector('tbody').innerHTML=metricBody(rows)
+  const st=window._mSort||{};t.querySelectorAll('thead tr.mhead th').forEach((th,i)=>th.setAttribute('data-sdir',st.col===i?st.dir:''))
+  const ct=document.getElementById('mCt');if(ct)ct.textContent=f0(rows.length)}
 function metricSort(i){const s=window._mSort||{col:-1,dir:'asc'};window._mSort=(s.col===i&&s.dir==='asc')?{col:i,dir:'desc'}:{col:i,dir:'asc'};renderMetricTable()}
-function metricFilter(q){window._mQuery=q||'';renderMetricTable()}
-window.metricSort=metricSort;window.metricFilter=metricFilter
+function metricColFilter(i,v){if(!window._mColFilters)window._mColFilters={};window._mColFilters[i]=v;renderMetricTable()}
+function metricClearFilters(){window._mColFilters={};const t=document.getElementById('mTbl');if(t){t.querySelectorAll('.mfilt input').forEach(el=>el.value='');t.querySelectorAll('.mfilt select').forEach(el=>el.value='')}renderMetricTable()}
+window.metricSort=metricSort;window.metricColFilter=metricColFilter;window.metricClearFilters=metricClearFilters
 function exportMetric(){const def=window._mDef,cols=window._mCols||MCOLS;if(!def)return;const rows=metricRows()
   exportXlsx('bmw-'+window._mId,cols.map(c=>c.h),rows.map(c=>cols.map(col=>col.csv(c))))}
 window.exportMetric=exportMetric
