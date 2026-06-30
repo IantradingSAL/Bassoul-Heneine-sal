@@ -484,11 +484,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.21'
+const APP_VERSION='v5.22'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.22',date:'2026-06-30',items:[
+    {t:'fix',d:'Resubmitted / credited / resolved claims are now also removed from the BMW Statement — Shortfall, Outstanding and the Outstanding € figure — so a claim being recovered through a new claim is not still counted as owed. They show their manual status (e.g. 📤 Resubmitted) in the statement instead of Shortfall.'}]},
   {v:'v5.21',date:'2026-06-30',items:[
     {t:'fix',d:'Resubmitted / credited / resolved claims are no longer counted in the Rejected and Pricing-Difference totals or drill-downs — once a rejected claim has been resubmitted (or credited/resolved) it is being recovered through its new claim, so counting both double-counted the loss (e.g. 71202 resubmitted as 71341). Their status badge now shows the manual status (e.g. 📤 Resubmitted) instead of the original Error, since the claim is no longer simply rejected.'}]},
   {v:'v5.20',date:'2026-06-30',items:[
@@ -1340,7 +1342,7 @@ const HLIVE={
   pending:()=>f0(scopedClaims().filter(effPending).length),
   attention:()=>f0(scopedClaims().concat(scopedOrphans()).filter(c=>effKey(c)==='Error'||effKey(c)==='Warning').length),
   no_submission:()=>f0(scopedOrphans().length),
-  outstanding:()=>{const r=scopedClaims();const pend=r.filter(effPending).reduce((s,c)=>s+c.invoiced,0);const sf=r.reduce((s,c)=>s+(c.answered?Math.max(c.invoiced-c.accepted,0):0),0);return '€'+f0(pend+sf)},
+  outstanding:()=>{const r=scopedClaims().filter(c=>!isHandled(c));const pend=r.filter(effPending).reduce((s,c)=>s+c.invoiced,0);const sf=r.reduce((s,c)=>s+(c.answered?Math.max(c.invoiced-c.accepted,0):0),0);return '€'+f0(pend+sf)},
   shortfall:()=>'€'+f0(scopedClaims().reduce((s,c)=>s+(c.answered?Math.max(c.invoiced-c.accepted,0):0),0)),
   gap_at_risk:()=>'€'+f0(scopedClaims().concat(scopedOrphans()).filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').reduce((s,c)=>s+c.gap,0)),
   processing:()=>{const w=scopedClaims().filter(c=>c.lag_days!=null&&c.lag_days>=0);return (w.length?_sum(w,'lag_days')/w.length:0).toFixed(0)+' days avg'},
@@ -1944,8 +1946,11 @@ window.exportUnlinked=exportUnlinked
 function statementRows(){
   const onlyOut=document.getElementById('st_out').checked, mk=document.getElementById('st_make').value
   let rows=scopedClaims().filter(c=>!mk||c.make===mk)
-  rows.forEach(c=>{c._pending=effPending(c);c._shortfall=c.answered?Math.max(c.invoiced-c.accepted,0):0;c._owed=c._pending?c.invoiced:c._shortfall
-    c._otype=c._pending?'pending':(c._shortfall>0.5?'shortfall':'settled')})
+  rows.forEach(c=>{const handled=isHandled(c)
+    c._pending=!handled&&effPending(c)
+    c._shortfall=(!handled&&c.answered)?Math.max(c.invoiced-c.accepted,0):0
+    c._owed=c._pending?c.invoiced:c._shortfall
+    c._otype=handled?'handled':(c._pending?'pending':(c._shortfall>0.5?'shortfall':'settled'))})
   if(onlyOut)rows=rows.filter(c=>c._owed>0.5)
   return rows.sort((a,b)=>b._owed-a._owed)
 }
@@ -1969,7 +1974,7 @@ function rStatement(){
       <div class="kpi drill" onclick="openMetric('st_shortfall')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔻 Shortfall (€)</div><div class="kv lem">${f0(shortfallVal)}</div><div class="ks">answered &amp; underpaid</div></div>
     </div>
     <div class="tw"><table class="t"><thead><tr><th>#</th><th>Invoice (GAR)</th><th>Kind</th><th>Make</th><th>VIN</th><th>Sub Date</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th>Status</th><th class="num">Owed €</th></tr></thead><tbody>`
-  rows.slice(0,800).forEach((c,i)=>{const ob=c._otype==='pending'?'<span class="badge b-sun">⏳ Pending</span>':c._otype==='shortfall'?'<span class="badge b-lem">🔻 Shortfall</span>':'<span class="badge b-mint">✅ Settled</span>'
+  rows.slice(0,800).forEach((c,i)=>{const ob=c._otype==='pending'?'<span class="badge b-sun">⏳ Pending</span>':c._otype==='shortfall'?'<span class="badge b-lem">🔻 Shortfall</span>':c._otype==='handled'?manBadge(c):'<span class="badge b-mint">✅ Settled</span>'
     h+=`<tr class="tr-clickable" onclick="if(!event.target.closest('.vin-cell'))openClaim('${esc(c.kind)}','${esc(c.no)}')">
       <td style="color:var(--faint)">${i+1}</td><td class="mono" style="font-weight:600">${esc(c.doc_no||'—')}</td><td>${kindBadge(c.kind)}</td>
       <td><span class="badge b-n">${esc(c.make||'—')}</span></td><td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
