@@ -461,11 +461,14 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.7'
+const APP_VERSION='v5.8'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.8',date:'2026-06-30',items:[
+    {t:'feat',d:'Pending claims can now be given a manual status: a Set status button appears on pending rows (Pipeline and the claim view) so you can mark them resubmitted, rejected, credited or resolved while you wait for the credit note. The chosen status shows as a badge on the Pipeline outcome.'},
+    {t:'feat',d:'Every drill-down detail view (Source records) now has a search box to filter the records and clickable column headers to sort A to Z or Z to A. Export Excel respects the filter, so what you see is what you export.'}]},
   {v:'v5.7',date:'2026-06-29',items:[
     {t:'feat',d:'Gap is now split into two: Rejected (claimed minus paid - the money to chase) and Pricing Difference (incadea rate vs BMW rate - not a rejection). New KPIs on the Dashboard and Rejections page, a breakdown on each claim, and drill-downs with an Invoiced - Claimed - Paid table. Exact where Claimed Price is on the credit note, otherwise split by status.'}]},
   {v:'v5.6',date:'2026-06-29',items:[
@@ -878,7 +881,7 @@ function openClaim(kind,no){
         :'<div class="vin-empty">⏳ This claim was submitted to BMW but no credit note has been received yet.</div>'}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
         ${claim.vin?`<button class="btn btn-bmw btn-sm" onclick="closeModal();openVin('${esc(claim.vin)}')">🚗 Full VIN history</button>`:''}
-        ${(claim.status_overall==='Error'||claim.status_overall==='Warning')?`<button class="btn btn-sun btn-sm" onclick="closeModal();openTrack('${esc(claim.kind)}','${esc(claim.no)}')">${S.resub[claim.kind+':'+claim.no]?'✏️ Edit':'+ Track'} recovery</button>`:''}
+        ${(claim.status_overall==='Error'||claim.status_overall==='Warning'||!claim.answered)?`<button class="btn btn-sun btn-sm" onclick="closeModal();openTrack('${esc(claim.kind)}','${esc(claim.no)}')">${S.resub[claim.kind+':'+claim.no]?'✏️ Edit':(claim.answered?'+ Track recovery':'⚙ Set status')}</button>`:''}
       </div>
     </div></div>`
   document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
@@ -1153,20 +1156,12 @@ function openMetric(id){
   const def=METRIC_DEFS[id];if(!def){showToast('No detail available');return}
   const cols=def.cols||MCOLS,rowClick=def.rowClick!==false
   const rows=def.rows();window._mDef=def;window._mRows=rows;window._mId=id;window._mCols=cols
-  const stats=def.stats(rows),fidx=cols.findIndex(c=>c.h===def.focus)
+  const stats=def.stats(rows)
+  window._mSort={col:-1,dir:'asc'};window._mQuery=''
   let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
   const srcCards=def.src.map(k=>{const s=SRC[k];return `<div class="src"><h4>${s.icon} ${esc(s.name)}</h4><p>${esc(s.desc)}</p><div class="cnt">${f0(s.n())}</div></div>`}).join('')
-  const head=cols.map((c,i)=>`<th class="${c.num?'num':''}${i===fidx?' foc':''}">${c.h}</th>`).join('')
-  const cap=600
-  const body=rows.slice(0,cap).map(c=>{
-    const tds=cols.map((col,i)=>`<td class="${col.num?'num':''}${i===fidx?' foc':''}">${col.cell(c)}</td>`).join('')
-    if(!rowClick)return `<tr>${tds}</tr>`
-    const click=c.orphan?`openVin('${esc(c.vin)}')`:`openClaim('${esc(c.kind)}','${esc(c.no)}')`
-    return `<tr class="clickable" onclick="closeModal();${click}">${tds}</tr>`
-  }).join('')
-  const more=rows.length>cap?`<tr><td colspan="${cols.length}" style="text-align:center;padding:12px;color:var(--muted)">… ${f0(rows.length-cap)} more rows — export CSV for the full list</td></tr>`:''
   const scopeLbl=S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty'
-  const hint=rowClick?'💡 Click any row to open the full claim · figures respect the current All / Warranty / BSI scope.':'💡 Figures respect the current All / Warranty / BSI scope · use Export CSV for the full breakdown.'
+  const hint=rowClick?'💡 Click any column header to sort A→Z · type to filter · click any row to open the full claim · figures respect the current All / Warranty / BSI scope.':'💡 Click any column header to sort · type to filter · figures respect the current All / Warranty / BSI scope · Export Excel for the full breakdown.'
   const topic=helpFor(id)
   const calc=topic?`<details class="calc-box"><summary>ⓘ How is this calculated?</summary>${topicBody(topic,true)}</details>`:''
   bg.innerHTML=`<div class="bmw-modal"><div class="bmw-modal-h"><div class="bmw-modal-icon">${def.icon}</div>
@@ -1176,9 +1171,10 @@ function openMetric(id){
       <div class="vin-summary">${stats.map(([l,v],i)=>`<div class="vin-stat"><div class="vin-stat-l">${esc(l)}</div><div class="vin-stat-v" style="${i===0?'color:'+def.accent:''}">${v}</div></div>`).join('')}</div>
       ${calc}
       <div class="vin-section"><div class="vin-section-h"><span>🗂️ Source files behind this value</span></div><div class="src-grid" style="margin-top:0">${srcCards}</div></div>
-      <div class="vin-section"><div class="vin-section-h"><span>📄 Source records</span><span class="ct">${f0(rows.length)}</span>
+      <div class="vin-section"><div class="vin-section-h"><span>📄 Source records</span><span class="ct" id="mCt">${f0(rows.length)}</span>
         <button class="btn btn-sm" style="margin-left:auto" onclick="exportMetric()">⬇️ Export Excel</button></div>
-        ${rows.length?`<div class="tw"><table class="vin-mini"><thead><tr>${head}</tr></thead><tbody>${body}${more}</tbody></table></div>`:'<div class="vin-empty">No records for this metric in the current scope.</div>'}
+        ${rows.length?`<input id="mSearch" class="help-search" style="margin:8px 0 0" placeholder="🔍 Filter these ${f0(rows.length)} records — VIN, claim no., make, status…" oninput="metricFilter(this.value)">
+        <div class="tw"><table class="vin-mini" id="mTbl"><thead><tr>${metricHead()}</tr></thead><tbody>${metricBody(metricRows())}</tbody></table></div>`:'<div class="vin-empty">No records for this metric in the current scope.</div>'}
         <div class="metric-hint">${hint}</div>
       </div>
     </div></div>`
@@ -1186,7 +1182,28 @@ function openMetric(id){
   bg.addEventListener('click',e=>{if(e.target===bg)closeModal()});document.addEventListener('keydown',escClose)
 }
 window.openMetric=openMetric
-function exportMetric(){const def=window._mDef,rows=window._mRows,cols=window._mCols||MCOLS;if(!def||!rows)return
+// ── drill-down "Source records" filter + A→Z sort (reuses each column's .csv accessor) ──
+function metricRows(){let rows=window._mRows||[];const cols=window._mCols||MCOLS;const q=(window._mQuery||'').trim().toLowerCase()
+  if(q)rows=rows.filter(c=>cols.some(col=>String(col.csv(c)??'').toLowerCase().includes(q)))
+  const st=window._mSort
+  if(st&&st.col>=0&&cols[st.col]){const col=cols[st.col],d=st.dir==='desc'?-1:1
+    rows=[...rows].sort((x,y)=>{let va=col.csv(x),vb=col.csv(y)
+      if(col.num){va=parseFloat(va);vb=parseFloat(vb);if(isNaN(va))va=-Infinity;if(isNaN(vb))vb=-Infinity;return(va-vb)*d}
+      return String(va==null?'':va).localeCompare(String(vb==null?'':vb))*d})}
+  return rows}
+function metricHead(){const cols=window._mCols||MCOLS,def=window._mDef,fidx=cols.findIndex(c=>c.h===def.focus),st=window._mSort||{}
+  return cols.map((c,i)=>`<th class="${c.num?'num ':''}${i===fidx?'foc':''}" data-sdir="${st.col===i?st.dir:''}" onclick="metricSort(${i})">${c.h}</th>`).join('')}
+function metricBody(rows){const cols=window._mCols||MCOLS,def=window._mDef,rowClick=def.rowClick!==false,fidx=cols.findIndex(c=>c.h===def.focus),cap=600
+  const body=rows.slice(0,cap).map(c=>{const tds=cols.map((col,i)=>`<td class="${col.num?'num':''}${i===fidx?' foc':''}">${col.cell(c)}</td>`).join('')
+    if(!rowClick)return `<tr>${tds}</tr>`
+    const click=c.orphan?`openVin('${esc(c.vin)}')`:`openClaim('${esc(c.kind)}','${esc(c.no)}')`
+    return `<tr class="clickable" onclick="closeModal();${click}">${tds}</tr>`}).join('')
+  return body+(rows.length>cap?`<tr><td colspan="${cols.length}" style="text-align:center;padding:12px;color:var(--muted)">… ${f0(rows.length-cap)} more rows — Export Excel for the full list</td></tr>`:'')}
+function renderMetricTable(){const rows=metricRows(),t=document.getElementById('mTbl');if(t){t.querySelector('thead').innerHTML='<tr>'+metricHead()+'</tr>';t.querySelector('tbody').innerHTML=metricBody(rows)}const ct=document.getElementById('mCt');if(ct)ct.textContent=f0(rows.length)}
+function metricSort(i){const s=window._mSort||{col:-1,dir:'asc'};window._mSort=(s.col===i&&s.dir==='asc')?{col:i,dir:'desc'}:{col:i,dir:'asc'};renderMetricTable()}
+function metricFilter(q){window._mQuery=q||'';renderMetricTable()}
+window.metricSort=metricSort;window.metricFilter=metricFilter
+function exportMetric(){const def=window._mDef,cols=window._mCols||MCOLS;if(!def)return;const rows=metricRows()
   exportXlsx('bmw-'+window._mId,cols.map(c=>c.h),rows.map(c=>cols.map(col=>col.csv(c))))}
 window.exportMetric=exportMetric
 
@@ -1396,12 +1413,12 @@ function openTrack(kind,no){
   let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
   const fld=(id,label,val,type)=>`<div><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">${label}</label><input id="${id}" type="${type||'text'}" value="${esc(val||'')}" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit"></div>`
   bg.innerHTML=`<div class="bmw-modal" style="max-width:560px"><div class="bmw-modal-h"><div class="bmw-modal-icon">📝</div>
-    <div class="bmw-modal-title" style="flex:1"><h3>${ex.status?'Edit':'Track'} Recovery</h3><p>${esc(no)} · ${esc(claim.make)} · ${esc(claim.vin||'')}</p></div>
+    <div class="bmw-modal-title" style="flex:1"><h3>${ex.status?'Edit ':''}${claim.answered?(ex.status?'Recovery':'Track Recovery'):'Status'}</h3><p>${esc(no)} · ${esc(claim.make)} · ${esc(claim.vin||'')}${claim.answered?'':' · ⏳ pending — set a manual status'}</p></div>
     <button class="bmw-modal-x" onclick="closeModal()">✕</button></div><div class="bmw-modal-body">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px">
       <div><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Status</label>
         <select id="tr_status" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit">
-        ${['pending','resubmitted','credited','resolved'].map(o=>`<option value="${o}"${ex.status===o?' selected':''}>${o}</option>`).join('')}</select></div>
+        ${['pending','resubmitted','rejected','credited','resolved'].map(o=>`<option value="${o}"${ex.status===o?' selected':''}>${o}</option>`).join('')}</select></div>
       ${fld('tr_newclaim','New Claim #',ex.new_claim)}
       <div style="grid-column:1/-1">${fld('tr_reason','Reason',ex.reason).replace('<div>','').replace(/<\/div>$/,'')}</div>
       ${fld('tr_resub_date','Resubmit Date',ex.resub_date,'date')}
@@ -1565,7 +1582,7 @@ function rPipe(){
       <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c.noSubmission?'<span style="color:var(--faint)">—</span>':(c.answered?f(c.gap):'—')}</td>
       <td class="num">${c.answered&&c.invoiced?`<span style="font-weight:700;color:${c.accept_ratio>=85?'var(--mint-d)':c.accept_ratio>=65?'var(--lemon-d)':'var(--rose-d)'}">${c.accept_ratio.toFixed(0)}%</span>`:'—'}</td>
       <td>${sBadge(c.status_overall)}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${tr?` <span class="badge b-sky">${tr.status}</span>`:''}</td>
-      <td>${(c.status_overall==='Error'||c.status_overall==='Warning')?`<button class="btn btn-sm ${tr?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr?'✏️':'+ Track'}</button>`:'<span style="color:var(--faint)">—</span>'}</td></tr>`})
+      <td>${(c.status_overall==='Error'||c.status_overall==='Warning'||!c.answered)?`<button class="btn btn-sm ${tr?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr?'✏️':(c.answered?'+ Track':'⚙ Status')}</button>`:'<span style="color:var(--faint)">—</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="12" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
   document.getElementById('T_pipe').innerHTML=h
