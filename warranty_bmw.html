@@ -509,11 +509,14 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.27'
+const APP_VERSION='v5.28'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.28',date:'2026-06-30',items:[
+    {t:'feat',d:'The "Invoiced € (incadea)" card on the Credit Notes page is now clickable - it opens a drill-down listing every claim behind the figure (invoice, VIN, invoiced, credited, gap, status).'},
+    {t:'fix',d:'Cancelled invoices (recorded with a credit memo) are now excluded from the incadea invoice count shown in the header and the Upload Center, so a credit-memo cancellation (e.g. GAR0282057 / GCR06247) really drops out of the incadea totals - not just the Not Submitted page.'}]},
   {v:'v5.27',date:'2026-06-30',items:[
     {t:'fix',d:'Corrected the cancelled-invoice logic. A new "Cancelled Invoices (credit memos)" panel in the Upload Center lets you record that an incadea invoice (GAR…) was cancelled by a credit memo (GCR…). Those invoices are then flagged on the Not Submitted page and excluded from the Warranty € to claim total and the sidebar badge, since a cancelled invoice was never really billed. Replaces the earlier (incorrect) attempt that guessed cancellation from BMW credit notes.'}]},
   {v:'v5.26',date:'2026-06-30',items:[
@@ -838,7 +841,7 @@ async function refreshData(){
   S.inv=inv;S.subs=subs;S.cred=cred;S.resub=resub;S.ovr=ovr;S.cancels=cancels
   applyOverrides(ovr)
   invalidateReconcile()
-  document.getElementById('cnt_inv').textContent=f0(inv.length)
+  document.getElementById('cnt_inv').textContent=f0(inv.filter(i=>!cancelOf(i)).length)
   document.getElementById('cnt_sub').textContent=f0(subs.length)
   document.getElementById('cnt_cr').textContent=f0(cred.length)
 }
@@ -1231,6 +1234,8 @@ const METRIC_DEFS={
     stats:r=>[['Answered claims',f0(r.length)],['Credited €','€'+f0(_sum(r,'accepted'))],['Errors',f0(r.filter(c=>c.status_overall==='Error').length)],['Warnings',f0(r.filter(c=>c.status_overall==='Warning').length)]]},
   cr_credited:{icon:'💰',title:'Credits · Credited €',accent:'var(--mint-d)',sub:'Matches the current Credits filters',src:['cred'],focus:'Credited €',
     rows:()=>(window._crRows||[]).filter(c=>c.accepted>0).sort((a,b)=>b.accepted-a.accepted),stats:ST_CIV},
+  cr_invoiced:{icon:'🧾',title:'Credits · Invoiced € (incadea)',accent:'var(--slate)',sub:'What we billed in incadea for these credited claims · current filters',src:['inv','cred'],focus:'Invoiced €',
+    rows:()=>(window._crRows||[]).slice().sort((a,b)=>(Number(b.invoiced)||0)-(Number(a.invoiced)||0)),stats:ST_CIV},
   cr_warn:{icon:'⚠️',title:'Credits · Warnings',accent:'var(--lemon-d)',sub:'Matches the current Credits filters',src:['cred'],focus:'Status',
     rows:()=>(window._crRows||[]).filter(c=>c.status_overall==='Warning'),stats:ST_CIV},
   cr_err:{icon:'❌',title:'Credits · Errors',accent:'var(--rose-d)',sub:'Matches the current Credits filters',src:['cred'],focus:'Status',
@@ -1687,7 +1692,7 @@ function updateBadges(){
   const nsb=document.getElementById('B_notsub');if(nsb){const nsc=notSubInvoices().filter(i=>i.payment_method_code==='CREDIT'&&!cancelOf(i)).length;nsb.textContent=f0(nsc);nsb.style.display=nsc?'':'none'}
   const invMakes=[...new Set(S.inv.map(i=>i.make_code).filter(Boolean))].sort()
   const nm=document.getElementById('ns_make');if(nm){const cur=nm.value;nm.innerHTML='<option value="">All</option>'+invMakes.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');nm.value=cur}
-  document.querySelector('#lastSync span:last-child').textContent=`${f0(S.inv.length)} inv · ${f0(S.subs.length)} sub · ${f0(S.cred.length)} cr`
+  document.querySelector('#lastSync span:last-child').textContent=`${f0(S.inv.filter(i=>!cancelOf(i)).length)} inv · ${f0(S.subs.length)} sub · ${f0(S.cred.length)} cr`
   const makes=[...new Set(reconcile().claims.map(c=>c.make).filter(Boolean))].sort()
   const months=[...new Set(reconcile().claims.map(c=>c.month).filter(Boolean))].sort().reverse()
   const brands=[...new Set(S.cred.map(c=>c.brand).filter(Boolean))].sort()
@@ -1826,7 +1831,7 @@ function rCredits(){
   const filtered=!!(sf||bf||lf||mo||cn||q)
   document.getElementById('K_cr').innerHTML=`
     <div class="kpi drill" onclick="openMetric('cr_notes')"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📑 Credit Notes</div><div class="kv bmw">${f0(new Set(S.cred.filter(c=>S.scope==='all'||c.credit_type===S.scope).map(c=>c.credit_note_number)).size)}</div><div class="ks">${f0(rows.length)} answered claims</div></div>
-    <div class="kpi"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced € (incadea)${filtered?' · filtered':''}</div><div class="kv slate">${f0(invoiced)}</div><div class="ks">what we sent for these claims</div></div>
+    <div class="kpi drill" onclick="openMetric('cr_invoiced')"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced € (incadea)${filtered?' · filtered':''}</div><div class="kv slate">${f0(invoiced)}</div><div class="ks">what we sent for these claims</div></div>
     <div class="kpi drill" onclick="openMetric('cr_credited')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited €</div><div class="kv mint">${f0(accepted)}</div><div class="ks">Δ €${f0(crGap)} vs invoiced</div></div>
     <div class="kpi drill" onclick="openMetric('cr_warn')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
     <div class="kpi drill" onclick="openMetric('cr_err')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
