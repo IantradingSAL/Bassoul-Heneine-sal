@@ -481,11 +481,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.12'
+const APP_VERSION='v5.13'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.13',date:'2026-06-30',items:[
+    {t:'fix',d:'The Status column in every drill-down now reflects the manual status, so the Status filter splits out all of them — Pending, Resubmitted, Rejected, Credited, Resolved and Duplicate — not just the four BMW outcomes. The status cell also shows the manual badge.'}]},
   {v:'v5.12',date:'2026-06-30',items:[
     {t:'feat',d:'When a claim has a follow-up scheduled, a clickable 📅 chip now appears right next to its status on the Pipeline, Credit Notes and Rejections lists (red 🔴 if overdue, ✅ if done). Click the chip — or the banner shown at the top of the claim view — to jump straight to that claim follow-up and edit it.'}]},
   {v:'v5.11',date:'2026-06-30',items:[
@@ -896,6 +898,9 @@ function scopedDuplicates(){return reconcile().claims.concat(reconcile().orphans
 function fuBadge(c){const r=S.resub[c.kind+':'+c.no];if(!r||!r.follow_up_date)return '';const today=new Date().toISOString().slice(0,10),done=!!r.follow_up_done,overdue=!done&&r.follow_up_date<today,due=!done&&r.follow_up_date===today
   const col=done?'b-mint':overdue?'b-rose':due?'b-sun':'b-sky',ic=done?'✅':overdue?'🔴':'📅',lbl=done?'follow-up done':overdue?'follow-up overdue':due?'follow-up today':r.follow_up_date
   return ` <span class="badge ${col}" style="cursor:pointer" title="${esc(r.follow_up_note||'')} — click to open follow-up" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${ic} ${esc(lbl)}</span>`}
+// effective status label (includes manual statuses: duplicate / resubmitted / rejected / credited / resolved)
+function effStatusLabel(c){const m=manStatus(c);if(m)return m.charAt(0).toUpperCase()+m.slice(1);return c.answered?c.status_overall:'Pending'}
+function statusCell(c){const base=c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):sBadge(effKey(c)));return base+manBadge(c)}
 const kindBadge=k=>k==='bsi'?'<span class="badge b-sky">BSI</span>':'<span class="badge b-bmw">Warranty</span>'
 
 // ══ MODAL ═══════════════════════════════════════════════════════
@@ -1055,7 +1060,7 @@ const MCOLS=[
   {h:'Credited €',num:1,cell:c=>c.answered?`<span style="font-weight:700">${f(c.accepted)}</span>`:'<span style="color:var(--faint)">—</span>',csv:c=>c.answered?c.accepted:''},
   {h:'Gap €',num:1,cell:c=>c.answered?`<span style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${f(c.gap)}</span>`:'<span style="color:var(--faint)">—</span>',csv:c=>c.answered?c.gap:''},
   {h:'Cred %',num:1,cell:c=>c.answered&&c.invoiced?`${c.accept_ratio.toFixed(0)}%`:'<span style="color:var(--faint)">—</span>',csv:c=>c.answered&&c.invoiced?c.accept_ratio.toFixed(1):''},
-  {h:'Status',cell:c=>sBadge(c.status_overall),csv:c=>c.status_overall},
+  {h:'Status',cell:c=>statusCell(c),csv:c=>effStatusLabel(c)},
 ]
 // custom column models for non-standard (aggregated / timing) metrics
 const TCOLS=[
@@ -1096,7 +1101,7 @@ const RCOLS=[
   {h:'Pricing diff €',num:1,cell:c=>Math.abs(c.pricing_diff||0)>0.005?`<span style="color:var(--lemon-d)">${f(c.pricing_diff)}</span>`:'—',csv:c=>c.pricing_diff},
   {h:'Rejected €',num:1,cell:c=>c.rejected>0.005?`<span style="color:var(--rose-d);font-weight:700">${f(c.rejected)}</span>`:'—',csv:c=>c.rejected},
   {h:'Basis',cell:c=>c.claim_basis==='claimed'?'<span class="badge b-mint">exact</span>':'<span class="badge b-n">status</span>',csv:c=>c.claim_basis},
-  {h:'Status',cell:c=>sBadge(c.status_overall),csv:c=>c.status_overall},
+  {h:'Status',cell:c=>statusCell(c),csv:c=>effStatusLabel(c)},
 ]
 // builders shared with the Insights tab renderers
 const _defectAgg=()=>{const creds=S.cred.filter(c=>S.scope==='all'||c.credit_type===S.scope);const byD={};creds.forEach(r=>{const code=r.defect_code||'—';if(!byD[code])byD[code]={code,text:r.defect_text||'',cnt:0,value:0,err:0};const d=byD[code];d.cnt++;d.value+=Number(r.accepted_price_incl_hc)||0;if(r.crediting_item_status==='Error')d.err++;if(!d.text&&r.defect_text)d.text=r.defect_text});return Object.values(byD).sort((a,b)=>b.value-a.value)}
