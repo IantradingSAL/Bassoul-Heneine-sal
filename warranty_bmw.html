@@ -471,7 +471,7 @@ const APP_VERSION='v5.8'
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
   {v:'v5.8',date:'2026-06-30',items:[
-    {t:'feat',d:'Pending claims can now be given a manual status: a Set status button appears on pending rows (Pipeline and the claim view) so you can mark them resubmitted, rejected, credited or resolved while you wait for the credit note. The chosen status shows as a badge on the Pipeline outcome.'},
+    {t:'feat',d:'Pending claims can now be given a manual status: a Set status button appears on pending rows (Pipeline and the claim view) so you can mark them resubmitted, rejected, credited or resolved while you wait for the credit note. Marking a claim rejected, credited or resolved now actually moves it OUT of Pending everywhere — the Pipeline row, the Pending counts, the dashboard donut and the status filter all reflect the manual status (rejected counts toward Needs Attention, credited/resolved as success). Resubmitted stays pending but shows its badge. Money figures are unchanged.'},
     {t:'feat',d:'Every drill-down detail view (Source records) now has a filter box under each column header — dropdowns for Kind, Make and Status, and type-to-filter for the rest. Number columns accept >100 or <50. Clickable headers still sort A to Z or Z to A, and Export Excel respects the active filters, so what you see is what you export.'}]},
   {v:'v5.7',date:'2026-06-29',items:[
     {t:'feat',d:'Gap is now split into two: Rejected (claimed minus paid - the money to chase) and Pricing Difference (incadea rate vs BMW rate - not a rejection). New KPIs on the Dashboard and Rejections page, a breakdown on each claim, and drill-downs with an Invoiced - Claimed - Paid table. Exact where Claimed Price is on the credit note, otherwise split by status.'}]},
@@ -849,6 +849,14 @@ function applySort(rows,k,acc){const st=S.sortState[k];if(!st||st.col<0||!acc[st
 function th(l,k,i,o){o=o||{};const st=S.sortState[k]||{};const cls=['sortable'];if(o.num)cls.push('num');if(st.col===i)cls.push(st.dir==='desc'?'sort-desc':'sort-asc');return `<th class="${cls.join(' ')}" onclick="sortClick('${k}',${i})">${l}</th>`}
 const sBadge=s=>s==='Error'?'<span class="badge b-rose">❌ Error</span>':s==='Warning'?'<span class="badge b-lem">⚠️ Warning</span>':s==='Pending'?'<span class="badge b-sun">⏳ Pending</span>':'<span class="badge b-mint">✅ Success</span>'
 const corrBadge=c=>c&&c.corrected?' <span class="badge b-sky" title="Resubmitted &amp; corrected — outcome reflects the latest credit note">✎ corrected</span>':''
+// ── manual status override (warranty_bmw_resub) for still-pending claims ──
+// Terminal manual statuses take a pending claim OUT of "Pending"; 'resubmitted' stays
+// pending (still awaiting BMW) but shows its badge. Money figures are untouched.
+const MAN_TERMINAL={rejected:'Error',credited:'Success',resolved:'Success'}
+function manStatus(c){const t=S.resub[c.kind+':'+c.no];return t&&t.status&&t.status!=='pending'?t.status:null}
+function effKey(c){if(c.answered)return c.status_overall;const s=manStatus(c);return s&&MAN_TERMINAL[s]?MAN_TERMINAL[s]:'Pending'}
+function effPending(c){return effKey(c)==='Pending'}
+function manBadge(c){const s=manStatus(c);if(!s)return '';const col=s==='rejected'?'b-rose':(s==='credited'||s==='resolved')?'b-mint':'b-sky';const ic=s==='rejected'?'❌':(s==='credited'||s==='resolved')?'✅':'🔁';return ` <span class="badge ${col}" title="Manually set status ✎">${ic} ${esc(s)} ✎</span>`}
 const kindBadge=k=>k==='bsi'?'<span class="badge b-sky">BSI</span>':'<span class="badge b-bmw">Warranty</span>'
 
 // ══ MODAL ═══════════════════════════════════════════════════════
@@ -912,7 +920,7 @@ function openVin(vin){
       <div class="vin-stat"><div class="vin-stat-l">📋 Claims</div><div class="vin-stat-v" style="color:var(--bmw)">${claims.length+orph.length}</div></div>
       <div class="vin-stat"><div class="vin-stat-l">🧾 Invoiced (incadea)</div><div class="vin-stat-v">€${f(totInv)}</div><div class="vin-stat-l" style="margin-top:2px;text-transform:none;font-weight:600">${vinInvs.length} invoice${vinInvs.length===1?'':'s'} on file</div></div>
       <div class="vin-stat"><div class="vin-stat-l">💰 Credited</div><div class="vin-stat-v" style="color:var(--mint-d)">€${f(totAcc)}</div></div>
-      <div class="vin-stat"><div class="vin-stat-l">⏳ Pending</div><div class="vin-stat-v" style="color:var(--sun)">${claims.filter(c=>!c.answered).length}</div></div>
+      <div class="vin-stat"><div class="vin-stat-l">⏳ Pending</div><div class="vin-stat-v" style="color:var(--sun)">${claims.filter(effPending).length}</div></div>
     </div>
     ${vinInvs.length?`<div class="vin-section"><div class="vin-section-h"><span>🧾 incadea invoices for this VIN</span><span class="ct">${vinInvs.length}</span></div>
       <table class="vin-mini"><thead><tr><th>Invoice (GAR)</th><th>Posting Date</th><th>Model</th><th class="num">Invoiced €</th><th>Link</th></tr></thead>
@@ -1059,13 +1067,13 @@ const METRIC_DEFS={
     stats:r=>[['Claims',f0(r.length)],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Unique VINs',f0(_uniq(r,'vin'))],['Avg / claim','€'+f0(_sum(r,'invoiced')/(r.length||1))]]},
   submitted:{icon:'📨',title:'Submitted to BMW',accent:'var(--slate)',sub:'All claims submitted for warranty / BSI credit',src:['sub'],focus:'Status',
     rows:()=>scopedClaims().sort((a,b)=>(a.answered-b.answered)),
-    stats:r=>[['Claims',f0(r.length)],['Answered',f0(r.filter(c=>c.answered).length)],['Pending',f0(r.filter(c=>!c.answered).length)],['Unique VINs',f0(_uniq(r,'vin'))]]},
+    stats:r=>[['Claims',f0(r.length)],['Answered',f0(r.filter(c=>!effPending(c)).length)],['Pending',f0(r.filter(effPending).length)],['Unique VINs',f0(_uniq(r,'vin'))]]},
   credited:{icon:'📑',title:'Credited by BMW',accent:'var(--mint-d)',sub:'Claims with an accepted credit note',src:['cred'],focus:'Credited €',
     rows:()=>scopedClaims().filter(c=>c.accepted>0).concat(scopedOrphans().filter(o=>o.accepted>0)).sort((a,b)=>b.accepted-a.accepted),
     stats:r=>[['Lines credited',f0(r.length)],['Credited €','€'+f0(_sum(r,'accepted'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Avg cred %',pct(_sum(r,'accepted'),_sum(r,'invoiced')).toFixed(1)+'%']]},
   not_credited:{icon:'Δ',title:'Not Credited — money to chase',accent:'var(--rose-d)',sub:'Invoiced amount BMW has not (yet) credited',src:['inv','cred'],focus:'Gap €',
     rows:()=>scopedClaims().filter(c=>c.gap>0.5).sort((a,b)=>b.gap-a.gap),
-    stats:r=>[['Open claims',f0(r.length)],['Gap €','€'+f0(_sum(r,'gap'))],['Still pending',f0(r.filter(c=>!c.answered).length)],['Errors / Warnings',f0(r.filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').length)]]},
+    stats:r=>[['Open claims',f0(r.length)],['Gap €','€'+f0(_sum(r,'gap'))],['Still pending',f0(r.filter(effPending).length)],['Errors / Warnings',f0(r.filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').length)]]},
   total_claims:{icon:'📋',title:'Total Claims',accent:'var(--bmw)',sub:'Every reconciled warranty & BSI claim in scope',src:['inv','sub','cred'],focus:'Status',
     rows:()=>scopedClaims().concat(scopedOrphans()),
     stats:r=>[['Claims',f0(r.length)],['Unique VINs',f0(_uniq(r,'vin'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Credited €','€'+f0(_sum(r,'accepted'))]]},
@@ -1073,11 +1081,11 @@ const METRIC_DEFS={
     rows:()=>scopedClaims().filter(c=>c.answered&&c.invoiced>0).sort((a,b)=>a.accept_ratio-b.accept_ratio),
     stats:r=>[['Answered claims',f0(r.length)],['Cred rate',pct(_sum(r,'accepted'),_sum(r,'invoiced')).toFixed(1)+'%'],['Credited €','€'+f0(_sum(r,'accepted'))],['Gap €','€'+f0(_sum(r,'gap'))]]},
   pending:{icon:'⏳',title:'Pending Answer',accent:'var(--sun)',sub:'Submitted to BMW, awaiting a credit note',src:['sub'],focus:'Status',
-    rows:()=>scopedClaims().filter(c=>!c.answered).sort((a,b)=>String(a.document_date).localeCompare(String(b.document_date))),
+    rows:()=>scopedClaims().filter(effPending).sort((a,b)=>String(a.document_date).localeCompare(String(b.document_date))),
     stats:r=>[['Pending',f0(r.length)],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
-  attention:{icon:'⚠️',title:'Needs Attention',accent:'var(--rose)',sub:'Claims credited with an error or warning',src:['cred'],focus:'Status',
-    rows:()=>scopedClaims().concat(scopedOrphans()).filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').sort((a,b)=>b.gap-a.gap),
-    stats:r=>[['Errors',f0(r.filter(c=>c.status_overall==='Error').length)],['Warnings',f0(r.filter(c=>c.status_overall==='Warning').length)],['Gap at risk €','€'+f0(_sum(r,'gap'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
+  attention:{icon:'⚠️',title:'Needs Attention',accent:'var(--rose)',sub:'Claims with an error/warning, or manually marked rejected',src:['cred'],focus:'Status',
+    rows:()=>scopedClaims().concat(scopedOrphans()).filter(c=>effKey(c)==='Error'||effKey(c)==='Warning').sort((a,b)=>b.gap-a.gap),
+    stats:r=>[['Errors',f0(r.filter(c=>effKey(c)==='Error').length)],['Warnings',f0(r.filter(c=>effKey(c)==='Warning').length)],['Gap at risk €','€'+f0(_sum(r,'gap'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
   no_submission:{icon:'💳',title:'Credited · No Submission',accent:'var(--pur)',sub:'BMW credited these, but no submission row is loaded',src:['cred'],focus:'Credited €',
     rows:()=>scopedOrphans().sort((a,b)=>b.accepted-a.accepted),
     stats:r=>[['Claims',f0(r.length)],['Credited €','€'+f0(_sum(r,'accepted'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
@@ -1089,7 +1097,7 @@ const METRIC_DEFS={
   pp_credited:{icon:'💰',title:'Pipeline · Credited €',accent:'var(--mint-d)',sub:'Matches the current Pipeline filters',src:['cred'],focus:'Credited €',
     rows:()=>(window._ppRows||[]).filter(c=>c.accepted>0).sort((a,b)=>b.accepted-a.accepted),stats:ST_CIV},
   pp_pending:{icon:'⏳',title:'Pipeline · Pending',accent:'var(--sun)',sub:'Matches the current Pipeline filters',src:['sub'],focus:'Status',
-    rows:()=>(window._ppRows||[]).filter(c=>!c.answered),stats:ST_CIV},
+    rows:()=>(window._ppRows||[]).filter(effPending),stats:ST_CIV},
   pp_nosub:{icon:'💳',title:'Pipeline · No Submission',accent:'var(--pur)',sub:'Credited, submission file not loaded · current filters',src:['cred'],focus:'Credited €',
     rows:()=>(window._ppRows||[]).filter(c=>c.noSubmission).sort((a,b)=>b.accepted-a.accepted),stats:ST_CIV},
   // ── CREDITS page ──
@@ -1128,7 +1136,7 @@ const METRIC_DEFS={
     rows:()=>(window._stRows||[]).filter(c=>c._shortfall>0.5).sort((a,b)=>b._shortfall-a._shortfall),stats:ST_OWED},
   // ── INSIGHTS · Pending tab (same scopedClaims as dashboard → counts match) ──
   ins_overdue:{icon:'🐌',title:'Insights · Overdue Pending (>60d)',accent:'var(--rose-d)',sub:'Submitted over 60 days ago, still no credit note',src:['sub'],focus:'Status',
-    rows:()=>{const t=new Date().toISOString().slice(0,10);return scopedClaims().filter(c=>!c.answered).map(c=>({...c,_age:c.document_date?days(c.document_date,t):null})).filter(c=>c._age!=null&&c._age>60).sort((a,b)=>(b._age||0)-(a._age||0))},
+    rows:()=>{const t=new Date().toISOString().slice(0,10);return scopedClaims().filter(effPending).map(c=>({...c,_age:c.document_date?days(c.document_date,t):null})).filter(c=>c._age!=null&&c._age>60).sort((a,b)=>(b._age||0)-(a._age||0))},
     stats:r=>[['Overdue',f0(r.length)],['Invoiced & waiting €','€'+f0(_sum(r,'invoiced'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
   // ── INSIGHTS · Timing tab (custom Days column) ──
   tm_lag:{icon:'⏱️',title:'Processing Time · repair → credit',accent:'var(--bmw)',sub:'Every claim with repair & credit dates, slowest first',src:['cred'],focus:'Days',cols:TCOLS,
@@ -1243,10 +1251,10 @@ const HLIVE={
   credited_rate:()=>{const c=scopedClaims();return pct(_sum(c,'accepted'),_sum(c,'invoiced')).toFixed(1)+'%'},
   total_claims:()=>f0(scopedClaims().length+scopedOrphans().length),
   submitted:()=>f0(scopedClaims().length),
-  pending:()=>f0(scopedClaims().filter(c=>!c.answered).length),
-  attention:()=>f0(scopedClaims().concat(scopedOrphans()).filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').length),
+  pending:()=>f0(scopedClaims().filter(effPending).length),
+  attention:()=>f0(scopedClaims().concat(scopedOrphans()).filter(c=>effKey(c)==='Error'||effKey(c)==='Warning').length),
   no_submission:()=>f0(scopedOrphans().length),
-  outstanding:()=>{const r=scopedClaims();const pend=r.filter(c=>!c.answered).reduce((s,c)=>s+c.invoiced,0);const sf=r.reduce((s,c)=>s+(c.answered?Math.max(c.invoiced-c.accepted,0):0),0);return '€'+f0(pend+sf)},
+  outstanding:()=>{const r=scopedClaims();const pend=r.filter(effPending).reduce((s,c)=>s+c.invoiced,0);const sf=r.reduce((s,c)=>s+(c.answered?Math.max(c.invoiced-c.accepted,0):0),0);return '€'+f0(pend+sf)},
   shortfall:()=>'€'+f0(scopedClaims().reduce((s,c)=>s+(c.answered?Math.max(c.invoiced-c.accepted,0):0),0)),
   gap_at_risk:()=>'€'+f0(scopedClaims().concat(scopedOrphans()).filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').reduce((s,c)=>s+c.gap,0)),
   processing:()=>{const w=scopedClaims().filter(c=>c.lag_days!=null&&c.lag_days>=0);return (w.length?_sum(w,'lag_days')/w.length:0).toFixed(0)+' days avg'},
@@ -1293,8 +1301,8 @@ const HELP_SECTIONS=[
       what:'Every reconciled claim in scope, including credited-no-submission ones. The sub-line counts the distinct vehicles (VINs) behind them.',
       formula:'Total Claims = claims + credited-no-submission\nUnique VINs  = distinct claim.vin',src:['sub','cred'],metric:'total_claims',live:'total_claims'},
     {id:'pending',icon:'⏳',q:'What is "Pending Answer"?',kw:['pending','awaiting','waiting','no answer'],
-      what:'Claims submitted to BMW that have no credit note yet. These are amounts in limbo — money neither credited nor rejected.',
-      formula:'Pending = claims with zero credit-note lines',src:['sub'],metric:'pending',live:'pending'},
+      what:'Claims submitted to BMW that have no credit note yet. These are amounts in limbo — money neither credited nor rejected. If you set a manual status (rejected, credited or resolved) on a pending claim, it leaves Pending; resubmitted stays pending.',
+      formula:'Pending = claims with zero credit-note lines AND no terminal manual status',src:['sub'],metric:'pending',live:'pending'},
     {id:'attention',icon:'⚠️',q:'What is "Needs Attention"?',kw:['attention','errors','warnings','problem','rejected','issues'],
       what:'Claims BMW answered but flagged — at least one line came back as a Warning or Error. These are the claims worth reviewing or resubmitting.',
       formula:'Needs Attention = claims with status Error or Warning',src:['cred'],metric:'attention',live:'attention'},
@@ -1493,7 +1501,7 @@ function exportXlsx(name,headers,rows){
 // ══ RENDER ══════════════════════════════════════════════════════
 function currentPage(){return document.querySelector('.si.active')?.dataset.page||'dashboard'}
 function renderPage(p){if(p==='dashboard')rDash();if(p==='pipeline')rPipe();if(p==='credits')rCredits();if(p==='rejections')rRej();if(p==='insights')rInsights();if(p==='statement')rStatement();if(p==='upload')rUploadHist()}
-function monthly(claims){const m={};claims.forEach(c=>{if(!c.month)return;if(!m[c.month])m[c.month]={month:c.month,cnt:0,invoiced:0,accepted:0,answered:0,err:0,warn:0,success:0,pending:0,labor:0,parts:0,ext:0};const b=m[c.month];b.cnt++;b.invoiced+=c.invoiced;b.accepted+=c.accepted;b.labor+=c.labor;b.parts+=c.parts;b.ext+=c.ext;if(!c.answered)b.pending++;else{b.answered++;if(c.status_overall==='Error')b.err++;else if(c.status_overall==='Warning')b.warn++;else b.success++}});return Object.values(m).sort((a,b)=>a.month.localeCompare(b.month))}
+function monthly(claims){const m={};claims.forEach(c=>{if(!c.month)return;if(!m[c.month])m[c.month]={month:c.month,cnt:0,invoiced:0,accepted:0,answered:0,err:0,warn:0,success:0,pending:0,labor:0,parts:0,ext:0};const b=m[c.month];b.cnt++;b.invoiced+=c.invoiced;b.accepted+=c.accepted;b.labor+=c.labor;b.parts+=c.parts;b.ext+=c.ext;const k=effKey(c);if(k==='Pending')b.pending++;else{b.answered++;if(k==='Error')b.err++;else if(k==='Warning')b.warn++;else b.success++}});return Object.values(m).sort((a,b)=>a.month.localeCompare(b.month))}
 
 function updateBadges(){
   const claims=scopedClaims()
@@ -1546,8 +1554,8 @@ function rDash(){
   const claims=scopedClaims()
   const invoiced=claims.reduce((s,c)=>s+c.invoiced,0),accepted=claims.reduce((s,c)=>s+c.accepted,0)
   const totRejected=claims.reduce((s,c)=>s+(c.rejected||0),0),totPricing=claims.reduce((s,c)=>s+(c.pricing_diff||0),0)
-  const answered=claims.filter(c=>c.answered).length,pending=claims.length-answered
-  const err=claims.filter(c=>c.status_overall==='Error').length,warn=claims.filter(c=>c.status_overall==='Warning').length,success=claims.filter(c=>c.status_overall==='Success').length
+  const pending=claims.filter(effPending).length,answered=claims.length-pending
+  const err=claims.filter(c=>effKey(c)==='Error').length,warn=claims.filter(c=>effKey(c)==='Warning').length,success=claims.filter(c=>effKey(c)==='Success').length
   const series=monthly(claims)
   const offCredits=scopedOrphans();const offVal=offCredits.reduce((s,c)=>s+c.accepted,0)
   const offCard=offCredits.length?`<div class="kpi drill" onclick="openMetric('no_submission')"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 Credited · No Submission</div><div class="kv pur">${f0(offVal)}</div><div class="ks">${f0(offCredits.length)} claims · submission file not loaded</div></div>`:''
@@ -1585,10 +1593,10 @@ function rDash(){
 function rPipe(){
   const all=scopedClaims().concat(scopedOrphans())
   const sf=document.getElementById('pp_status').value,mk=document.getElementById('pp_make').value,mo=document.getElementById('pp_month').value,q=document.getElementById('pp_search').value.toLowerCase().trim()
-  let rows=all.filter(c=>{if(sf&&c.status_overall!==sf)return false;if(mk&&c.make!==mk)return false;if(mo&&c.month!==mo)return false;if(q&&![c.no,c.record_no,c.doc_no,c.vin,c.cn_no].join('|').toLowerCase().includes(q))return false;return true})
+  let rows=all.filter(c=>{if(sf&&effKey(c)!==sf)return false;if(mk&&c.make!==mk)return false;if(mo&&c.month!==mo)return false;if(q&&![c.no,c.record_no,c.doc_no,c.vin,c.cn_no].join('|').toLowerCase().includes(q))return false;return true})
   rows=applySort(rows,'pp',[c=>c.document_date,c=>c.kind,c=>c.no,c=>c.doc_no,c=>c.make,c=>c.vin,c=>c.invoiced,c=>c.accepted,c=>c.gap,c=>c.accept_ratio,c=>c.status_overall])
   window._ppRows=rows
-  const invoiced=rows.reduce((s,c)=>s+c.invoiced,0),accepted=rows.reduce((s,c)=>s+c.accepted,0),pending=rows.filter(c=>!c.answered).length,noSub=rows.filter(c=>c.noSubmission).length
+  const invoiced=rows.reduce((s,c)=>s+c.invoiced,0),accepted=rows.reduce((s,c)=>s+c.accepted,0),pending=rows.filter(effPending).length,noSub=rows.filter(c=>c.noSubmission).length
   document.getElementById('K_pipe').innerHTML=`
     <div class="kpi drill" onclick="openMetric('pp_claims')"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">🔗 Claims</div><div class="kv bmw">${f0(rows.length)}</div></div>
     <div class="kpi drill" onclick="openMetric('pp_invoiced')"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced €</div><div class="kv slate">${f0(invoiced)}</div></div>
@@ -1606,7 +1614,7 @@ function rPipe(){
       <td class="num">${c.noSubmission?(c.inferred_inv?`<span style="color:var(--muted)" title="from the inferred invoice">≈ ${f(c.inferred_inv.total_invoiced)}</span>`:'<span style="color:var(--faint)">—</span>'):f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
       <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c.noSubmission?'<span style="color:var(--faint)">—</span>':(c.answered?f(c.gap):'—')}</td>
       <td class="num">${c.answered&&c.invoiced?`<span style="font-weight:700;color:${c.accept_ratio>=85?'var(--mint-d)':c.accept_ratio>=65?'var(--lemon-d)':'var(--rose-d)'}">${c.accept_ratio.toFixed(0)}%</span>`:'—'}</td>
-      <td>${sBadge(c.status_overall)}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${tr?` <span class="badge b-sky">${tr.status}</span>`:''}</td>
+      <td>${c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):'')}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${manBadge(c)}</td>
       <td>${(c.status_overall==='Error'||c.status_overall==='Warning'||!c.answered)?`<button class="btn btn-sm ${tr?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr?'✏️':(c.answered?'+ Track':'⚙ Status')}</button>`:'<span style="color:var(--faint)">—</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="12" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
@@ -1794,7 +1802,7 @@ window.exportUnlinked=exportUnlinked
 function statementRows(){
   const onlyOut=document.getElementById('st_out').checked, mk=document.getElementById('st_make').value
   let rows=scopedClaims().filter(c=>!mk||c.make===mk)
-  rows.forEach(c=>{c._pending=!c.answered;c._shortfall=c.answered?Math.max(c.invoiced-c.accepted,0):0;c._owed=c._pending?c.invoiced:c._shortfall
+  rows.forEach(c=>{c._pending=effPending(c);c._shortfall=c.answered?Math.max(c.invoiced-c.accepted,0):0;c._owed=c._pending?c.invoiced:c._shortfall
     c._otype=c._pending?'pending':(c._shortfall>0.5?'shortfall':'settled')})
   if(onlyOut)rows=rows.filter(c=>c._owed>0.5)
   return rows.sort((a,b)=>b._owed-a._owed)
