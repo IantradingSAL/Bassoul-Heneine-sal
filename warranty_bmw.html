@@ -509,11 +509,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.29'
+const APP_VERSION='v5.30'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.30',date:'2026-06-30',items:[
+    {t:'fix',d:'Shared-invoice roll-up now shows the combined credited on the main claim, so its row is fully consistent (invoiced minus credited = gap). The supplementary claims are rolled into the main claim (credited shown as a pointer) and hidden from the Credit Notes, Rejections and Statement lists to avoid duplicates. Example: 71557 now shows invoiced 1,090.41, credited 1,105.58, gap -15.17.'}]},
   {v:'v5.29',date:'2026-06-30',items:[
     {t:'fix',d:'Major accuracy fix: when one incadea invoice (repair order) was submitted to BMW as several claims (about 900 of your invoices, ~EUR 255k), the app was attaching the FULL invoice amount to every claim - double-counting invoiced and inflating the gap. Now each invoice is counted ONCE on the main claim; the other claims on the same GAR are shown as supplementary (invoice = shared) and the gap is measured against the total credited across all of them. Example: GAR0282265 (EUR 1,090.41, claims 71557 + 71558) now shows one invoice fully credited instead of a phantom ~EUR 1,049 gap.'}]},
   {v:'v5.28',date:'2026-06-30',items:[
@@ -922,14 +924,24 @@ function reconcile(){
   Object.values(_byDoc).forEach(grp=>{if(grp.length<2)return
     grp.sort((a,b)=>(b.accepted-a.accepted)||(b.invoiced-a.invoiced)||String(a.no).localeCompare(String(b.no)))
     const primary=grp[0],secs=grp.slice(1)
-    const groupAccepted=grp.reduce((s,c)=>s+(c.accepted||0),0),groupErr=grp.some(c=>c.status_overall==='Error')
+    // the primary absorbs the whole repair: combined credited + all credit lines, so its row reads
+    // consistently (invoiced − credited = gap). The supplementary claims become pointer rows.
+    const groupAccepted=grp.reduce((s,c)=>s+(c.accepted||0),0),allCredits=grp.reduce((a,c)=>a.concat(c.credits||[]),[])
+    const gst={Success:0,Warning:0,Error:0};allCredits.forEach(x=>{if(x.crediting_item_status)gst[x.crediting_item_status]=(gst[x.crediting_item_status]||0)+1})
     primary._sharedWith=secs.map(c=>c.no);primary._sharedInv=true;primary._groupAccepted=groupAccepted
+    primary.accepted=groupAccepted;primary.credits=allCredits;primary.items_count=allCredits.length;primary.statuses=gst
+    primary.labor=grp.reduce((s,c)=>s+(c.labor||0),0);primary.parts=grp.reduce((s,c)=>s+(c.parts||0),0);primary.ext=grp.reduce((s,c)=>s+(c.ext||0),0)
+    primary.claimed_price=grp.reduce((s,c)=>s+(c.claimed_price||0),0)
+    primary.cn_no=[...new Set(grp.flatMap(c=>String(c.cn_no||'').split(', ').filter(Boolean)))].join(', ')
+    if(primary.answered)primary.status_overall=gst.Error>0?'Error':gst.Warning>0?'Warning':'Success'
+    const groupErr=gst.Error>0
     primary.gap=primary.invoiced-groupAccepted
     const gv=primary.gap
     primary.rejected=primary.answered?((groupErr||groupAccepted<0.5)?Math.max(gv,0):0):0
     primary.pricing_diff=primary.answered?Math.max(gv-primary.rejected,0):0
     primary.claim_basis='status'
-    secs.forEach(c=>{c._secondary=true;c._primaryNo=primary.no;c.invoiced=0;c.gap=0;c.rejected=0;c.pricing_diff=0;c.accept_ratio=0})
+    primary.accept_ratio=primary.invoiced?pct(groupAccepted,primary.invoiced):0
+    secs.forEach(c=>{c._secondary=true;c._primaryNo=primary.no;c.invoiced=0;c.accepted=0;c.gap=0;c.rejected=0;c.pricing_diff=0;c.accept_ratio=0;c.credits=[];c.items_count=0})
   })
   // orphan credits: keys present in credits but not in any submission
   const subKeys=new Set(_subs.map(s=>s.sub_key))
@@ -1827,8 +1839,8 @@ function rPipe(){
       <td style="font-size:10px;color:var(--muted)">${esc(c.document_date||'')}</td><td>${kindBadge(c.kind)}</td><td class="mono" style="font-weight:600">${esc(c.no)}<div style="font-size:9px;font-weight:400">${c.noSubmission?'<span style="color:var(--sun)">no submission file</span>':'<span style="color:var(--faint)">'+(c.kind==='bsi'?'contract ':'rec ')+esc(c.record_no||'')+'</span>'}</div></td>
       <td class="mono">${c.doc_no?esc(c.doc_no):(c.inferred_inv?`<span title="inferred from incadea by VIN + amount — verify">≈ ${esc(c.inferred_inv.doc_no)}</span>`:'—')}</td><td><span class="badge b-n">${esc(c.make||'—')}</span></td>
       <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
-      <td class="num">${c._secondary?`<span style="color:var(--faint)" title="Invoice counted on claim ${esc(c._primaryNo)}">shared</span>`:c.noSubmission?(c.inferred_inv?`<span style="color:var(--muted)" title="from the inferred invoice">≈ ${f(c.inferred_inv.total_invoiced)}</span>`:'<span style="color:var(--faint)">—</span>'):f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
-      <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c.noSubmission?'<span style="color:var(--faint)">—</span>':(c.answered?f(c.gap):'—')}</td>
+      <td class="num">${c._secondary?`<span style="color:var(--faint)" title="Invoice counted on claim ${esc(c._primaryNo)}">shared</span>`:c.noSubmission?(c.inferred_inv?`<span style="color:var(--muted)" title="from the inferred invoice">≈ ${f(c.inferred_inv.total_invoiced)}</span>`:'<span style="color:var(--faint)">—</span>'):f(c.invoiced)}</td><td class="num" style="font-weight:700">${c._secondary?`<span style="color:var(--faint)" title="Credited rolled up into claim ${esc(c._primaryNo)}">↳</span>`:(c.answered?f(c.accepted):'—')}</td>
+      <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c._secondary?'<span style="color:var(--faint)">—</span>':c.noSubmission?'<span style="color:var(--faint)">—</span>':(c.answered?f(c.gap):'—')}</td>
       <td class="num">${c.answered&&c.invoiced?`<span style="font-weight:700;color:${c.accept_ratio>=85?'var(--mint-d)':c.accept_ratio>=65?'var(--lemon-d)':'var(--rose-d)'}">${c.accept_ratio.toFixed(0)}%</span>`:'—'}</td>
       <td>${isDuplicate(c)||manStatus(c)?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):''))}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${manBadge(c)}${fuBadge(c)}${sharedBadge(c)}</td>
       <td>${(c.status_overall==='Error'||c.status_overall==='Warning'||!c.answered)?`<button class="btn btn-sm ${tr?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr?'✏️':(c.answered?'+ Track':'⚙ Status')}</button>`:'<span style="color:var(--faint)">—</span>'}</td></tr>`})
@@ -1840,7 +1852,7 @@ function rPipe(){
 function rCredits(){
   const {claims,orphans}=reconcile()
   // build per-credit-note-line grouped by credit note number for detail; but show claim-level list
-  const list=[...claims.filter(c=>c.answered&&inScope(c)&&!isDuplicate(c)),...orphans.filter(c=>inScope(c)&&!isDuplicate(c))]
+  const list=[...claims.filter(c=>c.answered&&inScope(c)&&!isDuplicate(c)&&!c._secondary),...orphans.filter(c=>inScope(c)&&!isDuplicate(c))]
   const sf=document.getElementById('cr_status').value,bf=document.getElementById('cr_brand').value,lf=document.getElementById('cr_link').value,q=document.getElementById('cr_search').value.toLowerCase().trim()
   const mo=document.getElementById('cr_month')?.value||'',cn=document.getElementById('cr_cn')?.value||''
   let rows=list.filter(c=>{if(sf&&c.status_overall!==sf)return false;if(bf&&(c.credits[0]?.brand||'')!==bf)return false
@@ -1874,7 +1886,7 @@ function rCredits(){
 }
 
 function rRej(){
-  const claims=scopedClaims().concat(scopedOrphans()).filter(c=>c.status_overall==='Error'||c.status_overall==='Warning')
+  const claims=scopedClaims().concat(scopedOrphans()).filter(c=>(c.status_overall==='Error'||c.status_overall==='Warning')&&!c._secondary)
   const sf=document.getElementById('rj_status').value,mk=document.getElementById('rj_make').value,q=document.getElementById('rj_search').value.toLowerCase().trim()
   let rows=claims.filter(c=>{const tr=S.resub[c.kind+':'+c.no]
     if(isHandled(c)&&sf!=='tracked')return false  // credited/resolved/resubmitted are no longer open rejections (still visible under "Tracked only")
@@ -2024,7 +2036,7 @@ window.exportUnlinked=exportUnlinked
 // ── BMW receivables statement: what BMW still owes us
 function statementRows(){
   const onlyOut=document.getElementById('st_out').checked, mk=document.getElementById('st_make').value
-  let rows=scopedClaims().filter(c=>!mk||c.make===mk)
+  let rows=scopedClaims().filter(c=>(!mk||c.make===mk)&&!c._secondary)
   rows.forEach(c=>{const handled=isHandled(c)
     c._pending=!handled&&effPending(c)
     c._shortfall=(!handled&&c.answered)?Math.max(c.invoiced-c.accepted,0):0
