@@ -509,11 +509,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.28'
+const APP_VERSION='v5.29'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.29',date:'2026-06-30',items:[
+    {t:'fix',d:'Major accuracy fix: when one incadea invoice (repair order) was submitted to BMW as several claims (about 900 of your invoices, ~EUR 255k), the app was attaching the FULL invoice amount to every claim - double-counting invoiced and inflating the gap. Now each invoice is counted ONCE on the main claim; the other claims on the same GAR are shown as supplementary (invoice = shared) and the gap is measured against the total credited across all of them. Example: GAR0282265 (EUR 1,090.41, claims 71557 + 71558) now shows one invoice fully credited instead of a phantom ~EUR 1,049 gap.'}]},
   {v:'v5.28',date:'2026-06-30',items:[
     {t:'feat',d:'The "Invoiced € (incadea)" card on the Credit Notes page is now clickable - it opens a drill-down listing every claim behind the figure (invoice, VIN, invoiced, credited, gap, status).'},
     {t:'fix',d:'Cancelled invoices (recorded with a credit memo) are now excluded from the incadea invoice count shown in the header and the Upload Center, so a credit-memo cancellation (e.g. GAR0282057 / GCR06247) really drops out of the incadea totals - not just the Not Submitted page.'}]},
@@ -910,6 +912,25 @@ function reconcile(){
       invoiced,accepted:accepted2,claimed_price:claimedPrice,gap:gapVal,rejected,pricing_diff,claim_basis:_basis,accept_ratio:pct(accepted2,invoiced),
       cn_no:[...cnNos].join(', '),defect_codes:[...defects],lag_days:days(repairDate,cnDate)}
   })
+  // ── roll up invoices shared by several claims: count each incadea invoice (GAR) ONCE ──
+  // One repair order can be submitted to BMW as several claims. The full invoice must not be
+  // counted on every claim. The main claim (highest credited) carries the invoice; the others
+  // become "supplementary" (invoiced 0). The main claim's gap is measured against the TOTAL
+  // credited across all claims on that invoice, so a fully-credited repair shows no phantom gap.
+  const _byDoc={}
+  claims.forEach(c=>{if(c.doc_no)(_byDoc[c.doc_no]=_byDoc[c.doc_no]||[]).push(c)})
+  Object.values(_byDoc).forEach(grp=>{if(grp.length<2)return
+    grp.sort((a,b)=>(b.accepted-a.accepted)||(b.invoiced-a.invoiced)||String(a.no).localeCompare(String(b.no)))
+    const primary=grp[0],secs=grp.slice(1)
+    const groupAccepted=grp.reduce((s,c)=>s+(c.accepted||0),0),groupErr=grp.some(c=>c.status_overall==='Error')
+    primary._sharedWith=secs.map(c=>c.no);primary._sharedInv=true;primary._groupAccepted=groupAccepted
+    primary.gap=primary.invoiced-groupAccepted
+    const gv=primary.gap
+    primary.rejected=primary.answered?((groupErr||groupAccepted<0.5)?Math.max(gv,0):0):0
+    primary.pricing_diff=primary.answered?Math.max(gv-primary.rejected,0):0
+    primary.claim_basis='status'
+    secs.forEach(c=>{c._secondary=true;c._primaryNo=primary.no;c.invoiced=0;c.gap=0;c.rejected=0;c.pricing_diff=0;c.accept_ratio=0})
+  })
   // orphan credits: keys present in credits but not in any submission
   const subKeys=new Set(_subs.map(s=>s.sub_key))
   const orphanByKey={}
@@ -979,9 +1000,11 @@ function scopedDuplicates(){return reconcile().claims.concat(reconcile().orphans
 function fuBadge(c){const r=S.resub[c.kind+':'+c.no];if(!r||!r.follow_up_date)return '';const today=new Date().toISOString().slice(0,10),done=!!r.follow_up_done,overdue=!done&&r.follow_up_date<today,due=!done&&r.follow_up_date===today
   const col=done?'b-mint':overdue?'b-rose':due?'b-sun':'b-sky',ic=done?'✅':overdue?'🔴':'📅',lbl=done?'follow-up done':overdue?'follow-up overdue':due?'follow-up today':r.follow_up_date
   return ` <span class="badge ${col}" style="cursor:pointer" title="${esc(r.follow_up_note||'')} — click to open follow-up" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${ic} ${esc(lbl)}</span>`}
+// badge for invoices shared across several claims (roll-up): primary carries the invoice, others are supplementary
+function sharedBadge(c){if(c._secondary)return ` <span class="badge b-n" title="Supplementary claim — this repair's invoice is counted on claim ${esc(c._primaryNo)}">↳ shared w/ ${esc(c._primaryNo)}</span>`;if(c._sharedInv&&(c._sharedWith||[]).length)return ` <span class="badge b-sky" title="Invoice shared with claim(s) ${(c._sharedWith||[]).map(esc).join(', ')} — counted once here; gap covers all of them">🔗 shared inv +${(c._sharedWith||[]).length}</span>`;return ''}
 // effective status label (includes manual statuses: duplicate / resubmitted / rejected / credited / resolved)
 function effStatusLabel(c){const m=manStatus(c);if(m)return m.charAt(0).toUpperCase()+m.slice(1);return c.answered?c.status_overall:'Pending'}
-function statusCell(c){if(isDuplicate(c))return manBadge(c)+fuBadge(c);const base=manStatus(c)?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):sBadge(effKey(c))));return base+manBadge(c)+fuBadge(c)}
+function statusCell(c){if(isDuplicate(c))return manBadge(c)+fuBadge(c);const base=manStatus(c)?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):sBadge(effKey(c))));return base+manBadge(c)+fuBadge(c)+sharedBadge(c)}
 const kindBadge=k=>k==='bsi'?'<span class="badge b-sky">BSI</span>':'<span class="badge b-bmw">Warranty</span>'
 
 // ══ MODAL ═══════════════════════════════════════════════════════
@@ -1804,10 +1827,10 @@ function rPipe(){
       <td style="font-size:10px;color:var(--muted)">${esc(c.document_date||'')}</td><td>${kindBadge(c.kind)}</td><td class="mono" style="font-weight:600">${esc(c.no)}<div style="font-size:9px;font-weight:400">${c.noSubmission?'<span style="color:var(--sun)">no submission file</span>':'<span style="color:var(--faint)">'+(c.kind==='bsi'?'contract ':'rec ')+esc(c.record_no||'')+'</span>'}</div></td>
       <td class="mono">${c.doc_no?esc(c.doc_no):(c.inferred_inv?`<span title="inferred from incadea by VIN + amount — verify">≈ ${esc(c.inferred_inv.doc_no)}</span>`:'—')}</td><td><span class="badge b-n">${esc(c.make||'—')}</span></td>
       <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
-      <td class="num">${c.noSubmission?(c.inferred_inv?`<span style="color:var(--muted)" title="from the inferred invoice">≈ ${f(c.inferred_inv.total_invoiced)}</span>`:'<span style="color:var(--faint)">—</span>'):f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
+      <td class="num">${c._secondary?`<span style="color:var(--faint)" title="Invoice counted on claim ${esc(c._primaryNo)}">shared</span>`:c.noSubmission?(c.inferred_inv?`<span style="color:var(--muted)" title="from the inferred invoice">≈ ${f(c.inferred_inv.total_invoiced)}</span>`:'<span style="color:var(--faint)">—</span>'):f(c.invoiced)}</td><td class="num" style="font-weight:700">${c.answered?f(c.accepted):'—'}</td>
       <td class="num" style="color:${c.gap>0.5?'var(--rose-d)':'var(--mint-d)'};font-weight:600">${c.noSubmission?'<span style="color:var(--faint)">—</span>':(c.answered?f(c.gap):'—')}</td>
       <td class="num">${c.answered&&c.invoiced?`<span style="font-weight:700;color:${c.accept_ratio>=85?'var(--mint-d)':c.accept_ratio>=65?'var(--lemon-d)':'var(--rose-d)'}">${c.accept_ratio.toFixed(0)}%</span>`:'—'}</td>
-      <td>${isDuplicate(c)||manStatus(c)?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):''))}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${manBadge(c)}${fuBadge(c)}</td>
+      <td>${isDuplicate(c)||manStatus(c)?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):''))}${corrBadge(c)}${c.noSubmission?' <span class="badge b-pur">no sub</span>':''}${manBadge(c)}${fuBadge(c)}${sharedBadge(c)}</td>
       <td>${(c.status_overall==='Error'||c.status_overall==='Warning'||!c.answered)?`<button class="btn btn-sm ${tr?'btn-ghost':'btn-sun'}" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">${tr?'✏️':(c.answered?'+ Track':'⚙ Status')}</button>`:'<span style="color:var(--faint)">—</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="12" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
   h+=`</tbody></table></div></div>`
