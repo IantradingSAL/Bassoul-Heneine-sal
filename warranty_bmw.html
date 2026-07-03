@@ -509,11 +509,14 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.33'
+const APP_VERSION='v5.34'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.34',date:'2026-07-03',items:[
+    {t:'feat',d:'Hover any clickable figure (Dashboard KPIs, the flow strip, every drill card on every page) and a small popover now explains what it is, the exact formula, and the live value for the current scope — the same explanation as the Guide, without leaving the page. Click still opens the full records.'},
+    {t:'fix',d:'The "Source files behind this value" cards in a drill panel now show the € totals for the claims IN that panel instead of the global record count — e.g. incadea invoices = € invoiced and BMW credit notes = € credited on exactly those rows, so the panel reconciles (invoiced − credited = the gap). Previously they showed how many rows were loaded in the whole app (e.g. 5,391 credit-note lines), under a "€ credited" caption, which read like a euro amount.'}]},
   {v:'v5.33',date:'2026-07-03',items:[
     {t:'feat',d:'Dashboard now shows a "👁️ Paid Warnings (cleared)" card counting the warnings BMW paid but re-priced (e.g. oil billed as a part → reimbursed as sublet), with how many are acknowledged. Click it to drill into the list with the pricing-difference total. The card only appears when there are any.'}]},
   {v:'v5.32',date:'2026-07-03',items:[
@@ -1357,13 +1360,21 @@ const METRIC_DEFS={
     stats:r=>[['Claims',f0(r.length)],['Pricing diff €','€'+f0(_sum(r,'pricing_diff'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Paid €','€'+f0(_sum(r,'accepted'))]]},
 }
 function openMetric(id){
+  if(window.hideCalcTip)hideCalcTip()
   const def=METRIC_DEFS[id];if(!def){showToast('No detail available');return}
   const cols=def.cols||MCOLS,rowClick=def.rowClick!==false
   const rows=def.rows();window._mDef=def;window._mRows=rows;window._mId=id;window._mCols=cols
   const stats=def.stats(rows)
   window._mSort={col:-1,dir:'asc'};window._mColFilters={}
   let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
-  const srcCards=def.src.map(k=>{const s=SRC[k];return `<div class="src"><h4>${s.icon} ${esc(s.name)}</h4><p>${esc(s.desc)}</p><div class="cnt">${f0(s.n())}</div></div>`}).join('')
+  // source cards show the € totals for THESE panel rows (not global record counts), so the
+  // panel reconciles: incadea invoiced − BMW credited = the gap. Falls back to a record count
+  // for aggregated metrics whose rows carry no invoiced/accepted figure.
+  const srcCards=def.src.map(k=>{const s=SRC[k];let big=f0(s.n()),cap=esc(s.desc)
+    if(k==='inv'&&rows.some(c=>c&&c.invoiced!=null)){big='€'+f0(rows.reduce((a,c)=>a+(Number(c.invoiced)||0),0));cap='invoiced on these '+f0(rows.length)+' claims'}
+    else if(k==='cred'&&rows.some(c=>c&&c.accepted!=null)){big='€'+f0(rows.reduce((a,c)=>a+(Number(c.accepted)||0),0));cap='credited by BMW on these claims'}
+    else if(k==='sub'&&rows.length){big=f0(rows.length);cap='claims sent to BMW'}
+    return `<div class="src"><h4>${s.icon} ${esc(s.name)}</h4><p>${cap}</p><div class="cnt">${big}</div></div>`}).join('')
   const scopeLbl=S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty'
   const hint=rowClick?'💡 Filter any column with the boxes under each header (numbers accept &gt;100, &lt;50) · click a header to sort A→Z · click a row to open the full claim · figures respect the All / Warranty / BSI scope.':'💡 Filter any column with the boxes under each header (numbers accept &gt;100, &lt;50) · click a header to sort · figures respect the All / Warranty / BSI scope · Export Excel for the full breakdown.'
   const topic=helpFor(id)
@@ -1385,6 +1396,33 @@ function openMetric(id){
   bg.addEventListener('click',e=>{if(e.target===bg)closeModal()});document.addEventListener('keydown',escClose)
 }
 window.openMetric=openMetric
+// ── hover tooltip: explain how any clickable figure is calculated ──────────────
+// Any element whose onclick calls openMetric('id') gets a small popover on hover,
+// built from the same Guide explanation (what it is + the formula + the live value).
+let _calcTipEl=null,_calcTipFor=null
+function _calcTip(){if(_calcTipEl)return _calcTipEl
+  const s=document.createElement('style');s.textContent=`.calc-tip{position:fixed;z-index:9000;max-width:320px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:10px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.35);font-size:11.5px;line-height:1.5;pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s}.calc-tip.on{opacity:1;transform:translateY(0)}.calc-tip .ctt{font-weight:800;color:#fff;font-size:12px;margin-bottom:3px}.calc-tip .ctw{color:#cbd5e1;margin-bottom:6px}.calc-tip .ctf{white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;background:#1e293b;border-radius:6px;padding:6px 8px;color:#a5b4fc;margin-bottom:6px}.calc-tip .ctl{color:#7dd3fc}.calc-tip .ctl b{color:#fff;font-size:13px}.calc-tip .cth{color:#64748b;font-size:10px;margin-top:5px}`
+  document.head.appendChild(s)
+  _calcTipEl=document.createElement('div');_calcTipEl.className='calc-tip';document.body.appendChild(_calcTipEl);return _calcTipEl}
+function _calcTipContent(id){const def=(typeof METRIC_DEFS!=='undefined')?METRIC_DEFS[id]:null,t=helpFor(id)
+  const title=def?def.title:(t?t.q:id)
+  const what=t?t.what:(def?def.sub:'')
+  const formula=(t&&t.formula)?t.formula:''
+  const scopeLbl=S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty'
+  const live=(t&&t.live&&typeof HLIVE!=='undefined'&&HLIVE[t.live])?HLIVE[t.live]():''
+  return `<div class="ctt">${esc(title)}</div>${what?`<div class="ctw">${esc(what)}</div>`:''}${formula?`<div class="ctf">${esc(formula)}</div>`:''}${live?`<div class="ctl">Now · ${esc(scopeLbl)}: <b>${live}</b></div>`:''}<div class="cth">👆 click to see the records behind it</div>`}
+function showCalcTip(el,id){const tip=_calcTip();if(_calcTipFor!==id){tip.innerHTML=_calcTipContent(id);_calcTipFor=id}
+  const r=el.getBoundingClientRect();tip.style.visibility='hidden';tip.classList.add('on')
+  const tw=tip.offsetWidth,th=tip.offsetHeight,pad=8
+  let left=r.left+r.width/2-tw/2;left=Math.max(pad,Math.min(left,innerWidth-tw-pad))
+  let top=r.top-th-8;if(top<pad)top=r.bottom+8
+  tip.style.left=left+'px';tip.style.top=top+'px';tip.style.visibility='visible'}
+function hideCalcTip(){if(_calcTipEl){_calcTipEl.classList.remove('on');_calcTipFor=null}}
+window.hideCalcTip=hideCalcTip
+const _mid=el=>{const oc=el&&el.getAttribute&&el.getAttribute('onclick');const m=oc&&oc.match(/openMetric\(['"]([^'"]+)['"]/);return m?m[1]:null}
+document.addEventListener('mouseover',e=>{const el=e.target.closest&&e.target.closest('[onclick]');const id=el&&_mid(el);if(id)showCalcTip(el,id)})
+document.addEventListener('mouseout',e=>{const el=e.target.closest&&e.target.closest('[onclick]');if(!el||!_mid(el))return;const to=e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest('[onclick]');if(el!==to)hideCalcTip()})
+window.addEventListener('scroll',hideCalcTip,true)
 // ── drill-down "Source records": per-column filters + A→Z sort (reuses each column's .csv accessor) ──
 function _mfNum(raw,q){const m=q.trim().match(/^(>=|<=|>|<|=)?\s*(-?[\d.,]+)$/);const val=parseFloat(raw)||0
   if(!m)return String(raw??'').toLowerCase().includes(q.trim().toLowerCase())
