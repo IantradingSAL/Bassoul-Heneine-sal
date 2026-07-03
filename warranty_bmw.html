@@ -509,11 +509,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.37'
+const APP_VERSION='v5.38'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.38',date:'2026-07-03',items:[
+    {t:'fix',d:'The hover explanation now shows the value the card is actually displaying, so after you apply filters (e.g. Month or Credit Note on the Credit Notes page) the number in the tooltip updates to match the filtered figure on screen instead of a fixed scope-level total.'}]},
   {v:'v5.37',date:'2026-07-03',items:[
     {t:'fix',d:'Every cent now counts. Removed the €0.50 cut-off on the Over-credited, Rejected and Pricing Difference drill pages, so amounts as small as €0.01 are included. Each Dashboard card now exactly equals the total of the rows behind it.'}]},
   {v:'v5.36',date:'2026-07-03',items:[
@@ -1414,14 +1416,18 @@ function _calcTip(){if(_calcTipEl)return _calcTipEl
   const s=document.createElement('style');s.textContent=`.calc-tip{position:fixed;z-index:9000;max-width:320px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:10px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.35);font-size:11.5px;line-height:1.5;pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s}.calc-tip.on{opacity:1;transform:translateY(0)}.calc-tip .ctt{font-weight:800;color:#fff;font-size:12px;margin-bottom:3px}.calc-tip .ctw{color:#cbd5e1;margin-bottom:6px}.calc-tip .ctf{white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;background:#1e293b;border-radius:6px;padding:6px 8px;color:#a5b4fc;margin-bottom:6px}.calc-tip .ctl{color:#7dd3fc}.calc-tip .ctl b{color:#fff;font-size:13px}.calc-tip .cth{color:#64748b;font-size:10px;margin-top:5px}`
   document.head.appendChild(s)
   _calcTipEl=document.createElement('div');_calcTipEl.className='calc-tip';document.body.appendChild(_calcTipEl);return _calcTipEl}
-function _calcTipContent(id){const def=(typeof METRIC_DEFS!=='undefined')?METRIC_DEFS[id]:null,t=helpFor(id)
+function _calcTipContent(id,shown){const def=(typeof METRIC_DEFS!=='undefined')?METRIC_DEFS[id]:null,t=helpFor(id)
   const title=def?def.title:(t?t.q:id)
   const what=t?t.what:(def?def.sub:'')
   const formula=(t&&t.formula)?t.formula:''
   const scopeLbl=S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty'
-  const live=(t&&t.live&&typeof HLIVE!=='undefined'&&HLIVE[t.live])?HLIVE[t.live]():''
-  return `<div class="ctt">${esc(title)}</div>${what?`<div class="ctw">${esc(what)}</div>`:''}${formula?`<div class="ctf">${esc(formula)}</div>`:''}${live?`<div class="ctl">Now · ${esc(scopeLbl)}: <b>${live}</b></div>`:''}<div class="cth">👆 click to see the records behind it</div>`}
-function showCalcTip(el,id){const tip=_calcTip();if(_calcTipFor!==id){tip.innerHTML=_calcTipContent(id);_calcTipFor=id}
+  // show the value the card is actually displaying — reflects the current page filters & scope,
+  // so the tooltip number always matches what's on screen (Credit Notes filters included)
+  return `<div class="ctt">${esc(title)}</div>${what?`<div class="ctw">${esc(what)}</div>`:''}${formula?`<div class="ctf">${esc(formula)}</div>`:''}${shown?`<div class="ctl">On screen now · ${esc(scopeLbl)}: <b>${esc(shown)}</b></div>`:''}<div class="cth">👆 click to see the records behind it</div>`}
+function showCalcTip(el,id){const tip=_calcTip()
+  const shown=((el.querySelector&&el.querySelector('.kv,.fl-v,.vin-stat-v,.kv-sm'))||{}).textContent
+  const disp=(shown||'').trim(),key=id+'|'+disp
+  if(_calcTipFor!==key){tip.innerHTML=_calcTipContent(id,disp);_calcTipFor=key}
   const r=el.getBoundingClientRect();tip.style.visibility='hidden';tip.classList.add('on')
   const tw=tip.offsetWidth,th=tip.offsetHeight,pad=8
   let left=r.left+r.width/2-tw/2;left=Math.max(pad,Math.min(left,innerWidth-tw-pad))
