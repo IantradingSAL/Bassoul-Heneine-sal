@@ -509,11 +509,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.39'
+const APP_VERSION='v5.40'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.40',date:'2026-07-03',items:[
+    {t:'feat',d:'Credit Notes table now shows an Invoiced € column, a per-row Δ €, and a TOTAL row (invoiced · credited · Δ) covering all filtered claims — so the "Δ vs invoiced" KPI is fully transparent and you can see exactly which claim drives the number. Orphan credits (no incadea invoice loaded) are shown as "no inv" and are not counted in Invoiced.'}]},
   {v:'v5.39',date:'2026-07-03',items:[
     {t:'fix',d:'Credit Notes page: the "Invoiced € (incadea)" KPI and its "Δ vs invoiced" now sum only real incadea invoices, matching the exact figure and the drill-down. Before, it also added inferred/guessed invoices for orphan credit notes (credited · no submission), which inflated the invoiced total and the Δ (e.g. Δ showed €1,956 instead of the correct €1,902.38 on a filtered view). Credited was always correct; only the invoiced side was off.'}]},
   {v:'v5.38',date:'2026-07-03',items:[
@@ -1997,17 +1999,20 @@ function rCredits(){
     <div class="kpi drill" onclick="openMetric('cr_warn')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
     <div class="kpi drill" onclick="openMetric('cr_err')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
     <div class="kpi drill" onclick="openMetric('cr_nosub')"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 Credited · No Submission</div><div class="kv pur">${f0(orphans.filter(inScope).length)}</div><div class="ks">submission file not loaded</div></div>`
-  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>CN Date</th><th>Credit Note</th><th>Kind</th><th>Dealer Claim</th><th>Invoice</th><th>Brand</th><th>VIN</th><th class="num">Lines</th><th class="num">Credited €</th><th>Status</th><th>Link</th></tr></thead><tbody>`
-  rows.slice(0,700).forEach(c=>{h+=`<tr class="tr-clickable" onclick="${c.orphan?`openVin('${esc(c.vin)}')`:`openClaim('${esc(c.kind)}','${esc(c.no)}')`}">
+  let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>CN Date</th><th>Credit Note</th><th>Kind</th><th>Dealer Claim</th><th>Invoice</th><th>Brand</th><th>VIN</th><th class="num">Lines</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th class="num">Δ €</th><th>Status</th><th>Link</th></tr></thead><tbody>`
+  rows.slice(0,700).forEach(c=>{const cInv=Number(c.invoiced)||0;h+=`<tr class="tr-clickable" onclick="${c.orphan?`openVin('${esc(c.vin)}')`:`openClaim('${esc(c.kind)}','${esc(c.no)}')`}">
     <td style="font-size:10px;color:var(--muted)">${esc(c.cn_date||'')}</td><td class="mono" style="font-weight:600">${esc(c.cn_no||'')}</td><td>${kindBadge(c.kind)}</td>
     <td class="mono">${esc(c.dealer_claim_number||c.credits?.[0]?.dealer_claim_number||c.no||c.sub?.last_submission||'—')}</td>
     <td class="mono">${c.doc_no?esc(c.doc_no):(c.inferred_inv?`<span title="inferred from incadea by VIN + amount — verify">≈ ${esc(c.inferred_inv.doc_no)}</span>`:'—')}</td>
     <td><span class="badge b-n">${esc(c.credits[0]?.brand||'—')}</span></td>
     <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td><td class="num">${c.items_count}</td>
-    <td class="num" style="font-weight:700">${f(c.accepted)}</td><td>${sBadge(c.status_overall)}${corrBadge(c)}${fuBadge(c)}</td>
+    <td class="num">${cInv?f(cInv):(c.orphan?'<span style="color:var(--faint)" title="orphan credit — no incadea invoice loaded, not counted in Invoiced">no inv</span>':'—')}</td>
+    <td class="num" style="font-weight:700">${f(c.accepted)}</td><td class="num" style="color:${cInv-c.accepted>0.5?'var(--rose-d)':'var(--mint-d)'}">${f(cInv-c.accepted)}</td><td>${sBadge(c.status_overall)}${corrBadge(c)}${fuBadge(c)}</td>
     <td>${c.orphan?'<span class="badge b-pur" title="BMW credited this, but no matching submission row is loaded">credited · no sub</span>':'<span class="badge b-mint">linked</span>'}</td></tr>`})
-  if(rows.length>700)h+=`<tr><td colspan="11" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍</td></tr>`
-  h+=`</tbody></table></div></div>`
+  if(rows.length>700)h+=`<tr><td colspan="13" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍 (the TOTAL below still covers all ${f0(rows.length)})</td></tr>`
+  h+=`</tbody><tfoot><tr style="border-top:2px solid var(--line)"><td colspan="8" style="text-align:right;font-weight:800">TOTAL · ${f0(rows.length)} claims</td>
+    <td class="num" style="font-weight:800">${f(invoiced)}</td><td class="num" style="font-weight:800">${f(accepted)}</td>
+    <td class="num" style="font-weight:800;color:${crGap>0.5?'var(--rose-d)':'var(--mint-d)'}">${f(crGap)}</td><td colspan="2"></td></tr></tfoot></table></div></div>`
   document.getElementById('T_cr').innerHTML=h
 }
 
