@@ -509,11 +509,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.38'
+const APP_VERSION='v5.39'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.39',date:'2026-07-03',items:[
+    {t:'fix',d:'Credit Notes page: the "Invoiced € (incadea)" KPI and its "Δ vs invoiced" now sum only real incadea invoices, matching the exact figure and the drill-down. Before, it also added inferred/guessed invoices for orphan credit notes (credited · no submission), which inflated the invoiced total and the Δ (e.g. Δ showed €1,956 instead of the correct €1,902.38 on a filtered view). Credited was always correct; only the invoiced side was off.'}]},
   {v:'v5.38',date:'2026-07-03',items:[
     {t:'fix',d:'The hover explanation now shows the value the card is actually displaying, so after you apply filters (e.g. Month or Credit Note on the Credit Notes page) the number in the tooltip updates to match the filtered figure on screen instead of a fixed scope-level total.'}]},
   {v:'v5.37',date:'2026-07-03',items:[
@@ -1984,7 +1986,9 @@ function rCredits(){
   rows.sort((a,b)=>(b.cn_date||'').localeCompare(a.cn_date||''))
   window._crRows=rows
   const accepted=rows.reduce((s,c)=>s+c.accepted,0),err=rows.filter(c=>c.status_overall==='Error').length,warn=rows.filter(c=>c.status_overall==='Warning').length
-  const invoiced=rows.reduce((s,c)=>s+(c.invoiced||c.inferred_inv?.total_invoiced||0),0),crGap=invoiced-accepted
+  // real incadea invoices only — do NOT add inferred/guessed invoices, so this total (and the
+  // Δ vs invoiced) matches the exact figure and the drill-down (which sum c.invoiced)
+  const invoiced=rows.reduce((s,c)=>s+(Number(c.invoiced)||0),0),crGap=invoiced-accepted
   const filtered=!!(sf||bf||lf||mo||cn||q)
   document.getElementById('K_cr').innerHTML=`
     <div class="kpi drill" onclick="openMetric('cr_notes')"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📑 Credit Notes</div><div class="kv bmw">${f0(new Set(S.cred.filter(c=>S.scope==='all'||c.credit_type===S.scope).map(c=>c.credit_note_number)).size)}</div><div class="ks">${f0(rows.length)} answered claims</div></div>
