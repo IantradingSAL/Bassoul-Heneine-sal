@@ -509,11 +509,15 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.31'
+const APP_VERSION='v5.32'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.32',date:'2026-07-03',items:[
+    {t:'feat',d:'Paid ⚠ warnings no longer count as money at risk. When BMW pays a line but re-prices/re-categorises it (e.g. engine oil billed in incadea as a part but reimbursed by BMW on the "Miscellaneous, oil, fluids" sublet line), the claim is a Warning yet nothing was rejected — only a small pricing difference remains. These "paid warnings" are now auto-recognised and drop out of Needs Attention, Gap at Risk and the open Rejections list (still visible under "Warnings only"). The claim view shows a green "Paid warning" note explaining it.'},
+    {t:'feat',d:'Acknowledge button. On any paid warning a one-click "👁️ Acknowledge warning" marks it reviewed & accepted so it clears from Needs Attention; "acknowledged" is also selectable as a manual status, and can be reopened. Acknowledged claims show a 👁️ badge and keep their real Warning status.'},
+    {t:'fix',d:'Oil & fluids are now counted in the External/sublet bucket instead of Parts (Insights parts-vs-sublet split), matching how BMW books them — oil, coolant, brake fluid, AdBlue and viscosity-graded items (5W-30, LL-01) map to sublet, while oil-filters stay as parts.'}]},
   {v:'v5.31',date:'2026-06-30',items:[
     {t:'feat',d:'Partial resubmission workflow. On a partly-rejected claim, a new "Resubmit rejected EUR…" button opens the recovery tracker pre-filled: status resubmitted, the rejected amount, and a note listing the rejected lines. The tracker now has two amounts - "Resubmitted EUR (to recover)" and "Recovered EUR (credited back)" - giving a real recovery rate. When the new claim number you entered later appears in the loaded data with its own credit note, the tracker and claim view auto-detect it and show whether it was credited (with a one-click "use as recovered"). A Resubmission Protocol card was added to the Guide.'}]},
   {v:'v5.30',date:'2026-06-30',items:[
@@ -856,6 +860,10 @@ async function refreshData(){
 let _recCache=null
 function invalidateReconcile(){_recCache=null}
 window.invalidateReconcile=invalidateReconcile
+// Oil & fluids are billed in incadea as parts (Items) but BMW reimburses them on the sublet
+// line "Miscellaneous, oil, fluids, etc." — so an oil/fluid line is counted in the External
+// (sublet) bucket, not Parts, to match how BMW books it. Filters ("oil-filter") stay as parts.
+const OIL_RE=/\b(?:engine|motor|gear|transmission|hydraulic|brake)\s+(?:oil|fluid)\b|\bll-?0\d\b|\b[05]w-?\d0\b|\bcoolant\b|\bantifreeze\b|\badblue\b|\blubricant\b|\bfluids?\b/i
 function reconcile(){
   if(_recCache)return _recCache
   const invByDoc={};S.inv.forEach(i=>invByDoc[i.doc_no]=i)
@@ -876,7 +884,7 @@ function reconcile(){
     const st={Success:0,Warning:0,Error:0};let labor=0,parts=0,ext=0,accepted=0,claimedPrice=0
     const cnNos=new Set(),defects=new Set();let cnDate=null,repairDate=null
     cr.forEach(c=>{const a=Number(c.accepted_price_incl_hc)||0;accepted+=a;claimedPrice+=Number(c.claimed_price)||0
-      const p=c.claim_item_position||'';if(/labor/i.test(p))labor+=a;else if(/spare|material/i.test(p))parts+=a;else if(/external/i.test(p))ext+=a
+      const p=c.claim_item_position||'',d=c.claim_item_description||'';if(/labor/i.test(p))labor+=a;else if(/external/i.test(p)||((/spare|material/i.test(p)||!p)&&OIL_RE.test(d)))ext+=a;else if(/spare|material/i.test(p))parts+=a
       if(c.crediting_item_status)st[c.crediting_item_status]=(st[c.crediting_item_status]||0)+1
       if(c.credit_note_number)cnNos.add(c.credit_note_number);if(c.defect_code)defects.add(c.defect_code)
       if(c.credit_note_date&&(!cnDate||c.credit_note_date>cnDate))cnDate=c.credit_note_date
@@ -952,7 +960,7 @@ function reconcile(){
   const orphans=Object.entries(orphanByKey).map(([key,cr])=>{
     const st={Success:0,Warning:0,Error:0};let accepted=0,labor=0,parts=0,ext=0,claimedPrice=0;const cnNos=new Set(),defects=new Set();let cnDate=null,repairDate=null
     cr.forEach(c=>{const a=Number(c.accepted_price_incl_hc)||0;accepted+=a;claimedPrice+=Number(c.claimed_price)||0
-      const p=c.claim_item_position||'';if(/labor/i.test(p))labor+=a;else if(/spare|material/i.test(p))parts+=a;else if(/external/i.test(p))ext+=a
+      const p=c.claim_item_position||'',d=c.claim_item_description||'';if(/labor/i.test(p))labor+=a;else if(/external/i.test(p)||((/spare|material/i.test(p)||!p)&&OIL_RE.test(d)))ext+=a;else if(/spare|material/i.test(p))parts+=a
       if(c.crediting_item_status)st[c.crediting_item_status]=(st[c.crediting_item_status]||0)+1
       if(c.credit_note_number)cnNos.add(c.credit_note_number);if(c.defect_code)defects.add(c.defect_code)
       if(c.credit_note_date&&(!cnDate||c.credit_note_date>cnDate))cnDate=c.credit_note_date
@@ -1004,8 +1012,16 @@ function effPending(c){return effKey(c)==='Pending'}
 // it must drop out of the Rejected/Pricing totals so it is not double-counted with its new claim
 const MAN_HANDLED=new Set(['resubmitted','credited','resolved'])
 function isHandled(c){return MAN_HANDLED.has(manStatus(c))}
+// A ⚠ Warning where BMW still PAID the line (nothing rejected — just re-priced, e.g. oil billed
+// as a part but reimbursed on the sublet line) is a normal outcome, not money at risk.
+function isPaidWarning(c){return c.answered&&c.status_overall==='Warning'&&(c.rejected||0)<0.5}
+// manually acknowledged: a human reviewed the warning and accepted it — drop it from attention.
+function isAcked(c){return manStatus(c)==='acknowledged'}
+// a claim still worth attention = an Error/Warning that isn't handled, acknowledged, or a paid-warning
+function needsAttn(c){const k=effKey(c);return (k==='Error'||k==='Warning')&&!isHandled(c)&&!isAcked(c)&&!isPaidWarning(c)}
 function manBadge(c){const s=manStatus(c);if(!s)return ''
   if(s==='duplicate')return ` <span class="badge b-n" title="Duplicate — excluded from all reports (closed)">🔁 Duplicate · closed ✎</span>`
+  if(s==='acknowledged')return ` <span class="badge b-mint" title="Warning reviewed &amp; accepted — no action needed ✎">👁️ acknowledged ✎</span>`
   const col=s==='rejected'?'b-rose':(s==='credited'||s==='resolved')?'b-mint':'b-sky';const ic=s==='rejected'?'❌':(s==='credited'||s==='resolved')?'✅':s==='resubmitted'?'📤':'🔁';return ` <span class="badge ${col}" title="Manually set status ✎">${ic} ${esc(s)} ✎</span>`}
 // a claim manually flagged as a duplicate (sent twice) is excluded from every report/total
 function isDuplicate(c){return manStatus(c)==='duplicate'}
@@ -1017,8 +1033,8 @@ function fuBadge(c){const r=S.resub[c.kind+':'+c.no];if(!r||!r.follow_up_date)re
 // badge for invoices shared across several claims (roll-up): primary carries the invoice, others are supplementary
 function sharedBadge(c){if(c._secondary)return ` <span class="badge b-n" title="Supplementary claim — this repair's invoice is counted on claim ${esc(c._primaryNo)}">↳ shared w/ ${esc(c._primaryNo)}</span>`;if(c._sharedInv&&(c._sharedWith||[]).length)return ` <span class="badge b-sky" title="Invoice shared with claim(s) ${(c._sharedWith||[]).map(esc).join(', ')} — counted once here; gap covers all of them">🔗 shared inv +${(c._sharedWith||[]).length}</span>`;return ''}
 // effective status label (includes manual statuses: duplicate / resubmitted / rejected / credited / resolved)
-function effStatusLabel(c){const m=manStatus(c);if(m)return m.charAt(0).toUpperCase()+m.slice(1);return c.answered?c.status_overall:'Pending'}
-function statusCell(c){if(isDuplicate(c))return manBadge(c)+fuBadge(c);const base=manStatus(c)?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):sBadge(effKey(c))));return base+manBadge(c)+fuBadge(c)+sharedBadge(c)}
+function effStatusLabel(c){const m=manStatus(c);if(m==='acknowledged')return (c.answered?c.status_overall:'Pending')+' · ack';if(m)return m.charAt(0).toUpperCase()+m.slice(1);return c.answered?c.status_overall:'Pending'}
+function statusCell(c){if(isDuplicate(c))return manBadge(c)+fuBadge(c);const base=(manStatus(c)&&!isAcked(c))?'':(c.answered?sBadge(c.status_overall):(effPending(c)?sBadge('Pending'):sBadge(effKey(c))));return base+manBadge(c)+fuBadge(c)+sharedBadge(c)}
 const kindBadge=k=>k==='bsi'?'<span class="badge b-sky">BSI</span>':'<span class="badge b-bmw">Warranty</span>'
 
 // ══ MODAL ═══════════════════════════════════════════════════════
@@ -1057,8 +1073,10 @@ function openClaim(kind,no){
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
         ${claim.vin?`<button class="btn btn-bmw btn-sm" onclick="closeModal();openVin('${esc(claim.vin)}')">🚗 Full VIN history</button>`:''}
         ${claim.rejected>0.5&&!S.resub[claim.kind+':'+claim.no]?`<button class="btn btn-bmw btn-sm" onclick="closeModal();openResubmit('${esc(claim.kind)}','${esc(claim.no)}')">↩ Resubmit rejected €${f0(claim.rejected)}</button>`:''}
+        ${isAcked(claim)?`<button class="btn btn-sm" onclick="ackClaim('${esc(claim.kind)}','${esc(claim.no)}',false)">↩ Reopen (undo acknowledge)</button>`:(claim.status_overall==='Warning'&&(claim.rejected||0)<0.5)?`<button class="btn btn-mint btn-sm" title="This warning was PAID (repriced, e.g. oil billed as part → reimbursed as sublet) — mark it reviewed so it drops out of Needs Attention" onclick="ackClaim('${esc(claim.kind)}','${esc(claim.no)}',true)">👁️ Acknowledge warning</button>`:''}
         ${(()=>{const tr=S.resub[claim.kind+':'+claim.no];const lbl=tr?'✏️ Edit tracking & follow-up':(claim.status_overall==='Error'||claim.status_overall==='Warning')?'+ Track recovery':!claim.answered?'⚙ Set status / 📅 follow-up':'📅 Follow-up / notes';return `<button class="btn btn-sun btn-sm" onclick="closeModal();openTrack('${esc(claim.kind)}','${esc(claim.no)}')">${lbl}</button>`})()}
       </div>
+      ${(claim.status_overall==='Warning'&&(claim.rejected||0)<0.5)?`<div class="al" style="margin-top:12px;background:#f0fdf4;border:1px solid var(--mint);font-size:11px">✅ <b>Paid warning.</b> BMW accepted &amp; paid these lines but re-priced/re-categorised at least one (e.g. oil billed as a part → reimbursed on the sublet line). Only the €${f(claim.pricing_diff)} pricing difference differs — <b>nothing was rejected</b>${isAcked(claim)?', and this is acknowledged.':'. Acknowledge it to clear it from Needs Attention.'}</div>`:''}
       ${(()=>{const tr=S.resub[claim.kind+':'+claim.no];if(!tr||!tr.new_claim)return '';const oc=recoveryOutcome(tr.new_claim);const chased=tr.resubmitted_amt||claim.rejected||0,rec=tr.credited_amt||0;return `<div class="al" style="margin-top:12px;background:${rec>0?'#f0fdf4':'#eff6ff'};border:1px solid ${rec>0?'var(--mint)':'var(--sky)'}">↩ <b>Resubmitted</b> as claim <b>${esc(tr.new_claim)}</b> · chasing €${f(chased)}${rec>0?` · recovered €${f(rec)} (${f0(chased>0?rec/chased*100:0)}%)`:''}${oc?` · new claim in data: ${oc.answered?(oc.credited>0?'✅ credited €'+f(oc.credited):'answered '+esc(oc.status)):'⏳ pending'}`:' · new claim not in the data yet'}</div>`})()}
     </div></div>`
   document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
@@ -1247,8 +1265,8 @@ const METRIC_DEFS={
   pending:{icon:'⏳',title:'Pending Answer',accent:'var(--sun)',sub:'Submitted to BMW, awaiting a credit note',src:['sub'],focus:'Status',
     rows:()=>scopedClaims().filter(effPending).sort((a,b)=>String(a.document_date).localeCompare(String(b.document_date))),
     stats:r=>[['Pending',f0(r.length)],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
-  attention:{icon:'⚠️',title:'Needs Attention',accent:'var(--rose)',sub:'Claims with an error/warning, or manually marked rejected',src:['cred'],focus:'Status',
-    rows:()=>scopedClaims().concat(scopedOrphans()).filter(c=>effKey(c)==='Error'||effKey(c)==='Warning').sort((a,b)=>b.gap-a.gap),
+  attention:{icon:'⚠️',title:'Needs Attention',accent:'var(--rose)',sub:'Unresolved errors/warnings — paid (repriced) warnings & acknowledged ones are excluded',src:['cred'],focus:'Status',
+    rows:()=>scopedClaims().concat(scopedOrphans()).filter(needsAttn).sort((a,b)=>b.gap-a.gap),
     stats:r=>[['Errors',f0(r.filter(c=>effKey(c)==='Error').length)],['Warnings',f0(r.filter(c=>effKey(c)==='Warning').length)],['Gap at risk €','€'+f0(_sum(r,'gap'))],['Unique VINs',f0(_uniq(r,'vin'))]]},
   duplicates:{icon:'🔁',title:'Duplicate Claims (excluded)',accent:'var(--slate)',sub:'Marked as sent twice — excluded from every report, total and count',src:['sub'],focus:'Status',
     rows:()=>scopedDuplicates().sort((a,b)=>String(a.no).localeCompare(String(b.no))),
@@ -1421,11 +1439,11 @@ const HLIVE={
   total_claims:()=>f0(scopedClaims().length+scopedOrphans().length),
   submitted:()=>f0(scopedClaims().length),
   pending:()=>f0(scopedClaims().filter(effPending).length),
-  attention:()=>f0(scopedClaims().concat(scopedOrphans()).filter(c=>effKey(c)==='Error'||effKey(c)==='Warning').length),
+  attention:()=>f0(scopedClaims().concat(scopedOrphans()).filter(needsAttn).length),
   no_submission:()=>f0(scopedOrphans().length),
   outstanding:()=>{const r=scopedClaims().filter(c=>!isHandled(c));const pend=r.filter(effPending).reduce((s,c)=>s+c.invoiced,0);const sf=r.reduce((s,c)=>s+(c.answered?Math.max(c.invoiced-c.accepted,0):0),0);return '€'+f0(pend+sf)},
   shortfall:()=>'€'+f0(scopedClaims().reduce((s,c)=>s+(c.answered?Math.max(c.invoiced-c.accepted,0):0),0)),
-  gap_at_risk:()=>'€'+f0(scopedClaims().concat(scopedOrphans()).filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').reduce((s,c)=>s+c.gap,0)),
+  gap_at_risk:()=>'€'+f0(scopedClaims().concat(scopedOrphans()).filter(needsAttn).reduce((s,c)=>s+c.gap,0)),
   processing:()=>{const w=scopedClaims().filter(c=>c.lag_days!=null&&c.lag_days>=0);return (w.length?_sum(w,'lag_days')/w.length:0).toFixed(0)+' days avg'},
   recovery:()=>'€'+f0(Object.values(S.resub).reduce((s,r)=>s+(Number(r.credited_amt)||0),0)),
 }
@@ -1446,6 +1464,9 @@ const HELP_SECTIONS=[
     {id:'status',icon:'🚦',q:'What do the claim statuses mean?',kw:['status','error','warning','success','pending','outcome'],
       what:'Pending = sent to BMW but no credit note received yet. Success = credited with no issues. Warning = credited but at least one line flagged. Error = at least one line rejected. The worst line decides the claim status.',
       formula:'no credit note      → Pending\nany line Error      → Error\nany line Warning    → Warning\notherwise           → Success',src:['cred']},
+    {id:'paidwarning',icon:'👁️',q:'Why do some ⚠ warnings not count as money at risk?',kw:['warning','paid warning','oil','sublet','acknowledge','repriced','fluids','miscellaneous'],
+      what:'A Warning means BMW flagged a line — but if it still PAID that line (nothing rejected), it is not lost money. The classic case: engine oil is billed in incadea as a part (Item) but BMW reimburses oil only on the sublet line "Miscellaneous, oil, fluids, etc." — so it comes back as a Warning with a small pricing difference (e.g. €118.37 billed → €112.00 paid = €6.37). The oil was accepted, not refused. These "paid warnings" are auto-excluded from Needs Attention and Gap at Risk. You can also press "👁️ Acknowledge warning" on the claim to confirm you reviewed it; oil & fluids are counted in the sublet bucket to match BMW.',
+      formula:'paid warning = answered · status Warning · rejected ≈ €0\n           → excluded from Needs Attention / Gap at Risk\nAcknowledge → clears it manually (any warning)',src:['cred']},
     {id:'drilldown',icon:'⤢',q:'How do I see the numbers behind a value?',kw:['drill','click','detail','press','source records','breakdown'],
       what:'Press any figure — a flow step, a KPI card, a chart title. A panel opens with the summary, the source files behind it, every underlying record, and an Export CSV button. This works on all pages.',
       formula:'click value → detail panel → source records + CSV',src:[]},
@@ -1634,7 +1655,7 @@ function openTrack(kind,no,opts){opts=opts||{}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px">
       <div><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Status</label>
         <select id="tr_status" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit">
-        ${['pending','resubmitted','rejected','credited','resolved','duplicate'].map(o=>`<option value="${o}"${curStatus===o?' selected':''}>${o==='duplicate'?'duplicate (exclude from report)':o}</option>`).join('')}</select></div>
+        ${['pending','resubmitted','rejected','credited','resolved','acknowledged','duplicate'].map(o=>`<option value="${o}"${curStatus===o?' selected':''}>${o==='duplicate'?'duplicate (exclude from report)':o==='acknowledged'?'acknowledged (warning reviewed — no action)':o}</option>`).join('')}</select></div>
       ${fld('tr_newclaim','New Claim # (BMW re-submission)',ex.new_claim)}
       <div style="grid-column:1/-1">${fld('tr_reason','Reason',ex.reason).replace('<div>','').replace(/<\/div>$/,'')}</div>
       ${claim.rejected>0.5?`<div style="grid-column:1/-1;font-size:10px;color:var(--muted)">❌ This claim has <b style="color:var(--rose-d)">€${f(claim.rejected)}</b> rejected${rejLines.length?': '+rejLines.slice(0,3).map(esc).join('; ')+(rejLines.length>3?' …':''):''}</div>`:''}
@@ -1678,6 +1699,18 @@ async function saveTrack(kind,no){
 window.saveTrack=saveTrack
 async function delTrack(key){if(!confirm('Delete this recovery record?'))return;showLoad('Deleting…');const {error}=await sb.from('warranty_bmw_resub').delete().eq('orig_claim',key);hideLoad();if(error){showToast('❌ '+error.message);return}delete S.resub[key];invalidateReconcile();closeModal();showToast('✅ Removed');updateBadges();renderPage(currentPage())}
 window.delTrack=delTrack
+// one-click acknowledge: mark a paid ⚠ warning as reviewed & accepted (drops it from attention), or reopen it
+async function ackClaim(kind,no,on){const key=kind+':'+no,ex=S.resub[key]||{}
+  const _r=reconcile();const claim=[..._r.claims,..._r.orphans].find(c=>c.kind===kind&&c.no===no)
+  const payload={orig_claim:key,orig_vin:ex.orig_vin||claim?.vin||null,orig_brand:ex.orig_brand||claim?.make||null,orig_month:ex.orig_month||claim?.month||null,
+    orig_amount:ex.orig_amount||claim?.accepted||claim?.invoiced||null,new_claim:ex.new_claim||null,reason:ex.reason||null,
+    resub_date:ex.resub_date||null,credited_amt:ex.credited_amt??null,resubmitted_amt:ex.resubmitted_amt??null,recovery_rate:ex.recovery_rate??null,
+    notes:ex.notes||null,follow_up_date:ex.follow_up_date||null,follow_up_note:ex.follow_up_note||null,follow_up_done:ex.follow_up_done||false,
+    status:on?'acknowledged':'pending',updated_by:S.me?.id||null,updated_by_name:S.me?.name||null}
+  showLoad('Saving…');const {error}=await sb.from('warranty_bmw_resub').upsert(payload,{onConflict:'orig_claim'});hideLoad()
+  if(error){showToast('❌ '+error.message);return}
+  S.resub=await loadResub();invalidateReconcile();closeModal();showToast(on?'👁️ Acknowledged':'↩ Reopened');updateBadges();renderPage(currentPage())}
+window.ackClaim=ackClaim
 
 // ══ FOLLOW-UPS / REMINDERS ══════════════════════════════════════════
 function _today(){return new Date().toISOString().slice(0,10)}
@@ -1744,7 +1777,7 @@ function monthly(claims){const m={};claims.forEach(c=>{if(!c.month)return;if(!m[
 function updateBadges(){
   const claims=scopedClaims()
   document.getElementById('B_pipe').textContent=f0(claims.length)
-  document.getElementById('B_rej').textContent=f0(claims.filter(c=>(c.status_overall==='Error'||c.status_overall==='Warning')&&!isHandled(c)).length)
+  document.getElementById('B_rej').textContent=f0(claims.filter(needsAttn).length)
   const fb=document.getElementById('B_follow');if(fb){const fc=followCount();fb.textContent=f0(fc);fb.style.display=fc?'':'none'}
   const nsb=document.getElementById('B_notsub');if(nsb){const nsc=notSubInvoices().filter(i=>i.payment_method_code==='CREDIT'&&!cancelOf(i)).length;nsb.textContent=f0(nsc);nsb.style.display=nsc?'':'none'}
   const invMakes=[...new Set(S.inv.map(i=>i.make_code).filter(Boolean))].sort()
@@ -1912,6 +1945,7 @@ function rRej(){
   const sf=document.getElementById('rj_status').value,mk=document.getElementById('rj_make').value,q=document.getElementById('rj_search').value.toLowerCase().trim()
   let rows=claims.filter(c=>{const tr=S.resub[c.kind+':'+c.no]
     if(isHandled(c)&&sf!=='tracked')return false  // credited/resolved/resubmitted are no longer open rejections (still visible under "Tracked only")
+    if((isPaidWarning(c)||isAcked(c))&&sf!=='Warning'&&sf!=='tracked')return false  // paid (repriced) & acknowledged warnings aren't open rejections — see them under "Warnings only"
     if(sf==='Error'&&c.status_overall!=='Error')return false;if(sf==='Warning'&&c.status_overall!=='Warning')return false
     if(sf==='tracked'&&!tr)return false;if(sf==='untracked'&&tr)return false;if(mk&&c.make!==mk)return false
     if(q&&![c.no,c.record_no,c.doc_no,c.vin,c.cn_no].join('|').toLowerCase().includes(q))return false;return true})
