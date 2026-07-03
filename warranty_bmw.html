@@ -509,11 +509,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.30'
+const APP_VERSION='v5.31'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.31',date:'2026-06-30',items:[
+    {t:'feat',d:'Partial resubmission workflow. On a partly-rejected claim, a new "Resubmit rejected EUR…" button opens the recovery tracker pre-filled: status resubmitted, the rejected amount, and a note listing the rejected lines. The tracker now has two amounts - "Resubmitted EUR (to recover)" and "Recovered EUR (credited back)" - giving a real recovery rate. When the new claim number you entered later appears in the loaded data with its own credit note, the tracker and claim view auto-detect it and show whether it was credited (with a one-click "use as recovered"). A Resubmission Protocol card was added to the Guide.'}]},
   {v:'v5.30',date:'2026-06-30',items:[
     {t:'fix',d:'Shared-invoice roll-up now shows the combined credited on the main claim, so its row is fully consistent (invoiced minus credited = gap). The supplementary claims are rolled into the main claim (credited shown as a pointer) and hidden from the Credit Notes, Rejections and Statement lists to avoid duplicates. Example: 71557 now shows invoiced 1,090.41, credited 1,105.58, gap -15.17.'}]},
   {v:'v5.29',date:'2026-06-30',items:[
@@ -1054,8 +1056,10 @@ function openClaim(kind,no){
         :'<div class="vin-empty">⏳ This claim was submitted to BMW but no credit note has been received yet.</div>'}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
         ${claim.vin?`<button class="btn btn-bmw btn-sm" onclick="closeModal();openVin('${esc(claim.vin)}')">🚗 Full VIN history</button>`:''}
+        ${claim.rejected>0.5&&!S.resub[claim.kind+':'+claim.no]?`<button class="btn btn-bmw btn-sm" onclick="closeModal();openResubmit('${esc(claim.kind)}','${esc(claim.no)}')">↩ Resubmit rejected €${f0(claim.rejected)}</button>`:''}
         ${(()=>{const tr=S.resub[claim.kind+':'+claim.no];const lbl=tr?'✏️ Edit tracking & follow-up':(claim.status_overall==='Error'||claim.status_overall==='Warning')?'+ Track recovery':!claim.answered?'⚙ Set status / 📅 follow-up':'📅 Follow-up / notes';return `<button class="btn btn-sun btn-sm" onclick="closeModal();openTrack('${esc(claim.kind)}','${esc(claim.no)}')">${lbl}</button>`})()}
       </div>
+      ${(()=>{const tr=S.resub[claim.kind+':'+claim.no];if(!tr||!tr.new_claim)return '';const oc=recoveryOutcome(tr.new_claim);const chased=tr.resubmitted_amt||claim.rejected||0,rec=tr.credited_amt||0;return `<div class="al" style="margin-top:12px;background:${rec>0?'#f0fdf4':'#eff6ff'};border:1px solid ${rec>0?'var(--mint)':'var(--sky)'}">↩ <b>Resubmitted</b> as claim <b>${esc(tr.new_claim)}</b> · chasing €${f(chased)}${rec>0?` · recovered €${f(rec)} (${f0(chased>0?rec/chased*100:0)}%)`:''}${oc?` · new claim in data: ${oc.answered?(oc.credited>0?'✅ credited €'+f(oc.credited):'answered '+esc(oc.status)):'⏳ pending'}`:' · new claim not in the data yet'}</div>`})()}
     </div></div>`
   document.body.appendChild(bg);requestAnimationFrame(()=>bg.classList.add('on'))
   bg.addEventListener('click',e=>{if(e.target===bg)closeModal()});document.addEventListener('keydown',escClose)
@@ -1490,6 +1494,9 @@ const HELP_SECTIONS=[
     {id:'recovery',icon:'💚',q:'What are "Tracked" and "Recovered"?',kw:['tracked','recovered','recovery','resubmit','chase','track'],
       what:'When you press "+ Track" on a rejection you log a recovery effort (resubmission, dispute, credited amount). "Tracked" counts those records; "Recovered" sums the € you logged as credited back.',
       formula:'Recovered = Σ recovery.credited_amt  (your tracked records)',src:['cred'],live:'recovery'},
+    {id:'resubmit',icon:'↩️',q:'How do I resubmit only the rejected part of a claim?',kw:['resubmit','partial','rejected part','partly credited','partly rejected','resubmission','protocol','new claim','recover rejected'],
+      what:'When BMW credits part of a claim and rejects the rest, you can re-send just the rejected lines. Protocol: (1) Open the claim — the ✗ lines and the Rejected € are shown. (2) Fix the cause and submit only the rejected part to BMW; they give it a NEW claim number. (3) On the original claim press "↩ Resubmit rejected €…" — it pre-fills status = resubmitted, the rejected amount, and lists the rejected lines. Enter the new claim number and save. (4) The rejected € then leaves "Rejected to chase" so it is not double-counted while in flight. (5) When BMW answers the new claim and its credit note is uploaded, the tracker auto-detects it and shows whether it was credited — enter the recovered € to close the loop.',
+      formula:'Recovery rate = Recovered € ÷ Resubmitted €\nResubmitted € defaults to the claim’s Rejected €',src:['cred','inv'],metric:'rejected_gap'},
   ]},
   {sec:'Insights',topics:[
     {id:'processing',icon:'⏱️',q:'How is "Processing Time" measured?',kw:['processing','days','lag','turnaround','time to credit','speed'],
@@ -1605,9 +1612,20 @@ function navTo(p){const el=document.querySelector('.si[data-page="'+p+'"]');if(e
 window.navTo=navTo
 
 // ── recovery tracking modal (reuses warranty_bmw_resub; key = kind:no)
-function openTrack(kind,no){
+// auto-close the loop: find the resubmission's new claim in the reconciled data
+function findClaimByNo(no){if(no==null)return null;const n=String(no).trim().toLowerCase();if(!n)return null;return reconcile().claims.find(c=>String(c.no||'').toLowerCase()===n||String(c.record_no||'').toLowerCase()===n)||null}
+function recoveryOutcome(newClaim){const c=findClaimByNo(newClaim);if(!c)return null;return {no:c.no,status:c.status_overall,credited:c.accepted,answered:c.answered}}
+function openResubmit(kind,no){openTrack(kind,no,{resubmit:true})}
+window.openResubmit=openResubmit
+function openTrack(kind,no,opts){opts=opts||{}
   const _r=reconcile();const claim=[..._r.claims,..._r.orphans].find(c=>c.kind===kind&&c.no===no);if(!claim)return
   const key=kind+':'+no,ex=S.resub[key]||{}
+  const rej=Math.round((claim.rejected||0)*100)/100
+  const rejLines=(claim.credits||[]).filter(l=>l.crediting_item_status==='Error').map(l=>[l.claim_item_position,l.claim_item_description,l.defect_code?'('+l.defect_code+')':''].filter(Boolean).join(' ').trim()).filter(Boolean)
+  const curStatus=ex.status||(opts.resubmit?'resubmitted':'')
+  const preResubAmt=(ex.resubmitted_amt!=null&&ex.resubmitted_amt!=='')?ex.resubmitted_amt:(opts.resubmit?rej:'')
+  const preNotes=ex.notes||(opts.resubmit&&rejLines.length?('Resubmitting rejected lines: '+rejLines.join('; ')):'')
+  const oc=ex.new_claim?recoveryOutcome(ex.new_claim):null
   let bg=document.querySelector('.bmw-modal-bg');if(bg)bg.remove();bg=document.createElement('div');bg.className='bmw-modal-bg'
   const fld=(id,label,val,type)=>`<div><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">${label}</label><input id="${id}" type="${type||'text'}" value="${esc(val||'')}" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit"></div>`
   bg.innerHTML=`<div class="bmw-modal" style="max-width:560px"><div class="bmw-modal-h"><div class="bmw-modal-icon">📝</div>
@@ -1616,12 +1634,16 @@ function openTrack(kind,no){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:11px">
       <div><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Status</label>
         <select id="tr_status" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit">
-        ${['pending','resubmitted','rejected','credited','resolved','duplicate'].map(o=>`<option value="${o}"${ex.status===o?' selected':''}>${o==='duplicate'?'duplicate (exclude from report)':o}</option>`).join('')}</select></div>
-      ${fld('tr_newclaim','New Claim #',ex.new_claim)}
+        ${['pending','resubmitted','rejected','credited','resolved','duplicate'].map(o=>`<option value="${o}"${curStatus===o?' selected':''}>${o==='duplicate'?'duplicate (exclude from report)':o}</option>`).join('')}</select></div>
+      ${fld('tr_newclaim','New Claim # (BMW re-submission)',ex.new_claim)}
       <div style="grid-column:1/-1">${fld('tr_reason','Reason',ex.reason).replace('<div>','').replace(/<\/div>$/,'')}</div>
+      ${claim.rejected>0.5?`<div style="grid-column:1/-1;font-size:10px;color:var(--muted)">❌ This claim has <b style="color:var(--rose-d)">€${f(claim.rejected)}</b> rejected${rejLines.length?': '+rejLines.slice(0,3).map(esc).join('; ')+(rejLines.length>3?' …':''):''}</div>`:''}
       ${fld('tr_resub_date','Resubmit Date',ex.resub_date,'date')}
-      ${fld('tr_credited','Credited (€)',ex.credited_amt,'number')}
-      <div style="grid-column:1/-1"><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Notes</label><textarea id="tr_notes" rows="2" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit;resize:vertical">${esc(ex.notes||'')}</textarea></div>
+      ${fld('tr_resubamt','Resubmitted € (to recover)',preResubAmt,'number')}
+      ${fld('tr_credited','Recovered € (credited back)',ex.credited_amt,'number')}
+      <div style="display:flex;align-items:flex-end;font-size:10px;color:var(--muted);padding-bottom:8px">Recovery rate = recovered ÷ resubmitted</div>
+      ${oc?`<div style="grid-column:1/-1;background:${oc.answered&&oc.credited>0?'#f0fdf4':oc.status==='Error'?'#fef2f2':'#eff6ff'};border:1px solid ${oc.answered&&oc.credited>0?'var(--mint)':oc.status==='Error'?'var(--rose)':'var(--sky)'};border-radius:8px;padding:8px 10px;font-size:11px;display:flex;align-items:center;gap:8px"><span style="font-size:14px">${oc.answered&&oc.credited>0?'✅':oc.status==='Error'?'❌':'⏳'}</span><span>New claim <b>${esc(oc.no)}</b> is in the loaded data — ${oc.answered?(oc.credited>0?'credited €'+f(oc.credited):'answered · '+esc(oc.status)):'still pending'}.</span>${oc.credited>0?`<button class="btn btn-sm" style="margin-left:auto" onclick="document.getElementById('tr_credited').value='${Math.round(oc.credited*100)/100}'">Use as recovered</button>`:''}</div>`:''}
+      <div style="grid-column:1/-1"><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Notes</label><textarea id="tr_notes" rows="2" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit;resize:vertical">${esc(preNotes)}</textarea></div>
       <div style="grid-column:1/-1;border-top:1px solid var(--line2);margin-top:4px;padding-top:10px">
         <div style="font-weight:800;color:var(--bmw);font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">📅 Follow-up reminder</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end">
@@ -1641,11 +1663,11 @@ function openTrack(kind,no){
 window.openTrack=openTrack
 async function saveTrack(kind,no){
   const _r=reconcile();const claim=[..._r.claims,..._r.orphans].find(c=>c.kind===kind&&c.no===no);if(!claim)return
-  const key=kind+':'+no,credited=parseFloat(document.getElementById('tr_credited').value)||null
+  const key=kind+':'+no,credited=parseFloat(document.getElementById('tr_credited').value)||null,resubAmt=parseFloat(document.getElementById('tr_resubamt')?.value)||null
   const payload={orig_claim:key,orig_vin:claim.vin||null,orig_brand:claim.make||null,orig_month:claim.month||null,orig_amount:claim.accepted||claim.invoiced||null,
     new_claim:document.getElementById('tr_newclaim').value||null,reason:document.getElementById('tr_reason').value||null,
-    resub_date:document.getElementById('tr_resub_date').value||null,credited_amt:credited,
-    recovery_rate:credited!=null&&claim.accepted>0?credited/claim.accepted*100:null,
+    resub_date:document.getElementById('tr_resub_date').value||null,credited_amt:credited,resubmitted_amt:resubAmt,
+    recovery_rate:credited!=null&&resubAmt>0?credited/resubAmt*100:(credited!=null&&claim.rejected>0?credited/claim.rejected*100:null),
     status:document.getElementById('tr_status').value||'pending',notes:document.getElementById('tr_notes').value||null,
     follow_up_date:document.getElementById('tr_fudate').value||null,follow_up_note:document.getElementById('tr_funote').value||null,follow_up_done:document.getElementById('tr_fudone').checked,
     updated_by:S.me?.id||null,updated_by_name:S.me?.name||null}
