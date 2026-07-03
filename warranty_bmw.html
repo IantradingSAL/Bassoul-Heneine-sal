@@ -509,11 +509,14 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.34'
+const APP_VERSION='v5.35'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.35',date:'2026-07-03',items:[
+    {t:'feat',d:'New "➕ BMW Over-credited" card on the Dashboard shows the total BMW credited ABOVE what we invoiced (handling charges added on top, or several invoices combined into one claim). This is the surplus that explains why "Not Credited" comes out lower than the gross "Pricing Difference" — the two now visibly reconcile. Click it to see the over-credited claims.'},
+    {t:'fix',d:'The Dashboard monthly performance (trend chart, invoiced-vs-credited chart, monthly table and its Excel export) no longer shows 2025 months.'}]},
   {v:'v5.34',date:'2026-07-03',items:[
     {t:'feat',d:'Hover any clickable figure (Dashboard KPIs, the flow strip, every drill card on every page) and a small popover now explains what it is, the exact formula, and the live value for the current scope — the same explanation as the Guide, without leaving the page. Click still opens the full records.'},
     {t:'fix',d:'The "Source files behind this value" cards in a drill panel now show the € totals for the claims IN that panel instead of the global record count — e.g. incadea invoices = € invoiced and BMW credit notes = € credited on exactly those rows, so the panel reconciles (invoiced − credited = the gap). Previously they showed how many rows were loaded in the whole app (e.g. 5,391 credit-note lines), under a "€ credited" caption, which read like a euro amount.'}]},
@@ -1358,6 +1361,9 @@ const METRIC_DEFS={
   pricing_gap:{icon:'🔧',title:'Pricing Difference',accent:'var(--lemon-d)',sub:'incadea rate vs BMW rate (invoiced − claimed; where claimed price is missing, the gap on accepted claims)',src:['inv','cred'],focus:'Pricing diff €',cols:RCOLS,
     rows:()=>scopedClaims().filter(c=>Math.abs(c.pricing_diff)>0.5&&!isHandled(c)).sort((a,b)=>b.pricing_diff-a.pricing_diff),
     stats:r=>[['Claims',f0(r.length)],['Pricing diff €','€'+f0(_sum(r,'pricing_diff'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Paid €','€'+f0(_sum(r,'accepted'))]]},
+  over_credited:{icon:'➕',title:'BMW Over-credited',accent:'var(--sky)',sub:'Claims where BMW credited MORE than we invoiced (handling charges added on top, or several invoices combined into one claim). This surplus is why Not Credited is smaller than the total Pricing Difference.',src:['inv','cred'],focus:'Over €',cols:RCOLS,
+    rows:()=>scopedClaims().filter(c=>((c.accepted||0)-(c.invoiced||0))>0.5).sort((a,b)=>((b.accepted-b.invoiced)-(a.accepted-a.invoiced))),
+    stats:r=>[['Claims',f0(r.length)],['Over-credited €','€'+f0(r.reduce((s,c)=>s+Math.max((c.accepted||0)-(c.invoiced||0),0),0))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Credited €','€'+f0(_sum(r,'accepted'))]]},
 }
 function openMetric(id){
   if(window.hideCalcTip)hideCalcTip()
@@ -1878,7 +1884,11 @@ function rDash(){
   const totRejected=claims.reduce((s,c)=>s+(isHandled(c)?0:(c.rejected||0)),0),totPricing=claims.reduce((s,c)=>s+(isHandled(c)?0:(c.pricing_diff||0)),0)
   const pending=claims.filter(effPending).length,answered=claims.length-pending
   const err=claims.filter(c=>effKey(c)==='Error').length,warn=claims.filter(c=>effKey(c)==='Warning').length,success=claims.filter(c=>effKey(c)==='Success').length
-  const series=monthly(claims)
+  const series=monthly(claims).filter(m=>m.month.slice(0,4)!=='2025')  // hide 2025 from monthly performance
+  // total BMW credited ABOVE what we invoiced — the surplus (handling charges / combined invoices)
+  // that makes Not Credited come out lower than the gross Pricing Difference
+  const overCred=claims.reduce((s,c)=>s+Math.max((c.accepted||0)-(c.invoiced||0),0),0)
+  const ocCard=overCred>0.5?`<div class="kpi drill" onclick="openMetric('over_credited')"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">➕ BMW Over-credited</div><div class="kv sky">${f0(overCred)}</div><div class="ks">paid above invoice · handling charges / combined</div></div>`:''
   const offCredits=scopedOrphans();const offVal=offCredits.reduce((s,c)=>s+c.accepted,0)
   const offCard=offCredits.length?`<div class="kpi drill" onclick="openMetric('no_submission')"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 Credited · No Submission</div><div class="kv pur">${f0(offVal)}</div><div class="ks">${f0(offCredits.length)} claims · submission file not loaded</div></div>`:''
   const dupN=scopedDuplicates().length
@@ -1901,7 +1911,7 @@ function rDash(){
     <div class="kpi drill" onclick="openMetric('pending')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending Answer</div><div class="kv sun">${f0(pending)}</div><div class="ks">submitted, awaiting BMW</div></div>
     <div class="kpi drill" onclick="openMetric('attention')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">⚠️ Needs Attention</div><div class="kv rose">${f0(err+warn)}</div><div class="ks">${err} errors · ${warn} warnings</div></div>
     <div class="kpi drill" onclick="openMetric('rejected_gap')"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">❌ Rejected (to chase)</div><div class="kv" style="color:var(--rose-d)">${f0(totRejected)}</div><div class="ks">BMW cut what we claimed</div></div>
-    <div class="kpi drill" onclick="openMetric('pricing_gap')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔧 Pricing Difference</div><div class="kv lem">${f0(totPricing)}</div><div class="ks">incadea rate vs BMW rate</div></div>`+pwCard+offCard+dupCard
+    <div class="kpi drill" onclick="openMetric('pricing_gap')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔧 Pricing Difference</div><div class="kv lem">${f0(totPricing)}</div><div class="ks">incadea rate vs BMW rate</div></div>`+ocCard+pwCard+offCard+dupCard
   document.getElementById('CH_trend').innerHTML=trendChart(series.map(s=>({label:fmM(s.month),short:fmMs(s.month),value:s.accepted,count:s.cnt})))
   document.getElementById('CH_status').innerHTML=donutChart([{label:'Success',value:success,color:'#10b981'},{label:'Warning',value:warn,color:'#eab308'},{label:'Error',value:err,color:'#e11d48'},{label:'Pending',value:pending,color:'#f59e0b'}],{centerTop:f0(claims.length),centerSub:'CLAIMS'})
   document.getElementById('CH_gap').innerHTML=groupBarChart(series.map(s=>({label:fmMs(s.month),a:s.invoiced,b:s.accepted,aLabel:'Invoiced',bLabel:'Credited'})))
@@ -2310,7 +2320,7 @@ document.querySelectorAll('#insSeg button').forEach(b=>b.addEventListener('click
 document.getElementById('pp_export').addEventListener('click',()=>{const rows=(window._ppRows||[]).map(c=>[c.kind,c.no,c.record_no,c.doc_no||(c.inferred_inv?'≈'+c.inferred_inv.doc_no:''),c.make,c.vin,c.document_date,c.invoiced,c.answered?c.accepted:'',c.gap,c.accept_ratio?c.accept_ratio.toFixed(0)+'%':'',c.status_overall,c.corrected?'corrected':'',c.cn_no]);exportXlsx('bmw_pipeline',['Kind','Claim No','Record No','Invoice','Make','VIN','Sub Date','Invoiced €','Credited €','Gap €','Cred %','Outcome','Corrected','Credit Notes'],rows);showToast('⬇ Exported '+rows.length+' claims to Excel')})
 document.getElementById('cr_xlsx').addEventListener('click',()=>{const rows=(window._crRows||[]).map(c=>[c.cn_date,c.cn_no,c.kind,c.dealer_claim_number||c.credits?.[0]?.dealer_claim_number||c.no||c.sub?.last_submission||'',c.doc_no||(c.inferred_inv?'≈'+c.inferred_inv.doc_no:''),c.credits[0]?.brand||'',c.vin,c.items_count,c.accepted,c.status_overall,c.corrected?'corrected':'',c.orphan?'no submission':'linked']);exportXlsx('bmw_credits',['CN Date','Credit Note','Kind','Dealer Claim','Invoice','Brand','VIN','Lines','Credited €','Status','Corrected','Link'],rows);showToast('⬇ Exported '+rows.length+' credit rows to Excel')})
 document.getElementById('rj_xlsx').addEventListener('click',()=>{const rows=(window._rjRows||[]).map(c=>{const tr=S.resub[c.kind+':'+c.no]||{};return [c.cn_date,c.no,c.make,c.vin,c.accepted,c.gap,c.status_overall,c.statuses?.Error||0,c.statuses?.Warning||0,tr.status||'untracked',tr.credited_amt||'']});exportXlsx('bmw_rejections',['CN Date','Submission','Make','VIN','Credited €','Gap €','Issue','Errors','Warnings','Tracked','Recovered €'],rows);showToast('⬇ Exported '+rows.length+' rejections to Excel')})
-document.getElementById('dash_xlsx').addEventListener('click',()=>{const series=monthly(scopedClaims());const rows=series.map(m=>[fmM(m.month),m.cnt,m.invoiced,m.accepted,pct(m.accepted,m.invoiced).toFixed(0)+'%',m.invoiced-m.accepted,m.success,m.warn,m.err,m.pending]);exportXlsx('bmw_monthly',['Month','Claims','Invoiced €','Credited €','Cred %','Gap €','Success','Warning','Error','Pending'],rows);showToast('⬇ Exported '+rows.length+' months to Excel')})
+document.getElementById('dash_xlsx').addEventListener('click',()=>{const series=monthly(scopedClaims()).filter(m=>m.month.slice(0,4)!=='2025');const rows=series.map(m=>[fmM(m.month),m.cnt,m.invoiced,m.accepted,pct(m.accepted,m.invoiced).toFixed(0)+'%',m.invoiced-m.accepted,m.success,m.warn,m.err,m.pending]);exportXlsx('bmw_monthly',['Month','Claims','Invoiced €','Credited €','Cred %','Gap €','Success','Warning','Error','Pending'],rows);showToast('⬇ Exported '+rows.length+' months to Excel')})
 ;['st_make','st_out'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('change',rStatement)})
 document.getElementById('st_csv').addEventListener('click',()=>{const rows=(window._stRows||[]).map(c=>[c.doc_no,c.kind,c.make,c.vin,c.document_date,c.invoiced,c.answered?c.accepted:'',c._otype,c._owed]);exportXlsx('bmw_statement',['Invoice','Kind','Make','VIN','Sub Date','Invoiced €','Credited €','Type','Owed €'],rows);showToast('⬇ Exported statement — '+rows.length+' rows to Excel')})
 document.getElementById('st_print').addEventListener('click',()=>window.print())
