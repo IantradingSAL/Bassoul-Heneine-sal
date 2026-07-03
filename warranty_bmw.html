@@ -509,13 +509,15 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.36'
+const APP_VERSION='v5.37'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.37',date:'2026-07-03',items:[
+    {t:'fix',d:'Every cent now counts. Removed the €0.50 cut-off on the Over-credited, Rejected and Pricing Difference drill pages, so amounts as small as €0.01 are included. Each Dashboard card now exactly equals the total of the rows behind it.'}]},
   {v:'v5.36',date:'2026-07-03',items:[
-    {t:'fix',d:'The Dashboard "BMW Over-credited" card now matches the total on its drill page. The card was summing every claim over-credited by even a few cents, while the drill only lists claims over €0.50 — so the card read ~€46 higher. Both now use the same €0.50 rule and show the identical figure.'}]},
+    {t:'fix',d:'The Dashboard "BMW Over-credited" card now matches the total on its drill page. The card was summing every claim over-credited by even a few cents, while the drill only lists claims over €0.50 — so the card read ~€46 higher. Both now use the same rule and show the identical figure.'}]},
   {v:'v5.35',date:'2026-07-03',items:[
     {t:'feat',d:'New "➕ BMW Over-credited" card on the Dashboard shows the total BMW credited ABOVE what we invoiced (handling charges added on top, or several invoices combined into one claim). This is the surplus that explains why "Not Credited" comes out lower than the gross "Pricing Difference" — the two now visibly reconcile. Click it to see the over-credited claims.'},
     {t:'fix',d:'The Dashboard monthly performance (trend chart, invoiced-vs-credited chart, monthly table and its Excel export) no longer shows 2025 months.'}]},
@@ -1358,13 +1360,13 @@ const METRIC_DEFS={
     stats:r=>[['Accounts',f0(r.length)],['Credited €','€'+f0(_sum(r,'accepted'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Top share',r.length?pct(r[0].accepted,_sum(r,'accepted')).toFixed(0)+'%':'0%']]},
   // ── GAP DECOMPOSITION: rejection vs pricing difference ──
   rejected_gap:{icon:'❌',title:'Rejected — money to chase',accent:'var(--rose-d)',sub:'BMW paid less than we claimed (claimed − paid; where claimed price is missing, the gap on rejected claims)',src:['cred','inv'],focus:'Rejected €',cols:RCOLS,
-    rows:()=>scopedClaims().concat(scopedOrphans()).filter(c=>c.rejected>0.5&&!isHandled(c)).sort((a,b)=>b.rejected-a.rejected),
+    rows:()=>scopedClaims().concat(scopedOrphans()).filter(c=>c.rejected>0.005&&!isHandled(c)).sort((a,b)=>b.rejected-a.rejected),
     stats:r=>[['Claims',f0(r.length)],['Rejected €','€'+f0(_sum(r,'rejected'))],['Exact (claimed price)',f0(r.filter(c=>c.claim_basis==='claimed').length)],['By status',f0(r.filter(c=>c.claim_basis!=='claimed').length)]]},
   pricing_gap:{icon:'🔧',title:'Pricing Difference',accent:'var(--lemon-d)',sub:'incadea rate vs BMW rate (invoiced − claimed; where claimed price is missing, the gap on accepted claims)',src:['inv','cred'],focus:'Pricing diff €',cols:RCOLS,
-    rows:()=>scopedClaims().filter(c=>Math.abs(c.pricing_diff)>0.5&&!isHandled(c)).sort((a,b)=>b.pricing_diff-a.pricing_diff),
+    rows:()=>scopedClaims().filter(c=>Math.abs(c.pricing_diff)>0.005&&!isHandled(c)).sort((a,b)=>b.pricing_diff-a.pricing_diff),
     stats:r=>[['Claims',f0(r.length)],['Pricing diff €','€'+f0(_sum(r,'pricing_diff'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Paid €','€'+f0(_sum(r,'accepted'))]]},
   over_credited:{icon:'➕',title:'BMW Over-credited',accent:'var(--sky)',sub:'Claims where BMW credited MORE than we invoiced (handling charges added on top, or several invoices combined into one claim). This surplus is why Not Credited is smaller than the total Pricing Difference.',src:['inv','cred'],focus:'Over €',cols:RCOLS,
-    rows:()=>scopedClaims().filter(c=>((c.accepted||0)-(c.invoiced||0))>0.5).sort((a,b)=>((b.accepted-b.invoiced)-(a.accepted-a.invoiced))),
+    rows:()=>scopedClaims().filter(c=>((c.accepted||0)-(c.invoiced||0))>0.005).sort((a,b)=>((b.accepted-b.invoiced)-(a.accepted-a.invoiced))),
     stats:r=>[['Claims',f0(r.length)],['Over-credited €','€'+f0(r.reduce((s,c)=>s+Math.max((c.accepted||0)-(c.invoiced||0),0),0))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Credited €','€'+f0(_sum(r,'accepted'))]]},
 }
 function openMetric(id){
@@ -1889,9 +1891,9 @@ function rDash(){
   const series=monthly(claims).filter(m=>m.month.slice(0,4)!=='2025')  // hide 2025 from monthly performance
   // total BMW credited ABOVE what we invoiced — the surplus (handling charges / combined invoices)
   // that makes Not Credited come out lower than the gross Pricing Difference
-  // sum only over-credits above €0.50 — same rule the drill page uses, so the card total
-  // matches the sum of the rows you see when you click it (no sub-cent noise mismatch)
-  const overCred=claims.reduce((s,c)=>{const o=(c.accepted||0)-(c.invoiced||0);return s+(o>0.5?o:0)},0)
+  // count every cent of over-credit (≥ €0.01) — same rule the drill page uses, so the card
+  // total exactly equals the sum of the rows behind it
+  const overCred=claims.reduce((s,c)=>{const o=(c.accepted||0)-(c.invoiced||0);return s+(o>0.005?o:0)},0)
   const ocCard=overCred>0.5?`<div class="kpi drill" onclick="openMetric('over_credited')"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">➕ BMW Over-credited</div><div class="kv sky">${f0(overCred)}</div><div class="ks">paid above invoice · handling charges / combined</div></div>`:''
   const offCredits=scopedOrphans();const offVal=offCredits.reduce((s,c)=>s+c.accepted,0)
   const offCard=offCredits.length?`<div class="kpi drill" onclick="openMetric('no_submission')"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 Credited · No Submission</div><div class="kv pur">${f0(offVal)}</div><div class="ks">${f0(offCredits.length)} claims · submission file not loaded</div></div>`:''
