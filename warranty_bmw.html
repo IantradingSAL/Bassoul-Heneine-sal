@@ -524,11 +524,14 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.41'
+const APP_VERSION='v5.42'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.42',date:'2026-07-14',items:[
+    {t:'fix',d:'Credit Notes page: when filtering by a specific credit note number, the Credited €, Δ €, and Lines columns now show only what BMW paid on that credit note — not the combined total across all credit notes linked to the claim. This fixes reconciliation for resubmitted claims (e.g. 71939, which had both 1M1432047 and 1M1391886): the CN column now shows only the selected note, and the page total matches the actual credit note value exactly.'},
+    {t:'fix',d:'Claim status: a resubmitted claim sharing an incadea invoice with an earlier rejected claim no longer inherits the ERROR status from the older credit note. The shared-invoice group roll-up now applies the same "latest credit note date wins" rule used by individual claims, so claim 71939 (CN 2026-07-10, credited €169.61) correctly shows ✅ Success instead of ❌ Error.'}]},
   {v:'v5.41',date:'2026-07-03',items:[
     {t:'feat',d:'New "🏷️ Pricing Review" page lists every claim carrying a pricing difference (incadea billed more than BMW credited, with no rejection) — including "Success but under-credited" claims like 71538 that never show on the Rejections page. Approve each one with a click (or "Approve all shown"), filter by Month / pending / approved, and track progress with To-approve € vs Approved € totals. The sidebar badge counts what is still pending approval. Approvals are saved per claim.'}]},
   {v:'v5.40',date:'2026-07-03',items:[
