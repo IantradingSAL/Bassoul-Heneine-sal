@@ -972,7 +972,12 @@ function reconcile(){
     // the primary absorbs the whole repair: combined credited + all credit lines, so its row reads
     // consistently (invoiced − credited = gap). The supplementary claims become pointer rows.
     const groupAccepted=grp.reduce((s,c)=>s+(c.accepted||0),0),allCredits=grp.reduce((a,c)=>a.concat(c.credits||[]),[])
-    const gst={Success:0,Warning:0,Error:0};allCredits.forEach(x=>{if(x.crediting_item_status)gst[x.crediting_item_status]=(gst[x.crediting_item_status]||0)+1})
+    // Use the latest CN date across the group so that a corrected resubmission on a shared
+    // invoice is not contaminated by Error lines from the older, superseded credit note.
+    let gLatestCnDate=null;allCredits.forEach(x=>{if(x.credit_note_date&&(!gLatestCnDate||x.credit_note_date>gLatestCnDate))gLatestCnDate=x.credit_note_date})
+    const gstAll={Success:0,Warning:0,Error:0},gstL={Success:0,Warning:0,Error:0}
+    allCredits.forEach(x=>{if(x.crediting_item_status){gstAll[x.crediting_item_status]=(gstAll[x.crediting_item_status]||0)+1;if(x.credit_note_date===gLatestCnDate)gstL[x.crediting_item_status]=(gstL[x.crediting_item_status]||0)+1}})
+    const gst=(gstL.Success+gstL.Warning+gstL.Error)>0?gstL:gstAll
     primary._sharedWith=secs.map(c=>c.no);primary._sharedInv=true;primary._groupAccepted=groupAccepted
     primary.accepted=groupAccepted;primary.credits=allCredits;primary.items_count=allCredits.length;primary.statuses=gst
     primary.labor=grp.reduce((s,c)=>s+(c.labor||0),0);primary.parts=grp.reduce((s,c)=>s+(c.parts||0),0);primary.ext=grp.reduce((s,c)=>s+(c.ext||0),0)
