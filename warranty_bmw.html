@@ -2009,8 +2009,11 @@ function rCredits(){
     if(mo&&c.month!==mo)return false;if(cn&&!String(c.cn_no||'').split(', ').includes(cn))return false
     if(q&&![c.cn_no,c.vin,c.dealer_claim_number||c.sub?.last_submission||'',c.credits?.[0]?.dealer_claim_number||'',c.no||''].join('|').toLowerCase().includes(q))return false;return true})
   rows.sort((a,b)=>(b.cn_date||'').localeCompare(a.cn_date||''))
+  // When a specific CN is selected, scope credited amounts and line counts to that CN only
+  // so the totals match what BMW actually paid on that credit note (not combined multi-CN totals).
+  if(cn){rows.forEach(c=>{const cl=c.credits.filter(x=>x.credit_note_number===cn);c._cnAccepted=cl.reduce((s,x)=>s+(Number(x.accepted_price_incl_hc)||0),0);c._cnLines=cl.length})}
   window._crRows=rows
-  const accepted=rows.reduce((s,c)=>s+c.accepted,0),err=rows.filter(c=>c.status_overall==='Error').length,warn=rows.filter(c=>c.status_overall==='Warning').length
+  const accepted=rows.reduce((s,c)=>s+(cn&&c._cnAccepted!=null?c._cnAccepted:c.accepted),0),err=rows.filter(c=>c.status_overall==='Error').length,warn=rows.filter(c=>c.status_overall==='Warning').length
   // real incadea invoices only — do NOT add inferred/guessed invoices, so this total (and the
   // Δ vs invoiced) matches the exact figure and the drill-down (which sum c.invoiced)
   const invoiced=rows.reduce((s,c)=>s+(Number(c.invoiced)||0),0),crGap=invoiced-accepted
@@ -2024,13 +2027,13 @@ function rCredits(){
     <div class="kpi drill" onclick="openMetric('cr_nosub')"><div class="kpi-accent" style="background:var(--pur)"></div><div class="kl">💳 Credited · No Submission</div><div class="kv pur">${f0(orphans.filter(inScope).length)}</div><div class="ks">submission file not loaded</div></div>`
   let h=`<div class="card" style="padding:0;overflow:hidden"><div class="tw"><table class="t"><thead><tr><th>CN Date</th><th>Credit Note</th><th>Kind</th><th>Dealer Claim</th><th>Invoice</th><th>Brand</th><th>VIN</th><th class="num">Lines</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th class="num">Δ €</th><th>Status</th><th>Link</th></tr></thead><tbody>`
   rows.slice(0,700).forEach(c=>{const cInv=Number(c.invoiced)||0;h+=`<tr class="tr-clickable" onclick="${c.orphan?`openVin('${esc(c.vin)}')`:`openClaim('${esc(c.kind)}','${esc(c.no)}')`}">
-    <td style="font-size:10px;color:var(--muted)">${esc(c.cn_date||'')}</td><td class="mono" style="font-weight:600">${esc(c.cn_no||'')}</td><td>${kindBadge(c.kind)}</td>
+    <td style="font-size:10px;color:var(--muted)">${esc(c.cn_date||'')}</td><td class="mono" style="font-weight:600">${esc(cn||c.cn_no||'')}</td><td>${kindBadge(c.kind)}</td>
     <td class="mono">${esc(c.dealer_claim_number||c.credits?.[0]?.dealer_claim_number||c.no||c.sub?.last_submission||'—')}</td>
     <td class="mono">${c.doc_no?esc(c.doc_no):(c.inferred_inv?`<span title="inferred from incadea by VIN + amount — verify">≈ ${esc(c.inferred_inv.doc_no)}</span>`:'—')}</td>
     <td><span class="badge b-n">${esc(c.credits[0]?.brand||'—')}</span></td>
-    <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td><td class="num">${c.items_count}</td>
+    <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td><td class="num">${cn&&c._cnLines!=null?c._cnLines:c.items_count}</td>
     <td class="num">${cInv?f(cInv):(c.orphan?'<span style="color:var(--faint)" title="orphan credit — no incadea invoice loaded, not counted in Invoiced">no inv</span>':'—')}</td>
-    <td class="num" style="font-weight:700">${f(c.accepted)}</td><td class="num" style="color:${cInv-c.accepted>0.5?'var(--rose-d)':'var(--mint-d)'}">${f(cInv-c.accepted)}</td><td>${sBadge(c.status_overall)}${corrBadge(c)}${fuBadge(c)}</td>
+    ${(()=>{const ca=cn&&c._cnAccepted!=null?c._cnAccepted:c.accepted;return`<td class="num" style="font-weight:700">${f(ca)}</td><td class="num" style="color:${cInv-ca>0.5?'var(--rose-d)':'var(--mint-d)'}">${f(cInv-ca)}</td>`})()}<td>${sBadge(c.status_overall)}${corrBadge(c)}${fuBadge(c)}</td>
     <td>${c.orphan?'<span class="badge b-pur" title="BMW credited this, but no matching submission row is loaded">credited · no sub</span>':'<span class="badge b-mint">linked</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="13" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍 (the TOTAL below still covers all ${f0(rows.length)})</td></tr>`
   h+=`</tbody><tfoot><tr style="border-top:2px solid var(--line)"><td colspan="8" style="text-align:right;font-weight:800">TOTAL · ${f0(rows.length)} claims</td>
