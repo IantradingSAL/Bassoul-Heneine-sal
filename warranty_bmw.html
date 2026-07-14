@@ -525,11 +525,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.43'
+const APP_VERSION='v5.44'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.44',date:'2026-07-14',items:[
+    {t:'feat',d:'Share Report now includes the ✎ Corrected, ✅ Follow-up done, 🔴 Follow-up overdue, and 📅 follow-up date badges inline in the Status column — matching exactly what is shown on screen. Recipients can instantly see which claims were resubmitted and which have open or completed follow-ups.'}]},
   {v:'v5.43',date:'2026-07-14',items:[
     {t:'feat',d:'Professional "📤 Share Report" button on the Credit Notes page generates a beautiful standalone HTML report (KPI tiles + full claim table with Invoiced €, Credited €, Δ €, colour-coded status) that opens in a new tab. Save as PDF or share the link — includes a "View live details →" link back to the system. Respects all active filters so the report matches exactly what you see on screen.'},
     {t:'feat',d:'Excel exports across all pages now include the page name and today\'s date in the filename (e.g. BMW_Credit-Notes_2026-07-14.xlsx). Pages: Credit Notes, Rejections, Claim Pipeline, Monthly Performance, Statement, Pricing Review, Not Submitted, Follow-ups, No-Submission Gaps, drill-down details.'},
@@ -2457,6 +2459,7 @@ function generateCrReport(){
   const ok=rows.filter(c=>c.status_overall==='Success').length
   const fe=v=>v==null?'—':'€'+Number(v).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})
   const liveUrl=window.location.href
+  const _rToday=todayIso
   const rowsHtml=rows.map(c=>{
     const ca=c._cnAccepted!=null?c._cnAccepted:c.accepted
     const cinv=Number(c.invoiced)||0
@@ -2464,6 +2467,14 @@ function generateCrReport(){
     const st=c.status_overall
     const stColor=st==='Success'?'#1a7f4b':st==='Error'?'#c0392b':st==='Warning'?'#c07a00':'#555'
     const stBg=st==='Success'?'#e8f8ef':st==='Error'?'#fdf0ef':st==='Warning'?'#fdf8e1':'#f2f2f2'
+    // badges: corrected + follow-up (mirror fuBadge logic)
+    const chips=[]
+    if(c.corrected)chips.push('<span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;color:#0369a1;background:#e0f2fe;margin-left:4px">✎ Corrected</span>')
+    const _r=S.resub&&S.resub[c.kind+':'+c.no]
+    if(_r&&_r.follow_up_date){const done=!!_r.follow_up_done,ov=!done&&_r.follow_up_date<_rToday,due=!done&&_r.follow_up_date===_rToday
+      const fic=done?'✅':ov?'🔴':'📅',flbl=done?'Follow-up done':ov?'Follow-up overdue':due?'Follow-up today':_r.follow_up_date
+      const fc=done?'#1a7f4b':ov?'#c0392b':due?'#b45309':'#0369a1',fbg=done?'#e8f8ef':ov?'#fdf0ef':due?'#fef3c7':'#e0f2fe'
+      chips.push(`<span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;color:${fc};background:${fbg};margin-left:4px">${fic} ${flbl}</span>`)}
     return`<tr>
       <td>${c.cn_date||'—'}</td>
       <td class="mono">${c._cnDisplay||c.cn_no||'—'}</td>
@@ -2474,7 +2485,7 @@ function generateCrReport(){
       <td class="num">${cinv?fe(cinv):'—'}</td>
       <td class="num"><strong>${fe(ca)}</strong></td>
       <td class="num" style="color:${delta>0.5?'#c0392b':delta<-0.5?'#1a7f4b':'#555'}">${delta!=null?fe(delta):'—'}</td>
-      <td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;color:${stColor};background:${stBg}">${st}</span></td>
+      <td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;color:${stColor};background:${stBg}">${st}</span>${chips.join('')}</td>
       <td>${c.orphan?'No sub':'Linked'}</td>
     </tr>`}).join('')
   const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
