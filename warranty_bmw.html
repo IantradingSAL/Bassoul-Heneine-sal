@@ -525,11 +525,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.45'
+const APP_VERSION='v5.46'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.46',date:'2026-07-14',items:[
+    {t:'fix',d:'Credit Notes page: claims with tracking status "resubmitted" now show the ↺ Resubmitted chip (amber) next to ❌ Error directly in the table row — previously this chip was only visible in the Share Report but not on the live Credit Notes page.'}]},
   {v:'v5.45',date:'2026-07-14',items:[
     {t:'feat',d:'Share Report: resubmitted claims now show a ↺ Resubmitted chip (amber) next to ❌ Error — keeping the original status for traceability while making it clear the error has been actioned. Consistent with the follow-up badge pattern: status + action side by side.'}]},
   {v:'v5.44',date:'2026-07-14',items:[
@@ -2052,7 +2054,7 @@ function rCredits(){
     <td><span class="badge b-n">${esc(c.credits[0]?.brand||'—')}</span></td>
     <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td><td class="num">${c._cnLines!=null?c._cnLines:c.items_count}</td>
     <td class="num">${cInv?f(cInv):(c.orphan?'<span style="color:var(--faint)" title="orphan credit — no incadea invoice loaded, not counted in Invoiced">no inv</span>':'—')}</td>
-    ${(()=>{const ca=c._cnAccepted!=null?c._cnAccepted:c.accepted;return`<td class="num" style="font-weight:700">${f(ca)}</td><td class="num" style="color:${cInv-ca>0.5?'var(--rose-d)':'var(--mint-d)'}">${f(cInv-ca)}</td>`})()}<td>${sBadge(c.status_overall)}${corrBadge(c)}${fuBadge(c)}</td>
+    ${(()=>{const ca=c._cnAccepted!=null?c._cnAccepted:c.accepted;return`<td class="num" style="font-weight:700">${f(ca)}</td><td class="num" style="color:${cInv-ca>0.5?'var(--rose-d)':'var(--mint-d)'}">${f(cInv-ca)}</td>`})()}<td>${sBadge(c.status_overall)}${corrBadge(c)}${manBadge(c)}${fuBadge(c)}</td>
     <td>${c.orphan?'<span class="badge b-pur" title="BMW credited this, but no matching submission row is loaded">credited · no sub</span>':'<span class="badge b-mint">linked</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="13" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍 (the TOTAL below still covers all ${f0(rows.length)})</td></tr>`
   h+=`</tbody><tfoot><tr style="border-top:2px solid var(--line)"><td colspan="8" style="text-align:right;font-weight:800">TOTAL · ${f0(rows.length)} claims</td>
