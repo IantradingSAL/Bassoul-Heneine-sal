@@ -525,11 +525,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.44'
+const APP_VERSION='v5.45'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.45',date:'2026-07-14',items:[
+    {t:'feat',d:'Share Report: resubmitted claims now show a ↺ Resubmitted chip (amber) next to ❌ Error — keeping the original status for traceability while making it clear the error has been actioned. Consistent with the follow-up badge pattern: status + action side by side.'}]},
   {v:'v5.44',date:'2026-07-14',items:[
     {t:'feat',d:'Share Report now includes the ✎ Corrected, ✅ Follow-up done, 🔴 Follow-up overdue, and 📅 follow-up date badges inline in the Status column — matching exactly what is shown on screen. Recipients can instantly see which claims were resubmitted and which have open or completed follow-ups.'}]},
   {v:'v5.43',date:'2026-07-14',items:[
@@ -2470,6 +2472,7 @@ function generateCrReport(){
     // badges: corrected + follow-up (mirror fuBadge logic)
     const chips=[]
     if(c.corrected)chips.push('<span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;color:#0369a1;background:#e0f2fe;margin-left:4px">✎ Corrected</span>')
+    if(_r&&_r.status==='resubmitted')chips.push('<span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;color:#92400e;background:#fef3c7;margin-left:4px">↺ Resubmitted</span>')
     const _r=S.resub&&S.resub[c.kind+':'+c.no]
     if(_r&&_r.follow_up_date){const done=!!_r.follow_up_done,ov=!done&&_r.follow_up_date<_rToday,due=!done&&_r.follow_up_date===_rToday
       const fic=done?'✅':ov?'🔴':'📅',flbl=done?'Follow-up done':ov?'Follow-up overdue':due?'Follow-up today':_r.follow_up_date
