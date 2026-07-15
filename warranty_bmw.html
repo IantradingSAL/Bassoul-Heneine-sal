@@ -547,11 +547,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.52'
+const APP_VERSION='v5.53'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.53',date:'2026-07-15',items:[
+    {t:'feat',d:'Statement table Status column now shows WHY a claim is a shortfall: ❌ €X badge for the BMW-rejected portion, 🔧 €Y badge for the pricing difference portion, ↺ Resubmitted when you already resubmitted the claim. Pending claims and settled claims unchanged.'}]},
   {v:'v5.52',date:'2026-07-15',items:[
     {t:'fix',d:'Statement page crash: mode variable was undefined inside rStatement() causing the page to show no data. Fixed by reading the dropdown value directly inside rStatement().'},
     {t:'feat',d:'New "📊 Summary Report" button on the Statement page — generates a shareable HTML report showing: Total Invoiced, Credited by BMW, and a full gap breakdown into 6 categories: Pending (awaiting answer), Resubmitted (corrected & retrying), To Chase (BMW rejected), Pricing Difference (rate card), Acknowledged Shortfall, and Written Off. Each category lists the individual claims with invoiced / credited / difference amounts.'}]},
@@ -2392,7 +2394,19 @@ function rStatement(){
       <div class="kpi"><div class="kpi-accent" style="background:var(--muted)"></div><div class="kl" style="color:var(--muted)">✓ Accepted gap (€)</div><div class="kv" style="color:var(--muted)">${f0(acceptedVal)}</div><div class="ks">acknowledged · not chasing</div></div>
     </div>
     <div class="tw"><table class="t"><thead><tr><th>#</th><th>Invoice (GAR)</th><th>Kind</th><th>Make</th><th>VIN</th><th>Sub Date</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th>Status</th><th class="num">Owed €</th></tr></thead><tbody>`
-  rows.slice(0,800).forEach((c,i)=>{const ob=c._otype==='pending'?'<span class="badge b-sun">⏳ Pending</span>':c._otype==='shortfall'?'<span class="badge b-lem">🔻 Shortfall</span>':c._otype==='accepted'?'<span class="badge b-n" title="You acknowledged this gap — not chasing, but money is still missing">✓ Accepted</span>':c._otype==='handled'?manBadge(c):'<span class="badge b-mint">✅ Settled</span>'
+  rows.slice(0,800).forEach((c,i)=>{
+    const ms=manStatus(c)
+    let ob=''
+    if(c._otype==='pending'){ob='<span class="badge b-sun">⏳ Pending</span>'}
+    else if(c._otype==='shortfall'){
+      ob='<span class="badge b-lem">🔻 Shortfall</span>'
+      if(ms==='resubmitted')ob+=' <span class="badge b-sun">↺ Resubmitted</span>'
+      else if((c.rejected||0)>0.5&&(c.pricing_diff||0)>0.5)ob+=` <span class="badge b-rose" title="BMW rejected €${f(c.rejected)}">❌ €${f(c.rejected)}</span> <span class="badge b-lem" title="Pricing diff €${f(c.pricing_diff)}">🔧 €${f(c.pricing_diff)}</span>`
+      else if((c.rejected||0)>0.5)ob+=` <span class="badge b-rose" title="BMW rejected this amount">❌ €${f(c.rejected)}</span>`
+      else if((c.pricing_diff||0)>0.5)ob+=` <span class="badge b-lem" title="incadea vs BMW rate difference">🔧 €${f(c.pricing_diff)}</span>`
+    }else if(c._otype==='accepted'){ob='<span class="badge b-n" title="You acknowledged this gap — not chasing, but money is still missing">✓ Accepted</span>'}
+    else if(c._otype==='handled'){ob=manBadge(c)}
+    else{ob='<span class="badge b-mint">✅ Settled</span>'}
     h+=`<tr class="tr-clickable" onclick="if(!event.target.closest('.vin-cell'))openClaim('${esc(c.kind)}','${esc(c.no)}')">
       <td style="color:var(--faint)">${i+1}</td><td class="mono" style="font-weight:600">${esc(c.doc_no||'—')}</td><td>${kindBadge(c.kind)}</td>
       <td><span class="badge b-n">${esc(c.make||'—')}</span></td><td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
