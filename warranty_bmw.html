@@ -432,7 +432,13 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
     <div class="page" id="P_statement">
       <div class="card" id="st_actions" style="margin-bottom:14px"><div class="filters">
         <span class="fl-l">Make</span><select id="st_make"><option value="">All</option></select>
-        <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer"><input type="checkbox" id="st_out" checked style="width:15px;height:15px"> Outstanding only</label>
+        <span class="fl-l">Show</span>
+        <select id="st_out_mode" style="padding:5px 9px;border:1px solid var(--line);border-radius:7px;font-size:11px">
+          <option value="all">All claims</option>
+          <option value="outstanding">📌 Outstanding (all owed)</option>
+          <option value="tochase" selected>🎯 To Chase only</option>
+        </select>
+        <input type="hidden" id="st_out" value="1">
         <span style="flex:1"></span>
         <button class="btn btn-sm btn-bmw" id="st_csv">⬇ Excel</button>
         <button class="btn btn-sm btn-bmw" id="st_print">🖨️ Print</button>
@@ -540,11 +546,14 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.50'
+const APP_VERSION='v5.51'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.51',date:'2026-07-15',items:[
+    {t:'feat',d:'Statement filter upgraded from a checkbox to a 3-way dropdown: All claims / 📌 Outstanding (all owed, incl. accepted gaps) / 🎯 To Chase only (pending + active shortfalls). Default is "To Chase only" so you see what you\'re actually pursuing.'},
+    {t:'fix',d:'Outstanding live formula in the help panel now matches the Statement: includes accepted gaps in total. Not Credited flow step renamed from "money to chase" to "gap to recover". Shortfall description clarified to "still chasing (excludes accepted gaps)". FAQ updated with new Outstanding formula breakdown.'}]},
   {v:'v5.50',date:'2026-07-15',items:[
     {t:'feat',d:'BMW Statement now shows two outstanding figures side by side: 📌 Outstanding (total — everything BMW hasn\'t paid including acknowledged gaps, so you know the full picture) and 🎯 To Chase (pending + active shortfall only — what you\'re still pursuing). Acknowledged shortfalls now show as "✓ Accepted" in the table (grey badge) instead of "🔻 Shortfall", and are counted in a new ✓ Accepted gap KPI so the split is always clear.'}]},
   {v:'v5.49',date:'2026-07-15',items:[
@@ -1332,7 +1341,7 @@ const METRIC_DEFS={
   credited:{icon:'📑',title:'Credited by BMW',accent:'var(--mint-d)',sub:'Claims with an accepted credit note',src:['cred'],focus:'Credited €',
     rows:()=>scopedClaims().filter(c=>c.accepted>0).concat(scopedOrphans().filter(o=>o.accepted>0)).sort((a,b)=>b.accepted-a.accepted),
     stats:r=>[['Lines credited',f0(r.length)],['Credited €','€'+f0(_sum(r,'accepted'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Avg cred %',pct(_sum(r,'accepted'),_sum(r,'invoiced')).toFixed(1)+'%']]},
-  not_credited:{icon:'Δ',title:'Not Credited — money to chase',accent:'var(--rose-d)',sub:'Invoiced amount BMW has not (yet) credited',src:['inv','cred'],focus:'Gap €',
+  not_credited:{icon:'Δ',title:'Not Credited — Gap to recover',accent:'var(--rose-d)',sub:'Invoiced amount BMW has not (yet) credited',src:['inv','cred'],focus:'Gap €',
     rows:()=>scopedClaims().filter(c=>c.gap>0.5).sort((a,b)=>b.gap-a.gap),
     stats:r=>[['Open claims',f0(r.length)],['Gap €','€'+f0(_sum(r,'gap'))],['Still pending',f0(r.filter(effPending).length)],['Errors / Warnings',f0(r.filter(c=>c.status_overall==='Error'||c.status_overall==='Warning').length)]]},
   total_claims:{icon:'📋',title:'Total Claims',accent:'var(--bmw)',sub:'Every reconciled warranty & BSI claim in scope',src:['inv','sub','cred'],focus:'Status',
@@ -1401,7 +1410,7 @@ const METRIC_DEFS={
     rows:()=>(window._stRows||[]).filter(c=>c._owed>0.5).sort((a,b)=>b._owed-a._owed),stats:ST_OWED},
   st_pending:{icon:'⏳',title:'Statement · Pending €',accent:'var(--sun)',sub:'Submitted, awaiting BMW answer · current filters',src:['sub'],focus:'Status',
     rows:()=>(window._stRows||[]).filter(c=>c._pending).sort((a,b)=>b.invoiced-a.invoiced),stats:ST_OWED},
-  st_shortfall:{icon:'🔻',title:'Statement · Shortfall €',accent:'var(--lemon-d)',sub:'Answered but underpaid by BMW · current filters',src:['cred'],focus:'Gap €',
+  st_shortfall:{icon:'🔻',title:'Statement · Shortfall €',accent:'var(--lemon-d)',sub:'Answered but underpaid by BMW · still chasing (excludes acknowledged/accepted gaps)',src:['cred'],focus:'Gap €',
     rows:()=>(window._stRows||[]).filter(c=>c._shortfall>0.5).sort((a,b)=>b._shortfall-a._shortfall),stats:ST_OWED},
   // ── INSIGHTS · Pending tab (same scopedClaims as dashboard → counts match) ──
   ins_overdue:{icon:'🐌',title:'Insights · Overdue Pending (>60d)',accent:'var(--rose-d)',sub:'Submitted over 60 days ago, still no credit note',src:['sub'],focus:'Status',
@@ -1565,7 +1574,7 @@ const HLIVE={
   pending:()=>f0(scopedClaims().filter(effPending).length),
   attention:()=>f0(scopedClaims().concat(scopedOrphans()).filter(needsAttn).length),
   no_submission:()=>f0(scopedOrphans().length),
-  outstanding:()=>{const r=scopedClaims().filter(c=>!isHandled(c));const pend=r.filter(effPending).reduce((s,c)=>s+c.invoiced,0);const sf=r.reduce((s,c)=>s+(c.answered?Math.max(c.invoiced-c.accepted,0):0),0);return '€'+f0(pend+sf)},
+  outstanding:()=>{const r=scopedClaims().filter(c=>!isHandled(c));const pend=r.filter(effPending).reduce((s,c)=>s+c.invoiced,0);const sf=r.filter(c=>c.answered&&!isAcked(c)).reduce((s,c)=>s+Math.max(c.invoiced-c.accepted,0),0);const acc=r.filter(c=>c.answered&&isAcked(c)).reduce((s,c)=>s+Math.max(c.invoiced-c.accepted,0),0);return '€'+f0(pend+sf+acc)},
   shortfall:()=>'€'+f0(scopedClaims().reduce((s,c)=>s+(c.answered?Math.max(c.invoiced-c.accepted,0):0),0)),
   gap_at_risk:()=>'€'+f0(scopedClaims().concat(scopedOrphans()).filter(needsAttn).reduce((s,c)=>s+c.gap,0)),
   processing:()=>{const w=scopedClaims().filter(c=>c.lag_days!=null&&c.lag_days>=0);return (w.length?_sum(w,'lag_days')/w.length:0).toFixed(0)+' days avg'},
@@ -1625,9 +1634,9 @@ const HELP_SECTIONS=[
       formula:'Orphan = credit note whose key matches no submission',src:['cred'],metric:'no_submission',live:'no_submission'},
   ]},
   {sec:'Receivables (Statement)',topics:[
-    {id:'outstanding',icon:'📌',q:'How is "Outstanding" calculated?',kw:['outstanding','owed','receivable','bmw owes','total owed'],
-      what:'Everything BMW still owes us: the full invoiced value of claims not yet answered, plus the underpaid portion of answered claims.',
-      formula:'Outstanding = Pending € + Shortfall €',src:['inv','cred'],live:'outstanding'},
+    {id:'outstanding',icon:'📌',q:'How is "Outstanding" calculated?',kw:['outstanding','owed','receivable','bmw owes','total owed','to chase'],
+      what:'Outstanding = everything BMW has not fully paid. Split into: 🎯 To Chase (pending + shortfalls still pursuing) and ✓ Accepted gap (shortfalls you acknowledged — know it\'s missing, not chasing). Use the Statement Show dropdown to filter.',
+      formula:'Outstanding = Pending + Active Shortfall + Accepted gap\nTo Chase = Pending + Active Shortfall',src:['inv','cred'],live:'outstanding'},
     {id:'shortfall',icon:'🔻',q:'What is "Shortfall"?',kw:['shortfall','underpaid','short','less than invoiced'],
       what:'On claims BMW has answered, the part of the invoice BMW did not credit. Only counted when positive (BMW paid less than billed).',
       formula:'Shortfall = Σ max(invoiced − credited, 0)  on answered claims',src:['inv','cred'],live:'shortfall'},
@@ -1985,7 +1994,7 @@ function rDash(){
     <div class="flow-arrow">→</div>
     <div class="flow-step drill" onclick="openMetric('credited')"><div class="fl-t">📑 Credited by BMW</div><div class="fl-v" style="color:var(--mint-d)">€${f0(accepted)}</div><div class="fl-s">${pct(accepted,invoiced).toFixed(1)}% of invoiced</div></div>
     <div class="flow-arrow">=</div>
-    <div class="flow-step drill" onclick="openMetric('not_credited')" style="background:#fff1f2"><div class="fl-t">Δ Not Credited</div><div class="fl-v" style="color:var(--rose-d)">€${f0(invoiced-accepted)}</div><div class="fl-s">money to chase</div></div></div>`
+    <div class="flow-step drill" onclick="openMetric('not_credited')" style="background:#fff1f2"><div class="fl-t">Δ Not Credited</div><div class="fl-v" style="color:var(--rose-d)">€${f0(invoiced-accepted)}</div><div class="fl-s">gap to recover</div></div></div>`
   document.getElementById('K_dash').innerHTML=`
     <div class="kpi drill" onclick="openMetric('total_claims')"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl">📋 Total Claims</div><div class="kv bmw">${f0(claims.length)}</div><div class="ks">${f0(new Set(claims.map(c=>c.vin).filter(Boolean)).size)} unique VINs</div></div>
     <div class="kpi drill" onclick="openMetric('credited')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited (€)</div><div class="kv mint">${f0(accepted)}</div><div class="ks">of €${fk(invoiced)} invoiced</div></div>
@@ -2303,7 +2312,7 @@ window.exportUnlinked=exportUnlinked
 
 // ── BMW receivables statement: what BMW still owes us
 function statementRows(){
-  const onlyOut=document.getElementById('st_out').checked, mk=document.getElementById('st_make').value
+  const mode=document.getElementById('st_out_mode')?.value||'tochase', mk=document.getElementById('st_make').value
   let rows=scopedClaims().filter(c=>(!mk||c.make===mk)&&!c._secondary)
   rows.forEach(c=>{const handled=isHandled(c),acked=isAcked(c)
     c._pending=!handled&&effPending(c)
@@ -2312,7 +2321,8 @@ function statementRows(){
     c._accepted=gap&&acked?gap:0     // acknowledged — know it's lost, not chasing
     c._owed=c._pending?c.invoiced:(c._shortfall+c._accepted)
     c._otype=handled?'handled':(c._pending?'pending':(c._shortfall>0.5?'shortfall':(c._accepted>0.5?'accepted':'settled')))})
-  if(onlyOut)rows=rows.filter(c=>c._owed>0.5)
+  if(mode==='outstanding')rows=rows.filter(c=>c._owed>0.5)
+  else if(mode==='tochase')rows=rows.filter(c=>c._pending||c._shortfall>0.5)
   return rows.sort((a,b)=>b._owed-a._owed)
 }
 // ── incadea invoices billed but never submitted to BMW (potential missed warranty money) ──
@@ -2365,7 +2375,7 @@ function rStatement(){
   let h=`<div class="card">
     <div class="stmt-head">
       <div><h2>BMW Warranty &amp; BSI — Receivables Statement</h2><div class="sub">Amounts invoiced to BMW vs credited back · ${esc(scopeLbl)}</div></div>
-      <div class="co"><div class="stmt-co-name">Bassoul, Heneine SAL</div>Generated ${esc(today)}<br>${f0(rows.length)} claims${document.getElementById('st_out').checked?' (outstanding)':''}</div>
+      <div class="co"><div class="stmt-co-name">Bassoul, Heneine SAL</div>Generated ${esc(today)}<br>${f0(rows.length)} claims${mode==='tochase'?' (to chase)':mode==='outstanding'?' (outstanding)':''}</div>
     </div>
     <div class="kpis" style="margin-bottom:16px">
       <div class="kpi drill" onclick="openMetric('st_invoiced')"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced (€)</div><div class="kv slate">${f0(invoiced)}</div></div>
@@ -2739,7 +2749,7 @@ tfoot td{padding:10px 10px;font-weight:800;background:#f8fafc;border-top:2px sol
 document.getElementById('cr_xlsx').addEventListener('click',()=>{const rows=(window._crRows||[]).map(c=>{const ca=c._cnAccepted!=null?c._cnAccepted:c.accepted;const inv=Number(c.invoiced)||0;return[c.cn_date,c._cnDisplay||c.cn_no,c.kind,c.dealer_claim_number||c.credits?.[0]?.dealer_claim_number||c.no||c.sub?.last_submission||'',c.doc_no||(c.inferred_inv?'≈'+c.inferred_inv.doc_no:''),c.credits[0]?.brand||'',c.vin,c._cnLines!=null?c._cnLines:c.items_count,inv||'',ca,inv?+(inv-ca).toFixed(2):'',c.status_overall,c.corrected?'corrected':'',c.orphan?'no submission':'linked']});exportXlsx('BMW_Credit-Notes',['CN Date','Credit Note','Kind','Dealer Claim','Invoice','Brand','VIN','Lines','Invoiced €','Credited €','Δ €','Status','Corrected','Link'],rows);showToast('⬇ Exported '+rows.length+' credit rows to Excel')})
 document.getElementById('rj_xlsx').addEventListener('click',()=>{const rows=(window._rjRows||[]).map(c=>{const tr=S.resub[c.kind+':'+c.no]||{};return [c.cn_date,c.no,c.make,c.vin,c.accepted,c.gap,c.status_overall,c.statuses?.Error||0,c.statuses?.Warning||0,tr.status||'untracked',tr.credited_amt||'']});exportXlsx('BMW_Rejections',['CN Date','Submission','Make','VIN','Credited €','Gap €','Issue','Errors','Warnings','Tracked','Recovered €'],rows);showToast('⬇ Exported '+rows.length+' rejections to Excel')})
 document.getElementById('dash_xlsx').addEventListener('click',()=>{const series=monthly(scopedClaims()).filter(m=>m.month.slice(0,4)!=='2025');const rows=series.map(m=>[fmM(m.month),m.cnt,m.invoiced,m.accepted,pct(m.accepted,m.invoiced).toFixed(0)+'%',m.invoiced-m.accepted,m.success,m.warn,m.err,m.pending]);exportXlsx('BMW_Monthly-Performance',['Month','Claims','Invoiced €','Credited €','Cred %','Gap €','Success','Warning','Error','Pending'],rows);showToast('⬇ Exported '+rows.length+' months to Excel')})
-;['st_make','st_out'].forEach(id=>{const e=document.getElementById(id);e.addEventListener('change',rStatement)})
+;['st_make','st_out_mode'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('change',rStatement)})
 document.getElementById('st_csv').addEventListener('click',()=>{const rows=(window._stRows||[]).map(c=>[c.doc_no,c.kind,c.make,c.vin,c.document_date,c.invoiced,c.answered?c.accepted:'',c._otype,c._owed]);exportXlsx('BMW_Statement',['Invoice','Kind','Make','VIN','Sub Date','Invoiced €','Credited €','Type','Owed €'],rows);showToast('⬇ Exported statement — '+rows.length+' rows to Excel')})
 document.getElementById('st_print').addEventListener('click',()=>window.print())
 document.getElementById('ov_add').addEventListener('click',addOverride)
