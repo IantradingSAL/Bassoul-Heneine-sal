@@ -540,11 +540,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.47'
+const APP_VERSION='v5.48'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.48',date:'2026-07-14',items:[
+    {t:'fix',d:'Written Off page: claims where BMW never issued a credit note (rejected=€0) now show the Invoiced € as the written-off amount instead of €0 — marked with "(inv)" so you know the source. Net Loss and totals updated accordingly.'}]},
   {v:'v5.47',date:'2026-07-14',items:[
     {t:'feat',d:'New "Written Off" page — claims you mark as Rejected in the tracking panel now move OUT of "Unpaid — To Chase" and into a dedicated Written Off page. Shows Written Off €, Compensated € (BMW offset / goodwill), and Net Loss € per claim. Includes KPIs, Excel export, and a shareable PDF-ready report. Compensated € field added to the Track Recovery modal.'},
     {t:'fix',d:'Renamed "Rejected — money to chase" → "Unpaid — To Chase" everywhere (KPIs, panels, claim detail) to reflect that these claims are still being pursued, not written off.'}]},
@@ -2379,13 +2381,15 @@ function rStatement(){
 // ══ WRITTEN OFF PAGE ════════════════════════════════════════════════
 function writtenOffRows(){
   const _r=reconcile()
-  return [..._r.claims,..._r.orphans].filter(c=>manStatus(c)==='rejected').sort((a,b)=>b.rejected-a.rejected)
+  return [..._r.claims,..._r.orphans].filter(c=>manStatus(c)==='rejected').sort((a,b)=>woAmt(b)-woAmt(a))
 }
+// Written-off amount: BMW rejection figure if available, otherwise invoiced (BMW never responded)
+function woAmt(c){return (c.rejected>0.005?c.rejected:(c.invoiced||0))}
 function rWrittenOff(){
   const q=(document.getElementById('wo_q')?.value||'').toLowerCase().trim()
   let rows=writtenOffRows()
   if(q)rows=rows.filter(c=>(c.no||'').toLowerCase().includes(q)||(c.vin||'').toLowerCase().includes(q)||(c.make||'').toLowerCase().includes(q))
-  const totalRej=rows.reduce((s,c)=>s+(c.rejected||0),0)
+  const totalRej=rows.reduce((s,c)=>s+woAmt(c),0)
   const totalComp=rows.reduce((s,c)=>s+(S.resub[c.kind+':'+c.no]?.compensated_amt||0),0)
   const netLoss=totalRej-totalComp
   // KPIs
@@ -2403,15 +2407,16 @@ function rWrittenOff(){
   if(!rows.length){h+=`<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--muted)">No written-off claims yet — mark a claim as <b>Rejected</b> in the tracking panel to add it here.</td></tr>`}
   rows.forEach(c=>{
     const key=c.kind+':'+c.no,_r=S.resub[key]||{}
-    const comp=_r.compensated_amt||0,net=(c.rejected||0)-comp
+    const wa=woAmt(c),comp=_r.compensated_amt||0,net=wa-comp
+    const noRej=c.rejected<=0.005
     h+=`<tr onclick="openClaimDetail('${esc(c.kind)}','${esc(c.no)}')" style="cursor:pointer">
       <td><span class="badge ${c.kind==='warranty'?'b-bmw':'b-pur'}">${esc(c.kind.toUpperCase())}</span></td>
       <td class="mono" style="font-weight:600">${esc(c.no)}</td>
       <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
       <td>${esc(c.month||'—')}</td>
-      <td class="num" style="color:var(--rose-d);font-weight:700">€${f(c.rejected||0)}</td>
+      <td class="num" style="color:var(--rose-d);font-weight:700">€${f(wa)}${noRej?` <span title="BMW never issued a credit note — invoiced amount used" style="font-size:9px;color:var(--muted);font-weight:400">(inv)</span>`:''}</td>
       <td class="num" style="color:${comp>0?'var(--mint-d)':'var(--faint)'}">€${f(comp)}</td>
-      <td class="num" style="font-weight:700;color:${net>0.5?'var(--rose-d)':'var(--mint-d)'}">€${f(net)}</td>
+      <td class="num" style="font-weight:700;color:${net>0.5?'var(--rose-d)':'var(--mint-d)'}">€${f(Math.max(net,0))}</td>
       <td style="max-width:180px;font-size:10px;color:var(--muted)">${esc(_r.reason||'—')}</td>
       <td style="max-width:180px;font-size:10px;color:var(--muted)">${esc(_r.notes||'—')}</td>
       <td><button class="btn btn-sm" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">✏️ Edit</button></td>
@@ -2423,7 +2428,7 @@ function rWrittenOff(){
   const expBtn=document.getElementById('wo_export')
   if(expBtn){expBtn.onclick=()=>{
     const headers=['Kind','Claim No.','VIN','Month','Written Off €','Compensated €','Net Loss €','Reason','Notes']
-    const exRows=rows.map(c=>{const key=c.kind+':'+c.no,_r=S.resub[key]||{},comp=_r.compensated_amt||0,net=(c.rejected||0)-comp;return[c.kind.toUpperCase(),c.no,c.vin||'',c.month||'',c.rejected||0,comp,net,_r.reason||'',_r.notes||'']})
+    const exRows=rows.map(c=>{const key=c.kind+':'+c.no,_r=S.resub[key]||{},wa=woAmt(c),comp=_r.compensated_amt||0,net=wa-comp;return[c.kind.toUpperCase(),c.no,c.vin||'',c.month||'',wa,comp,Math.max(net,0),_r.reason||'',_r.notes||'']})
     exportXlsx('Written Off',headers,exRows)
   }}
   // Share Report
@@ -2437,20 +2442,20 @@ window.rWrittenOff=rWrittenOff
 
 function generateWoReport(rows){
   const today=new Date().toISOString().slice(0,10)
-  const totalRej=rows.reduce((s,c)=>s+(c.rejected||0),0)
+  const totalRej=rows.reduce((s,c)=>s+woAmt(c),0)
   const totalComp=rows.reduce((s,c)=>s+(S.resub[c.kind+':'+c.no]?.compensated_amt||0),0)
   const netLoss=totalRej-totalComp
   const f2=v=>v==null?'—':'€'+Number(v).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})
   let rowsHtml=rows.map(c=>{
-    const key=c.kind+':'+c.no,_r=S.resub[key]||{},comp=_r.compensated_amt||0,net=(c.rejected||0)-comp
+    const key=c.kind+':'+c.no,_r=S.resub[key]||{},wa=woAmt(c),comp=_r.compensated_amt||0,net=wa-comp
     return`<tr>
       <td><span style="padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;background:${c.kind==='warranty'?'#dbeafe':'#f3e8ff'};color:${c.kind==='warranty'?'#1e40af':'#6b21a8'}">${c.kind.toUpperCase()}</span></td>
       <td style="font-family:monospace;font-weight:600">${c.no}</td>
       <td style="font-family:monospace;font-size:11px">${c.vin||'—'}</td>
       <td>${c.month||'—'}</td>
-      <td style="text-align:right;color:#dc2626;font-weight:700">${f2(c.rejected)}</td>
+      <td style="text-align:right;color:#dc2626;font-weight:700">${f2(wa)}${c.rejected<=0.005?' <span style="font-size:9px;color:#9ca3af">(inv)</span>':''}</td>
       <td style="text-align:right;color:${comp>0?'#059669':'#9ca3af'}">${f2(comp)}</td>
-      <td style="text-align:right;font-weight:700;color:${net>0.5?'#dc2626':'#059669'}">${f2(net)}</td>
+      <td style="text-align:right;font-weight:700;color:${net>0.5?'#dc2626':'#059669'}">${f2(Math.max(net,0))}</td>
       <td style="font-size:11px;color:#6b7280;max-width:200px">${(_r.reason||'—').replace(/</g,'&lt;')}</td>
     </tr>`}).join('')
   const html=`<!doctype html><html><head><meta charset="utf-8"><title>Written Off Report · ${today}</title>
