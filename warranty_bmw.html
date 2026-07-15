@@ -312,6 +312,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
     <div class="si" data-page="statement"><span class="si-icon">💶</span><span>BMW Statement</span></div>
     <div class="si" data-page="notsub"><span class="si-icon">🚩</span><span>Not Submitted</span><span class="si-badge" id="B_notsub" style="background:var(--sun)">0</span></div>
     <div class="si" data-page="followups"><span class="si-icon">📅</span><span>Follow-ups</span><span class="si-badge" id="B_follow" style="background:var(--sun)">0</span></div>
+    <div class="si" data-page="writtenoff"><span class="si-icon">🗑️</span><span>Written Off</span><span class="si-badge" id="B_writtenoff" style="background:var(--rose)">0</span></div>
     <div class="nav-sec">Data</div>
     <div class="si" data-page="upload"><span class="si-icon">📤</span><span>Upload Center</span></div>
     <div id="verFoot" style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL</div>
@@ -466,6 +467,20 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
       <div id="T_follow"></div>
     </div>
 
+    <!-- WRITTEN OFF -->
+    <div class="page" id="P_writtenoff">
+      <div class="al al-i">🗑️ Claims you manually marked as <b>Rejected</b> in the tracking panel — these are fully written off (you tried but could not recover them). They are <b>excluded</b> from the <i>Unpaid — To Chase</i> panel. Log any partial offset BMW gave you in the <b>Compensated €</b> field to track the true net loss.</div>
+      <div class="kpis" id="K_writtenoff"></div>
+      <div class="card"><div class="filters">
+        <span class="fl-l">Search</span>
+        <input id="wo_q" placeholder="claim no., VIN…" style="padding:5px 9px;border:1px solid var(--line);border-radius:7px;font-size:11px;width:160px">
+        <span style="flex:1"></span>
+        <button class="btn btn-sm" id="wo_share" style="background:var(--bmw);color:#fff">📤 Share Report</button>
+        <button class="btn btn-sm btn-bmw" id="wo_export">⬇ Excel</button>
+      </div></div>
+      <div id="T_writtenoff"></div>
+    </div>
+
     <!-- UPLOAD -->
     <div class="page" id="P_upload">
       <div class="al al-i">📤 Drop all three files together — incadea, the Warranty/BSI submissions, and the SAP credit notes. The system auto-detects each file type, de-duplicates, and re-links the chain.</div>
@@ -525,11 +540,16 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.45'
+const APP_VERSION='v5.47'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.47',date:'2026-07-14',items:[
+    {t:'feat',d:'New "Written Off" page — claims you mark as Rejected in the tracking panel now move OUT of "Unpaid — To Chase" and into a dedicated Written Off page. Shows Written Off €, Compensated € (BMW offset / goodwill), and Net Loss € per claim. Includes KPIs, Excel export, and a shareable PDF-ready report. Compensated € field added to the Track Recovery modal.'},
+    {t:'fix',d:'Renamed "Rejected — money to chase" → "Unpaid — To Chase" everywhere (KPIs, panels, claim detail) to reflect that these claims are still being pursued, not written off.'}]},
+  {v:'v5.46',date:'2026-07-14',items:[
+    {t:'fix',d:'Credit Notes page: claims with tracking status "resubmitted" now show the ↺ Resubmitted chip (amber) next to ❌ Error directly in the table row — previously this chip was only visible in the Share Report but not on the live Credit Notes page.'}]},
   {v:'v5.45',date:'2026-07-14',items:[
     {t:'feat',d:'Share Report: resubmitted claims now show a ↺ Resubmitted chip (amber) next to ❌ Error — keeping the original status for traceability while making it clear the error has been actioned. Consistent with the follow-up badge pattern: status + action side by side.'}]},
   {v:'v5.44',date:'2026-07-14',items:[
@@ -1062,7 +1082,7 @@ function effKey(c){if(c.answered)return c.status_overall;const s=manStatus(c);re
 function effPending(c){return effKey(c)==='Pending'}
 // a claim that has been actioned (resubmitted / credited / resolved) is no longer "to chase" —
 // it must drop out of the Rejected/Pricing totals so it is not double-counted with its new claim
-const MAN_HANDLED=new Set(['resubmitted','credited','resolved'])
+const MAN_HANDLED=new Set(['resubmitted','credited','resolved','rejected'])
 function isHandled(c){return MAN_HANDLED.has(manStatus(c))}
 // A ⚠ Warning where BMW still PAID the line (nothing rejected — just re-priced, e.g. oil billed
 // as a part but reimbursed on the sublet line) is a normal outcome, not money at risk.
@@ -1111,7 +1131,7 @@ function openClaim(kind,no){
       </div>
       ${claim.answered&&(Math.abs(claim.pricing_diff||0)>0.5||claim.rejected>0.5)?`<div class="vin-summary" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
         <div class="vin-stat"><div class="vin-stat-l">🔧 Pricing difference (incadea rate vs BMW rate)</div><div class="vin-stat-v" style="color:var(--lemon-d)">€${f(claim.pricing_diff)}</div></div>
-        <div class="vin-stat"><div class="vin-stat-l">❌ Rejected (money to chase)</div><div class="vin-stat-v" style="color:var(--rose-d)">€${f(claim.rejected)}</div></div>
+        <div class="vin-stat"><div class="vin-stat-l">❌ Unpaid (to chase)</div><div class="vin-stat-v" style="color:var(--rose-d)">€${f(claim.rejected)}</div></div>
         <div style="grid-column:1/-1;font-size:10px;color:var(--faint)">${claim.claim_basis==='claimed'?'Exact — measured from the claimed price on the credit note.':'Estimated from the claim status (a reliable claimed price is not in the file).'}</div></div>`:''}
       ${claim.answered?`<div class="vin-section"><div class="vin-section-h"><span>📑 Credit lines</span><span class="ct">${items.length}</span></div>
         <table class="vin-mini"><thead><tr><th>Credit Note</th><th>Position</th><th>Claim Item No.</th><th>Description</th><th>Defect</th><th class="num">Qty</th><th class="num">Accepted €</th><th>Status</th></tr></thead>
@@ -1399,7 +1419,7 @@ const METRIC_DEFS={
     rows:_dealerAgg,
     stats:r=>[['Accounts',f0(r.length)],['Credited €','€'+f0(_sum(r,'accepted'))],['Invoiced €','€'+f0(_sum(r,'invoiced'))],['Top share',r.length?pct(r[0].accepted,_sum(r,'accepted')).toFixed(0)+'%':'0%']]},
   // ── GAP DECOMPOSITION: rejection vs pricing difference ──
-  rejected_gap:{icon:'❌',title:'Rejected — money to chase',accent:'var(--rose-d)',sub:'BMW paid less than we claimed (claimed − paid; where claimed price is missing, the gap on rejected claims)',src:['cred','inv'],focus:'Rejected €',cols:RCOLS,
+  rejected_gap:{icon:'❌',title:'Unpaid — To Chase',accent:'var(--rose-d)',sub:'BMW paid less than we claimed — still pursuing recovery (claimed − paid; where claimed price is missing, the gap on rejected claims). Claims you marked as "rejected" (written off) are excluded — see the Written Off page.',src:['cred','inv'],focus:'Rejected €',cols:RCOLS,
     rows:()=>scopedClaims().concat(scopedOrphans()).filter(c=>c.rejected>0.005&&!isHandled(c)).sort((a,b)=>b.rejected-a.rejected),
     stats:r=>[['Claims',f0(r.length)],['Rejected €','€'+f0(_sum(r,'rejected'))],['Exact (claimed price)',f0(r.filter(c=>c.claim_basis==='claimed').length)],['By status',f0(r.filter(c=>c.claim_basis!=='claimed').length)]]},
   pricing_gap:{icon:'🔧',title:'Pricing Difference',accent:'var(--lemon-d)',sub:'incadea rate vs BMW rate (invoiced − claimed; where claimed price is missing, the gap on accepted claims)',src:['inv','cred'],focus:'Pricing diff €',cols:RCOLS,
@@ -1759,7 +1779,8 @@ function openTrack(kind,no,opts){opts=opts||{}
       ${fld('tr_resub_date','Resubmit Date',ex.resub_date,'date')}
       ${fld('tr_resubamt','Resubmitted € (to recover)',preResubAmt,'number')}
       ${fld('tr_credited','Recovered € (credited back)',ex.credited_amt,'number')}
-      <div style="display:flex;align-items:flex-end;font-size:10px;color:var(--muted);padding-bottom:8px">Recovery rate = recovered ÷ resubmitted</div>
+      ${fld('tr_compensated','Compensated € (BMW offset / goodwill)',ex.compensated_amt,'number')}
+      <div style="display:flex;align-items:flex-end;font-size:10px;color:var(--muted);padding-bottom:8px">Recovery rate = recovered ÷ resubmitted · Compensated = partial offset on written-off claims</div>
       ${oc?`<div style="grid-column:1/-1;background:${oc.answered&&oc.credited>0?'#f0fdf4':oc.status==='Error'?'#fef2f2':'#eff6ff'};border:1px solid ${oc.answered&&oc.credited>0?'var(--mint)':oc.status==='Error'?'var(--rose)':'var(--sky)'};border-radius:8px;padding:8px 10px;font-size:11px;display:flex;align-items:center;gap:8px"><span style="font-size:14px">${oc.answered&&oc.credited>0?'✅':oc.status==='Error'?'❌':'⏳'}</span><span>New claim <b>${esc(oc.no)}</b> is in the loaded data — ${oc.answered?(oc.credited>0?'credited €'+f(oc.credited):'answered · '+esc(oc.status)):'still pending'}.</span>${oc.credited>0?`<button class="btn btn-sm" style="margin-left:auto" onclick="document.getElementById('tr_credited').value='${Math.round(oc.credited*100)/100}'">Use as recovered</button>`:''}</div>`:''}
       <div style="grid-column:1/-1"><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Notes</label><textarea id="tr_notes" rows="2" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit;resize:vertical">${esc(preNotes)}</textarea></div>
       <div style="grid-column:1/-1;border-top:1px solid var(--line2);margin-top:4px;padding-top:10px">
@@ -1781,10 +1802,10 @@ function openTrack(kind,no,opts){opts=opts||{}
 window.openTrack=openTrack
 async function saveTrack(kind,no){
   const _r=reconcile();const claim=[..._r.claims,..._r.orphans].find(c=>c.kind===kind&&c.no===no);if(!claim)return
-  const key=kind+':'+no,credited=parseFloat(document.getElementById('tr_credited').value)||null,resubAmt=parseFloat(document.getElementById('tr_resubamt')?.value)||null
+  const key=kind+':'+no,credited=parseFloat(document.getElementById('tr_credited').value)||null,resubAmt=parseFloat(document.getElementById('tr_resubamt')?.value)||null,compensated=parseFloat(document.getElementById('tr_compensated')?.value)||null
   const payload={orig_claim:key,orig_vin:claim.vin||null,orig_brand:claim.make||null,orig_month:claim.month||null,orig_amount:claim.accepted||claim.invoiced||null,
     new_claim:document.getElementById('tr_newclaim').value||null,reason:document.getElementById('tr_reason').value||null,
-    resub_date:document.getElementById('tr_resub_date').value||null,credited_amt:credited,resubmitted_amt:resubAmt,
+    resub_date:document.getElementById('tr_resub_date').value||null,credited_amt:credited,resubmitted_amt:resubAmt,compensated_amt:compensated,
     recovery_rate:credited!=null&&resubAmt>0?credited/resubAmt*100:(credited!=null&&claim.rejected>0?credited/claim.rejected*100:null),
     status:document.getElementById('tr_status').value||'pending',notes:document.getElementById('tr_notes').value||null,
     follow_up_date:document.getElementById('tr_fudate').value||null,follow_up_note:document.getElementById('tr_funote').value||null,follow_up_done:document.getElementById('tr_fudone').checked,
@@ -1801,7 +1822,7 @@ async function ackClaim(kind,no,on){const key=kind+':'+no,ex=S.resub[key]||{}
   const _r=reconcile();const claim=[..._r.claims,..._r.orphans].find(c=>c.kind===kind&&c.no===no)
   const payload={orig_claim:key,orig_vin:ex.orig_vin||claim?.vin||null,orig_brand:ex.orig_brand||claim?.make||null,orig_month:ex.orig_month||claim?.month||null,
     orig_amount:ex.orig_amount||claim?.accepted||claim?.invoiced||null,new_claim:ex.new_claim||null,reason:ex.reason||null,
-    resub_date:ex.resub_date||null,credited_amt:ex.credited_amt??null,resubmitted_amt:ex.resubmitted_amt??null,recovery_rate:ex.recovery_rate??null,
+    resub_date:ex.resub_date||null,credited_amt:ex.credited_amt??null,resubmitted_amt:ex.resubmitted_amt??null,recovery_rate:ex.recovery_rate??null,compensated_amt:ex.compensated_amt??null,
     notes:ex.notes||null,follow_up_date:ex.follow_up_date||null,follow_up_note:ex.follow_up_note||null,follow_up_done:ex.follow_up_done||false,
     status:on?'acknowledged':'pending',updated_by:S.me?.id||null,updated_by_name:S.me?.name||null}
   showLoad('Saving…');const {error}=await sb.from('warranty_bmw_resub').upsert(payload,{onConflict:'orig_claim'});hideLoad()
@@ -1869,7 +1890,7 @@ function exportXlsx(name,headers,rows){
 
 // ══ RENDER ══════════════════════════════════════════════════════
 function currentPage(){return document.querySelector('.si.active')?.dataset.page||'dashboard'}
-function renderPage(p){if(p==='dashboard')rDash();if(p==='pipeline')rPipe();if(p==='credits')rCredits();if(p==='rejections')rRej();if(p==='pricing')rPricing();if(p==='insights')rInsights();if(p==='statement')rStatement();if(p==='notsub')rNotSub();if(p==='followups')rFollowups();if(p==='upload')rUploadHist()}
+function renderPage(p){if(p==='dashboard')rDash();if(p==='pipeline')rPipe();if(p==='credits')rCredits();if(p==='rejections')rRej();if(p==='pricing')rPricing();if(p==='insights')rInsights();if(p==='statement')rStatement();if(p==='notsub')rNotSub();if(p==='followups')rFollowups();if(p==='writtenoff')rWrittenOff();if(p==='upload')rUploadHist()}
 function monthly(claims){const m={};claims.forEach(c=>{if(!c.month)return;if(!m[c.month])m[c.month]={month:c.month,cnt:0,invoiced:0,accepted:0,answered:0,err:0,warn:0,success:0,pending:0,labor:0,parts:0,ext:0};const b=m[c.month];b.cnt++;b.invoiced+=c.invoiced;b.accepted+=c.accepted;b.labor+=c.labor;b.parts+=c.parts;b.ext+=c.ext;const k=effKey(c);if(k==='Pending')b.pending++;else{b.answered++;if(k==='Error')b.err++;else if(k==='Warning')b.warn++;else b.success++}});return Object.values(m).sort((a,b)=>a.month.localeCompare(b.month))}
 
 function updateBadges(){
@@ -1878,6 +1899,7 @@ function updateBadges(){
   document.getElementById('B_rej').textContent=f0(claims.filter(needsAttn).length)
   const pb=document.getElementById('B_price');if(pb){const pc=pricingRows().filter(c=>!priceApproved(c)).length;pb.textContent=f0(pc);pb.style.display=pc?'':'none'}
   const fb=document.getElementById('B_follow');if(fb){const fc=followCount();fb.textContent=f0(fc);fb.style.display=fc?'':'none'}
+  const wb=document.getElementById('B_writtenoff');if(wb){const wc=writtenOffRows().length;wb.textContent=f0(wc);wb.style.display=wc?'':'none'}
   const nsb=document.getElementById('B_notsub');if(nsb){const nsc=notSubInvoices().filter(i=>i.payment_method_code==='CREDIT'&&!cancelOf(i)).length;nsb.textContent=f0(nsc);nsb.style.display=nsc?'':'none'}
   const invMakes=[...new Set(S.inv.map(i=>i.make_code).filter(Boolean))].sort()
   const nm=document.getElementById('ns_make');if(nm){const cur=nm.value;nm.innerHTML='<option value="">All</option>'+invMakes.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');nm.value=cur}
@@ -1962,7 +1984,7 @@ function rDash(){
     <div class="kpi drill" onclick="openMetric('credited_rate')"><div class="kpi-accent" style="background:var(--sky)"></div><div class="kl">🎯 Credited Rate</div><div class="kv sky">${pct(accepted,invoiced).toFixed(1)}%</div><div class="ks">€${fk(invoiced-accepted)} gap</div></div>
     <div class="kpi drill" onclick="openMetric('pending')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending Answer</div><div class="kv sun">${f0(pending)}</div><div class="ks">submitted, awaiting BMW</div></div>
     <div class="kpi drill" onclick="openMetric('attention')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">⚠️ Needs Attention</div><div class="kv rose">${f0(err+warn)}</div><div class="ks">${err} errors · ${warn} warnings</div></div>
-    <div class="kpi drill" onclick="openMetric('rejected_gap')"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">❌ Rejected (to chase)</div><div class="kv" style="color:var(--rose-d)">${f0(totRejected)}</div><div class="ks">BMW cut what we claimed</div></div>
+    <div class="kpi drill" onclick="openMetric('rejected_gap')"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">❌ Unpaid (to chase)</div><div class="kv" style="color:var(--rose-d)">${f0(totRejected)}</div><div class="ks">BMW cut what we claimed</div></div>
     <div class="kpi drill" onclick="openMetric('pricing_gap')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔧 Pricing Difference</div><div class="kv lem">${f0(totPricing)}</div><div class="ks">incadea rate vs BMW rate</div></div>`+ocCard+pwCard+offCard+dupCard
   document.getElementById('CH_trend').innerHTML=trendChart(series.map(s=>({label:fmM(s.month),short:fmMs(s.month),value:s.accepted,count:s.cnt})))
   document.getElementById('CH_status').innerHTML=donutChart([{label:'Success',value:success,color:'#10b981'},{label:'Warning',value:warn,color:'#eab308'},{label:'Error',value:err,color:'#e11d48'},{label:'Pending',value:pending,color:'#f59e0b'}],{centerTop:f0(claims.length),centerSub:'CLAIMS'})
@@ -2052,7 +2074,7 @@ function rCredits(){
     <td><span class="badge b-n">${esc(c.credits[0]?.brand||'—')}</span></td>
     <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td><td class="num">${c._cnLines!=null?c._cnLines:c.items_count}</td>
     <td class="num">${cInv?f(cInv):(c.orphan?'<span style="color:var(--faint)" title="orphan credit — no incadea invoice loaded, not counted in Invoiced">no inv</span>':'—')}</td>
-    ${(()=>{const ca=c._cnAccepted!=null?c._cnAccepted:c.accepted;return`<td class="num" style="font-weight:700">${f(ca)}</td><td class="num" style="color:${cInv-ca>0.5?'var(--rose-d)':'var(--mint-d)'}">${f(cInv-ca)}</td>`})()}<td>${sBadge(c.status_overall)}${corrBadge(c)}${fuBadge(c)}</td>
+    ${(()=>{const ca=c._cnAccepted!=null?c._cnAccepted:c.accepted;return`<td class="num" style="font-weight:700">${f(ca)}</td><td class="num" style="color:${cInv-ca>0.5?'var(--rose-d)':'var(--mint-d)'}">${f(cInv-ca)}</td>`})()}<td>${sBadge(c.status_overall)}${corrBadge(c)}${manBadge(c)}${fuBadge(c)}</td>
     <td>${c.orphan?'<span class="badge b-pur" title="BMW credited this, but no matching submission row is loaded">credited · no sub</span>':'<span class="badge b-mint">linked</span>'}</td></tr>`})
   if(rows.length>700)h+=`<tr><td colspan="13" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-700} more — narrow with filters 🔍 (the TOTAL below still covers all ${f0(rows.length)})</td></tr>`
   h+=`</tbody><tfoot><tr style="border-top:2px solid var(--line)"><td colspan="8" style="text-align:right;font-weight:800">TOTAL · ${f0(rows.length)} claims</td>
@@ -2080,7 +2102,7 @@ function rRej(){
   document.getElementById('K_rej').innerHTML=`
     <div class="kpi drill" onclick="openMetric('rj_err')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">❌ Errors</div><div class="kv rose">${err}</div></div>
     <div class="kpi drill" onclick="openMetric('rj_warn')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">⚠️ Warnings</div><div class="kv lem">${warn}</div></div>
-    <div class="kpi drill" onclick="openMetric('rejected_gap')"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">❌ Rejected € (to chase)</div><div class="kv" style="color:var(--rose-d)">${f0(rejAmt)}</div><div class="ks">claimed − paid</div></div>
+    <div class="kpi drill" onclick="openMetric('rejected_gap')"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">❌ Unpaid € (to chase)</div><div class="kv" style="color:var(--rose-d)">${f0(rejAmt)}</div><div class="ks">claimed − paid · still pursuing</div></div>
     <div class="kpi drill" onclick="openMetric('rj_gap')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">💰 Gap at Risk €</div><div class="kv sun">${f0(atRisk)}</div></div>
     <div class="kpi drill" onclick="openMetric('rj_tracked')"><div class="kpi-accent" style="background:var(--blue)"></div><div class="kl">✅ Tracked</div><div class="kv" style="color:var(--blue)">${tracked}</div><div class="ks">of ${claims.length}</div></div>
     <div class="kpi drill" onclick="openMetric('rj_recovered')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💚 Recovered €</div><div class="kv mint">${f0(credited)}</div></div>`
@@ -2353,6 +2375,117 @@ function rStatement(){
   </div>`
   document.getElementById('T_statement').innerHTML = h
 }
+
+// ══ WRITTEN OFF PAGE ════════════════════════════════════════════════
+function writtenOffRows(){
+  const _r=reconcile()
+  return [..._r.claims,..._r.orphans].filter(c=>manStatus(c)==='rejected').sort((a,b)=>b.rejected-a.rejected)
+}
+function rWrittenOff(){
+  const q=(document.getElementById('wo_q')?.value||'').toLowerCase().trim()
+  let rows=writtenOffRows()
+  if(q)rows=rows.filter(c=>(c.no||'').toLowerCase().includes(q)||(c.vin||'').toLowerCase().includes(q)||(c.make||'').toLowerCase().includes(q))
+  const totalRej=rows.reduce((s,c)=>s+(c.rejected||0),0)
+  const totalComp=rows.reduce((s,c)=>s+(S.resub[c.kind+':'+c.no]?.compensated_amt||0),0)
+  const netLoss=totalRej-totalComp
+  // KPIs
+  const kEl=document.getElementById('K_writtenoff')
+  if(kEl)kEl.innerHTML=`
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">🗑️ Written Off</div><div class="kv" style="color:var(--rose-d)">${f0(rows.length)}</div><div class="ks">claims given up on</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--rose-d)"></div><div class="kl">❌ Total Written Off €</div><div class="kv" style="color:var(--rose-d)">€${f0(totalRej)}</div><div class="ks">rejected by BMW</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:var(--mint-d)"></div><div class="kl">✅ Compensated €</div><div class="kv" style="color:var(--mint-d)">€${f0(totalComp)}</div><div class="ks">partial offset received</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background:${netLoss>0?'var(--rose-d)':'var(--muted)'}"></div><div class="kl">📉 Net Loss €</div><div class="kv" style="color:${netLoss>0?'var(--rose-d)':'var(--mint-d)'}">€${f0(netLoss)}</div><div class="ks">written off − compensated</div></div>`
+  // Table
+  let h=`<div class="card"><table class="tbl"><thead><tr>
+    <th>Kind</th><th>Claim No.</th><th>VIN</th><th>Month</th>
+    <th class="num">Written Off €</th><th class="num">Compensated €</th><th class="num">Net Loss €</th>
+    <th>Reason</th><th>Notes</th><th>Action</th></tr></thead><tbody>`
+  if(!rows.length){h+=`<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--muted)">No written-off claims yet — mark a claim as <b>Rejected</b> in the tracking panel to add it here.</td></tr>`}
+  rows.forEach(c=>{
+    const key=c.kind+':'+c.no,_r=S.resub[key]||{}
+    const comp=_r.compensated_amt||0,net=(c.rejected||0)-comp
+    h+=`<tr onclick="openClaimDetail('${esc(c.kind)}','${esc(c.no)}')" style="cursor:pointer">
+      <td><span class="badge ${c.kind==='warranty'?'b-bmw':'b-pur'}">${esc(c.kind.toUpperCase())}</span></td>
+      <td class="mono" style="font-weight:600">${esc(c.no)}</td>
+      <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
+      <td>${esc(c.month||'—')}</td>
+      <td class="num" style="color:var(--rose-d);font-weight:700">€${f(c.rejected||0)}</td>
+      <td class="num" style="color:${comp>0?'var(--mint-d)':'var(--faint)'}">€${f(comp)}</td>
+      <td class="num" style="font-weight:700;color:${net>0.5?'var(--rose-d)':'var(--mint-d)'}">€${f(net)}</td>
+      <td style="max-width:180px;font-size:10px;color:var(--muted)">${esc(_r.reason||'—')}</td>
+      <td style="max-width:180px;font-size:10px;color:var(--muted)">${esc(_r.notes||'—')}</td>
+      <td><button class="btn btn-sm" onclick="event.stopPropagation();openTrack('${esc(c.kind)}','${esc(c.no)}')">✏️ Edit</button></td>
+    </tr>`
+  })
+  h+=`</tbody></table></div>`
+  const tEl=document.getElementById('T_writtenoff');if(tEl)tEl.innerHTML=h
+  // Excel export
+  const expBtn=document.getElementById('wo_export')
+  if(expBtn){expBtn.onclick=()=>{
+    const headers=['Kind','Claim No.','VIN','Month','Written Off €','Compensated €','Net Loss €','Reason','Notes']
+    const exRows=rows.map(c=>{const key=c.kind+':'+c.no,_r=S.resub[key]||{},comp=_r.compensated_amt||0,net=(c.rejected||0)-comp;return[c.kind.toUpperCase(),c.no,c.vin||'',c.month||'',c.rejected||0,comp,net,_r.reason||'',_r.notes||'']})
+    exportXlsx('Written Off',headers,exRows)
+  }}
+  // Share Report
+  const shareBtn=document.getElementById('wo_share')
+  if(shareBtn){shareBtn.onclick=()=>generateWoReport(rows)}
+  // Search live
+  const qEl=document.getElementById('wo_q')
+  if(qEl&&!qEl._wobound){qEl._wobound=true;qEl.addEventListener('input',()=>rWrittenOff())}
+}
+window.rWrittenOff=rWrittenOff
+
+function generateWoReport(rows){
+  const today=new Date().toISOString().slice(0,10)
+  const totalRej=rows.reduce((s,c)=>s+(c.rejected||0),0)
+  const totalComp=rows.reduce((s,c)=>s+(S.resub[c.kind+':'+c.no]?.compensated_amt||0),0)
+  const netLoss=totalRej-totalComp
+  const f2=v=>v==null?'—':'€'+Number(v).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})
+  let rowsHtml=rows.map(c=>{
+    const key=c.kind+':'+c.no,_r=S.resub[key]||{},comp=_r.compensated_amt||0,net=(c.rejected||0)-comp
+    return`<tr>
+      <td><span style="padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;background:${c.kind==='warranty'?'#dbeafe':'#f3e8ff'};color:${c.kind==='warranty'?'#1e40af':'#6b21a8'}">${c.kind.toUpperCase()}</span></td>
+      <td style="font-family:monospace;font-weight:600">${c.no}</td>
+      <td style="font-family:monospace;font-size:11px">${c.vin||'—'}</td>
+      <td>${c.month||'—'}</td>
+      <td style="text-align:right;color:#dc2626;font-weight:700">${f2(c.rejected)}</td>
+      <td style="text-align:right;color:${comp>0?'#059669':'#9ca3af'}">${f2(comp)}</td>
+      <td style="text-align:right;font-weight:700;color:${net>0.5?'#dc2626':'#059669'}">${f2(net)}</td>
+      <td style="font-size:11px;color:#6b7280;max-width:200px">${(_r.reason||'—').replace(/</g,'&lt;')}</td>
+    </tr>`}).join('')
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Written Off Report · ${today}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Segoe UI',system-ui,sans-serif;background:#f9fafb;color:#111;padding:32px}
+  .hdr{background:linear-gradient(135deg,#1d1d1d 0%,#333 100%);color:#fff;border-radius:12px;padding:24px 28px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start}
+  .hdr h1{font-size:20px;font-weight:800;letter-spacing:-.02em}
+  .hdr p{font-size:12px;opacity:.7;margin-top:4px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+  .kpi{background:#fff;border-radius:10px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.08);border-top:4px solid var(--accent,#dc2626)}
+  .kl{font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}
+  .kv{font-size:22px;font-weight:800;margin:4px 0 2px;color:var(--accent,#111)}
+  .ks{font-size:10px;color:#9ca3af}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  th{background:#1d1d1d;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:10px 12px;text-align:left}
+  th.r{text-align:right}
+  td{padding:9px 12px;border-bottom:1px solid #f3f4f6;font-size:12px;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#fafafa}
+  .ft{margin-top:24px;font-size:10px;color:#9ca3af;text-align:center}</style></head><body>
+  <div class="hdr"><div><div style="font-size:10px;font-weight:700;letter-spacing:.15em;opacity:.6;margin-bottom:6px">BMW WARRANTY RECONCILIATION</div>
+  <h1>🗑️ Written Off Claims</h1><p>Claims given up on after all recovery attempts · as of ${today}</p></div>
+  <div style="text-align:right;font-size:11px;opacity:.7"><div style="font-weight:700">${rows.length} claims</div><div>Generated ${today}</div></div></div>
+  <div class="kpis">
+    <div class="kpi" style="--accent:#dc2626"><div class="kl">🗑️ Written Off</div><div class="kv">${rows.length}</div><div class="ks">claims given up on</div></div>
+    <div class="kpi" style="--accent:#dc2626"><div class="kl">❌ Total Written Off €</div><div class="kv">${f2(totalRej)}</div><div class="ks">rejected by BMW</div></div>
+    <div class="kpi" style="--accent:#059669"><div class="kl">✅ Compensated €</div><div class="kv">${f2(totalComp)}</div><div class="ks">partial offset received</div></div>
+    <div class="kpi" style="--accent:${netLoss>0?'#dc2626':'#059669'}"><div class="kl">📉 Net Loss €</div><div class="kv">${f2(netLoss)}</div><div class="ks">written off − compensated</div></div>
+  </div>
+  <table><thead><tr><th>Kind</th><th>Claim No.</th><th>VIN</th><th>Month</th><th class="r">Written Off €</th><th class="r">Compensated €</th><th class="r">Net Loss €</th><th>Reason</th></tr></thead>
+  <tbody>${rowsHtml}</tbody></table>
+  <div class="ft">© IanTradingSAL · BMW Warranty Reconciliation · Generated ${today}</div>
+  </body></html>`
+  const blob=new Blob([html],{type:'text/html'});window.open(URL.createObjectURL(blob))
+}
+window.generateWoReport=generateWoReport
 
 async function rUploadHist(){
   const el=document.getElementById('upHist');if(!el)return
