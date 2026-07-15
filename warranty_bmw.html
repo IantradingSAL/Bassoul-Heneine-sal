@@ -540,11 +540,14 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.48'
+const APP_VERSION='v5.49'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.49',date:'2026-07-15',items:[
+    {t:'fix',d:'Written Off page: Written Off € is now computed automatically in priority order — (1) manual override you enter in Edit, (2) BMW formal rejection amount, (3) gap between invoiced and credited when BMW answered. Falls back to "— enter in Edit" only when no data is available (e.g. BMW never responded). Removed incorrect fallback to full invoiced amount.'},
+    {t:'feat',d:'Track Recovery modal: new "Written Off € (override)" field — enter the exact amount only when the auto-computed value is wrong or unavailable. Auto-computed values show a source label: (gap) or (manual).'}]},
   {v:'v5.48',date:'2026-07-14',items:[
     {t:'fix',d:'Written Off page: claims where BMW never issued a credit note (rejected=€0) now show the Invoiced € as the written-off amount instead of €0 — marked with "(inv)" so you know the source. Net Loss and totals updated accordingly.'}]},
   {v:'v5.47',date:'2026-07-14',items:[
@@ -1782,7 +1785,8 @@ function openTrack(kind,no,opts){opts=opts||{}
       ${fld('tr_resubamt','Resubmitted € (to recover)',preResubAmt,'number')}
       ${fld('tr_credited','Recovered € (credited back)',ex.credited_amt,'number')}
       ${fld('tr_compensated','Compensated € (BMW offset / goodwill)',ex.compensated_amt,'number')}
-      <div style="display:flex;align-items:flex-end;font-size:10px;color:var(--muted);padding-bottom:8px">Recovery rate = recovered ÷ resubmitted · Compensated = partial offset on written-off claims</div>
+      ${fld('tr_written_off_amt','Written Off € (override · auto if blank)',ex.written_off_amt,'number')}
+      <div style="display:flex;align-items:flex-end;font-size:10px;color:var(--muted);padding-bottom:8px">Written Off = auto from BMW rejection or gap · enter manually only when auto is wrong or unavailable</div>
       ${oc?`<div style="grid-column:1/-1;background:${oc.answered&&oc.credited>0?'#f0fdf4':oc.status==='Error'?'#fef2f2':'#eff6ff'};border:1px solid ${oc.answered&&oc.credited>0?'var(--mint)':oc.status==='Error'?'var(--rose)':'var(--sky)'};border-radius:8px;padding:8px 10px;font-size:11px;display:flex;align-items:center;gap:8px"><span style="font-size:14px">${oc.answered&&oc.credited>0?'✅':oc.status==='Error'?'❌':'⏳'}</span><span>New claim <b>${esc(oc.no)}</b> is in the loaded data — ${oc.answered?(oc.credited>0?'credited €'+f(oc.credited):'answered · '+esc(oc.status)):'still pending'}.</span>${oc.credited>0?`<button class="btn btn-sm" style="margin-left:auto" onclick="document.getElementById('tr_credited').value='${Math.round(oc.credited*100)/100}'">Use as recovered</button>`:''}</div>`:''}
       <div style="grid-column:1/-1"><label style="display:block;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:4px">Notes</label><textarea id="tr_notes" rows="2" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:11px;font-family:inherit;resize:vertical">${esc(preNotes)}</textarea></div>
       <div style="grid-column:1/-1;border-top:1px solid var(--line2);margin-top:4px;padding-top:10px">
@@ -1804,10 +1808,10 @@ function openTrack(kind,no,opts){opts=opts||{}
 window.openTrack=openTrack
 async function saveTrack(kind,no){
   const _r=reconcile();const claim=[..._r.claims,..._r.orphans].find(c=>c.kind===kind&&c.no===no);if(!claim)return
-  const key=kind+':'+no,credited=parseFloat(document.getElementById('tr_credited').value)||null,resubAmt=parseFloat(document.getElementById('tr_resubamt')?.value)||null,compensated=parseFloat(document.getElementById('tr_compensated')?.value)||null
+  const key=kind+':'+no,credited=parseFloat(document.getElementById('tr_credited').value)||null,resubAmt=parseFloat(document.getElementById('tr_resubamt')?.value)||null,compensated=parseFloat(document.getElementById('tr_compensated')?.value)||null,writtenOffAmt=parseFloat(document.getElementById('tr_written_off_amt')?.value)||null
   const payload={orig_claim:key,orig_vin:claim.vin||null,orig_brand:claim.make||null,orig_month:claim.month||null,orig_amount:claim.accepted||claim.invoiced||null,
     new_claim:document.getElementById('tr_newclaim').value||null,reason:document.getElementById('tr_reason').value||null,
-    resub_date:document.getElementById('tr_resub_date').value||null,credited_amt:credited,resubmitted_amt:resubAmt,compensated_amt:compensated,
+    resub_date:document.getElementById('tr_resub_date').value||null,credited_amt:credited,resubmitted_amt:resubAmt,compensated_amt:compensated,written_off_amt:writtenOffAmt,
     recovery_rate:credited!=null&&resubAmt>0?credited/resubAmt*100:(credited!=null&&claim.rejected>0?credited/claim.rejected*100:null),
     status:document.getElementById('tr_status').value||'pending',notes:document.getElementById('tr_notes').value||null,
     follow_up_date:document.getElementById('tr_fudate').value||null,follow_up_note:document.getElementById('tr_funote').value||null,follow_up_done:document.getElementById('tr_fudone').checked,
@@ -1824,7 +1828,7 @@ async function ackClaim(kind,no,on){const key=kind+':'+no,ex=S.resub[key]||{}
   const _r=reconcile();const claim=[..._r.claims,..._r.orphans].find(c=>c.kind===kind&&c.no===no)
   const payload={orig_claim:key,orig_vin:ex.orig_vin||claim?.vin||null,orig_brand:ex.orig_brand||claim?.make||null,orig_month:ex.orig_month||claim?.month||null,
     orig_amount:ex.orig_amount||claim?.accepted||claim?.invoiced||null,new_claim:ex.new_claim||null,reason:ex.reason||null,
-    resub_date:ex.resub_date||null,credited_amt:ex.credited_amt??null,resubmitted_amt:ex.resubmitted_amt??null,recovery_rate:ex.recovery_rate??null,compensated_amt:ex.compensated_amt??null,
+    resub_date:ex.resub_date||null,credited_amt:ex.credited_amt??null,resubmitted_amt:ex.resubmitted_amt??null,recovery_rate:ex.recovery_rate??null,compensated_amt:ex.compensated_amt??null,written_off_amt:ex.written_off_amt??null,
     notes:ex.notes||null,follow_up_date:ex.follow_up_date||null,follow_up_note:ex.follow_up_note||null,follow_up_done:ex.follow_up_done||false,
     status:on?'acknowledged':'pending',updated_by:S.me?.id||null,updated_by_name:S.me?.name||null}
   showLoad('Saving…');const {error}=await sb.from('warranty_bmw_resub').upsert(payload,{onConflict:'orig_claim'});hideLoad()
@@ -2383,8 +2387,21 @@ function writtenOffRows(){
   const _r=reconcile()
   return [..._r.claims,..._r.orphans].filter(c=>manStatus(c)==='rejected').sort((a,b)=>woAmt(b)-woAmt(a))
 }
-// Written-off amount: BMW rejection figure if available, otherwise invoiced (BMW never responded)
-function woAmt(c){return (c.rejected>0.005?c.rejected:(c.invoiced||0))}
+// Written-off amount priority: manual override > BMW rejection > gap (invoiced−credited when answered) > 0 (needs manual entry)
+function woAmt(c){
+  const _r=S.resub[c.kind+':'+c.no]||{}
+  if(_r.written_off_amt>0.005)return _r.written_off_amt          // manual override
+  if(c.rejected>0.005)return c.rejected                          // BMW formal rejection
+  if(c.answered&&(c.gap||0)>0.005)return c.gap                  // answered but shortfall
+  return 0                                                        // no auto-data — enter manually
+}
+function woAmtSource(c){
+  const _r=S.resub[c.kind+':'+c.no]||{}
+  if(_r.written_off_amt>0.005)return 'manual'
+  if(c.rejected>0.005)return 'rej'
+  if(c.answered&&(c.gap||0)>0.005)return 'gap'
+  return 'none'
+}
 function rWrittenOff(){
   const q=(document.getElementById('wo_q')?.value||'').toLowerCase().trim()
   let rows=writtenOffRows()
@@ -2407,14 +2424,14 @@ function rWrittenOff(){
   if(!rows.length){h+=`<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--muted)">No written-off claims yet — mark a claim as <b>Rejected</b> in the tracking panel to add it here.</td></tr>`}
   rows.forEach(c=>{
     const key=c.kind+':'+c.no,_r=S.resub[key]||{}
-    const wa=woAmt(c),comp=_r.compensated_amt||0,net=wa-comp
-    const noRej=c.rejected<=0.005
+    const wa=woAmt(c),src=woAmtSource(c),comp=_r.compensated_amt||0,net=wa-comp
+    const srcLabel={rej:'',gap:' <span title="BMW answered but gap between invoiced and credited" style="font-size:9px;color:var(--muted);font-weight:400">(gap)</span>',manual:' <span title="Manually entered amount" style="font-size:9px;color:var(--sky);font-weight:400">(manual)</span>',none:''}[src]||''
     h+=`<tr onclick="openClaimDetail('${esc(c.kind)}','${esc(c.no)}')" style="cursor:pointer">
       <td><span class="badge ${c.kind==='warranty'?'b-bmw':'b-pur'}">${esc(c.kind.toUpperCase())}</span></td>
       <td class="mono" style="font-weight:600">${esc(c.no)}</td>
       <td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
       <td>${esc(c.month||'—')}</td>
-      <td class="num" style="color:var(--rose-d);font-weight:700">€${f(wa)}${noRej?` <span title="BMW never issued a credit note — invoiced amount used" style="font-size:9px;color:var(--muted);font-weight:400">(inv)</span>`:''}</td>
+      <td class="num" style="color:${src==='none'?'var(--muted)':'var(--rose-d)'};font-weight:700">${src==='none'?'<span style="font-size:10px">— enter in Edit</span>':('€'+f(wa)+srcLabel)}</td>
       <td class="num" style="color:${comp>0?'var(--mint-d)':'var(--faint)'}">€${f(comp)}</td>
       <td class="num" style="font-weight:700;color:${net>0.5?'var(--rose-d)':'var(--mint-d)'}">€${f(Math.max(net,0))}</td>
       <td style="max-width:180px;font-size:10px;color:var(--muted)">${esc(_r.reason||'—')}</td>
@@ -2447,13 +2464,13 @@ function generateWoReport(rows){
   const netLoss=totalRej-totalComp
   const f2=v=>v==null?'—':'€'+Number(v).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})
   let rowsHtml=rows.map(c=>{
-    const key=c.kind+':'+c.no,_r=S.resub[key]||{},wa=woAmt(c),comp=_r.compensated_amt||0,net=wa-comp
+    const key=c.kind+':'+c.no,_r=S.resub[key]||{},wa=woAmt(c),src2=woAmtSource(c),comp=_r.compensated_amt||0,net=wa-comp
     return`<tr>
       <td><span style="padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;background:${c.kind==='warranty'?'#dbeafe':'#f3e8ff'};color:${c.kind==='warranty'?'#1e40af':'#6b21a8'}">${c.kind.toUpperCase()}</span></td>
       <td style="font-family:monospace;font-weight:600">${c.no}</td>
       <td style="font-family:monospace;font-size:11px">${c.vin||'—'}</td>
       <td>${c.month||'—'}</td>
-      <td style="text-align:right;color:#dc2626;font-weight:700">${f2(wa)}${c.rejected<=0.005?' <span style="font-size:9px;color:#9ca3af">(inv)</span>':''}</td>
+      <td style="text-align:right;color:${src2==='none'?'#9ca3af':'#dc2626'};font-weight:700">${src2==='none'?'—':f2(wa)}${src2==='gap'?' <span style="font-size:9px;color:#9ca3af">(gap)</span>':src2==='manual'?' <span style="font-size:9px;color:#3b82f6">(manual)</span>':''}</td>
       <td style="text-align:right;color:${comp>0?'#059669':'#9ca3af'}">${f2(comp)}</td>
       <td style="text-align:right;font-weight:700;color:${net>0.5?'#dc2626':'#059669'}">${f2(Math.max(net,0))}</td>
       <td style="font-size:11px;color:#6b7280;max-width:200px">${(_r.reason||'—').replace(/</g,'&lt;')}</td>
