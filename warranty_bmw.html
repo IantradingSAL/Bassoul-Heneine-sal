@@ -540,11 +540,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.49'
+const APP_VERSION='v5.50'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.50',date:'2026-07-15',items:[
+    {t:'feat',d:'BMW Statement now shows two outstanding figures side by side: 📌 Outstanding (total — everything BMW hasn\'t paid including acknowledged gaps, so you know the full picture) and 🎯 To Chase (pending + active shortfall only — what you\'re still pursuing). Acknowledged shortfalls now show as "✓ Accepted" in the table (grey badge) instead of "🔻 Shortfall", and are counted in a new ✓ Accepted gap KPI so the split is always clear.'}]},
   {v:'v5.49',date:'2026-07-15',items:[
     {t:'fix',d:'Written Off page: Written Off € is now computed automatically in priority order — (1) manual override you enter in Edit, (2) BMW formal rejection amount, (3) gap between invoiced and credited when BMW answered. Falls back to "— enter in Edit" only when no data is available (e.g. BMW never responded). Removed incorrect fallback to full invoiced amount.'},
     {t:'feat',d:'Track Recovery modal: new "Written Off € (override)" field — enter the exact amount only when the auto-computed value is wrong or unavailable. Auto-computed values show a source label: (gap) or (manual).'}]},
@@ -2303,11 +2305,13 @@ window.exportUnlinked=exportUnlinked
 function statementRows(){
   const onlyOut=document.getElementById('st_out').checked, mk=document.getElementById('st_make').value
   let rows=scopedClaims().filter(c=>(!mk||c.make===mk)&&!c._secondary)
-  rows.forEach(c=>{const handled=isHandled(c)
+  rows.forEach(c=>{const handled=isHandled(c),acked=isAcked(c)
     c._pending=!handled&&effPending(c)
-    c._shortfall=(!handled&&c.answered)?Math.max(c.invoiced-c.accepted,0):0
-    c._owed=c._pending?c.invoiced:c._shortfall
-    c._otype=handled?'handled':(c._pending?'pending':(c._shortfall>0.5?'shortfall':'settled'))})
+    const gap=(!handled&&c.answered)?Math.max(c.invoiced-c.accepted,0):0
+    c._shortfall=gap&&!acked?gap:0   // still actively chasing
+    c._accepted=gap&&acked?gap:0     // acknowledged — know it's lost, not chasing
+    c._owed=c._pending?c.invoiced:(c._shortfall+c._accepted)
+    c._otype=handled?'handled':(c._pending?'pending':(c._shortfall>0.5?'shortfall':(c._accepted>0.5?'accepted':'settled')))})
   if(onlyOut)rows=rows.filter(c=>c._owed>0.5)
   return rows.sort((a,b)=>b._owed-a._owed)
 }
@@ -2352,7 +2356,10 @@ function rStatement(){
   const rows=statementRows();window._stRows=rows
   const invoiced=rows.reduce((s,c)=>s+c.invoiced,0),credited=rows.reduce((s,c)=>s+c.accepted,0)
   const pendingVal=rows.filter(c=>c._pending).reduce((s,c)=>s+c.invoiced,0)
-  const shortfallVal=rows.reduce((s,c)=>s+c._shortfall,0),outstanding=pendingVal+shortfallVal
+  const shortfallVal=rows.reduce((s,c)=>s+c._shortfall,0)
+  const acceptedVal=rows.reduce((s,c)=>s+c._accepted,0)
+  const outstanding=pendingVal+shortfallVal+acceptedVal   // TOTAL — everything BMW hasn't paid
+  const toChase=pendingVal+shortfallVal                   // active only — excludes accepted gaps
   const scopeLbl=S.scope==='all'?'Warranty + BSI':S.scope==='bsi'?'BSI only':'Warranty only'
   const today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})
   let h=`<div class="card">
@@ -2363,12 +2370,14 @@ function rStatement(){
     <div class="kpis" style="margin-bottom:16px">
       <div class="kpi drill" onclick="openMetric('st_invoiced')"><div class="kpi-accent" style="background:var(--slate)"></div><div class="kl">🧾 Invoiced (€)</div><div class="kv slate">${f0(invoiced)}</div></div>
       <div class="kpi drill" onclick="openMetric('st_credited')"><div class="kpi-accent" style="background:var(--mint)"></div><div class="kl">💰 Credited (€)</div><div class="kv mint">${f0(credited)}</div></div>
-      <div class="kpi drill" onclick="openMetric('st_outstanding')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">📌 Outstanding (€)</div><div class="kv rose">${f0(outstanding)}</div><div class="ks">total BMW owes</div></div>
+      <div class="kpi drill" onclick="openMetric('st_outstanding')"><div class="kpi-accent" style="background:var(--rose)"></div><div class="kl">📌 Outstanding (€)</div><div class="kv rose">${f0(outstanding)}</div><div class="ks">total BMW owes incl. accepted</div></div>
+      <div class="kpi" style="border-top:4px solid var(--bmw)"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="kl" style="color:var(--bmw)">🎯 To Chase (€)</div><div class="kv" style="color:var(--bmw)">${f0(toChase)}</div><div class="ks">pending + active shortfall</div></div>
       <div class="kpi drill" onclick="openMetric('st_pending')"><div class="kpi-accent" style="background:var(--sun)"></div><div class="kl">⏳ Pending (€)</div><div class="kv sun">${f0(pendingVal)}</div><div class="ks">awaiting BMW answer</div></div>
-      <div class="kpi drill" onclick="openMetric('st_shortfall')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔻 Shortfall (€)</div><div class="kv lem">${f0(shortfallVal)}</div><div class="ks">answered &amp; underpaid</div></div>
+      <div class="kpi drill" onclick="openMetric('st_shortfall')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔻 Shortfall (€)</div><div class="kv lem">${f0(shortfallVal)}</div><div class="ks">underpaid · still chasing</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--muted)"></div><div class="kl" style="color:var(--muted)">✓ Accepted gap (€)</div><div class="kv" style="color:var(--muted)">${f0(acceptedVal)}</div><div class="ks">acknowledged · not chasing</div></div>
     </div>
     <div class="tw"><table class="t"><thead><tr><th>#</th><th>Invoice (GAR)</th><th>Kind</th><th>Make</th><th>VIN</th><th>Sub Date</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th>Status</th><th class="num">Owed €</th></tr></thead><tbody>`
-  rows.slice(0,800).forEach((c,i)=>{const ob=c._otype==='pending'?'<span class="badge b-sun">⏳ Pending</span>':c._otype==='shortfall'?'<span class="badge b-lem">🔻 Shortfall</span>':c._otype==='handled'?manBadge(c):'<span class="badge b-mint">✅ Settled</span>'
+  rows.slice(0,800).forEach((c,i)=>{const ob=c._otype==='pending'?'<span class="badge b-sun">⏳ Pending</span>':c._otype==='shortfall'?'<span class="badge b-lem">🔻 Shortfall</span>':c._otype==='accepted'?'<span class="badge b-n" title="You acknowledged this gap — not chasing, but money is still missing">✓ Accepted</span>':c._otype==='handled'?manBadge(c):'<span class="badge b-mint">✅ Settled</span>'
     h+=`<tr class="tr-clickable" onclick="if(!event.target.closest('.vin-cell'))openClaim('${esc(c.kind)}','${esc(c.no)}')">
       <td style="color:var(--faint)">${i+1}</td><td class="mono" style="font-weight:600">${esc(c.doc_no||'—')}</td><td>${kindBadge(c.kind)}</td>
       <td><span class="badge b-n">${esc(c.make||'—')}</span></td><td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
@@ -2377,7 +2386,7 @@ function rStatement(){
       <td class="num" style="font-weight:800;color:${c._owed>0.5?'var(--rose-d)':'var(--mint-d)'}">${f(c._owed)}</td></tr>`})
   if(rows.length>800)h+=`<tr><td colspan="10" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-800} more — filter to narrow</td></tr>`
   h+=`</tbody><tfoot><tr><td colspan="6">TOTAL · ${f0(rows.length)} claims</td><td class="num">${f0(invoiced)}</td><td class="num">${f0(credited)}</td><td></td><td class="num" style="color:var(--rose-d)">${f0(outstanding)}</td></tr></tfoot></table></div>
-    <div style="font-size:10px;color:var(--faint);margin-top:10px">⏳ Pending = submitted to BMW, no credit note received yet (full invoiced amount in process). 🔻 Shortfall = BMW answered but credited less than invoiced. Owed for settled claims is €0.</div>
+    <div style="font-size:10px;color:var(--faint);margin-top:10px">📌 Outstanding = everything BMW hasn't paid (pending + active shortfall + accepted gaps) — your full receivable. 🎯 To Chase = pending + active shortfall only. ✓ Accepted = you acknowledged the gap (know it's there, not pursuing it). 🔻 Shortfall = BMW answered but credited less and you're still chasing it.</div>
   </div>`
   document.getElementById('T_statement').innerHTML = h
 }
