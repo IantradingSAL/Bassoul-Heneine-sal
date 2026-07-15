@@ -547,11 +547,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.53'
+const APP_VERSION='v5.54'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.54',date:'2026-07-15',items:[
+    {t:'feat',d:'Statement page: Written Off claims now always appear at the bottom of the table (below a red separator line), regardless of the Show filter. They appear grayed out with a 🗑️ Written Off badge, their written-off amount shown strikethrough (not included in owed totals). The footer shows the total owed + a separate "written off" note so nothing is hidden.'}]},
   {v:'v5.53',date:'2026-07-15',items:[
     {t:'feat',d:'Statement table Status column now shows WHY a claim is a shortfall: ❌ €X badge for the BMW-rejected portion, 🔧 €Y badge for the pricing difference portion, ↺ Resubmitted when you already resubmitted the claim. Pending claims and settled claims unchanged.'}]},
   {v:'v5.52',date:'2026-07-15',items:[
@@ -2320,16 +2322,20 @@ window.exportUnlinked=exportUnlinked
 function statementRows(){
   const mode=document.getElementById('st_out_mode')?.value||'tochase', mk=document.getElementById('st_make').value
   let rows=scopedClaims().filter(c=>(!mk||c.make===mk)&&!c._secondary)
-  rows.forEach(c=>{const handled=isHandled(c),acked=isAcked(c)
+  rows.forEach(c=>{const handled=isHandled(c),acked=isAcked(c),wo=manStatus(c)==='rejected'
     c._pending=!handled&&effPending(c)
     const gap=(!handled&&c.answered)?Math.max(c.invoiced-c.accepted,0):0
-    c._shortfall=gap&&!acked?gap:0   // still actively chasing
-    c._accepted=gap&&acked?gap:0     // acknowledged — know it's lost, not chasing
+    c._shortfall=gap&&!acked?gap:0
+    c._accepted=gap&&acked?gap:0
     c._owed=c._pending?c.invoiced:(c._shortfall+c._accepted)
-    c._otype=handled?'handled':(c._pending?'pending':(c._shortfall>0.5?'shortfall':(c._accepted>0.5?'accepted':'settled')))})
-  if(mode==='outstanding')rows=rows.filter(c=>c._owed>0.5)
-  else if(mode==='tochase')rows=rows.filter(c=>c._pending||c._shortfall>0.5)
-  return rows.sort((a,b)=>b._owed-a._owed)
+    c._otype=wo?'writtenoff':(handled?'handled':(c._pending?'pending':(c._shortfall>0.5?'shortfall':(c._accepted>0.5?'accepted':'settled'))))
+    c._woAmt=wo?woAmt(c):0})
+  // written-off always stay visible regardless of mode filter — they go below the owed rows
+  const woRows=rows.filter(c=>c._otype==='writtenoff')
+  if(mode==='outstanding')rows=rows.filter(c=>c._owed>0.5||c._otype==='writtenoff')
+  else if(mode==='tochase')rows=rows.filter(c=>c._pending||c._shortfall>0.5||c._otype==='writtenoff')
+  const active=rows.filter(c=>c._otype!=='writtenoff').sort((a,b)=>b._owed-a._owed)
+  return [...active,...woRows.sort((a,b)=>b._woAmt-a._woAmt)]
 }
 // ── incadea invoices billed but never submitted to BMW (potential missed warranty money) ──
 function notSubInvoices(){const subDocs=new Set(S.subs.map(s=>s.doc_no).filter(Boolean));return S.inv.filter(i=>!subDocs.has(i.doc_no))}
@@ -2393,11 +2399,15 @@ function rStatement(){
       <div class="kpi drill" onclick="openMetric('st_shortfall')"><div class="kpi-accent" style="background:var(--lemon)"></div><div class="kl">🔻 Shortfall (€)</div><div class="kv lem">${f0(shortfallVal)}</div><div class="ks">underpaid · still chasing</div></div>
       <div class="kpi"><div class="kpi-accent" style="background:var(--muted)"></div><div class="kl" style="color:var(--muted)">✓ Accepted gap (€)</div><div class="kv" style="color:var(--muted)">${f0(acceptedVal)}</div><div class="ks">acknowledged · not chasing</div></div>
     </div>
-    <div class="tw"><table class="t"><thead><tr><th>#</th><th>Invoice (GAR)</th><th>Kind</th><th>Make</th><th>VIN</th><th>Sub Date</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th>Status</th><th class="num">Owed €</th></tr></thead><tbody>`
+    <div class="tw"><table class="t"><thead><tr><th>#</th><th>Invoice (GAR)</th><th>Kind</th><th>Make</th><th>VIN</th><th>Sub Date</th><th class="num">Invoiced €</th><th class="num">Credited €</th><th>Status</th><th class="num">Owed / Written Off €</th></tr></thead><tbody>`
+  let woSepInserted=false
   rows.slice(0,800).forEach((c,i)=>{
-    const ms=manStatus(c)
+    const ms=manStatus(c),isWo=c._otype==='writtenoff'
+    if(isWo&&!woSepInserted){woSepInserted=true;h+=`<tr><td colspan="10" style="background:var(--rose-d);height:2px;padding:0"></td></tr><tr><td colspan="10" style="font-size:10px;font-weight:700;color:var(--rose-d);padding:8px 12px;background:rgba(220,38,38,.05);letter-spacing:.06em">🗑️ WRITTEN OFF — GIVEN UP (not included in owed totals above)</td></tr>`}
     let ob=''
-    if(c._otype==='pending'){ob='<span class="badge b-sun">⏳ Pending</span>'}
+    if(isWo){ob=`<span class="badge b-rose">🗑️ Written Off</span>`
+      const src=woAmtSource(c);if(src==='rej')ob+=` <span class="badge b-n" style="font-size:8px">BMW rejected</span>`;else if(src==='gap')ob+=` <span class="badge b-n" style="font-size:8px">gap</span>`;else if(src==='manual')ob+=` <span class="badge b-n" style="font-size:8px">manual</span>`}
+    else if(c._otype==='pending'){ob='<span class="badge b-sun">⏳ Pending</span>'}
     else if(c._otype==='shortfall'){
       ob='<span class="badge b-lem">🔻 Shortfall</span>'
       if(ms==='resubmitted')ob+=' <span class="badge b-sun">↺ Resubmitted</span>'
@@ -2407,14 +2417,17 @@ function rStatement(){
     }else if(c._otype==='accepted'){ob='<span class="badge b-n" title="You acknowledged this gap — not chasing, but money is still missing">✓ Accepted</span>'}
     else if(c._otype==='handled'){ob=manBadge(c)}
     else{ob='<span class="badge b-mint">✅ Settled</span>'}
-    h+=`<tr class="tr-clickable" onclick="if(!event.target.closest('.vin-cell'))openClaim('${esc(c.kind)}','${esc(c.no)}')">
+    const owedCell=isWo
+      ?`<td class="num" style="font-weight:700;color:var(--muted);text-decoration:line-through" title="Written off — not owed, given up">${f(c._woAmt)}</td>`
+      :`<td class="num" style="font-weight:800;color:${c._owed>0.5?'var(--rose-d)':'var(--mint-d)'}">${f(c._owed)}</td>`
+    h+=`<tr class="tr-clickable" style="${isWo?'opacity:.65':''}" onclick="if(!event.target.closest('.vin-cell'))openClaim('${esc(c.kind)}','${esc(c.no)}')">
       <td style="color:var(--faint)">${i+1}</td><td class="mono" style="font-weight:600">${esc(c.doc_no||'—')}</td><td>${kindBadge(c.kind)}</td>
       <td><span class="badge b-n">${esc(c.make||'—')}</span></td><td class="mono vin-cell" onclick="event.stopPropagation();openVin('${esc(c.vin)}')">${esc(c.vin||'—')}</td>
       <td style="font-size:10px;color:var(--muted)">${esc(c.document_date||'')}</td><td class="num">${f(c.invoiced)}</td>
-      <td class="num" style="font-weight:600">${c.answered?f(c.accepted):'—'}</td><td>${ob}</td>
-      <td class="num" style="font-weight:800;color:${c._owed>0.5?'var(--rose-d)':'var(--mint-d)'}">${f(c._owed)}</td></tr>`})
+      <td class="num" style="font-weight:600">${c.answered?f(c.accepted):'—'}</td><td>${ob}</td>${owedCell}</tr>`})
   if(rows.length>800)h+=`<tr><td colspan="10" style="text-align:center;padding:14px;color:var(--muted)">… ${rows.length-800} more — filter to narrow</td></tr>`
-  h+=`</tbody><tfoot><tr><td colspan="6">TOTAL · ${f0(rows.length)} claims</td><td class="num">${f0(invoiced)}</td><td class="num">${f0(credited)}</td><td></td><td class="num" style="color:var(--rose-d)">${f0(outstanding)}</td></tr></tfoot></table></div>
+  const woTotal=rows.filter(c=>c._otype==='writtenoff').reduce((s,c)=>s+c._woAmt,0)
+  h+=`</tbody><tfoot><tr><td colspan="6">TOTAL · ${f0(rows.length)} claims</td><td class="num">${f0(invoiced)}</td><td class="num">${f0(credited)}</td><td></td><td class="num" style="color:var(--rose-d)">${f0(outstanding)}${woTotal>0.5?` <span style="font-size:9px;color:var(--muted);font-weight:400">+ €${f0(woTotal)} written off</span>`:''}</td></tr></tfoot></table></div>
     <div style="font-size:10px;color:var(--faint);margin-top:10px">📌 Outstanding = everything BMW hasn't paid (pending + active shortfall + accepted gaps) — your full receivable. 🎯 To Chase = pending + active shortfall only. ✓ Accepted = you acknowledged the gap (know it's there, not pursuing it). 🔻 Shortfall = BMW answered but credited less and you're still chasing it.</div>
   </div>`
   document.getElementById('T_statement').innerHTML = h
