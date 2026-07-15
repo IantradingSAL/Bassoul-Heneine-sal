@@ -442,6 +442,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         <span style="flex:1"></span>
         <button class="btn btn-sm btn-bmw" id="st_csv">⬇ Excel</button>
         <button class="btn btn-sm btn-bmw" id="st_print">🖨️ Print</button>
+        <button class="btn btn-sm" style="background:var(--bmw);color:#fff" id="st_summary">📊 Summary Report</button>
       </div></div>
       <div id="T_statement"></div>
     </div>
@@ -546,11 +547,14 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.51'
+const APP_VERSION='v5.52'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.52',date:'2026-07-15',items:[
+    {t:'fix',d:'Statement page crash: mode variable was undefined inside rStatement() causing the page to show no data. Fixed by reading the dropdown value directly inside rStatement().'},
+    {t:'feat',d:'New "📊 Summary Report" button on the Statement page — generates a shareable HTML report showing: Total Invoiced, Credited by BMW, and a full gap breakdown into 6 categories: Pending (awaiting answer), Resubmitted (corrected & retrying), To Chase (BMW rejected), Pricing Difference (rate card), Acknowledged Shortfall, and Written Off. Each category lists the individual claims with invoiced / credited / difference amounts.'}]},
   {v:'v5.51',date:'2026-07-15',items:[
     {t:'feat',d:'Statement filter upgraded from a checkbox to a 3-way dropdown: All claims / 📌 Outstanding (all owed, incl. accepted gaps) / 🎯 To Chase only (pending + active shortfalls). Default is "To Chase only" so you see what you\'re actually pursuing.'},
     {t:'fix',d:'Outstanding live formula in the help panel now matches the Statement: includes accepted gaps in total. Not Credited flow step renamed from "money to chase" to "gap to recover". Shortfall description clarified to "still chasing (excludes accepted gaps)". FAQ updated with new Outstanding formula breakdown.'}]},
@@ -2364,6 +2368,7 @@ function rNotSub(){
 }
 function rStatement(){
   const rows=statementRows();window._stRows=rows
+  const mode=document.getElementById('st_out_mode')?.value||'tochase'
   const invoiced=rows.reduce((s,c)=>s+c.invoiced,0),credited=rows.reduce((s,c)=>s+c.accepted,0)
   const pendingVal=rows.filter(c=>c._pending).reduce((s,c)=>s+c.invoiced,0)
   const shortfallVal=rows.reduce((s,c)=>s+c._shortfall,0)
@@ -2527,6 +2532,110 @@ function generateWoReport(rows){
   const blob=new Blob([html],{type:'text/html'});window.open(URL.createObjectURL(blob))
 }
 window.generateWoReport=generateWoReport
+
+function generateSummaryReport(){
+  const today=new Date().toISOString().slice(0,10)
+  const all=scopedClaims().filter(c=>!c._secondary)
+  // ── Totals ──────────────────────────────────────────────────────────────
+  const totalInv=all.reduce((s,c)=>s+c.invoiced,0)
+  const totalCred=all.reduce((s,c)=>s+c.accepted,0)
+  const totalGap=totalInv-totalCred
+  const creditRate=totalInv>0?(totalCred/totalInv*100):0
+  // ── Gap categories ──────────────────────────────────────────────────────
+  // 1. Pending — BMW hasn't answered yet, not handled
+  const pendingRows=all.filter(c=>!isHandled(c)&&effPending(c))
+  const pendingAmt=pendingRows.reduce((s,c)=>s+c.invoiced,0)
+  // 2. Resubmitted — BMW rejected, we corrected and resubmitted
+  const resubRows=all.filter(c=>manStatus(c)==='resubmitted')
+  const resubAmt=resubRows.reduce((s,c)=>s+(c.rejected>0.005?c.rejected:(c.gap||0)),0)
+  // 3. Written Off — fully given up
+  const woRows=all.filter(c=>manStatus(c)==='rejected')
+  const woAmt_=woRows.reduce((s,c)=>s+woAmt(c),0)
+  // 4. Pricing Difference — incadea rate vs BMW rate (on answered claims not handled)
+  const prRows=all.filter(c=>!isHandled(c)&&(c.pricing_diff||0)>0.005)
+  const prAmt=prRows.reduce((s,c)=>s+(c.pricing_diff||0),0)
+  // 5. Active shortfall to chase — BMW rejected gap, not handled, not resubmitted
+  const chaseRows=all.filter(c=>!isHandled(c)&&(c.rejected||0)>0.005)
+  const chaseAmt=chaseRows.reduce((s,c)=>s+(c.rejected||0),0)
+  // 6. Acknowledged shortfall — noted, not actively chasing
+  const ackRows=all.filter(c=>isAcked(c)&&c.answered&&(c.gap||0)>0.005)
+  const ackAmt=ackRows.reduce((s,c)=>s+Math.max(c.invoiced-c.accepted,0),0)
+
+  const pct2=(n,d)=>d>0?((n/d)*100).toFixed(1)+'%':'—'
+  const f2=(n)=>n.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})
+  const rowHtml=(rows,amtFn)=>rows.map(c=>{const key=c.kind+':'+c.no,ms=manStatus(c)||'',amt=amtFn(c)
+    return `<tr><td>${c.kind.toUpperCase()}</td><td>${esc(c.no)}</td><td>${esc(c.vin||'')}</td><td>${esc(c.month||'')}</td>
+    <td class="r">€${f2(c.invoiced)}</td><td class="r">€${f2(c.accepted)}</td><td class="r" style="color:#dc2626">€${f2(amt)}</td>
+    <td>${ms||'pending'}</td></tr>`}).join('')
+
+  const tblHead=`<table><thead><tr><th>Kind</th><th>Claim No.</th><th>VIN</th><th>Month</th>
+    <th class="r">Invoiced €</th><th class="r">Credited €</th><th class="r">Difference €</th><th>Status</th></tr></thead><tbody>`
+
+  const section=(icon,title,color,amt,rows,amtFn,note='')=>{
+    if(!rows.length)return ''
+    return `<h3 style="margin:28px 0 8px;color:${color};border-bottom:2px solid ${color};padding-bottom:6px">${icon} ${title} &nbsp;<span style="font-size:13px;font-weight:400;color:#555">${rows.length} claim${rows.length===1?'':'s'} · €${f2(amt)} ${note}</span></h3>
+    ${tblHead}${rowHtml(rows,amtFn)}</tbody></table>`}
+
+  const html=`<!doctype html><html><head><meta charset="utf-8">
+  <title>BMW Warranty Reconciliation Summary · ${today}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;padding:30px 40px;max-width:1100px;margin:0 auto}
+    h1{font-size:22px;color:#1c69d4;margin-bottom:4px}
+    h2{font-size:15px;color:#334155;margin:22px 0 10px;text-transform:uppercase;letter-spacing:.06em}
+    h3{font-size:13px}
+    .meta{color:#64748b;font-size:11px;margin-bottom:24px}
+    .summary-box{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:28px}
+    .kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 20px;min-width:180px}
+    .kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:4px}
+    .kpi-value{font-size:22px;font-weight:700}
+    .kpi-sub{font-size:10px;color:#94a3b8;margin-top:2px}
+    .gap-table{width:100%;border-collapse:collapse;margin-bottom:22px}
+    .gap-table th,.gap-table td{padding:8px 12px;border:1px solid #e2e8f0;font-size:12px}
+    .gap-table th{background:#f1f5f9;font-weight:600;text-align:left}
+    .gap-table td.r{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+    .gap-table .tot td{background:#fff7ed;font-weight:700}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    table th,table td{padding:6px 10px;border:1px solid #e2e8f0}
+    table th{background:#f8fafc;font-weight:600}
+    td.r{text-align:right;font-variant-numeric:tabular-nums}
+    .ft{margin-top:36px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+    @media print{body{padding:16px}}
+  </style></head><body>
+  <h1>🏎 BMW Warranty Reconciliation — Summary Report</h1>
+  <div class="meta">Scope: ${esc(S.scope==='all'?'All':'BSI'==='bsi'?'BSI':'Warranty')} &nbsp;·&nbsp; Generated: ${today} &nbsp;·&nbsp; ${all.length} claims</div>
+
+  <h2>Overall Position</h2>
+  <div class="summary-box">
+    <div class="kpi"><div class="kpi-label">🧾 Total Invoiced</div><div class="kpi-value" style="color:#1c69d4">€${f2(totalInv)}</div><div class="kpi-sub">${all.length} claims</div></div>
+    <div class="kpi"><div class="kpi-label">✅ Credited by BMW</div><div class="kpi-value" style="color:#059669">€${f2(totalCred)}</div><div class="kpi-sub">${creditRate.toFixed(1)}% credit rate</div></div>
+    <div class="kpi"><div class="kpi-label">⚠️ Total Gap</div><div class="kpi-value" style="color:#dc2626">€${f2(totalGap)}</div><div class="kpi-sub">${pct2(totalGap,totalInv)} of invoiced</div></div>
+  </div>
+
+  <h2>Gap Breakdown</h2>
+  <table class="gap-table"><thead><tr>
+    <th>Category</th><th>Description</th><th class="r">Amount €</th><th class="r">% of Gap</th><th class="r">Claims</th>
+  </tr></thead><tbody>
+  <tr><td>⏳ Pending</td><td>Submitted — awaiting BMW response</td><td class="r">€${f2(pendingAmt)}</td><td class="r">${pct2(pendingAmt,totalGap)}</td><td class="r">${pendingRows.length}</td></tr>
+  <tr><td>↺ Resubmitted</td><td>BMW rejected → corrected &amp; resubmitted (still trying)</td><td class="r">€${f2(resubAmt)}</td><td class="r">${pct2(resubAmt,totalGap)}</td><td class="r">${resubRows.length}</td></tr>
+  <tr><td>❌ To Chase</td><td>BMW rejected — actively pursuing recovery</td><td class="r">€${f2(chaseAmt)}</td><td class="r">${pct2(chaseAmt,totalGap)}</td><td class="r">${chaseRows.length}</td></tr>
+  <tr><td>🔧 Pricing Diff</td><td>incadea rate vs BMW rate (acknowledged rate card diff)</td><td class="r">€${f2(prAmt)}</td><td class="r">${pct2(prAmt,totalGap)}</td><td class="r">${prRows.length}</td></tr>
+  <tr><td>✓ Acknowledged</td><td>Shortfall noted — not actively chasing</td><td class="r">€${f2(ackAmt)}</td><td class="r">${pct2(ackAmt,totalGap)}</td><td class="r">${ackRows.length}</td></tr>
+  <tr><td>🗑️ Written Off</td><td>Fully given up — cannot recover</td><td class="r">€${f2(woAmt_)}</td><td class="r">${pct2(woAmt_,totalGap)}</td><td class="r">${woRows.length}</td></tr>
+  </tbody><tfoot class="tot"><tr><td colspan="2"><b>TOTAL GAP</b></td><td class="r">€${f2(totalGap)}</td><td class="r">100%</td><td class="r">${all.length}</td></tr></tfoot></table>
+
+  ${section('⏳','Pending — Awaiting BMW Response','#b45309',pendingAmt,pendingRows,c=>c.invoiced)}
+  ${section('↺','Resubmitted — Corrected &amp; Trying Again','#d97706',resubAmt,resubRows,c=>c.rejected>0.005?c.rejected:(c.gap||0),'(rejected amount)')}
+  ${section('❌','To Chase — BMW Rejected','#dc2626',chaseAmt,chaseRows,c=>c.rejected||0,'(rejected amount)')}
+  ${section('🔧','Pricing Difference','#ca8a04',prAmt,prRows,c=>c.pricing_diff||0,'(pricing diff)')}
+  ${section('✓','Acknowledged Shortfall','#6b7280',ackAmt,ackRows,c=>Math.max(c.invoiced-c.accepted,0))}
+  ${section('🗑️','Written Off — Cannot Recover','#991b1b',woAmt_,woRows,c=>woAmt(c),'(written-off amount)')}
+
+  <div class="ft">© IanTradingSAL · BMW Warranty Reconciliation · Generated ${today}</div>
+  </body></html>`
+  const blob=new Blob([html],{type:'text/html'});window.open(URL.createObjectURL(blob))
+}
+window.generateSummaryReport=generateSummaryReport
 
 async function rUploadHist(){
   const el=document.getElementById('upHist');if(!el)return
@@ -2752,6 +2861,7 @@ document.getElementById('dash_xlsx').addEventListener('click',()=>{const series=
 ;['st_make','st_out_mode'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('change',rStatement)})
 document.getElementById('st_csv').addEventListener('click',()=>{const rows=(window._stRows||[]).map(c=>[c.doc_no,c.kind,c.make,c.vin,c.document_date,c.invoiced,c.answered?c.accepted:'',c._otype,c._owed]);exportXlsx('BMW_Statement',['Invoice','Kind','Make','VIN','Sub Date','Invoiced €','Credited €','Type','Owed €'],rows);showToast('⬇ Exported statement — '+rows.length+' rows to Excel')})
 document.getElementById('st_print').addEventListener('click',()=>window.print())
+document.getElementById('st_summary').addEventListener('click',()=>generateSummaryReport())
 document.getElementById('ov_add').addEventListener('click',addOverride)
 ;(()=>{const e=document.getElementById('ic_add');if(e)e.addEventListener('click',addCancel)})()
 ;['ov_old','ov_new','ov_note'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')addOverride()}))
