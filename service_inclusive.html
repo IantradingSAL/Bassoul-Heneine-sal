@@ -4164,8 +4164,8 @@ function buildQuoteEmail(pkg, vehicle, offer, ctx) {
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#7C3AED;border-radius:10px;">
         <tr><td style="padding:18px 20px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-            <td style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.85);text-transform:uppercase;letter-spacing:0.1em;vertical-align:middle;">💰 Package Price</td>
-            <td style="text-align:right;font-size:26px;font-weight:700;color:#FFFFFF;font-family:'Courier New',Consolas,monospace;vertical-align:middle;">${escHtml(priceText)}</td>
+            <td style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.85);text-transform:uppercase;letter-spacing:0.1em;vertical-align:middle;">💰 Package Price <span style="font-size:10px;color:rgba(255,255,255,0.7);">(TTC)</span></td>
+            <td style="text-align:right;font-size:26px;font-weight:700;color:#FFFFFF;font-family:'Courier New',Consolas,monospace;vertical-align:middle;">${escHtml(priceText)} <span style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.85);font-family:Arial,sans-serif;">TTC</span></td>
           </tr></table>
         </td></tr>
       </table>
@@ -4482,7 +4482,7 @@ PACKAGE COVERAGE
 - Package type: ${pkg.packageType}
 - Start date: ${fmtDate(pkg.startDate)}
 - Expiration date: ${fmtDate(pkg.endDate)}
-- Mileage range: ${fmtKm(pkg.startMileage)} → ${fmtKm(pkg.mileageCap)}${isQuote ? '\n- Package price: ' + packagePrice : ''}
+- Mileage range: ${fmtKm(pkg.startMileage)} → ${fmtKm(pkg.mileageCap)}${isQuote ? '\n- Package price (TTC): ' + packagePrice + ' (tax inclusive)' : ''}
 
 REMAINING COVERAGE
 - Time: ${stats.remainingDays} day${stats.remainingDays === 1 ? '' : 's'} left
