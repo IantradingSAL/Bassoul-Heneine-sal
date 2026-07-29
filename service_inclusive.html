@@ -1360,7 +1360,7 @@
     <div class="flex items-center justify-between gap-2 mt-4 flex-wrap">
       <div class="text-xs flex-1" style="color: var(--text-3); min-width: 200px;">
         <i data-lucide="info" class="w-3 h-3 inline"></i>
-No Brevo yet? Click <b>Copy rendered email</b>, then <b>Open in mail client</b>, then in Outlook select the body and paste (Ctrl+V) — the formatting is kept. <b>Send via Brevo</b> sends directly once set up.
+No Brevo yet? Click <b>Open in Outlook</b> to download a .eml — double-click it and Outlook opens a new message with the rendered email ready to send (works offline). <b>Send via Brevo</b> sends directly once set up.
       </div>
       <div class="flex gap-2 flex-wrap">
         <button type="button" class="btn btn-ghost" onclick="closeModal('modal-email-preview')">Cancel</button>
@@ -1368,7 +1368,7 @@ No Brevo yet? Click <b>Copy rendered email</b>, then <b>Open in mail client</b>,
         <button type="button" id="email-whatsapp-btn" class="btn btn-ghost" onclick="sendEmailToWhatsApp()"><i data-lucide="message-circle" class="w-4 h-4"></i>Send to WhatsApp</button>
         <button type="button" id="email-wa-pdf-btn" class="btn btn-ghost" onclick="shareToWhatsAppWithPdf()"><i data-lucide="file-up" class="w-4 h-4"></i>WhatsApp + PDF</button>
         <button type="button" id="email-pdf-btn" class="btn btn-ghost" onclick="downloadEmailPdf()"><i data-lucide="file-down" class="w-4 h-4"></i>Download PDF</button>
-        <a id="email-preview-send" href="#" class="btn btn-ghost" target="_blank"><i data-lucide="external-link" class="w-4 h-4"></i>Open in mail client</a>
+        <button type="button" id="email-preview-send" class="btn btn-ghost" onclick="openInMailClient()"><i data-lucide="external-link" class="w-4 h-4"></i>Open in Outlook</button>
         <button type="button" class="btn btn-ghost" onclick="markEmailSentManual()"><i data-lucide="check" class="w-4 h-4"></i>Mark sent</button>
         <button type="button" id="email-brevo-send" class="btn btn-primary" onclick="sendViaBrevo()"><i data-lucide="send" class="w-4 h-4"></i>Send via Brevo</button>
       </div>
@@ -4509,6 +4509,75 @@ function buildMailtoLink(toEmail, subject, body) {
   return `mailto:${encodeURIComponent(toEmail)}?${qs}`;
 }
 
+// RFC 2047 encoded-word for non-ASCII subject lines so Outlook parses them correctly.
+function encodeMimeHeader(str) {
+  if (!/[^\x20-\x7e]/.test(str)) return str;
+  const b64 = btoa(unescape(encodeURIComponent(str)));
+  return `=?UTF-8?B?${b64}?=`;
+}
+
+// Fold CRLF-terminated header lines and use QP-safe base64 for the HTML body so
+// no line exceeds 998 chars (RFC 5322) and international characters survive.
+function buildEmlFile({ to, from, subject, html, text }) {
+  const boundary = '----=BHS_' + Math.random().toString(36).slice(2, 10);
+  const lines = [];
+  lines.push(`From: ${from || ''}`);
+  lines.push(`To: ${to}`);
+  lines.push(`Subject: ${encodeMimeHeader(subject)}`);
+  lines.push('X-Unsent: 1'); // tells Outlook to open in compose mode
+  lines.push('MIME-Version: 1.0');
+  lines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+  lines.push('');
+  if (text) {
+    lines.push(`--${boundary}`);
+    lines.push('Content-Type: text/plain; charset=UTF-8');
+    lines.push('Content-Transfer-Encoding: base64');
+    lines.push('');
+    lines.push(btoa(unescape(encodeURIComponent(text))).replace(/.{76}/g, '$&\r\n'));
+  }
+  lines.push(`--${boundary}`);
+  lines.push('Content-Type: text/html; charset=UTF-8');
+  lines.push('Content-Transfer-Encoding: base64');
+  lines.push('');
+  lines.push(btoa(unescape(encodeURIComponent(html))).replace(/.{76}/g, '$&\r\n'));
+  lines.push(`--${boundary}--`);
+  lines.push('');
+  return lines.join('\r\n');
+}
+
+function openInMailClient() {
+  const packageId = document.getElementById('email-preview-package-id').value;
+  const stageKey = document.getElementById('email-preview-stage').value;
+  const pkg = state.packages.find(p => p.id === packageId);
+  if (!pkg) return;
+  const v = state.vehicles.find(x => x.id === pkg.vehicleId);
+  if (!v?.customerEmail) { toast('No customer email on file', 'danger'); return; }
+  const { subject, textContent, htmlContent } = buildEmailContent(pkg, v, stageKey);
+  const senderEmail = (state.settings.companyEmail || '').trim();
+  const senderName = state.settings.senderName || state.settings.companyName || '';
+  const from = senderEmail
+    ? (senderName ? `"${senderName.replace(/"/g,'')}" <${senderEmail}>` : senderEmail)
+    : '';
+  const eml = buildEmlFile({
+    to: v.customerEmail,
+    from,
+    subject,
+    html: htmlContent,
+    text: textContent,
+  });
+  const blob = new Blob([eml], { type: 'message/rfc822' });
+  const url = URL.createObjectURL(blob);
+  const safeName = (v.customerName || 'renewal').replace(/[^\w\-]+/g, '_').slice(0, 40) || 'renewal';
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${safeName}_${stageKey || 'email'}.eml`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast('Email downloaded — double-click the .eml file to open it in Outlook');
+}
+
 function previewEmail(packageId, stageKey) {
   const pkg = state.packages.find(p => p.id === packageId);
   if (!pkg) return;
@@ -4530,10 +4599,9 @@ function previewEmail(packageId, stageKey) {
   // Default back to the Rendered tab each time the modal opens
   switchEmailPreviewTab('rendered');
 
-  // Wire the "Open in mail client" mailto link as a fallback for users without Brevo wired up yet
+  // Show/hide the "Open in Outlook" button based on whether the customer has an email
   const sendBtn = document.getElementById('email-preview-send');
   if (v.customerEmail) {
-    sendBtn.href = buildMailtoLink(v.customerEmail, subject, textContent);
     sendBtn.style.display = 'inline-flex';
   } else {
     sendBtn.style.display = 'none';

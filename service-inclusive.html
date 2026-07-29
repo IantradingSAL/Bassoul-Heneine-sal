@@ -1293,7 +1293,7 @@
       <div class="flex gap-2">
         <button type="button" class="btn btn-ghost" onclick="closeModal('modal-email-preview')">Cancel</button>
         <button type="button" class="btn btn-ghost" onclick="markEmailSentManual()"><i data-lucide="check" class="w-4 h-4"></i>Mark sent (no email client)</button>
-        <a id="email-preview-send" href="#" class="btn btn-primary" target="_blank"><i data-lucide="send" class="w-4 h-4"></i>Open in mail client</a>
+        <button type="button" id="email-preview-send" class="btn btn-primary" onclick="openInMailClient()"><i data-lucide="send" class="w-4 h-4"></i>Open in Outlook</button>
       </div>
     </div>
   </div>
@@ -3175,6 +3175,27 @@ function buildMailtoLink(toEmail, subject, body) {
   return `mailto:${encodeURIComponent(toEmail)}?${qs}`;
 }
 
+function encodeMimeHeader(str) {
+  if (!/[^\x20-\x7e]/.test(str)) return str;
+  return `=?UTF-8?B?${btoa(unescape(encodeURIComponent(str)))}?=`;
+}
+
+function buildEmlFile({ to, from, subject, body }) {
+  const b64 = btoa(unescape(encodeURIComponent(body))).replace(/.{76}/g, '$&\r\n');
+  return [
+    `From: ${from || ''}`,
+    `To: ${to}`,
+    `Subject: ${encodeMimeHeader(subject)}`,
+    'X-Unsent: 1',
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    b64,
+    '',
+  ].join('\r\n');
+}
+
 function previewEmail(packageId, stageKey) {
   const pkg = state.packages.find(p => p.id === packageId);
   if (!pkg) return;
@@ -3187,13 +3208,39 @@ function previewEmail(packageId, stageKey) {
   document.getElementById('email-preview-stage').value = stageKey;
   const sendBtn = document.getElementById('email-preview-send');
   if (v.customerEmail) {
-    sendBtn.href = buildMailtoLink(v.customerEmail, subject, body);
     sendBtn.style.display = 'inline-flex';
-    sendBtn.onclick = () => setTimeout(() => markEmailSent(packageId, stageKey, v.customerEmail), 500);
   } else {
     sendBtn.style.display = 'none';
   }
   openModal('modal-email-preview');
+}
+
+function openInMailClient() {
+  const packageId = document.getElementById('email-preview-package-id').value;
+  const stageKey = document.getElementById('email-preview-stage').value;
+  const pkg = state.packages.find(p => p.id === packageId);
+  if (!pkg) return;
+  const v = state.vehicles.find(x => x.id === pkg.vehicleId);
+  if (!v?.customerEmail) { toast('No customer email on file', 'danger'); return; }
+  const { subject, body } = buildEmailContent(pkg, v, stageKey);
+  const senderEmail = (state.settings.companyEmail || '').trim();
+  const senderName = state.settings.senderName || state.settings.companyName || '';
+  const from = senderEmail
+    ? (senderName ? `"${senderName.replace(/"/g,'')}" <${senderEmail}>` : senderEmail)
+    : '';
+  const eml = buildEmlFile({ to: v.customerEmail, from, subject, body });
+  const blob = new Blob([eml], { type: 'message/rfc822' });
+  const url = URL.createObjectURL(blob);
+  const safeName = (v.customerName || 'renewal').replace(/[^\w\-]+/g, '_').slice(0, 40) || 'renewal';
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${safeName}_${stageKey || 'email'}.eml`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => markEmailSent(packageId, stageKey, v.customerEmail), 500);
+  toast('Email downloaded — double-click the .eml file to open it in Outlook');
 }
 
 function markEmailSent(packageId, stageKey, recipientEmail) {
