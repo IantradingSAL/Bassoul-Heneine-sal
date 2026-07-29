@@ -4083,7 +4083,7 @@ function buildQuoteEmail(pkg, vehicle, offer, ctx) {
   const _vEnd = new Date(validUntilISO); _vEnd.setDate(_vEnd.getDate() + 1);
   const _calEnd = !isNaN(_vEnd) ? _vEnd.toISOString().slice(0, 10).replace(/-/g, '') : _calStart;
   const _calTitle = `Service package quotation — decide by ${validUntil}`;
-  const _calDetails = `Quotation from ${company} for the ${offerLabel} package on ${vehicleInfo} (plate ${plate}, VIN ${vin}). Price: ${priceText}. Valid until ${validUntil}. Contact ${company}${phone ? ' at ' + phone : ''}.`;
+  const _calDetails = `Quotation from ${company} for the ${offerLabel} package on ${vehicleInfo} (plate ${plate}, VIN ${vin}). Price (TTC, tax inclusive): ${priceText}. Valid until ${validUntil}. Contact ${company}${phone ? ' at ' + phone : ''}.`;
   const _gcal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(_calTitle)}&dates=${_calStart}/${_calEnd}&details=${encodeURIComponent(_calDetails)}${company ? '&location=' + encodeURIComponent(company) : ''}`;
   const _gcalHtml = _gcal.replace(/&/g, '&amp;');
   const _tel = phone ? phone.replace(/[^+\d]/g, '') : '';
@@ -4197,7 +4197,7 @@ function buildQuoteEmail(pkg, vehicle, offer, ctx) {
     </td></tr>
 
     <tr><td style="background:#0F172A;padding:18px 32px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.6;">This quotation refers to ${escHtml(offerLabel)} for ${escHtml(vehicleInfo)} (VIN ${escHtml(vin)}). Prices valid until ${escHtml(validUntil)}.</td></tr></table>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.6;">This quotation refers to ${escHtml(offerLabel)} for ${escHtml(vehicleInfo)} (VIN ${escHtml(vin)}). All prices are <strong style="color:rgba(255,255,255,0.85);">TTC (tax inclusive)</strong> and valid until ${escHtml(validUntil)}.</td></tr></table>
     </td></tr>
 
   </table>
@@ -4223,7 +4223,7 @@ OFFERED PACKAGE${isUpgrade ? ' (UPGRADE)' : ''}
 - Package: ${offerLabel}
 - Coverage duration: ${durationText}
 - Mileage coverage: ${mileageText}${isUpgrade ? '\n- Upgrade path: ' + curCode + ' -> ' + oCode : ''}
-- PRICE: ${priceText}
+- PRICE (TTC, tax inclusive): ${priceText}
 ${descText ? '\nWHAT\u2019S COVERED\n' + descText + '\n' : ''}
 This quotation is valid for ONE MONTH, until ${validUntil}.
 
@@ -4380,13 +4380,16 @@ function buildEmailContent(pkg, vehicle, stageKey) {
     ${isQuote ? `<!-- Quoted price -->
     <tr><td style="padding:8px 32px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;">
-        <tr><td style="padding:16px 18px;">
+        <tr><td style="padding:16px 18px 6px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
             <tr>
-              <td style="font-size:11px;font-weight:700;color:#6D28D9;text-transform:uppercase;letter-spacing:0.1em;vertical-align:middle;">💰 Package Price</td>
+              <td style="font-size:11px;font-weight:700;color:#6D28D9;text-transform:uppercase;letter-spacing:0.1em;vertical-align:middle;">💰 Package Price (TTC)</td>
               <td style="text-align:right;font-size:24px;font-weight:700;color:#5B21B6;font-family:'Courier New',Consolas,monospace;vertical-align:middle;">${escHtml(packagePrice)}</td>
             </tr>
           </table>
+        </td></tr>
+        <tr><td align="right" style="padding:0 18px 14px;font-size:11px;font-weight:700;color:#6D28D9;font-family:Arial,Helvetica,sans-serif;letter-spacing:0.08em;">
+          TTC — All taxes included
         </td></tr>
       </table>
     </td></tr>` : ''}
@@ -4421,7 +4424,7 @@ function buildEmailContent(pkg, vehicle, stageKey) {
     <!-- Renewal pitch -->
     <tr><td style="padding:8px 32px 4px;font-size:14px;color:#475569;line-height:1.6;">
       ${isQuote
-        ? `The price above covers the ${escHtml(pkg.packageType)} service package as detailed. We would be glad to answer any questions and to proceed whenever you are ready.`
+        ? `The price above is <strong>TTC (tax inclusive)</strong> and covers the ${escHtml(pkg.packageType)} service package as detailed. We would be glad to answer any questions and to proceed whenever you are ready.`
         : `We invite you to contact us to discuss renewal options and ensure uninterrupted coverage for your vehicle. Renewing before expiration helps maintain continuous protection and may qualify you for loyalty benefits.`}
     </td></tr>
 
@@ -4491,7 +4494,7 @@ REMAINING COVERAGE
 - Time: ${stats.remainingDays} day${stats.remainingDays === 1 ? '' : 's'} left
 - Mileage: ${fmtKm(stats.remainingKm)} left
 
-${isQuote ? `The price above covers the ${pkg.packageType} service package as detailed. We would be glad to answer any questions and to proceed whenever you are ready.` : `We invite you to contact us to discuss renewal options and ensure uninterrupted coverage for your vehicle. Renewing before expiration helps maintain continuous protection and may qualify you for loyalty benefits.`}
+${isQuote ? `The price above is TTC (tax inclusive) and covers the ${pkg.packageType} service package as detailed. We would be glad to answer any questions and to proceed whenever you are ready.` : `We invite you to contact us to discuss renewal options and ensure uninterrupted coverage for your vehicle. Renewing before expiration helps maintain continuous protection and may qualify you for loyalty benefits.`}
 ${isQuote ? '' : `
 ADD A REMINDER TO YOUR CALENDAR
 - Google Calendar: ${_gcal}
