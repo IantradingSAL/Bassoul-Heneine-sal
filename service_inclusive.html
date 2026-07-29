@@ -1173,7 +1173,8 @@
       <div><label class="label">Customer name</label><input class="input" id="vehicle-customer" placeholder="John Doe" /></div>
       <div><label class="label">Customer phone</label><input class="input" id="vehicle-phone" placeholder="+961 ..." /></div>
       <div class="col-span-2"><label class="label">Customer email</label><input class="input" type="email" id="vehicle-email" placeholder="customer@example.com" /></div>
-      <div class="col-span-2"><label class="label">Current odometer (km)</label><input class="input font-mono" type="number" id="vehicle-mileage" min="0" placeholder="45000" /></div>
+      <div><label class="label">Warranty start date</label><input class="input" type="date" id="vehicle-warranty-start" /></div>
+      <div><label class="label">Current odometer (km)</label><input class="input font-mono" type="number" id="vehicle-mileage" min="0" placeholder="45000" /></div>
       <div class="col-span-2 flex justify-end gap-2 mt-2">
         <button type="button" class="btn btn-ghost" onclick="closeModal('modal-vehicle')">Cancel</button>
         <button type="submit" class="btn btn-primary"><i data-lucide="check" class="w-4 h-4"></i>Save Vehicle</button>
@@ -2450,6 +2451,15 @@ function openVehicleModal(id) {
   document.getElementById('vehicle-phone').value = v?.customerPhone || '';
   document.getElementById('vehicle-email').value = v?.customerEmail || '';
   document.getElementById('vehicle-mileage').value = v?.currentMileage ?? '';
+  // Warranty start date defaults to the vehicle's earliest package start date
+  // (grouped by package type — earliest per this vehicle) when not explicitly set.
+  let warrantyStart = v?.warrantyStartDate || '';
+  if (!warrantyStart && v?.id) {
+    const pkgs = (IDX.packagesByVehicle && IDX.packagesByVehicle.get(v.id)) || [];
+    const starts = pkgs.map(p => p.startDate).filter(Boolean).sort();
+    if (starts.length) warrantyStart = starts[0];
+  }
+  document.getElementById('vehicle-warranty-start').value = warrantyStart;
   openModal('modal-vehicle');
 }
 
@@ -2471,6 +2481,7 @@ document.getElementById('vehicle-form').addEventListener('submit', (e) => {
     customerName: document.getElementById('vehicle-customer').value.trim(),
     customerPhone: document.getElementById('vehicle-phone').value.trim(),
     customerEmail: document.getElementById('vehicle-email').value.trim(),
+    warrantyStartDate: document.getElementById('vehicle-warranty-start').value || null,
     currentMileage: parseInt(document.getElementById('vehicle-mileage').value) || 0,
     createdAt: id ? state.vehicles.find(v => v.id === id).createdAt : todayISO(),
   };
@@ -2659,8 +2670,11 @@ function openPackageModal(id, vehicleId) {
 
   document.getElementById('package-type').value = p?.packageType || '';
   document.getElementById('package-amount').value = p?.invoicedAmount ?? '';
-  document.getElementById('package-start-date').value = p?.startDate || todayISO();
-  document.getElementById('package-end-date').value = p?.endDate || addMonths(todayISO(), 24);
+  // On a new package, default start date to the vehicle's warranty start date if set.
+  const _sdVeh = state.vehicles.find(v => v.id === (p?.vehicleId || vehicleId));
+  const _defaultStart = _sdVeh?.warrantyStartDate || todayISO();
+  document.getElementById('package-start-date').value = p?.startDate || _defaultStart;
+  document.getElementById('package-end-date').value = p?.endDate || addMonths(_defaultStart, 24);
   document.getElementById('package-duration').value = p ? monthsBetween(p.startDate, p.endDate) : 24;
   document.getElementById('package-start-mileage').value = p?.startMileage ?? '';
   document.getElementById('package-mileage-cap').value = p?.mileageCap ?? '';
