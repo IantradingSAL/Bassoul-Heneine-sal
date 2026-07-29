@@ -2308,7 +2308,8 @@ document.getElementById('package-form').addEventListener('submit', (e) => {
   }
   save();
   closeModal('modal-package');
-  navigate(state.ui.currentView, document.getElementById('package-id').value || data.vehicleId);
+  const view = state.ui.currentView;
+  navigate(view, view === 'vehicle-detail' ? data.vehicleId : undefined);
 });
 
 /* =========================================================================
@@ -2423,7 +2424,8 @@ document.getElementById('service-form').addEventListener('submit', (e) => {
   }
   save();
   closeModal('modal-service');
-  navigate(state.ui.currentView, document.getElementById('service-id').value || data.vehicleId);
+  const view = state.ui.currentView;
+  navigate(view, view === 'vehicle-detail' ? data.vehicleId : undefined);
 });
 
 function deleteService(id) {
