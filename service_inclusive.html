@@ -1340,7 +1340,7 @@
 
     <!-- Rendered iframe (sandboxed so styles don't leak into the app) -->
     <div id="email-preview-rendered" class="email-preview-pane" style="border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #F1F5F9;">
-      <iframe id="email-preview-iframe" sandbox="allow-same-origin" style="width: 100%; height: 540px; border: 0; display: block; background: #F1F5F9;"></iframe>
+      <iframe id="email-preview-iframe" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" style="width: 100%; height: 540px; border: 0; display: block; background: #F1F5F9;"></iframe>
     </div>
 
     <!-- Plain text view -->
@@ -4078,7 +4078,7 @@ function buildQuoteEmail(pkg, vehicle, offer, ctx) {
   const rowTop = (k, v, strong) => `<tr><td width="42%" style="color:#64748B;font-size:13px;padding:6px 0;">${escHtml(k)}</td><td style="color:#0F172A;font-size:13px;${strong ? 'font-weight:700;' : ''}padding:6px 0;text-align:right;">${escHtml(v)}</td></tr>`;
 
   const htmlContent = `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${escHtml(subject)}</title></head>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><base target="_blank"><title>${escHtml(subject)}</title></head>
 <body style="margin:0;padding:0;background:#F1F5F9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#0F172A;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F1F5F9;padding:24px 12px;">
 <tr><td align="center">
@@ -4303,6 +4303,7 @@ function buildEmailContent(pkg, vehicle, stageKey) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base target="_blank">
 <title>${escHtml(theme.subject)}</title>
 </head>
 <body style="margin:0;padding:0;background:#F1F5F9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#0F172A;">
