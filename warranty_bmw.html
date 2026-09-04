@@ -548,11 +548,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.55'
+const APP_VERSION='v5.56'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.56',date:'2026-09-04',items:[
+    {t:'fix',d:'Invoiced vs Paid report simplified to a month-by-month summary: the per-claim detail tables were removed and replaced by one "By Month" table (Claims, Invoiced, Paid, Difference, ❌ Rejected, 🔧 In Correction, 💶 Price Diff per month, plus a TOTAL row). The KPIs, 3-category breakdown and proportion bar stay.'}]},
   {v:'v5.55',date:'2026-09-04',items:[
     {t:'feat',d:'New "📄 Invoiced vs Paid" button on the Credit Notes page — generates a shareable report comparing Invoiced € vs Paid € on answered claims, with the difference broken into exactly 3 categories: ❌ Rejected Completely (BMW refused — nothing recovered yet), 🔧 In Correction Phase (rejected → corrected & resubmitted, awaiting BMW\'s new answer) and 💶 Price Difference (paid, but at BMW\'s lower rate). Includes a stacked bar, per-category claim tables with BMW\'s rejection reason, and respects the Warranty/BSI scope + the Month filter.'}]},
   {v:'v5.54',date:'2026-07-15',items:[
@@ -2693,24 +2695,21 @@ function generateInvoicedPaidReport(){
 
   const f2=n=>n.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})
   const pct2=(n,d)=>d>0?((n/d)*100).toFixed(1)+'%':'—'
-  // BMW's own rejection reason from the latest credit note's failed lines
-  const rejReason=c=>{const dt=c.cn_date,msgs=new Set()
-    ;(c.credits||[]).forEach(x=>{if(x.crediting_item_status==='Error'&&(!dt||x.credit_note_date===dt)&&x.most_decisive_message)msgs.add(x.most_decisive_message)})
-    if(!msgs.size)(c.credits||[]).forEach(x=>{if(x.crediting_item_status==='Error'&&x.most_decisive_message)msgs.add(x.most_decisive_message)})
-    return [...msgs].slice(0,2).join(' · ')}
-  const corrInfo=c=>{const tr=S.resub[c.kind+':'+c.no];if(!tr||!tr.new_claim)return '↺ resubmitted'
-    const oc=recoveryOutcome(tr.new_claim)
-    return `↺ ${esc(tr.new_claim)} · ${oc?(oc.answered?(oc.credited>0?'✅ credited €'+f2(oc.credited):'answered '+esc(oc.status)):'⏳ pending'):'not in data yet'}`}
-  const woTag=c=>manStatus(c)==='rejected'?' <span style="color:#991b1b;font-size:9px">(written off ✎)</span>':''
 
-  const detTable=(rows,amtFn,amtLabel,amtColor,lastCol,lastFn)=>`
-    <table class="det"><thead><tr><th>Kind</th><th>Claim No.</th><th>VIN</th><th>Month</th>
-    <th class="r">Invoiced €</th><th class="r">Paid €</th><th class="r">${amtLabel} €</th><th>${lastCol}</th></tr></thead><tbody>
-    ${[...rows].sort((a,b)=>amtFn(b)-amtFn(a)).map(c=>`<tr><td>${c.kind.toUpperCase()}</td><td>${esc(c.no)}</td><td>${esc(c.vin||'')}</td><td>${esc(c.month||'')}</td>
-      <td class="r">${f2(c.invoiced)}</td><td class="r">${f2(c.accepted)}</td><td class="r" style="color:${amtColor};font-weight:600">${f2(amtFn(c))}</td><td>${lastFn(c)}</td></tr>`).join('')}
-    </tbody></table>`
-  const section=(icon,title,color,amt,rows,tbl)=>rows.length?`
-    <h3 style="color:${color};border-bottom:2px solid ${color}">${icon} ${title} &nbsp;<span style="font-size:13px;font-weight:400;color:#555">${rows.length} claim${rows.length===1?'':'s'} · €${f2(amt)}</span></h3>${tbl}`:''
+  // month-by-month roll-up — same bucket rules as the totals above, no claim detail
+  const byM={}
+  all.forEach(c=>{const m=c.month||'(no month)';const b=byM[m]=byM[m]||{n:0,inv:0,paid:0,rej:0,corr:0,pr:0}
+    b.n++;b.inv+=c.invoiced;b.paid+=c.accepted
+    if(manStatus(c)==='resubmitted'){if((c.gap||0)>0.005)b.corr+=c.gap}
+    else{if((c.rejected||0)>0.005)b.rej+=c.rejected;if((c.pricing_diff||0)>0.005)b.pr+=c.pricing_diff}})
+  const months=Object.keys(byM).sort()
+  const mRows=months.map(m=>{const b=byM[m],diff=b.inv-b.paid;return `<tr>
+    <td style="font-weight:600">${esc(m==='(no month)'?m:fmM(m))}</td><td class="r" style="font-weight:400">${b.n}</td>
+    <td class="r">€${f2(b.inv)}</td><td class="r" style="color:#059669">€${f2(b.paid)}</td>
+    <td class="r" style="color:${diff>0.005?'#dc2626':'#059669'}">€${f2(diff)}</td>
+    <td class="r" style="color:#dc2626">${b.rej>0.005?'€'+f2(b.rej):'—'}</td>
+    <td class="r" style="color:#d97706">${b.corr>0.005?'€'+f2(b.corr):'—'}</td>
+    <td class="r" style="color:#ca8a04">${b.pr>0.005?'€'+f2(b.pr):'—'}</td></tr>`}).join('')
 
   const bar=catTotal>0.005?`
     <div class="bar">
@@ -2747,11 +2746,6 @@ function generateInvoicedPaidReport(){
     .bar div{height:100%}
     .legend{display:flex;gap:18px;font-size:10px;color:#475569;margin-bottom:26px;flex-wrap:wrap}
     .legend span::before{content:'';display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;background:var(--c)}
-    table.det{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:6px}
-    table.det th,table.det td{padding:6px 10px;border:1px solid #e2e8f0}
-    table.det th{background:#f8fafc;font-weight:600;text-align:left}
-    table.det th.r{text-align:right}
-    table.det td.r{text-align:right;font-variant-numeric:tabular-nums}
     .note{font-size:10px;color:#94a3b8;margin-bottom:4px}
     .ft{margin-top:36px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
     @media print{body{padding:16px}}
@@ -2778,14 +2772,16 @@ function generateInvoicedPaidReport(){
   </tbody><tfoot><tr class="tot"><td colspan="2"><b>TOTAL DIFFERENCE (Invoiced − Paid)</b></td><td class="r">€${f2(totalDiff)}</td><td class="r">100%</td><td class="r">${new Set([...rejRows,...corrRows,...prRows].map(c=>c.kind+':'+c.no)).size}</td></tr></tfoot></table>
   ${bar}
 
-  ${section('❌','Rejected Completely','#dc2626',rejAmt,rejRows,
-    detTable(rejRows,c=>c.rejected,'Rejected','#dc2626','Reason (BMW message)',c=>esc(rejReason(c))+woTag(c)))}
-  ${section('🔧','In Correction Phase','#d97706',corrAmt,corrRows,
-    detTable(corrRows,c=>c.gap,'Chasing','#d97706','Resubmitted as',c=>corrInfo(c)))}
-  ${section('💶','Price Difference','#ca8a04',prAmt,prRows,
-    detTable(prRows,c=>c.pricing_diff,'Price Diff','#ca8a04','Status',c=>(c.status_overall==='Warning'?'Paid ⚠ (rate card)':c.status_overall==='Error'?'Partially paid ❌':'Paid ✅')+(isAcked(c)?' · 👁️ acknowledged':'')))}
+  <h2>By Month</h2>
+  <table class="gap-table"><thead><tr>
+    <th>Month</th><th class="r">Claims</th><th class="r">Invoiced €</th><th class="r">Paid €</th><th class="r">Difference €</th>
+    <th class="r">❌ Rejected €</th><th class="r">🔧 In Correction €</th><th class="r">💶 Price Diff €</th>
+  </tr></thead><tbody>${mRows}</tbody>
+  <tfoot><tr class="tot"><td><b>TOTAL</b></td><td class="r">${all.length}</td>
+    <td class="r">€${f2(totalInv)}</td><td class="r">€${f2(totalPaid)}</td><td class="r">€${f2(totalDiff)}</td>
+    <td class="r">€${f2(rejAmt)}</td><td class="r">€${f2(corrAmt)}</td><td class="r">€${f2(prAmt)}</td></tr></tfoot></table>
 
-  <div class="note">ℹ Pending claims (submitted, BMW has not answered yet) are not part of this report — invoiced vs paid only compares claims BMW has already answered. Duplicates and supplementary shared-invoice rows are excluded as usual. A claim that is partly rejected and partly re-priced appears in both categories with the corresponding amount.</div>
+  <div class="note">ℹ Pending claims (submitted, BMW has not answered yet) are not part of this report — invoiced vs paid only compares claims BMW has already answered. Duplicates and supplementary shared-invoice rows are excluded as usual. Months where BMW over-credited can show a Difference below the three category amounts.</div>
   <div class="ft">© IanTradingSAL · BMW Warranty Reconciliation · Generated ${today}</div>
   </body></html>`
   const blob=new Blob([html],{type:'text/html'});window.open(URL.createObjectURL(blob))
