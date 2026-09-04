@@ -548,11 +548,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.59'
+const APP_VERSION='v5.60'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.60',date:'2026-09-04',items:[
+    {t:'fix',d:'Invoiced vs Paid report: a claim manually marked ✅ credited or resolved (e.g. 513303 — rejected first, then corrected and paid) no longer appears in ❌ Rejected Completely; its small remaining gap counts as 💶 Price Difference. Rejected € is also capped at the claim\'s actual outstanding gap, so a corrected claim whose claimed price is summed over both credit notes can no longer inflate the rejected figure (513303 showed €116,64 rejected while its real gap was €4,10).'}]},
   {v:'v5.59',date:'2026-09-04',items:[
     {t:'fix',d:'Invoiced vs Paid report now covers the current year only (e.g. 2026) — older months no longer clutter the By Month table. The header shows "Year: 2026". Selecting a Month in the Credit Notes filter still reports on that single month, including months from earlier years.'}]},
   {v:'v5.58',date:'2026-09-04',items:[
@@ -2694,15 +2696,23 @@ function generateInvoicedPaidReport(){
     if(m)return false  // rejected/credited/resolved/acknowledged — no longer being corrected
     const tr=S.resub[c.kind+':'+c.no]
     return !!(tr&&(tr.status==='pending'||(tr.follow_up_date&&!tr.follow_up_done)))}
+  // A claim manually marked credited/resolved is settled — never "rejected"; whatever small
+  // gap remains is a price difference (BMW paid, just at its own number).
+  const settled=c=>{const m=manStatus(c);return m==='credited'||m==='resolved'}
+  // Never count more rejected € than the claim's actual outstanding gap: on a corrected claim
+  // the claimed price is summed over BOTH credit notes (old rejected + new paid), which would
+  // inflate the rejected figure far beyond what is really missing (e.g. 513303).
+  const effRej=c=>settled(c)?0:Math.min(c.rejected||0,Math.max(c.gap||0,0))
+  const effPr=c=>inCorrection(c)?0:Math.max(Math.max(c.gap||0,0)-effRej(c),0)
   // 1. In Correction Phase — rejected, then being corrected: resubmitted or disputed with BMW
   const corrRows=all.filter(c=>inCorrection(c)&&(c.gap||0)>0.005)
   const corrAmt=corrRows.reduce((s,c)=>s+c.gap,0)
   // 2. Rejected Completely — BMW refused and no correction activity is open
-  const rejRows=all.filter(c=>!inCorrection(c)&&(c.rejected||0)>0.005)
-  const rejAmt=rejRows.reduce((s,c)=>s+c.rejected,0)
+  const rejRows=all.filter(c=>!inCorrection(c)&&effRej(c)>0.005)
+  const rejAmt=rejRows.reduce((s,c)=>s+effRej(c),0)
   // 3. Price Difference — BMW paid, but at its own (lower) rate
-  const prRows=all.filter(c=>!inCorrection(c)&&(c.pricing_diff||0)>0.005)
-  const prAmt=prRows.reduce((s,c)=>s+c.pricing_diff,0)
+  const prRows=all.filter(c=>effPr(c)>0.005)
+  const prAmt=prRows.reduce((s,c)=>s+effPr(c),0)
   // over-credited claims (BMW paid more than invoiced) reduce the headline difference
   const overAmt=all.reduce((s,c)=>s+((c.gap||0)<-0.005?c.gap:0),0)
   const residual=totalDiff-(rejAmt+corrAmt+prAmt+overAmt)
@@ -2723,7 +2733,7 @@ function generateInvoicedPaidReport(){
   all.forEach(c=>{const m=c.month||'(no month)';const b=byM[m]=byM[m]||{n:0,inv:0,paid:0,rej:0,corr:0,pr:0}
     b.n++;b.inv+=c.invoiced;b.paid+=c.accepted
     if(inCorrection(c)){if((c.gap||0)>0.005)b.corr+=c.gap}
-    else{if((c.rejected||0)>0.005)b.rej+=c.rejected;if((c.pricing_diff||0)>0.005)b.pr+=c.pricing_diff}})
+    else{if(effRej(c)>0.005)b.rej+=effRej(c);if(effPr(c)>0.005)b.pr+=effPr(c)}})
   const months=Object.keys(byM).sort()
   const mRows=months.map(m=>{const b=byM[m],diff=b.inv-b.paid;return `<tr>
     <td style="font-weight:600">${esc(m==='(no month)'?m:fmM(m))}</td><td class="r" style="font-weight:400">${b.n}</td>
@@ -2807,9 +2817,9 @@ function generateInvoicedPaidReport(){
   <table class="gap-table"><thead><tr>
     <th>Claim No.</th><th>Kind</th><th>Month</th><th class="r">Rejected €</th><th>Reason</th>
   </tr></thead><tbody>
-  ${[...rejRows].sort((a,b)=>b.rejected-a.rejected).map(c=>`<tr>
+  ${[...rejRows].sort((a,b)=>effRej(b)-effRej(a)).map(c=>`<tr>
     <td style="font-weight:600">${esc(c.no)}</td><td>${c.kind==='bsi'?'BSI':'Warranty'}</td><td>${esc(c.month?fmM(c.month):'')}</td>
-    <td class="r" style="color:#dc2626">€${f2(c.rejected)}</td><td style="font-weight:400">${esc(rejReason(c))||'—'}</td></tr>`).join('')}
+    <td class="r" style="color:#dc2626">€${f2(effRej(c))}</td><td style="font-weight:400">${esc(rejReason(c))||'—'}</td></tr>`).join('')}
   </tbody><tfoot><tr class="tot"><td colspan="3"><b>TOTAL REJECTED</b></td><td class="r">€${f2(rejAmt)}</td><td></td></tr></tfoot></table>`:''}
 
   <div class="note">ℹ This report covers ${mo?esc(fmM(mo))+' only':yr+' only'} — select a Month in the Credit Notes filter to report on a single (even older) month. Pending claims (submitted, BMW has not answered yet) are not part of this report — invoiced vs paid only compares claims BMW has already answered. Duplicates and supplementary shared-invoice rows are excluded as usual. Months where BMW over-credited can show a Difference below the three category amounts.</div>
