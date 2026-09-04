@@ -548,11 +548,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.57'
+const APP_VERSION='v5.58'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.58',date:'2026-09-04',items:[
+    {t:'feat',d:'Invoiced vs Paid report: new compact "❌ Rejected Completely — Reasons" section at the bottom listing each fully-rejected claim with its rejected € and the reason — the Reason you typed in the tracking panel (e.g. "battery PDI") when set, otherwise BMW\'s own rejection message from the credit note. The monthly summary stays unchanged; no other claim lists were re-added.'}]},
   {v:'v5.57',date:'2026-09-04',items:[
     {t:'fix',d:'Invoiced vs Paid report: a rejected claim that is still being worked — resubmitted, OR with an open dispute/IDS case (tracking status "pending"), OR with a scheduled follow-up not yet done — now counts as 🔧 In Correction Phase instead of ❌ Rejected Completely (e.g. claims 513556 and 72275, both disputed via IDS cases). Rejected Completely is now only rejections with no correction activity open.'}]},
   {v:'v5.56',date:'2026-09-04',items:[
@@ -2704,6 +2706,13 @@ function generateInvoicedPaidReport(){
 
   const f2=n=>n.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})
   const pct2=(n,d)=>d>0?((n/d)*100).toFixed(1)+'%':'—'
+  // rejection reason: the manually entered Reason (tracking panel) wins; else BMW's message
+  const rejReason=c=>{const tr=S.resub[c.kind+':'+c.no]
+    if(tr&&tr.reason)return tr.reason
+    const dt=c.cn_date,msgs=new Set()
+    ;(c.credits||[]).forEach(x=>{if(x.crediting_item_status==='Error'&&(!dt||x.credit_note_date===dt)&&x.most_decisive_message)msgs.add(x.most_decisive_message)})
+    if(!msgs.size)(c.credits||[]).forEach(x=>{if(x.crediting_item_status==='Error'&&x.most_decisive_message)msgs.add(x.most_decisive_message)})
+    return [...msgs].slice(0,2).join(' · ')}
 
   // month-by-month roll-up — same bucket rules as the totals above, no claim detail
   const byM={}
@@ -2789,6 +2798,15 @@ function generateInvoicedPaidReport(){
   <tfoot><tr class="tot"><td><b>TOTAL</b></td><td class="r">${all.length}</td>
     <td class="r">€${f2(totalInv)}</td><td class="r">€${f2(totalPaid)}</td><td class="r">€${f2(totalDiff)}</td>
     <td class="r">€${f2(rejAmt)}</td><td class="r">€${f2(corrAmt)}</td><td class="r">€${f2(prAmt)}</td></tr></tfoot></table>
+
+  ${rejRows.length?`<h2>❌ Rejected Completely — Reasons</h2>
+  <table class="gap-table"><thead><tr>
+    <th>Claim No.</th><th>Kind</th><th>Month</th><th class="r">Rejected €</th><th>Reason</th>
+  </tr></thead><tbody>
+  ${[...rejRows].sort((a,b)=>b.rejected-a.rejected).map(c=>`<tr>
+    <td style="font-weight:600">${esc(c.no)}</td><td>${c.kind==='bsi'?'BSI':'Warranty'}</td><td>${esc(c.month?fmM(c.month):'')}</td>
+    <td class="r" style="color:#dc2626">€${f2(c.rejected)}</td><td style="font-weight:400">${esc(rejReason(c))||'—'}</td></tr>`).join('')}
+  </tbody><tfoot><tr class="tot"><td colspan="3"><b>TOTAL REJECTED</b></td><td class="r">€${f2(rejAmt)}</td><td></td></tr></tfoot></table>`:''}
 
   <div class="note">ℹ Pending claims (submitted, BMW has not answered yet) are not part of this report — invoiced vs paid only compares claims BMW has already answered. Duplicates and supplementary shared-invoice rows are excluded as usual. Months where BMW over-credited can show a Difference below the three category amounts.</div>
   <div class="ft">© IanTradingSAL · BMW Warranty Reconciliation · Generated ${today}</div>
