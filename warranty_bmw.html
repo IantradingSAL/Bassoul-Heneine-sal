@@ -384,6 +384,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         <input type="text" id="cr_search" placeholder="Search VIN, credit note IWE…, dealer claim…" style="flex:1;min-width:200px">
         <button class="btn btn-sm btn-bmw" id="cr_xlsx">⬇ Excel</button>
         <button class="btn btn-sm btn-sun" id="cr_share" style="margin-left:6px">📤 Share Report</button>
+        <button class="btn btn-sm" id="cr_ivp" style="background:var(--bmw);color:#fff;margin-left:6px" title="Invoiced vs Paid — difference split into Rejected / In Correction / Price Difference">📄 Invoiced vs Paid</button>
       </div></div>
       <div id="T_cr"></div>
     </div>
@@ -547,11 +548,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.54'
+const APP_VERSION='v5.55'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.55',date:'2026-09-04',items:[
+    {t:'feat',d:'New "📄 Invoiced vs Paid" button on the Credit Notes page — generates a shareable report comparing Invoiced € vs Paid € on answered claims, with the difference broken into exactly 3 categories: ❌ Rejected Completely (BMW refused — nothing recovered yet), 🔧 In Correction Phase (rejected → corrected & resubmitted, awaiting BMW\'s new answer) and 💶 Price Difference (paid, but at BMW\'s lower rate). Includes a stacked bar, per-category claim tables with BMW\'s rejection reason, and respects the Warranty/BSI scope + the Month filter.'}]},
   {v:'v5.54',date:'2026-07-15',items:[
     {t:'feat',d:'Statement page: Written Off claims now always appear at the bottom of the table (below a red separator line), regardless of the Show filter. They appear grayed out with a 🗑️ Written Off badge, their written-off amount shown strikethrough (not included in owed totals). The footer shows the total owed + a separate "written off" note so nothing is hidden.'}]},
   {v:'v5.53',date:'2026-07-15',items:[
@@ -2664,6 +2667,131 @@ function generateSummaryReport(){
 }
 window.generateSummaryReport=generateSummaryReport
 
+// ── Invoiced vs Paid report — difference in exactly 3 buckets ──────────────
+// ❌ Rejected Completely · 🔧 In Correction Phase (resubmitted) · 💶 Price Difference
+// Answered claims only (BMW has replied); respects scope + the Credit Notes month filter.
+function generateInvoicedPaidReport(){
+  const today=new Date().toISOString().slice(0,10)
+  const mo=document.getElementById('cr_month')?.value||''
+  const all=scopedClaims().filter(c=>!c._secondary&&c.answered&&(!mo||c.month===mo))
+  const totalInv=all.reduce((s,c)=>s+c.invoiced,0)
+  const totalPaid=all.reduce((s,c)=>s+c.accepted,0)
+  const totalDiff=totalInv-totalPaid
+  // 1. In Correction Phase — rejected, then corrected & resubmitted to BMW (whole open gap in flight)
+  const corrRows=all.filter(c=>manStatus(c)==='resubmitted'&&(c.gap||0)>0.005)
+  const corrAmt=corrRows.reduce((s,c)=>s+c.gap,0)
+  // 2. Rejected Completely — BMW refused the money and it is not being corrected (yet)
+  const rejRows=all.filter(c=>manStatus(c)!=='resubmitted'&&(c.rejected||0)>0.005)
+  const rejAmt=rejRows.reduce((s,c)=>s+c.rejected,0)
+  // 3. Price Difference — BMW paid, but at its own (lower) rate
+  const prRows=all.filter(c=>manStatus(c)!=='resubmitted'&&(c.pricing_diff||0)>0.005)
+  const prAmt=prRows.reduce((s,c)=>s+c.pricing_diff,0)
+  // over-credited claims (BMW paid more than invoiced) reduce the headline difference
+  const overAmt=all.reduce((s,c)=>s+((c.gap||0)<-0.005?c.gap:0),0)
+  const residual=totalDiff-(rejAmt+corrAmt+prAmt+overAmt)
+  const catTotal=rejAmt+corrAmt+prAmt
+
+  const f2=n=>n.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})
+  const pct2=(n,d)=>d>0?((n/d)*100).toFixed(1)+'%':'—'
+  // BMW's own rejection reason from the latest credit note's failed lines
+  const rejReason=c=>{const dt=c.cn_date,msgs=new Set()
+    ;(c.credits||[]).forEach(x=>{if(x.crediting_item_status==='Error'&&(!dt||x.credit_note_date===dt)&&x.most_decisive_message)msgs.add(x.most_decisive_message)})
+    if(!msgs.size)(c.credits||[]).forEach(x=>{if(x.crediting_item_status==='Error'&&x.most_decisive_message)msgs.add(x.most_decisive_message)})
+    return [...msgs].slice(0,2).join(' · ')}
+  const corrInfo=c=>{const tr=S.resub[c.kind+':'+c.no];if(!tr||!tr.new_claim)return '↺ resubmitted'
+    const oc=recoveryOutcome(tr.new_claim)
+    return `↺ ${esc(tr.new_claim)} · ${oc?(oc.answered?(oc.credited>0?'✅ credited €'+f2(oc.credited):'answered '+esc(oc.status)):'⏳ pending'):'not in data yet'}`}
+  const woTag=c=>manStatus(c)==='rejected'?' <span style="color:#991b1b;font-size:9px">(written off ✎)</span>':''
+
+  const detTable=(rows,amtFn,amtLabel,amtColor,lastCol,lastFn)=>`
+    <table class="det"><thead><tr><th>Kind</th><th>Claim No.</th><th>VIN</th><th>Month</th>
+    <th class="r">Invoiced €</th><th class="r">Paid €</th><th class="r">${amtLabel} €</th><th>${lastCol}</th></tr></thead><tbody>
+    ${[...rows].sort((a,b)=>amtFn(b)-amtFn(a)).map(c=>`<tr><td>${c.kind.toUpperCase()}</td><td>${esc(c.no)}</td><td>${esc(c.vin||'')}</td><td>${esc(c.month||'')}</td>
+      <td class="r">${f2(c.invoiced)}</td><td class="r">${f2(c.accepted)}</td><td class="r" style="color:${amtColor};font-weight:600">${f2(amtFn(c))}</td><td>${lastFn(c)}</td></tr>`).join('')}
+    </tbody></table>`
+  const section=(icon,title,color,amt,rows,tbl)=>rows.length?`
+    <h3 style="color:${color};border-bottom:2px solid ${color}">${icon} ${title} &nbsp;<span style="font-size:13px;font-weight:400;color:#555">${rows.length} claim${rows.length===1?'':'s'} · €${f2(amt)}</span></h3>${tbl}`:''
+
+  const bar=catTotal>0.005?`
+    <div class="bar">
+      <div style="width:${(rejAmt/catTotal*100).toFixed(2)}%;background:#dc2626"></div>
+      <div style="width:${(corrAmt/catTotal*100).toFixed(2)}%;background:#d97706"></div>
+      <div style="width:${(prAmt/catTotal*100).toFixed(2)}%;background:#ca8a04"></div>
+    </div>
+    <div class="legend">
+      <span style="--c:#dc2626">Rejected Completely €${f2(rejAmt)}</span>
+      <span style="--c:#d97706">In Correction Phase €${f2(corrAmt)}</span>
+      <span style="--c:#ca8a04">Price Difference €${f2(prAmt)}</span>
+    </div>`:''
+
+  const html=`<!doctype html><html><head><meta charset="utf-8">
+  <title>BMW Warranty — Invoiced vs Paid · ${today}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;padding:30px 40px;max-width:1100px;margin:0 auto}
+    h1{font-size:22px;color:#1c69d4;margin-bottom:4px}
+    h2{font-size:15px;color:#334155;margin:22px 0 10px;text-transform:uppercase;letter-spacing:.06em}
+    h3{font-size:13px;margin:28px 0 8px;padding-bottom:6px}
+    .meta{color:#64748b;font-size:11px;margin-bottom:24px}
+    .summary-box{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:28px}
+    .kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 20px;min-width:180px;flex:1}
+    .kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:4px}
+    .kpi-value{font-size:22px;font-weight:700}
+    .kpi-sub{font-size:10px;color:#94a3b8;margin-top:2px}
+    .gap-table{width:100%;border-collapse:collapse;margin-bottom:8px}
+    .gap-table th,.gap-table td{padding:9px 12px;border:1px solid #e2e8f0;font-size:12px}
+    .gap-table th{background:#f1f5f9;font-weight:600;text-align:left}
+    .gap-table td.r,.gap-table th.r{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+    .gap-table .tot td{background:#fff7ed;font-weight:700}
+    .bar{height:14px;border-radius:7px;overflow:hidden;display:flex;margin:6px 0 8px;border:1px solid #e2e8f0}
+    .bar div{height:100%}
+    .legend{display:flex;gap:18px;font-size:10px;color:#475569;margin-bottom:26px;flex-wrap:wrap}
+    .legend span::before{content:'';display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;background:var(--c)}
+    table.det{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:6px}
+    table.det th,table.det td{padding:6px 10px;border:1px solid #e2e8f0}
+    table.det th{background:#f8fafc;font-weight:600;text-align:left}
+    table.det th.r{text-align:right}
+    table.det td.r{text-align:right;font-variant-numeric:tabular-nums}
+    .note{font-size:10px;color:#94a3b8;margin-bottom:4px}
+    .ft{margin-top:36px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+    @media print{body{padding:16px}}
+  </style></head><body>
+  <h1>🏎 BMW Warranty — Invoiced vs Paid</h1>
+  <div class="meta">Scope: ${esc(S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty')}${mo?' · Month: '+esc(fmM(mo)):''} &nbsp;·&nbsp; Generated: ${today} &nbsp;·&nbsp; ${all.length} claims (answered by BMW)</div>
+
+  <h2>Overall Position</h2>
+  <div class="summary-box">
+    <div class="kpi"><div class="kpi-label">🧾 Invoiced</div><div class="kpi-value" style="color:#1c69d4">€${f2(totalInv)}</div><div class="kpi-sub">${all.length} claims (incadea)</div></div>
+    <div class="kpi"><div class="kpi-label">✅ Paid by BMW</div><div class="kpi-value" style="color:#059669">€${f2(totalPaid)}</div><div class="kpi-sub">${pct2(totalPaid,totalInv)} of invoiced</div></div>
+    <div class="kpi"><div class="kpi-label">⚠️ Difference</div><div class="kpi-value" style="color:${totalDiff>0.005?'#dc2626':'#059669'}">€${f2(totalDiff)}</div><div class="kpi-sub">${pct2(totalDiff,totalInv)} of invoiced</div></div>
+  </div>
+
+  <h2>Difference Breakdown</h2>
+  <table class="gap-table"><thead><tr>
+    <th>Category</th><th>Description</th><th class="r">Amount €</th><th class="r">% of Difference</th><th class="r">Claims</th>
+  </tr></thead><tbody>
+    <tr><td>❌ Rejected Completely</td><td>BMW refused — nothing recovered yet</td><td class="r">€${f2(rejAmt)}</td><td class="r">${pct2(rejAmt,catTotal)}</td><td class="r">${rejRows.length}</td></tr>
+    <tr><td>🔧 In Correction Phase</td><td>Rejected → corrected &amp; resubmitted, awaiting BMW's new answer</td><td class="r">€${f2(corrAmt)}</td><td class="r">${pct2(corrAmt,catTotal)}</td><td class="r">${corrRows.length}</td></tr>
+    <tr><td>💶 Price Difference</td><td>incadea rate vs BMW rate — paid, but at a lower price</td><td class="r">€${f2(prAmt)}</td><td class="r">${pct2(prAmt,catTotal)}</td><td class="r">${prRows.length}</td></tr>
+    ${overAmt<-0.005?`<tr><td>➕ Over-credited</td><td>BMW paid more than invoiced on some claims (offsets the difference)</td><td class="r">€${f2(overAmt)}</td><td class="r">—</td><td class="r">${all.filter(c=>(c.gap||0)<-0.005).length}</td></tr>`:''}
+    ${Math.abs(residual)>0.5?`<tr><td>· Other</td><td>Small rounding / mixed-basis remainder</td><td class="r">€${f2(residual)}</td><td class="r">—</td><td class="r">—</td></tr>`:''}
+  </tbody><tfoot><tr class="tot"><td colspan="2"><b>TOTAL DIFFERENCE (Invoiced − Paid)</b></td><td class="r">€${f2(totalDiff)}</td><td class="r">100%</td><td class="r">${new Set([...rejRows,...corrRows,...prRows].map(c=>c.kind+':'+c.no)).size}</td></tr></tfoot></table>
+  ${bar}
+
+  ${section('❌','Rejected Completely','#dc2626',rejAmt,rejRows,
+    detTable(rejRows,c=>c.rejected,'Rejected','#dc2626','Reason (BMW message)',c=>esc(rejReason(c))+woTag(c)))}
+  ${section('🔧','In Correction Phase','#d97706',corrAmt,corrRows,
+    detTable(corrRows,c=>c.gap,'Chasing','#d97706','Resubmitted as',c=>corrInfo(c)))}
+  ${section('💶','Price Difference','#ca8a04',prAmt,prRows,
+    detTable(prRows,c=>c.pricing_diff,'Price Diff','#ca8a04','Status',c=>(c.status_overall==='Warning'?'Paid ⚠ (rate card)':c.status_overall==='Error'?'Partially paid ❌':'Paid ✅')+(isAcked(c)?' · 👁️ acknowledged':'')))}
+
+  <div class="note">ℹ Pending claims (submitted, BMW has not answered yet) are not part of this report — invoiced vs paid only compares claims BMW has already answered. Duplicates and supplementary shared-invoice rows are excluded as usual. A claim that is partly rejected and partly re-priced appears in both categories with the corresponding amount.</div>
+  <div class="ft">© IanTradingSAL · BMW Warranty Reconciliation · Generated ${today}</div>
+  </body></html>`
+  const blob=new Blob([html],{type:'text/html'});window.open(URL.createObjectURL(blob))
+}
+window.generateInvoicedPaidReport=generateInvoicedPaidReport
+
 async function rUploadHist(){
   const el=document.getElementById('upHist');if(!el)return
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -2882,6 +3010,7 @@ tfoot td{padding:10px 10px;font-weight:800;background:#f8fafc;border-top:2px sol
   showToast('📤 Report opened in new tab — save as PDF or copy link to share')
 }
 ;(()=>{const e=document.getElementById('cr_share');if(e)e.addEventListener('click',generateCrReport)})()
+;(()=>{const e=document.getElementById('cr_ivp');if(e)e.addEventListener('click',generateInvoicedPaidReport)})()
 document.getElementById('cr_xlsx').addEventListener('click',()=>{const rows=(window._crRows||[]).map(c=>{const ca=c._cnAccepted!=null?c._cnAccepted:c.accepted;const inv=Number(c.invoiced)||0;return[c.cn_date,c._cnDisplay||c.cn_no,c.kind,c.dealer_claim_number||c.credits?.[0]?.dealer_claim_number||c.no||c.sub?.last_submission||'',c.doc_no||(c.inferred_inv?'≈'+c.inferred_inv.doc_no:''),c.credits[0]?.brand||'',c.vin,c._cnLines!=null?c._cnLines:c.items_count,inv||'',ca,inv?+(inv-ca).toFixed(2):'',c.status_overall,c.corrected?'corrected':'',c.orphan?'no submission':'linked']});exportXlsx('BMW_Credit-Notes',['CN Date','Credit Note','Kind','Dealer Claim','Invoice','Brand','VIN','Lines','Invoiced €','Credited €','Δ €','Status','Corrected','Link'],rows);showToast('⬇ Exported '+rows.length+' credit rows to Excel')})
 document.getElementById('rj_xlsx').addEventListener('click',()=>{const rows=(window._rjRows||[]).map(c=>{const tr=S.resub[c.kind+':'+c.no]||{};return [c.cn_date,c.no,c.make,c.vin,c.accepted,c.gap,c.status_overall,c.statuses?.Error||0,c.statuses?.Warning||0,tr.status||'untracked',tr.credited_amt||'']});exportXlsx('BMW_Rejections',['CN Date','Submission','Make','VIN','Credited €','Gap €','Issue','Errors','Warnings','Tracked','Recovered €'],rows);showToast('⬇ Exported '+rows.length+' rejections to Excel')})
 document.getElementById('dash_xlsx').addEventListener('click',()=>{const series=monthly(scopedClaims()).filter(m=>m.month.slice(0,4)!=='2025');const rows=series.map(m=>[fmM(m.month),m.cnt,m.invoiced,m.accepted,pct(m.accepted,m.invoiced).toFixed(0)+'%',m.invoiced-m.accepted,m.success,m.warn,m.err,m.pending]);exportXlsx('BMW_Monthly-Performance',['Month','Claims','Invoiced €','Credited €','Cred %','Gap €','Success','Warning','Error','Pending'],rows);showToast('⬇ Exported '+rows.length+' months to Excel')})
