@@ -548,11 +548,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.60'
+const APP_VERSION='v5.61'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.61',date:'2026-09-04',items:[
+    {t:'feat',d:'Invoiced vs Paid report polish: title now includes the year (e.g. "Invoiced vs Paid 2026") and the "only" wording was dropped; the IanTradingSAL branding was removed from this report\'s footer; a fixed "📄 Save as PDF" button was added (opens the browser print dialog — choose Save as PDF; hidden on the printout); and the Rejected Completely reasons table now shows the invoice (GAR) number next to each claim number.'}]},
   {v:'v5.60',date:'2026-09-04',items:[
     {t:'fix',d:'Invoiced vs Paid report: a claim manually marked ✅ credited or resolved (e.g. 513303 — rejected first, then corrected and paid) no longer appears in ❌ Rejected Completely; its small remaining gap counts as 💶 Price Difference. Rejected € is also capped at the claim\'s actual outstanding gap, so a corrected claim whose claimed price is summed over both credit notes can no longer inflate the rejected figure (513303 showed €116,64 rejected while its real gap was €4,10).'}]},
   {v:'v5.59',date:'2026-09-04',items:[
@@ -2780,9 +2782,12 @@ function generateInvoicedPaidReport(){
     .legend span::before{content:'';display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;background:var(--c)}
     .note{font-size:10px;color:#94a3b8;margin-bottom:4px}
     .ft{margin-top:36px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
-    @media print{body{padding:16px}}
+    .pdf-btn{position:fixed;top:14px;right:16px;background:#1c69d4;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(28,105,212,.35)}
+    .pdf-btn:hover{background:#1657ae}
+    @media print{body{padding:16px}.pdf-btn{display:none}}
   </style></head><body>
-  <h1>🏎 BMW Warranty — Invoiced vs Paid</h1>
+  <button class="pdf-btn" onclick="window.print()">📄 Save as PDF</button>
+  <h1>🏎 BMW Warranty — Invoiced vs Paid ${mo?esc(fmM(mo)):yr}</h1>
   <div class="meta">Scope: ${esc(S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty')} · ${mo?'Month: '+esc(fmM(mo)):'Year: '+yr} &nbsp;·&nbsp; Generated: ${today} &nbsp;·&nbsp; ${all.length} claims (answered by BMW)</div>
 
   <h2>Overall Position</h2>
@@ -2815,15 +2820,15 @@ function generateInvoicedPaidReport(){
 
   ${rejRows.length?`<h2>❌ Rejected Completely — Reasons</h2>
   <table class="gap-table"><thead><tr>
-    <th>Claim No.</th><th>Kind</th><th>Month</th><th class="r">Rejected €</th><th>Reason</th>
+    <th>Claim No.</th><th>Invoice</th><th>Kind</th><th>Month</th><th class="r">Rejected €</th><th>Reason</th>
   </tr></thead><tbody>
   ${[...rejRows].sort((a,b)=>effRej(b)-effRej(a)).map(c=>`<tr>
-    <td style="font-weight:600">${esc(c.no)}</td><td>${c.kind==='bsi'?'BSI':'Warranty'}</td><td>${esc(c.month?fmM(c.month):'')}</td>
+    <td style="font-weight:600">${esc(c.no)}</td><td style="font-weight:400">${esc(c.doc_no||'—')}</td><td>${c.kind==='bsi'?'BSI':'Warranty'}</td><td>${esc(c.month?fmM(c.month):'')}</td>
     <td class="r" style="color:#dc2626">€${f2(effRej(c))}</td><td style="font-weight:400">${esc(rejReason(c))||'—'}</td></tr>`).join('')}
-  </tbody><tfoot><tr class="tot"><td colspan="3"><b>TOTAL REJECTED</b></td><td class="r">€${f2(rejAmt)}</td><td></td></tr></tfoot></table>`:''}
+  </tbody><tfoot><tr class="tot"><td colspan="4"><b>TOTAL REJECTED</b></td><td class="r">€${f2(rejAmt)}</td><td></td></tr></tfoot></table>`:''}
 
-  <div class="note">ℹ This report covers ${mo?esc(fmM(mo))+' only':yr+' only'} — select a Month in the Credit Notes filter to report on a single (even older) month. Pending claims (submitted, BMW has not answered yet) are not part of this report — invoiced vs paid only compares claims BMW has already answered. Duplicates and supplementary shared-invoice rows are excluded as usual. Months where BMW over-credited can show a Difference below the three category amounts.</div>
-  <div class="ft">© IanTradingSAL · BMW Warranty Reconciliation · Generated ${today}</div>
+  <div class="note">ℹ This report covers ${mo?esc(fmM(mo)):yr} — select a Month in the Credit Notes filter to report on a single (even older) month. Pending claims (submitted, BMW has not answered yet) are not part of this report — invoiced vs paid only compares claims BMW has already answered. Duplicates and supplementary shared-invoice rows are excluded as usual. Months where BMW over-credited can show a Difference below the three category amounts.</div>
+  <div class="ft">BMW Warranty Reconciliation · Generated ${today}</div>
   </body></html>`
   const blob=new Blob([html],{type:'text/html'});window.open(URL.createObjectURL(blob))
 }
