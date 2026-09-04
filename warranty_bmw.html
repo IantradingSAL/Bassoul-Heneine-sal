@@ -548,11 +548,13 @@ const S = { inv:[], subs:[], cred:[], resub:{}, me:null, scope:'all', sortState:
 window.S = S
 
 // ── single source of truth for the app version (shown in the header + sidebar) ──
-const APP_VERSION='v5.58'
+const APP_VERSION='v5.59'
 ;(()=>{const vc=document.getElementById('verChip');if(vc){vc.textContent=APP_VERSION;vc.style.cursor='pointer';vc.title='What changed — click for the changelog';vc.addEventListener('click',()=>window.openChangelog&&window.openChangelog())}
   const vf=document.getElementById('verFoot');if(vf)vf.textContent='© IanTradingSAL · '+APP_VERSION})()
 // ── change history (newest first). type: 'fix' | 'feat' ──
 const CHANGELOG=[
+  {v:'v5.59',date:'2026-09-04',items:[
+    {t:'fix',d:'Invoiced vs Paid report now covers the current year only (e.g. 2026) — older months no longer clutter the By Month table. The header shows "Year: 2026". Selecting a Month in the Credit Notes filter still reports on that single month, including months from earlier years.'}]},
   {v:'v5.58',date:'2026-09-04',items:[
     {t:'feat',d:'Invoiced vs Paid report: new compact "❌ Rejected Completely — Reasons" section at the bottom listing each fully-rejected claim with its rejected € and the reason — the Reason you typed in the tracking panel (e.g. "battery PDI") when set, otherwise BMW\'s own rejection message from the credit note. The monthly summary stays unchanged; no other claim lists were re-added.'}]},
   {v:'v5.57',date:'2026-09-04',items:[
@@ -2679,7 +2681,9 @@ window.generateSummaryReport=generateSummaryReport
 function generateInvoicedPaidReport(){
   const today=new Date().toISOString().slice(0,10)
   const mo=document.getElementById('cr_month')?.value||''
-  const all=scopedClaims().filter(c=>!c._secondary&&c.answered&&(!mo||c.month===mo))
+  // current year only — pick a Month in the Credit Notes filter to see one specific (even older) month
+  const yr=String(new Date().getFullYear())
+  const all=scopedClaims().filter(c=>!c._secondary&&c.answered&&(mo?c.month===mo:String(c.month||'').startsWith(yr)))
   const totalInv=all.reduce((s,c)=>s+c.invoiced,0)
   const totalPaid=all.reduce((s,c)=>s+c.accepted,0)
   const totalDiff=totalInv-totalPaid
@@ -2769,7 +2773,7 @@ function generateInvoicedPaidReport(){
     @media print{body{padding:16px}}
   </style></head><body>
   <h1>🏎 BMW Warranty — Invoiced vs Paid</h1>
-  <div class="meta">Scope: ${esc(S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty')}${mo?' · Month: '+esc(fmM(mo)):''} &nbsp;·&nbsp; Generated: ${today} &nbsp;·&nbsp; ${all.length} claims (answered by BMW)</div>
+  <div class="meta">Scope: ${esc(S.scope==='all'?'All':S.scope==='bsi'?'BSI':'Warranty')} · ${mo?'Month: '+esc(fmM(mo)):'Year: '+yr} &nbsp;·&nbsp; Generated: ${today} &nbsp;·&nbsp; ${all.length} claims (answered by BMW)</div>
 
   <h2>Overall Position</h2>
   <div class="summary-box">
@@ -2808,7 +2812,7 @@ function generateInvoicedPaidReport(){
     <td class="r" style="color:#dc2626">€${f2(c.rejected)}</td><td style="font-weight:400">${esc(rejReason(c))||'—'}</td></tr>`).join('')}
   </tbody><tfoot><tr class="tot"><td colspan="3"><b>TOTAL REJECTED</b></td><td class="r">€${f2(rejAmt)}</td><td></td></tr></tfoot></table>`:''}
 
-  <div class="note">ℹ Pending claims (submitted, BMW has not answered yet) are not part of this report — invoiced vs paid only compares claims BMW has already answered. Duplicates and supplementary shared-invoice rows are excluded as usual. Months where BMW over-credited can show a Difference below the three category amounts.</div>
+  <div class="note">ℹ This report covers ${mo?esc(fmM(mo))+' only':yr+' only'} — select a Month in the Credit Notes filter to report on a single (even older) month. Pending claims (submitted, BMW has not answered yet) are not part of this report — invoiced vs paid only compares claims BMW has already answered. Duplicates and supplementary shared-invoice rows are excluded as usual. Months where BMW over-credited can show a Difference below the three category amounts.</div>
   <div class="ft">© IanTradingSAL · BMW Warranty Reconciliation · Generated ${today}</div>
   </body></html>`
   const blob=new Blob([html],{type:'text/html'});window.open(URL.createObjectURL(blob))
