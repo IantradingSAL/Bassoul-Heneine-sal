@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="cw-page" content="warranty_bmw_quick">
+<title>BMW Warranty · Quick Entry — Bassoul, Heneine SAL</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='10' fill='%231C69D4'/><text x='12' y='17' font-size='12' text-anchor='middle' fill='white' font-weight='800' font-family='Arial'>B</text></svg>">
+
+<script type="module" src="./auth_guard.js"></script>
+<script src="./access.js"></script>
+<script type="module" src="./notifications.js"></script>
+
+<style>
+:root{
+  --bg:#fafbff; --surf:#ffffff; --surf2:#f1f5f9; --line:#e2e8f0;
+  --txt:#0f172a; --muted:#64748b; --faint:#94a3b8;
+  --bmw:#1C69D4; --bmw-dark:#0F4FA8; --blue4:#eef2ff;
+  --mint:#10b981; --sun:#f59e0b; --rose:#e11d48;
+  --mono:'SF Mono','Roboto Mono','Menlo',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;padding:0 16px;padding-block:0 48px;font-size:13px}
+
+.wrap{max-width:600px;margin:0 auto}
+.wrapwide{max-width:920px;margin:0 auto}
+.top{display:flex;align-items:center;gap:12px;padding-block:18px 6px;flex-wrap:wrap}
+.logo{width:40px;height:40px;background:linear-gradient(135deg,#1C69D4,#0F4FA8);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:19px;flex-shrink:0;text-decoration:none}
+.top h1{margin:0;font-size:19px;font-weight:800;letter-spacing:-.3px}
+.top p{margin:2px 0 0;font-size:11px;color:var(--muted);font-weight:600}
+.advisor{margin-left:auto;text-align:right;flex-shrink:0}
+.advisor .chip{display:inline-block;background:var(--blue4);color:var(--bmw);font-size:10px;font-weight:700;padding:4px 10px;border-radius:999px}
+.advisor .sub{font-size:9px;color:var(--faint);font-weight:600;margin-top:3px}
+.backrow{max-width:920px;margin:12px auto 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.backlink{font-size:11px;font-weight:700;color:var(--muted);text-decoration:none;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.backlink:hover{color:var(--bmw);border-color:var(--bmw)}
+
+.switcher{max-width:920px;margin:12px auto 0;display:flex;gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px}
+.switcher button{flex:1;padding:11px 10px;border:none;border-radius:9px;background:transparent;font-family:inherit;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;line-height:1.35}
+.switcher button.on{background:var(--bmw);color:#fff}
+.switcher button small{display:block;font-size:9px;font-weight:600;opacity:.75;margin-top:2px}
+.pane{display:none}
+.pane.on{display:block}
+
+.card{background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:20px;margin-top:14px;box-shadow:0 1px 3px rgba(15,23,42,.04)}
+.st{flex-shrink:0;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.st.pend{background:#fef9c3;color:#854d0e}
+.st.ok{background:rgba(16,185,129,.13);color:#047857}
+.st.err{background:rgba(225,29,72,.13);color:#9f1239}
+.alllink{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:18px;padding:15px;background:#fff;border:1.5px solid var(--line);border-radius:14px;text-decoration:none;color:var(--txt);font-size:14px;font-weight:700;transition:border-color .15s}
+.alllink:hover{border-color:var(--bmw);color:var(--bmw)}
+.alllink .arr{color:var(--bmw);font-weight:800}
+.alllink .sub{display:block;font-size:10px;color:var(--muted);font-weight:500;margin-top:2px}
+.alllink .txt{text-align:center}
+
+/* ── simple form ── */
+.fld{margin-bottom:16px}
+.fld label{display:block;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px}
+.fld input,.fld textarea{width:100%;padding:14px 16px;border:1.5px solid var(--line);border-radius:12px;font-size:17px;font-family:inherit;color:var(--txt);background:#fff}
+.fld input:focus,.fld textarea:focus{outline:none;border-color:var(--bmw);box-shadow:0 0 0 4px rgba(28,105,212,.12)}
+.fld .hint{font-size:10px;color:var(--faint);margin-top:5px;font-weight:500}
+.fld input.big{font-size:24px;font-weight:800;font-family:var(--mono);letter-spacing:.5px}
+.fld input.vin{text-transform:uppercase;font-family:var(--mono);font-size:16px;letter-spacing:1px}
+.gorbox{display:flex;align-items:center;justify-content:space-between;background:rgba(28,105,212,.06);border:1.5px dashed var(--bmw);border-radius:12px;padding:12px 16px;margin-bottom:16px}
+.gorbox .l{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.gorbox .v{font-family:var(--mono);font-size:20px;font-weight:800;color:var(--bmw)}
+.daterow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.daterow .fld{flex:1;min-width:140px;margin-bottom:0}
+.daterow input{font-size:15px;padding:12px 14px}
+details.more{border-top:1px solid var(--line);padding-top:12px;margin-bottom:14px}
+details.more summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--bmw);list-style:none;user-select:none}
+details.more summary::-webkit-details-marker{display:none}
+details.more summary::before{content:'▸ '}
+details.more[open] summary::before{content:'▾ '}
+details.more .inner{margin-top:12px}
+details.more textarea{font-size:14px;min-height:64px;resize:vertical}
+.savebtn{width:100%;padding:17px;border:none;border-radius:14px;background:linear-gradient(135deg,#1C69D4,#0F4FA8);color:#fff;font-size:17px;font-weight:800;font-family:inherit;cursor:pointer;letter-spacing:.2px;box-shadow:0 6px 18px rgba(28,105,212,.3)}
+.savebtn:active{transform:scale(.985)}
+.savebtn:disabled{opacity:.6;cursor:wait}
+.saved-flash{display:none;margin-top:12px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.35);color:#047857;font-size:13px;font-weight:700;padding:12px 14px;border-radius:12px;text-align:center}
+.saved-flash.on{display:block}
+.saved-flash.err{background:rgba(225,29,72,.08);border-color:rgba(225,29,72,.3);color:#9f1239}
+
+/* ── saved today ── */
+.today{max-width:920px;margin:22px auto 0}
+.today-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+.today-h h2{margin:0;font-size:13px;font-weight:800;letter-spacing:-.2px}
+.today-h .cnt{font-size:11px;color:var(--muted);font-weight:600}
+.entry{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.entry .ref{font-family:var(--mono);font-size:13px;font-weight:800;color:var(--bmw);flex-shrink:0}
+.entry .who{flex:1;min-width:0}
+.entry .who .nm{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entry .who .vin{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entry-empty{font-size:11px;color:var(--faint);font-style:italic;text-align:center;padding:14px;background:var(--surf2);border-radius:10px}
+
+/* ── rapid grid ── */
+.gridcard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:14px;box-shadow:0 1px 3px rgba(15,23,42,.04)}
+.grid-help{background:var(--blue4);color:#1e40af;font-size:11px;font-weight:600;padding:9px 12px;border-radius:9px;margin-bottom:12px;line-height:1.5}
+.gtw{overflow-x:auto}
+.gt{width:100%;border-collapse:collapse;min-width:720px}
+.gt th{text-align:left;font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;background:var(--surf2);padding:8px 10px;white-space:nowrap;border-bottom:1px solid var(--line)}
+.gt td{padding:5px 4px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+.gt input{width:100%;padding:10px 10px;border:1.5px solid transparent;border-radius:8px;font-size:13px;font-family:inherit;background:transparent;color:var(--txt)}
+.gt input:hover:not([readonly]){background:var(--surf2)}
+.gt input:focus{outline:none;border-color:var(--bmw);background:#fff;box-shadow:0 0 0 3px rgba(28,105,212,.1)}
+.gt input[readonly]{color:var(--muted)}
+.gt input.gmono{font-family:var(--mono);font-weight:700}
+.gt input.gvin{font-family:var(--mono);text-transform:uppercase;font-size:12px;letter-spacing:.5px}
+.gt .gref{font-family:var(--mono);font-size:11px;font-weight:800;color:var(--bmw);white-space:nowrap;padding:0 6px}
+.gt tr.saved-row td{background:rgba(16,185,129,.05)}
+.gt tr.just-saved td{animation:savedpulse 1.2s ease}
+@keyframes savedpulse{0%{background:rgba(16,185,129,.28)}100%{background:rgba(16,185,129,.05)}}
+.gt .rowstat{white-space:nowrap;padding:0 8px}
+.rowsave{border:none;background:var(--bmw);color:#fff;font-size:10px;font-weight:700;padding:6px 10px;border-radius:7px;cursor:pointer;font-family:inherit}
+.rowsave:hover{background:var(--bmw-dark)}
+.autosave-note{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:11px;color:var(--muted);font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--mint);animation:blink 2s infinite}
+@keyframes blink{50%{opacity:.35}}
+
+.toast{position:fixed;bottom:24px;right:24px;background:#0f172a;color:#fff;padding:11px 16px;border-radius:11px;font-size:12px;font-weight:600;box-shadow:0 12px 32px rgba(0,0,0,.18);z-index:900;opacity:0;transform:translateY(8px);transition:all .25s;max-width:420px}
+.toast.on{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="backrow">
+  <a class="backlink" href="index.html">🏠 Dashboard</a>
+  <a class="backlink" href="warranty_bmw_orders.html">📋 All orders (full details)</a>
+  <a class="backlink" href="warranty_bmw.html">🏁 Credits / Upload</a>
+</div>
+
+<div class="wrapwide">
+  <div class="top">
+    <a class="logo" href="index.html">B</a>
+    <div>
+      <h1>Quick Entry</h1>
+      <p>BMW Warranty · New repair orders</p>
+    </div>
+    <div class="advisor">
+      <span class="chip" id="advisorChip">👤 —</span>
+      <div class="sub">Auto from your login</div>
+    </div>
+  </div>
+</div>
+
+<div class="switcher">
+  <button id="tabForm" class="on">📝 Simple form<small>One order at a time · phone friendly</small></button>
+  <button id="tabGrid">⚡ Rapid grid<small>Several orders like Excel · auto-save · new line opens</small></button>
+</div>
+
+<!-- ═════════ SIMPLE FORM ═════════ -->
+<div class="pane on" id="paneForm">
+<div class="wrap">
+  <div class="card">
+    <div class="fld">
+      <label>Order number</label>
+      <input class="big" id="f_order" type="text" inputmode="numeric" placeholder="267779" autocomplete="off">
+      <div class="hint">Digits only — this is the only required field</div>
+    </div>
+
+    <div class="gorbox">
+      <span class="l">Order ref · auto</span>
+      <span class="v" id="f_gor">GOR0—</span>
+    </div>
+
+    <div class="fld">
+      <label>VIN</label>
+      <input class="vin" id="f_vin" type="text" placeholder="WBA…" autocomplete="off">
+      <div class="hint">Vehicle chassis number</div>
+    </div>
+
+    <div class="fld">
+      <label>Customer name</label>
+      <input id="f_customer" type="text" placeholder="Owner / company" autocomplete="off">
+    </div>
+
+    <div class="daterow">
+      <div class="fld">
+        <label>Order date</label>
+        <input id="f_orderdate" type="date">
+      </div>
+      <div class="fld">
+        <label>Date (service)</label>
+        <input id="f_date" type="date">
+      </div>
+    </div>
+
+    <details class="more">
+      <summary>Add advisor note (optional)</summary>
+      <div class="inner fld">
+        <textarea id="f_note" placeholder="e.g. to be sent today"></textarea>
+      </div>
+    </details>
+
+    <button class="savebtn" id="saveBtn">💾 Save order</button>
+    <div class="saved-flash" id="flash"></div>
+  </div>
+</div>
+</div>
+
+<!-- ═════════ RAPID GRID ═════════ -->
+<div class="pane" id="paneGrid">
+<div class="wrapwide">
+  <div class="gridcard">
+    <div class="grid-help">⌨️ Works like Excel: <strong>Tab / Enter</strong> moves to the next cell. Press <strong>Enter on the Order date</strong> (or tap 💾) — the row saves itself ✅ and a new empty line opens on Order #. Order ref and advisor fill automatically, dates default to today.</div>
+    <div class="gtw">
+      <table class="gt">
+        <thead>
+          <tr>
+            <th style="width:110px">Order #</th>
+            <th style="width:112px">Order ref</th>
+            <th>VIN</th>
+            <th>Customer</th>
+            <th style="width:135px">Order date</th>
+            <th style="width:104px">Status</th>
+          </tr>
+        </thead>
+        <tbody id="gbody"></tbody>
+      </table>
+    </div>
+    <div class="autosave-note"><span class="dot"></span> Auto-save is on — every completed line is saved instantly, nothing else to click.</div>
+  </div>
+</div>
+</div>
+
+<!-- saved today -->
+<div class="today">
+  <div class="today-h">
+    <h2>📥 Saved today</h2>
+    <span class="cnt" id="todayCnt">—</span>
+  </div>
+  <div id="todayList"><div class="entry-empty">Loading…</div></div>
+
+  <a class="alllink" href="warranty_bmw_orders.html">
+    <div class="txt">📋 View all orders — full details
+      <span class="sub">Table, filters, claim dates, edit &amp; print report</span>
+    </div>
+    <span class="arr">→</span>
+  </a>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { SUPABASE_CONFIG } from './config.js'
+
+let createClient = null
+const cdns = [
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
+  'https://cdn.skypack.dev/@supabase/supabase-js@2',
+  'https://esm.sh/@supabase/supabase-js@2',
+  'https://unpkg.com/@supabase/supabase-js@2/dist/module/index.js'
+]
+for (const url of cdns){ try { const m = await import(url); if (m && m.createClient){ createClient = m.createClient; break } } catch(e){} }
+if (!createClient){ alert('Could not load Supabase library — please check your network.'); throw new Error('Supabase unreachable') }
+const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
+window._sb = sb
+
+const WARRANTY_ADMIN_ROLES = ['admin', 'manager', 'warranty admin', 'warranty manager']
+const S = { me:null, advisorName:'—', authEmail:'', authUserId:'', role:'employee', isAdmin:false, rows:[] }
+
+const $ = id => document.getElementById(id)
+const val = id => ($(id)?.value || '').trim()
+const todayISO = () => { const d=new Date(); const o=d.getTimezoneOffset(); return new Date(d.getTime()-o*60000).toISOString().slice(0,10) }
+const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
+const showToast = (msg, ms=3500) => { const t=$('toast'); t.textContent=msg; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),ms) }
+
+async function whoami(){
+  let roleStr = (sessionStorage.getItem('cw_role') || localStorage.getItem('cw_role') || '').toLowerCase()
+  try{
+    const { data:{ user } } = await sb.auth.getUser()
+    S.authEmail = user?.email || ''; S.authUserId = user?.id || ''
+    if (user){
+      const { data } = await sb.from('employees').select('id,name,email,role,custom_role,auth_user_id').eq('auth_user_id', user.id).maybeSingle()
+      if (data){ S.me=data; roleStr=(data.custom_role||data.role||roleStr||'').toLowerCase() }
+    }
+  }catch(e){ console.warn('whoami', e) }
+  S.role = roleStr || 'employee'
+  S.isAdmin = WARRANTY_ADMIN_ROLES.some(r => S.role.includes(r))
+  S.advisorName = (S.me && S.me.name) || window.CW_USER || sessionStorage.getItem('cw_name') || localStorage.getItem('cw_name') || S.authEmail || '—'
+  $('advisorChip').textContent = '👤 ' + S.advisorName
+}
+
+function buildPayload({order_number, vin, customer_name, order_date, work_date, note}){
+  return {
+    order_number,
+    vin: vin || null,
+    customer_name: customer_name || null,
+    order_date: order_date || null,
+    work_date: work_date || null,
+    service_advisor: S.advisorName === '—' ? null : S.advisorName,
+    service_advisor_id: S.me ? S.me.id : null,
+    note: note || null
+  }
+}
+
+// insert one order; returns { ok, dup, msg }
+async function insertOrder(fields){
+  const { error } = await sb.from('warranty_bmw_orders').insert(buildPayload(fields))
+  if (!error) return { ok:true }
+  if (error.code === '23505') return { ok:false, dup:true, msg:'Order '+fields.order_number+' already exists' }
+  return { ok:false, msg:(error.message||'Save failed').slice(0,90) }
+}
+
+// ── tabs ──
+const tabForm=$('tabForm'), tabGrid=$('tabGrid'), paneForm=$('paneForm'), paneGrid=$('paneGrid')
+tabForm.addEventListener('click', ()=>{ tabForm.classList.add('on'); tabGrid.classList.remove('on'); paneForm.classList.add('on'); paneGrid.classList.remove('on'); $('f_order').focus() })
+tabGrid.addEventListener('click', ()=>{ tabGrid.classList.add('on'); tabForm.classList.remove('on'); paneGrid.classList.add('on'); paneForm.classList.remove('on'); focusLastGridRow() })
+
+// ── simple form ──
+$('f_order').addEventListener('input', ()=>{ const v=val('f_order').replace(/\D/g,''); $('f_order').value=v; $('f_gor').textContent=v?'GOR0'+v:'GOR0—' })
+$('f_vin').addEventListener('input', ()=>{ $('f_vin').value = $('f_vin').value.toUpperCase() })
+
+function flash(msg, isErr){
+  const f=$('flash'); f.textContent=msg; f.classList.toggle('err', !!isErr); f.classList.add('on')
+  setTimeout(()=>f.classList.remove('on'), 4000)
+}
+async function saveForm(){
+  const order_number = val('f_order')
+  if (!order_number){ flash('⚠️ Order number is required', true); $('f_order').focus(); return }
+  $('saveBtn').disabled = true
+  const res = await insertOrder({
+    order_number, vin: val('f_vin'), customer_name: val('f_customer'),
+    order_date: val('f_orderdate'), work_date: val('f_date'), note: val('f_note')
+  })
+  $('saveBtn').disabled = false
+  if (!res.ok){ flash((res.dup?'⚠️ ':'❌ ')+res.msg, true); return }
+  flash('✅ Order GOR0'+order_number+' saved — ready for the next one')
+  ;['f_order','f_vin','f_customer','f_note'].forEach(id=>{ $(id).value='' })
+  $('f_orderdate').value=todayISO(); $('f_date').value=todayISO(); $('f_gor').textContent='GOR0—'
+  $('f_order').focus()
+  loadToday()
+}
+$('saveBtn').addEventListener('click', saveForm)
+
+// ── rapid grid ──
+const gbody = $('gbody')
+function focusLastGridRow(){ const inp = gbody.querySelector('tr:last-child input.go:not([readonly])'); if (inp) inp.focus() }
+function addRow(){
+  const tr = document.createElement('tr')
+  tr.innerHTML = '<td><input class="gmono go" inputmode="numeric" placeholder="267…" autocomplete="off"></td>'
+    + '<td class="gref">GOR0—</td>'
+    + '<td><input class="gvin gv" placeholder="WBA…" autocomplete="off"></td>'
+    + '<td><input class="gc" placeholder="Customer name" autocomplete="off"></td>'
+    + '<td><input type="date" class="gd"></td>'
+    + '<td class="rowstat"><button class="rowsave" title="Save row">💾</button></td>'
+  gbody.appendChild(tr)
+  const o=tr.querySelector('.go'), v=tr.querySelector('.gv'), c=tr.querySelector('.gc'), d=tr.querySelector('.gd'), ref=tr.querySelector('.gref'), stat=tr.querySelector('.rowstat'), btn=tr.querySelector('.rowsave')
+  d.value = todayISO()
+  o.addEventListener('input', ()=>{ o.value=o.value.replace(/\D/g,''); ref.textContent=o.value?'GOR0'+o.value:'GOR0—' })
+  v.addEventListener('input', ()=>{ v.value=v.value.toUpperCase() })
+  const hop=(from,to)=>from.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); to.focus() } })
+  hop(o,v); hop(v,c); hop(c,d)
+  let saving=false
+  async function saveRow(){
+    if (saving || o.readOnly) return
+    if (!o.value){ stat.innerHTML='<span class="st err">order # ?</span>'; setTimeout(()=>{ if(!o.readOnly){ stat.innerHTML=''; stat.appendChild(btn) } },1800); o.focus(); return }
+    saving=true
+    stat.innerHTML='<span class="st pend">saving…</span>'
+    const res = await insertOrder({ order_number:o.value, vin:v.value.trim(), customer_name:c.value.trim(), order_date:d.value, work_date:d.value })
+    saving=false
+    if (!res.ok){
+      stat.innerHTML='<span class="st err">'+(res.dup?'⚠ exists':'❌ failed')+'</span>'
+      showToast((res.dup?'⚠️ ':'❌ ')+res.msg)
+      stat.appendChild(btn)
+      return
+    }
+    ;[o,v,c,d].forEach(i=>i.readOnly=true)
+    tr.classList.add('saved-row','just-saved')
+    stat.innerHTML='<span class="st ok">✓ saved</span>'
+    if (tr === gbody.querySelector('tr:last-child')) addRow()
+    focusLastGridRow()
+    loadToday()
+  }
+  d.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); saveRow() } })
+  btn.addEventListener('click', saveRow)
+  return tr
+}
+addRow()
+
+// ── saved today ──
+function scopeRows(rows){
+  if (S.isAdmin) return rows
+  return rows.filter(r =>
+    (S.me && r.service_advisor_id && r.service_advisor_id === S.me.id) ||
+    (r.service_advisor && S.advisorName !== '—' && (r.service_advisor||'').toLowerCase() === S.advisorName.toLowerCase()) ||
+    (r.created_by && S.authUserId && r.created_by === S.authUserId)
+  )
+}
+async function loadToday(){
+  try{
+    const { data, error } = await sb.from('warranty_bmw_orders').select('*')
+      .gte('created_at', todayISO()+'T00:00:00').order('created_at',{ascending:false}).limit(60)
+    if (error) throw error
+    const rows = scopeRows(data||[]).slice(0,10)
+    $('todayCnt').textContent = rows.length + ' order' + (rows.length===1?'':'s')
+    if (!rows.length){ $('todayList').innerHTML='<div class="entry-empty">Nothing saved today yet — your entries will appear here.</div>'; return }
+    $('todayList').innerHTML = rows.map(r =>
+      '<div class="entry">'
+      + '<span class="ref">'+esc(r.order_ref||('GOR0'+r.order_number))+'</span>'
+      + '<div class="who"><div class="nm">'+esc(r.customer_name||'—')+'</div><div class="vin">'+esc(r.vin||'')+'</div></div>'
+      + '<span class="st '+(r.warranty_claim_date?'ok':'pend')+'">'+(r.warranty_claim_date?'✓ matched':'⏳ pending')+'</span>'
+      + '</div>'
+    ).join('')
+  }catch(e){
+    $('todayCnt').textContent=''
+    $('todayList').innerHTML='<div class="entry-empty">Could not load today’s orders.</div>'
+  }
+}
+
+// init
+$('f_orderdate').value = todayISO(); $('f_date').value = todayISO()
+await whoami()
+await loadToday()
+$('f_order').focus()
+</script>
+<script src="analytics.js?v=1" data-site="bassoul-heneine"></script>
+</body>
+</html>
