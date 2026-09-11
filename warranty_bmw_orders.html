@@ -394,8 +394,8 @@ body.hide-sc .c-sc{display:none}
       <div class="sec-lab">🔒 Warranty admin fields</div>
       <div class="fld"><label>Pick-up date</label><input id="m_pickup" type="date"></div>
       <div class="fld"><label>Return date</label><input id="m_return" type="date"></div>
-      <div class="fld" id="wrap_m_wc"><label>Warranty claim date &amp; time</label><input id="m_warranty" type="datetime-local"><span class="hint">Defaults to now · advisors see date only</span></div>
-      <div class="fld" id="wrap_m_sc"><label>Service claim date &amp; time</label><input id="m_service" type="datetime-local"><span class="hint">Defaults to now · advisors see date only</span></div>
+      <div class="fld" id="wrap_m_wc"><label>Warranty claim date <span class="auto-tag pending-tag">AUTO · FROM UPLOAD</span></label><input id="m_warranty" type="text" readonly><span class="hint">Matched automatically from the BMW Warranty submissions upload</span></div>
+      <div class="fld" id="wrap_m_sc"><label>Service claim date <span class="auto-tag pending-tag">AUTO · FROM UPLOAD</span></label><input id="m_service" type="text" readonly><span class="hint">Matched automatically from the BSI submissions upload</span></div>
       <div class="fld"><label>Warranty note</label><textarea id="m_wnote" rows="2"></textarea></div>
 
       <div class="form-actions" style="margin-top:4px">
@@ -411,6 +411,7 @@ body.hide-sc .c-sc{display:none}
 
 <script type="module">
 import { SUPABASE_CONFIG } from './config.js'
+import { matchClaimDates } from './bmw-claim-match.js'
 
 const WARRANTY_ADMIN_ROLES = ['admin', 'manager', 'warranty admin', 'warranty manager']
 
@@ -432,9 +433,7 @@ const S = { me:null, advisorName:'—', authEmail:'', authUserId:'', empEmail:''
 const $ = id => document.getElementById(id)
 const val = id => ($(id)?.value || '').trim()
 const todayISO = () => { const d=new Date(); const o=d.getTimezoneOffset(); return new Date(d.getTime()-o*60000).toISOString().slice(0,10) }
-const nowLocal = () => { const d=new Date(); const o=d.getTimezoneOffset(); return new Date(d.getTime()-o*60000).toISOString().slice(0,16) }
 const setDate = (id,d) => { const el=$(id); if(el) el.value = d ? String(d).slice(0,10) : '' }
-const setDT   = (id,d) => { const el=$(id); if(!el) return; if(!d){ el.value=''; return } const dt=new Date(d); const o=dt.getTimezoneOffset(); el.value=new Date(dt.getTime()-o*60000).toISOString().slice(0,16) }
 const showToast = (msg, ms=3500) => { const t=$('toast'); t.textContent=msg; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),ms) }
 const showLoad = msg => { $('loadingMsg').textContent = msg||'Loading…'; $('loadingOverlay').classList.add('on') }
 const hideLoad = () => $('loadingOverlay').classList.remove('on')
@@ -534,6 +533,10 @@ async function load(){
   hideLoad()
   if (error){ showToast('❌ '+(error.message||'').slice(0,90)); $('tbody').innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--rose);padding:26px">'+esc(error.message)+'</td></tr>'; return }
   S.rows = data || []
+  try{
+    const m = await matchClaimDates(sb, S.rows)
+    if (m.updated) showToast('🔗 '+m.updated+' claim date'+(m.updated===1?'':'s')+' matched from the BMW uploads')
+  }catch(e){ console.warn('claim match', e) }
   populateAdvisorFilter()
   render()
 }
@@ -652,13 +655,14 @@ function openModal(id){
   $('m_vin').value = r.vin || ''; $('m_customer').value = r.customer_name || ''
   $('m_note').value = r.note || ''; $('m_wnote').value = r.warranty_note || ''
   setDate('m_pickup', r.pickup_date); setDate('m_return', r.return_date)
-  if (S.isAdmin){ setDT('m_warranty', r.warranty_claim_date || nowLocal()); setDT('m_service', r.service_claim_date || nowLocal()) }
-  else { setDT('m_warranty', r.warranty_claim_date); setDT('m_service', r.service_claim_date) }
-  // advisor edits VIN / customer / their own note; admin edits warranty fields
+  $('m_warranty').value = r.warranty_claim_date ? fmtDT(r.warranty_claim_date) : '⏳ Pending — auto from BMW upload'
+  $('m_service').value  = r.service_claim_date  ? fmtDT(r.service_claim_date)  : '⏳ Pending — auto from BMW upload'
+  // advisor edits VIN / customer / their own note; admin edits warranty fields.
+  // Claim dates are read-only for everyone — matched from the BMW uploads.
   $('m_vin').disabled = S.isAdmin; $('m_customer').disabled = S.isAdmin; $('m_note').disabled = S.isAdmin
-  ;['m_pickup','m_return','m_warranty','m_service','m_wnote'].forEach(i=>{ $(i).disabled = !S.isAdmin })
+  ;['m_pickup','m_return','m_wnote'].forEach(i=>{ $(i).disabled = !S.isAdmin })
   $('m_modeNote').textContent = S.isAdmin
-    ? '🔓 Warranty admin — set pick-up, return, claim date/time and the warranty note.'
+    ? '🔓 Warranty admin — set pick-up, return and the warranty note. Claim dates fill automatically from the BMW submissions uploads.'
     : '🔒 Advisor — edit VIN, customer and your own note. Warranty fields are admin-managed.'
   resolveVisibility()
   $('modalBg').classList.add('on')
@@ -667,10 +671,8 @@ window._closeModal = () => { $('modalBg').classList.remove('on'); S.editId=null 
 
 async function saveModal(){
   if (!S.editId) return
-  const dtISO = id => { const v=val(id); return v ? new Date(v).toISOString() : null }
   const upd = S.isAdmin
-    ? { pickup_date: val('m_pickup')||null, return_date: val('m_return')||null,
-        warranty_claim_date: dtISO('m_warranty'), service_claim_date: dtISO('m_service'), warranty_note: val('m_wnote')||null }
+    ? { pickup_date: val('m_pickup')||null, return_date: val('m_return')||null, warranty_note: val('m_wnote')||null }
     : { vin: val('m_vin')||null, customer_name: val('m_customer')||null, note: val('m_note')||null }
   showLoad('Saving…')
   const { error } = await sb.from('warranty_bmw_orders').update(upd).eq('id', S.editId)
