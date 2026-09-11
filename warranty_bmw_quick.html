@@ -243,6 +243,7 @@ details.more textarea{font-size:14px;min-height:64px;resize:vertical}
 
 <script type="module">
 import { SUPABASE_CONFIG } from './config.js'
+import { matchClaimDates } from './bmw-claim-match.js'
 
 let createClient = null
 const cdns = [
@@ -394,7 +395,9 @@ async function loadToday(){
     const { data, error } = await sb.from('warranty_bmw_orders').select('*')
       .gte('created_at', todayISO()+'T00:00:00').order('created_at',{ascending:false}).limit(60)
     if (error) throw error
-    const rows = scopeRows(data||[]).slice(0,10)
+    const scoped = scopeRows(data||[])
+    try{ await matchClaimDates(sb, scoped) }catch(e){ console.warn('claim match', e) }
+    const rows = scoped.slice(0,10)
     $('todayCnt').textContent = rows.length + ' order' + (rows.length===1?'':'s')
     if (!rows.length){ $('todayList').innerHTML='<div class="entry-empty">Nothing saved today yet — your entries will appear here.</div>'; return }
     $('todayList').innerHTML = rows.map(r =>
