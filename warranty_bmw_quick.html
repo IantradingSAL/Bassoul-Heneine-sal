@@ -202,7 +202,7 @@ details.more textarea{font-size:14px;min-height:64px;resize:vertical}
 <div class="pane" id="paneGrid">
 <div class="wrapwide">
   <div class="gridcard">
-    <div class="grid-help">⌨️ Works like Excel: <strong>Tab / Enter</strong> moves to the next cell. Press <strong>Enter on the Order date</strong> (or tap 💾) — the row saves itself ✅ and a new empty line opens on Order #. Order ref and advisor fill automatically, dates default to today.</div>
+    <div class="grid-help">⌨️ Works like Excel: <strong>Tab / Enter</strong> moves to the next cell. <strong>Entering the Order date</strong> (picking it in the calendar, or pressing Enter on it — or tapping 💾) saves the row ✅ and a new empty line opens on Order #. Order ref and advisor fill automatically, dates default to today.</div>
     <div class="gtw">
       <table class="gt">
         <thead>
@@ -373,6 +373,8 @@ function addRow(){
     loadToday()
   }
   d.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); saveRow() } })
+  // entering/picking the order date auto-saves the row and opens a new line
+  d.addEventListener('change', ()=>{ if (o.value && d.value) saveRow() })
   btn.addEventListener('click', saveRow)
   return tr
 }
