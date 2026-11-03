@@ -499,6 +499,7 @@ async function loadToday(){
       + '<div class="who"><div class="nm">'+esc(r.customer_name||'—')+'</div><div class="vin">'+esc(r.vin||'')+'</div></div>'
       + ((r.warranty_claim_date || r.service_claim_date)
           ? '<span class="st ok">✓ '+(r.warranty_claim_date && r.service_claim_date ? 'warranty + service' : r.warranty_claim_date ? 'warranty' : 'service')+'</span>'
+          : r.return_date ? '<span class="st pend" style="background:#ede9fe;color:#5b21b6">↩ returned</span>'
           : '<span class="st pend">⏳ pending</span>')
       + '</div>'
     ).join('')

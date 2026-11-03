@@ -167,11 +167,11 @@ td.nm{font-weight:700}
       <span><b>Orders</b> — repair orders by their order date.</span>
       <span><b>Warranty / Service</b> — orders with a warranty claim / a service (BSI) claim, from the order or from the Incadea claim upload.</span>
       <span><b>Warranty only / Service only / Both</b> — which claims the order has (an order needs one or the other, or both).</span>
-      <span><b>Pending</b> — no claim of either kind yet.</span>
+      <span><b>Pending</b> — no claim of either kind yet and not returned to the advisor.</span>
       <span><b>Answered</b> — BMW's credit note received.</span>
       <span><b>Sent back</b> — BMW rejected at least one line (SAP status <i>Error</i>); <b>BMW return rate</b> = sent back ÷ answered.</span>
       <span><b>Cut</b> — partly credited (status <i>Warning</i>).</span>
-      <span><b>Car returns</b> — orders with a return date; <b>car return rate</b> = returns ÷ orders.</span>
+      <span><b>Returned to advisor</b> — not a warranty case (internal, customer pays…): no claim, a return date set; <b>return rate</b> = returned ÷ orders.</span>
       <span><b>Days to claim</b> — average days from the order date to its first claim.</span>
     </div>
   </div>
@@ -273,8 +273,8 @@ const COLS = [
   ['Sent back',       t => cell(t.rejected)],
   ['BMW return rate', t => rateChip(pctOf(t.rejected, t.answered), 0.03, 0.10)],
   ['Cut',             t => cell(t.cut)],
-  ['Car returns',     t => cell(t.returned)],
-  ['Car return rate', t => rateChip(pctOf(t.returned, t.orders), 0.02, 0.08)],
+  ['Returned to advisor', t => cell(t.returned, t.orders)],
+  ['Return rate',     t => rateChip(pctOf(t.returned, t.orders), 0.02, 0.08)],
   ['Days to claim',   t => avgDays(t)],
 ]
 const head = first => `<thead><tr><th>${first}</th>${COLS.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead>`
@@ -296,9 +296,9 @@ function render(){
       k('', 'Orders', fmt(T.orders), `${new Set(rows.map(r => r.advisor)).size} advisor(s) · ${new Set(rows.map(r => r.month)).size} month(s)`)
     + k('w', 'Warranty claims', fmt(T.warranty), pctTxt(pctOf(T.warranty, T.orders)) + ' of orders')
     + k('sv', 'Service claims', fmt(T.service), pctTxt(pctOf(T.service, T.orders)) + ' of orders')
-    + k('p', 'Pending', fmt(T.pending), 'no claim yet')
+    + k('p', 'Pending', fmt(T.pending), 'no claim yet, not returned')
     + k(pctOf(T.rejected, T.answered) > 0.10 ? 'r' : 'ok', 'BMW return rate', pctTxt(pctOf(T.rejected, T.answered)), `${fmt(T.rejected)} sent back of ${fmt(T.answered)} answered`)
-    + k(pctOf(T.returned, T.orders) > 0.08 ? 'r' : 'ok', 'Car return rate', pctTxt(pctOf(T.returned, T.orders)), `${fmt(T.returned)} returns`)
+    + k(pctOf(T.returned, T.orders) > 0.08 ? 'r' : 'ok', 'Returned to advisor', pctTxt(pctOf(T.returned, T.orders)), `${fmt(T.returned)} not warranty cases`)
     + k('', 'Days to claim', avgDays(T), 'average, order → first claim')
 
   // By advisor
@@ -403,7 +403,7 @@ $('xlsBtn').addEventListener('click', async () => {
   try {
     const X = await loadXlsx()
     const rows = scoped()
-    const H = ['Orders','Warranty','Service','Warranty only','Service only','Both','Pending','Answered','Sent back','BMW return rate %','Cut','Car returns','Car return rate %','Avg days to claim']
+    const H = ['Orders','Warranty','Service','Warranty only','Service only','Both','Pending','Answered','Sent back','BMW return rate %','Cut','Returned to advisor','Return rate %','Avg days to claim']
     const vals = t => [t.orders, t.warranty, t.service, t.warranty_only, t.service_only, t.both_claims, t.pending, t.answered, t.rejected,
       t.answered ? +(t.rejected / t.answered * 100).toFixed(1) : null, t.cut, t.returned,
       t.orders ? +(t.returned / t.orders * 100).toFixed(1) : null,
