@@ -497,7 +497,9 @@ async function loadToday(){
       '<div class="entry">'
       + '<span class="ref">'+esc(r.order_ref||('GOR0'+r.order_number))+'</span>'
       + '<div class="who"><div class="nm">'+esc(r.customer_name||'—')+'</div><div class="vin">'+esc(r.vin||'')+'</div></div>'
-      + '<span class="st '+(r.warranty_claim_date?'ok':'pend')+'">'+(r.warranty_claim_date?'✓ matched':'⏳ pending')+'</span>'
+      + ((r.warranty_claim_date || r.service_claim_date)
+          ? '<span class="st ok">✓ '+(r.warranty_claim_date && r.service_claim_date ? 'warranty + service' : r.warranty_claim_date ? 'warranty' : 'service')+'</span>'
+          : '<span class="st pend">⏳ pending</span>')
       + '</div>'
     ).join('')
   }catch(e){
