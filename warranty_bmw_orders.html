@@ -378,6 +378,9 @@ body.hide-sc .c-sc{display:none}
           </tbody>
         </table>
       </div>
+      <div id="moreRow" style="display:none;text-align:center;padding:12px">
+        <button type="button" class="btn btn-sm btn-ghost viewer-ok" id="moreBtn">Show more</button>
+      </div>
     </div>
   </main>
 </div>
@@ -534,7 +537,17 @@ function clearForm(){
 
 async function load(){
   showLoad('Loading orders…')
-  const { data, error } = await sb.from('warranty_bmw_orders').select('*').order('created_at',{ascending:false})
+  // The API hands out at most 1,000 rows per request: read every page so all
+  // orders (and so every advisor) are on the page, newest order date first.
+  let data = [], error = null
+  for (let from = 0; ; from += 1000) {
+    const res = await sb.from('warranty_bmw_orders').select('*')
+      .order('order_date', { ascending:false, nullsFirst:false }).order('id', { ascending:false })
+      .range(from, from + 999)
+    if (res.error) { error = res.error; break }
+    data = data.concat(res.data || [])
+    if (!res.data || res.data.length < 1000) break
+  }
   hideLoad()
   if (error){ showToast('❌ '+(error.message||'').slice(0,90)); $('tbody').innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--rose);padding:26px">'+esc(error.message)+'</td></tr>'; return }
   S.rows = data || []
@@ -557,7 +570,8 @@ function applyFilters(rows){
   const from = val('f_from'), to = val('f_to')
   return rows.filter(r=>{
     if (q && !((r.order_number+' '+(r.order_ref||'')+' '+(r.vin||'')+' '+(r.customer_name||'')+' '+(r.service_advisor||'')).toLowerCase().includes(q))) return false
-    if (adv && (r.service_advisor||'') !== adv) return false
+    if (adv === '__none__') { if ((r.service_advisor||'').trim()) return false }
+    else if (adv && (r.service_advisor||'') !== adv) return false
     const od = (r.order_date||'').slice(0,10)
     if (from && (!od || od < from)) return false
     if (to && (!od || od > to)) return false
@@ -567,8 +581,12 @@ function applyFilters(rows){
 function populateAdvisorFilter(){
   if (!S.isAdmin) return
   const cur = val('f_adv')
-  const names = [...new Set(S.rows.map(r=>r.service_advisor).filter(Boolean))].sort()
-  $('f_adv').innerHTML = '<option value="">All advisors</option>' + names.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join('')
+  const count = {}
+  S.rows.forEach(r => { const n = (r.service_advisor||'').trim() || '__none__'; count[n] = (count[n]||0) + 1 })
+  const names = Object.keys(count).filter(n => n !== '__none__').sort((a,b) => a.localeCompare(b))
+  $('f_adv').innerHTML = '<option value="">All advisors</option>'
+    + names.map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)} (${count[n]})</option>`).join('')
+    + (count.__none__ ? `<option value="__none__" ${cur==='__none__'?'selected':''}>— no advisor — (${count.__none__})</option>` : '')
 }
 
 function render(){
@@ -576,11 +594,14 @@ function render(){
   S.view = applyFilters(scoped)
   const total = scoped.length, matched = scoped.filter(r=>r.warranty_claim_date).length
   $('k_total').textContent=total; $('k_matched').textContent=matched; $('k_pending').textContent=total-matched
-  $('resultCount').textContent = `Showing ${S.view.length} of ${total}`
+  const shown = Math.min(S.view.length, S.limit || 300)
+  $('resultCount').textContent = shown < S.view.length ? `Showing ${shown} of ${S.view.length} (of ${total})` : `Showing ${S.view.length} of ${total}`
+  $('moreRow').style.display = shown < S.view.length ? '' : 'none'
+  $('moreBtn').textContent = `Show ${Math.min(300, S.view.length - shown)} more`
   const dash='<span style="color:var(--faint)">—</span>'
   const claim = v => v ? (S.isAdmin ? fmtDT(v) : fmtD(v)) : null
   if (!S.view.length){ $('tbody').innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--faint);padding:26px">'+(scoped.length?'No orders match the filters.':'No orders yet — add one above.')+'</td></tr>'; return }
-  $('tbody').innerHTML = S.view.map(r=>{
+  $('tbody').innerHTML = S.view.slice(0, shown).map(r=>{
     const wc = r.warranty_claim_date ? '<span class="badge b-ok">'+claim(r.warranty_claim_date)+'</span>' : '<span class="badge b-pend">⏳ pending</span>'
     const sc = r.service_claim_date ? claim(r.service_claim_date) : dash
     return '<tr class="tr-clickable" data-id="'+r.id+'">'
@@ -688,6 +709,8 @@ $('saveBtn').addEventListener('click', save)
 $('clearBtn').addEventListener('click', clearForm)
 $('refreshBtn').addEventListener('click', load)
 $('printBtn').addEventListener('click', printReport)
+$('moreBtn').addEventListener('click', () => { S.limit = (S.limit || 300) + 300; render() })
+;['f_q','f_adv','f_from','f_to'].forEach(id => $(id).addEventListener('input', () => { S.limit = 300 }, true))
 $('m_save').addEventListener('click', saveModal)
 $('modalBg').addEventListener('click', e=>{ if(e.target===$('modalBg')) window._closeModal() })
 ;['f_q','f_adv','f_from','f_to'].forEach(id=> $(id).addEventListener('input', render))
