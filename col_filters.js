@@ -132,7 +132,7 @@ export function attachColumnFilters(opts){
   function keyOf(c, r){
     const v = c.get(r)
     if (v == null || String(v).trim() === '') return EMPTY
-    if (c.kind === 'month') return String(v).slice(0, 7)
+    if (c.kind === 'month' && /^\d{4}-\d{2}/.test(String(v))) return String(v).slice(0, 7)
     return String(v).trim()
   }
   function labelOf(c, k){
@@ -167,7 +167,11 @@ export function attachColumnFilters(opts){
     for (const r of others) { const k = keyOf(c, r); counts.set(k, (counts.get(k) || 0) + 1) }
     const keys = [...counts.keys()].sort((a, b) => {
       if (a === EMPTY) return 1; if (b === EMPTY) return -1
-      if (c.kind === 'month') return b.localeCompare(a)        // newest month first
+      if (c.kind === 'month') {                                 // newest month first, words after dates
+        const da = /^\d{4}-\d{2}$/.test(a), db = /^\d{4}-\d{2}$/.test(b)
+        if (da !== db) return da ? -1 : 1
+        return b.localeCompare(a)
+      }
       return a.localeCompare(b, undefined, { numeric:true })
     })
     openPicker({
