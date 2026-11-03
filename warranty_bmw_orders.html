@@ -82,6 +82,10 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .t tbody tr.tr-clickable:hover .vin-cell{color:var(--blue);text-decoration:underline}
 .vin-cell{cursor:pointer;transition:color .12s}
 .vin-cell:hover{color:var(--blue) !important;text-decoration:underline}
+.sheet-dlg{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:300;padding:16px}
+.sheet-dlg[hidden]{display:none}
+.sheet-box{background:#fff;border-radius:14px;padding:18px;width:100%;max-width:360px;box-shadow:0 20px 50px rgba(15,23,42,.3)}
+.sheet-box .fld input,.sheet-box .fld select{width:100%}
 .adv-pick{width:100%;min-width:190px;text-align:left;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font:inherit;font-size:13px;color:var(--txt);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .adv-pick:hover{border-color:var(--bmw)}
 .adv-pick.on{border-color:var(--bmw);background:var(--blue4,#eef2ff);color:var(--bmw);font-weight:700}
@@ -224,6 +228,7 @@ body.hide-sc .c-sc{display:none}
     <a href="warranty_bmw_quick.html" class="si"><span class="si-icon">⚡</span><span>Quick Entry</span></a>
     <div class="si active"><span class="si-icon">📝</span><span>New Order / Claim</span></div>
     <a href="warranty_bmw.html" class="si"><span class="si-icon">🏁</span><span>Credits / Upload</span></a>
+    <a href="warranty_bmw_pickup.html" class="si"><span class="si-icon">📥</span><span>Pick-up (warranty admin)</span></a>
     <a href="warranty_bmw_report.html" class="si"><span class="si-icon">📊</span><span>Advisor Report</span></a>
     <div style="margin-top:auto;padding-top:14px;font-size:9px;color:var(--faint);text-align:center">© IanTradingSAL · v2.0</div>
   </aside>
@@ -241,7 +246,7 @@ body.hide-sc .c-sc{display:none}
       </div>
     </div>
 
-    <div class="al al-i">📝 Fill in the order, VIN and customer, then press <strong>Save order</strong>. Your name is set from your login and the <strong>Order</strong> reference (GOR0…) builds itself. <strong>Order date</strong> and <strong>Date</strong> default to today. Pick-up, return and the warranty fields are handled by the warranty admin.</div>
+    <div class="al al-i">📝 Fill in the order, VIN and customer, then press <strong>Save order</strong>. Your name is set from your login and the <strong>Order</strong> reference (GOR0…) builds itself. For the VIN type only the <strong>last 7</strong> — the full VIN and the customer fill in from the system. The <strong>Order date</strong> 🔒 comes from Incadea; <strong>Date</strong> defaults to today. Pick-up, return and the warranty fields are handled by the warranty admin.</div>
 
     <!-- ── ENTRY FORM ── -->
     <div class="card editor-only">
@@ -254,8 +259,9 @@ body.hide-sc .c-sc{display:none}
         </div>
         <div class="fld">
           <label>VIN</label>
-          <input id="f_vin" type="text" placeholder="e.g. WBA…" autocomplete="off" style="text-transform:uppercase">
-          <span class="hint">Vehicle chassis number</span>
+          <input id="f_vin" type="text" placeholder="Last 7 — e.g. PU81149" autocomplete="off" maxlength="17" style="text-transform:uppercase">
+          <span class="hint">Last 7 characters — completed from the system</span>
+          <div class="vl-hint" id="f_vinhint"></div>
         </div>
         <div class="fld">
           <label>Customer name</label>
@@ -264,8 +270,8 @@ body.hide-sc .c-sc{display:none}
         </div>
         <div class="fld">
           <label>Order date</label>
-          <input id="f_orderdate" type="date">
-          <span class="hint">Defaults to today · editable</span>
+          <input id="f_orderdate" type="text" readonly tabindex="-1" placeholder="Filled from Incadea" style="background:var(--surf2);color:var(--muted)">
+          <span class="hint">🔒 From Incadea — fills in when the invoice is uploaded</span>
         </div>
         <div class="fld">
           <label>Date</label>
@@ -355,6 +361,7 @@ body.hide-sc .c-sc{display:none}
         <div class="btns">
           <button class="btn btn-sm btn-ghost" id="clearFilters">Clear</button>
           <button class="btn btn-sm btn-ghost" id="printBtn">🖨 Print report</button>
+          <button class="btn btn-sm btn-ghost viewer-ok" id="sheetBtn" title="The day's orders for the warranty admin to receive and sign">📝 Daily sheet</button>
           <button class="btn btn-sm" id="refreshBtn">↻ Refresh</button>
         </div>
       </div>
@@ -384,6 +391,18 @@ body.hide-sc .c-sc{display:none}
             <tr><td colspan="13" style="text-align:center;color:var(--faint);padding:26px">Loading…</td></tr>
           </tbody>
         </table>
+      </div>
+      <div id="sheetDlg" class="sheet-dlg" hidden>
+        <div class="sheet-box">
+          <div style="font-weight:800;font-size:14px;margin-bottom:4px">📝 Daily sheet</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">The orders an advisor registered on one day — printed for the warranty admin to receive, note and sign.</div>
+          <div class="fld"><label>Day</label><input type="date" id="sheetDay"></div>
+          <div class="fld" id="sheetAdvWrap" style="margin-top:10px"><label>Service advisor</label><select id="sheetAdv"></select></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+            <button type="button" class="btn btn-sm btn-ghost viewer-ok" id="sheetCancel">Cancel</button>
+            <button type="button" class="btn btn-sm viewer-ok" id="sheetGo">🖨 Print</button>
+          </div>
+        </div>
       </div>
       <div id="moreRow" style="display:none;text-align:center;padding:12px">
         <button type="button" class="btn btn-sm btn-ghost viewer-ok" id="moreBtn">Show more</button>
@@ -510,7 +529,16 @@ function resolveVisibility(){
 
 // order-ref preview + VIN uppercase
 $('f_order').addEventListener('input', () => { const v=val('f_order').replace(/\D/g,''); $('f_order').value=v; $('f_orderref').textContent=v?'GOR0'+v:'—' })
-$('f_vin').addEventListener('input', () => { $('f_vin').value = $('f_vin').value.toUpperCase() })
+// VIN from its last 7 characters; order date / VIN / customer from Incadea by the order number
+const { lookupOrder, attachVinLookup } = await import('./bmw_lookup.js?v=20261103a')
+const FV = attachVinLookup(sb, $('f_vin'), $('f_customer'), $('f_vinhint'))
+$('f_order').addEventListener('change', async () => {
+  const r = await lookupOrder(sb, val('f_order'))
+  $('f_orderdate').value = r?.order_date ? r.order_date.split('-').reverse().join('/') : ''
+  if (!r) return
+  if (!val('f_vin') && r.vin) { $('f_vin').value = r.vin; FV.check() }
+  if (!val('f_customer') && r.customer) $('f_customer').value = r.customer
+})
 
 async function save(){
   const order_number = val('f_order')
@@ -519,7 +547,7 @@ async function save(){
     order_number,
     vin: val('f_vin') || null,
     customer_name: val('f_customer') || null,
-    order_date: val('f_orderdate') || null,
+    order_date: null,                       // set from Incadea by the database
     work_date:  val('f_date')      || null,
     service_advisor: S.advisorName === '—' ? null : S.advisorName,
     service_advisor_id: S.me ? S.me.id : null,
@@ -539,7 +567,7 @@ async function save(){
 }
 function clearForm(){
   ['f_order','f_vin','f_customer','f_note','f_pickup','f_return','f_wnote'].forEach(id=>{ if($(id)) $(id).value='' })
-  $('f_orderdate').value=todayISO(); $('f_date').value=todayISO(); $('f_orderref').textContent='—'; $('f_order').focus()
+  $('f_orderdate').value=''; $('f_date').value=todayISO(); $('f_orderref').textContent='—'; FV.clear(); $('f_order').focus()
 }
 
 async function load(){
@@ -654,6 +682,75 @@ function render(){
   $('tbody').querySelectorAll('tr.tr-clickable').forEach(tr=>tr.addEventListener('click',()=>openModal(+tr.dataset.id)))
 }
 
+// ── daily sheet: one advisor's orders of one day, for the warranty admin ──
+// Printed and handed over with the job cards: the admin ticks what he
+// received, notes why a claim was not picked up, and both sign.
+function openSheet(){
+  $('sheetDay').value = todayISO()
+  const names = [...new Set(S.rows.map(r => (r.service_advisor||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b))
+  if (S.isAdmin) {
+    $('sheetAdvWrap').style.display = ''
+    $('sheetAdv').innerHTML = '<option value="">All advisors (one sheet each)</option>' + names.map(n => `<option>${esc(n)}</option>`).join('')
+  } else $('sheetAdvWrap').style.display = 'none'
+  $('sheetDlg').hidden = false
+}
+function printDailySheet(){
+  const day = $('sheetDay').value || todayISO()
+  const dayOf = r => (r.work_date || '').slice(0,10) || localDay(r.created_at)
+  let rows = scopeRows().filter(r => dayOf(r) === day)
+  const pick = S.isAdmin ? $('sheetAdv').value : ''
+  if (pick) rows = rows.filter(r => (r.service_advisor||'').trim() === pick)
+  $('sheetDlg').hidden = true
+  if (!rows.length) { showToast('No orders on ' + fmtD(day) + (pick ? ' for ' + pick : '')); return }
+  const groups = {}
+  rows.forEach(r => { const a = (r.service_advisor||'').trim() || '— no advisor —'; (groups[a] = groups[a] || []).push(r) })
+  const pages = Object.keys(groups).sort().map(a => {
+    const list = groups[a].sort((x,y) => String(x.order_number).localeCompare(String(y.order_number), undefined, { numeric:true }))
+    const body = list.map((r,i) => `<tr>
+      <td class="c">${i+1}</td>
+      <td class="m">${esc(r.order_ref || ('GOR0'+r.order_number))}</td>
+      <td class="m">${esc(r.vin || '')}</td>
+      <td>${esc(r.customer_name || '')}</td>
+      <td>${r.order_date ? fmtD(r.order_date) : '<span class="mu">Incadea</span>'}</td>
+      <td>${esc(r.note || '')}</td>
+      <td class="box">${r.pickup_date ? '✓ ' + fmtD(r.pickup_date) : ''}</td>
+      <td class="box"></td><td class="box"></td>
+      <td class="nt">${esc(r.warranty_note || '')}</td>
+    </tr>`).join('')
+    return `<section class="pg">
+      <div class="meta"><div><h1>🇩🇪 BMW Warranty — Daily sheet</h1>
+        <div class="sub">Bassoul, Heneine SAL · Service advisor: <b>${esc(a)}</b> · Day: <b>${fmtD(day)}</b> · ${list.length} order(s)</div></div>
+        <div class="sub">Printed ${new Date().toLocaleString('en-GB')}</div></div>
+      <table><thead><tr><th>#</th><th>Order</th><th>VIN</th><th>Customer</th><th>Order date</th><th>Advisor note</th>
+        <th>Received ✓</th><th>Warranty claim</th><th>Service claim</th><th style="width:22%">Warranty admin note (if not picked up)</th></tr></thead>
+        <tbody>${body}</tbody></table>
+      <div class="sign">
+        <div><div class="ln"></div>Service advisor — ${esc(a)}<br><span class="mu">Signature &amp; date</span></div>
+        <div><div class="ln"></div>Warranty admin — received by<br><span class="mu">Signature &amp; date</span></div>
+      </div></section>`
+  }).join('')
+  const w = window.open('', '_blank')
+  if (!w){ showToast('⚠️ Allow pop-ups to print'); return }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>BMW Daily sheet ${fmtD(day)}</title>
+    <style>
+      *{font-family:Arial,Helvetica,sans-serif;box-sizing:border-box}
+      body{margin:24px;color:#0f172a}
+      h1{font-size:17px;margin:0 0 2px} .sub{font-size:11px;color:#475569}
+      .meta{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;border-bottom:2px solid #1C69D4;padding-bottom:8px}
+      table{width:100%;border-collapse:collapse;font-size:10.5px}
+      th,td{border:1px solid #94a3b8;padding:7px 6px;text-align:left;vertical-align:top}
+      th{background:#1C69D4;color:#fff;font-size:9px;text-transform:uppercase;letter-spacing:.03em}
+      td{height:30px} td.c{text-align:center;width:24px;color:#64748b} td.m{font-family:Menlo,monospace;font-size:10px}
+      td.box{width:70px} td.nt{font-size:10px} .mu{color:#94a3b8;font-size:9.5px}
+      .sign{display:flex;gap:40px;margin-top:34px;font-size:11px}
+      .sign>div{flex:1} .ln{border-bottom:1px solid #0f172a;height:38px;margin-bottom:6px}
+      .pg{page-break-after:always} .pg:last-child{page-break-after:auto}
+      @media print{ @page{ size:landscape; margin:11mm } }
+    </style></head><body>${pages}</body></html>`)
+  w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print() }catch(e){} }, 350)
+}
+function localDay(ts){ if (!ts) return ''; const d = new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') }
+
 // ── print report (current scope + filters) ──
 function printReport(){
   const rows = S.view
@@ -741,6 +838,9 @@ $('saveBtn').addEventListener('click', save)
 $('clearBtn').addEventListener('click', clearForm)
 $('refreshBtn').addEventListener('click', load)
 $('printBtn').addEventListener('click', printReport)
+$('sheetBtn').addEventListener('click', openSheet)
+$('sheetCancel').addEventListener('click', () => { $('sheetDlg').hidden = true })
+$('sheetGo').addEventListener('click', printDailySheet)
 $('moreBtn').addEventListener('click', () => { S.limit = (S.limit || 300) + 300; render() })
 ;['f_q','f_adv','f_from','f_to'].forEach(id => $(id).addEventListener('input', () => { S.limit = 300 }, true))
 $('m_save').addEventListener('click', saveModal)
@@ -781,7 +881,7 @@ let CF = null
 }
 
 // init
-$('f_orderdate').value = todayISO(); $('f_date').value = todayISO()
+$('f_orderdate').value = ''; $('f_date').value = todayISO()
 await whoami()
 await loadRules()
 await load()

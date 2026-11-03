@@ -168,6 +168,7 @@ details.more textarea{font-size:14px;min-height:64px;resize:vertical}
   <a class="backlink" href="index.html">🏠 Dashboard</a>
   <a class="backlink" href="warranty_bmw_orders.html">📋 All orders (full details)</a>
   <a class="backlink" href="warranty_bmw.html">🏁 Credits / Upload</a>
+  <a class="backlink" href="warranty_bmw_pickup.html">📥 Pick-up</a>
   <a class="backlink" href="warranty_bmw_report.html">📊 Advisor report</a>
 </div>
 
@@ -208,8 +209,9 @@ details.more textarea{font-size:14px;min-height:64px;resize:vertical}
 
     <div class="fld">
       <label>VIN</label>
-      <input class="vin" id="f_vin" type="text" placeholder="WBA…" autocomplete="off">
-      <div class="hint">Vehicle chassis number</div>
+      <input class="vin" id="f_vin" type="text" placeholder="Last 7 — e.g. PU81149" autocomplete="off" maxlength="17">
+      <div class="hint">Type the <strong>last 7 characters</strong> — the full VIN and the customer fill in from the system</div>
+      <div class="vl-hint" id="f_vinhint"></div>
     </div>
 
     <div class="fld">
@@ -219,8 +221,8 @@ details.more textarea{font-size:14px;min-height:64px;resize:vertical}
 
     <div class="daterow">
       <div class="fld">
-        <label>Order date</label>
-        <input id="f_orderdate" type="date">
+        <label>Order date <span style="font-size:9px;color:var(--bmw);font-weight:800">🔒 INCADEA</span></label>
+        <input id="f_orderdate" type="text" readonly tabindex="-1" placeholder="Filled from Incadea" style="background:var(--surf2);color:var(--muted)">
       </div>
       <div class="fld">
         <label>Date (service)</label>
@@ -245,7 +247,7 @@ details.more textarea{font-size:14px;min-height:64px;resize:vertical}
 <div class="pane" id="paneGrid">
 <div class="wrapwide">
   <div class="gridcard">
-    <div class="grid-help">⌨️ Works like Excel: <strong>Tab / Enter</strong> moves to the next cell. <strong>Entering the Order date</strong> (picking it in the calendar, or pressing Enter on it — or tapping 💾) saves the row ✅ and a new empty line opens on Order #. Order ref and advisor fill automatically, dates default to today.</div>
+    <div class="grid-help">⌨️ Works like Excel: <strong>Tab / Enter</strong> moves to the next cell. For the VIN type only the <strong>last 7</strong> — the full VIN and the customer fill in from the system. <strong>Pressing Enter on the Date</strong> (or picking it, or tapping 💾) saves the row ✅ and a new empty line opens on Order #. The order date 🔒 comes from Incadea; order ref and advisor fill automatically.</div>
     <div class="gtw">
       <table class="gt">
         <thead>
@@ -254,7 +256,8 @@ details.more textarea{font-size:14px;min-height:64px;resize:vertical}
             <th style="width:112px">Order ref</th>
             <th>VIN</th>
             <th>Customer</th>
-            <th style="width:135px">Order date</th>
+            <th style="width:120px">Order date 🔒</th>
+            <th style="width:135px">Date</th>
             <th style="width:104px">Status</th>
           </tr>
         </thead>
@@ -405,7 +408,18 @@ tabImport.addEventListener('click', ()=>{ [tabForm,tabGrid].forEach(t=>t.classLi
 
 // ── simple form ──
 $('f_order').addEventListener('input', ()=>{ const v=val('f_order').replace(/\D/g,''); $('f_order').value=v; $('f_gor').textContent=v?'GOR0'+v:'GOR0—' })
-$('f_vin').addEventListener('input', ()=>{ $('f_vin').value = $('f_vin').value.toUpperCase() })
+// VIN from its last 7 characters; order date / VIN / customer from Incadea by the order number
+const { lookupOrder, attachVinLookup } = await import('./bmw_lookup.js?v=20261103a')
+const FV = attachVinLookup(sb, $('f_vin'), $('f_customer'), $('f_vinhint'))
+async function fillFromOrder(no, dateEl, vinEl, custEl, vinCtl){
+  const r = await lookupOrder(sb, no)
+  const show = d => d ? d.split('-').reverse().join('/') : ''
+  if (dateEl) { const v = r?.order_date ? show(r.order_date) : ''; if ('value' in dateEl && dateEl.tagName === 'INPUT') dateEl.value = v; else dateEl.textContent = v || '— Incadea'; dateEl.title = r?.order_date ? 'From Incadea' : 'Not in Incadea yet — fills in when the invoice is uploaded' }
+  if (!r) return
+  if (vinEl && !vinEl.value.trim() && r.vin) { vinEl.value = r.vin; vinCtl?.check() }
+  if (custEl && !custEl.value.trim() && r.customer) custEl.value = r.customer
+}
+$('f_order').addEventListener('change', () => fillFromOrder(val('f_order'), $('f_orderdate'), $('f_vin'), $('f_customer'), FV))
 
 function flash(msg, isErr){
   const f=$('flash'); f.textContent=msg; f.classList.toggle('err', !!isErr); f.classList.add('on')
@@ -417,13 +431,13 @@ async function saveForm(){
   $('saveBtn').disabled = true
   const res = await insertOrder({
     order_number, vin: val('f_vin'), customer_name: val('f_customer'),
-    order_date: val('f_orderdate'), work_date: val('f_date'), note: val('f_note')
+    order_date: null, work_date: val('f_date'), note: val('f_note')   // order date: set from Incadea by the database
   })
   $('saveBtn').disabled = false
   if (!res.ok){ flash((res.dup?'⚠️ ':'❌ ')+res.msg, true); return }
   flash('✅ Order GOR0'+order_number+' saved — ready for the next one')
   ;['f_order','f_vin','f_customer','f_note'].forEach(id=>{ $(id).value='' })
-  $('f_orderdate').value=todayISO(); $('f_date').value=todayISO(); $('f_gor').textContent='GOR0—'
+  $('f_orderdate').value=''; $('f_date').value=todayISO(); $('f_gor').textContent='GOR0—'; FV.clear()
   $('f_order').focus()
   loadToday()
 }
@@ -438,13 +452,16 @@ function addRow(){
     + '<td class="gref">GOR0—</td>'
     + '<td><input class="gvin gv" placeholder="WBA…" autocomplete="off"></td>'
     + '<td><input class="gc" placeholder="Customer name" autocomplete="off"></td>'
-    + '<td><input type="date" class="gd"></td>'
+    + '<td class="god" style="font-size:12px;color:var(--muted)" title="From Incadea">— Incadea</td>'
+    + '<td><input type="date" class="gd" title="Date (service)"></td>'
     + '<td class="rowstat"><button class="rowsave" title="Save row">💾</button></td>'
   gbody.appendChild(tr)
   const o=tr.querySelector('.go'), v=tr.querySelector('.gv'), c=tr.querySelector('.gc'), d=tr.querySelector('.gd'), ref=tr.querySelector('.gref'), stat=tr.querySelector('.rowstat'), btn=tr.querySelector('.rowsave')
   d.value = todayISO()
   o.addEventListener('input', ()=>{ o.value=o.value.replace(/\D/g,''); ref.textContent=o.value?'GOR0'+o.value:'GOR0—' })
-  v.addEventListener('input', ()=>{ v.value=v.value.toUpperCase() })
+  v.placeholder = 'Last 7'
+  const vctl = attachVinLookup(sb, v, c, null)
+  o.addEventListener('change', ()=>fillFromOrder(o.value, tr.querySelector('.god'), v, c, vctl))
   const hop=(from,to)=>from.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); to.focus() } })
   hop(o,v); hop(v,c); hop(c,d)
   let saving=false
@@ -453,7 +470,7 @@ function addRow(){
     if (!o.value){ stat.innerHTML='<span class="st err">order # ?</span>'; setTimeout(()=>{ if(!o.readOnly){ stat.innerHTML=''; stat.appendChild(btn) } },1800); o.focus(); return }
     saving=true
     stat.innerHTML='<span class="st pend">saving…</span>'
-    const res = await insertOrder({ order_number:o.value, vin:v.value.trim(), customer_name:c.value.trim(), order_date:d.value, work_date:d.value })
+    const res = await insertOrder({ order_number:o.value, vin:v.value.trim(), customer_name:c.value.trim(), order_date:null, work_date:d.value })
     saving=false
     if (!res.ok){
       stat.innerHTML='<span class="st err">'+(res.dup?'⚠ exists':'❌ failed')+'</span>'
@@ -469,7 +486,7 @@ function addRow(){
     loadToday()
   }
   d.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); saveRow() } })
-  // entering/picking the order date auto-saves the row and opens a new line
+  // entering/picking the date auto-saves the row and opens a new line
   d.addEventListener('change', ()=>{ if (o.value && d.value) saveRow() })
   btn.addEventListener('click', saveRow)
   return tr
@@ -899,7 +916,7 @@ $('impTemplate').addEventListener('click', async () => {
 tabImport.addEventListener('click', checkSysReady)
 
 // init
-$('f_orderdate').value = todayISO(); $('f_date').value = todayISO()
+$('f_orderdate').value = ''; $('f_date').value = todayISO()
 await whoami()
 await loadToday()
 $('f_order').focus()

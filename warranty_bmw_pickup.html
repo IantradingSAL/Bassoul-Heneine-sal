@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="cw-page" content="warranty_bmw_pickup">
+<title>BMW Warranty · Pick-up — Bassoul, Heneine SAL</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='10' fill='%231C69D4'/><text x='12' y='17' font-size='12' text-anchor='middle' fill='white' font-weight='800' font-family='Arial'>B</text></svg>">
+
+<script type="module" src="./auth_guard.js"></script>
+<script src="./access.js"></script>
+
+<style>
+:root{
+  --bg:#fafbff; --surf:#ffffff; --surf2:#f1f5f9; --line:#e2e8f0;
+  --txt:#0f172a; --muted:#64748b; --faint:#94a3b8;
+  --bmw:#1C69D4; --bmw-dark:#0F4FA8; --blue4:#eef2ff;
+  --mint:#10b981; --sun:#f59e0b; --rose:#e11d48; --violet:#7c3aed;
+  --mono:'SF Mono','Roboto Mono','Menlo',monospace;
+}
+*{box-sizing:border-box}
+html,body{overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;padding:0 16px 48px;font-size:13px}
+.wrap{max-width:1180px;margin:0 auto}
+.backrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.backlink{font-size:11px;font-weight:700;color:var(--muted);text-decoration:none;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.backlink:hover{color:var(--bmw);border-color:var(--bmw)}
+.top{display:flex;align-items:center;gap:12px;padding:16px 0 4px;flex-wrap:wrap}
+.logo{width:40px;height:40px;background:linear-gradient(135deg,#1C69D4,#0F4FA8);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:19px;flex-shrink:0;text-decoration:none}
+.top h1{margin:0;font-size:19px;font-weight:800;letter-spacing:-.3px}
+.top p{margin:2px 0 0;font-size:11px;color:var(--muted);font-weight:600}
+.top .me{margin-left:auto;text-align:right}
+.chip{display:inline-block;background:var(--blue4);color:var(--bmw);font-size:10px;font-weight:700;padding:4px 10px;border-radius:999px}
+.chip.adm{background:rgba(16,185,129,.13);color:#047857}
+
+.card{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px;box-shadow:0 1px 3px rgba(15,23,42,.04);min-width:0}
+.notice{margin-top:14px;padding:11px 14px;border-radius:12px;background:#fef9c3;color:#854d0e;font-size:12px;font-weight:700}
+
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
+.kpi{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 1px 3px rgba(15,23,42,.04);min-width:0}
+.kpi .l{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kpi .v{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:11px;color:var(--muted);font-weight:600;margin-top:2px}
+.kpi.w .v{color:var(--bmw)} .kpi.p .v{color:var(--sun)} .kpi.ok .v{color:var(--mint)} .kpi.r .v{color:var(--violet)}
+
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.fg{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fg.grow{flex:1 1 220px}
+.fg label{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.fg input,.fg select{padding:9px 11px;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;font-size:14px;background:#fff;color:var(--txt);width:100%;min-width:0}
+.fg select{min-width:180px}
+.btn{padding:9px 13px;border:1.5px solid var(--line);border-radius:9px;background:#fff;font-family:inherit;font-size:12px;font-weight:700;color:var(--txt);cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--bmw);color:var(--bmw)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ok{background:var(--mint);border-color:var(--mint);color:#fff}
+.btn.ok:hover{background:#059669;border-color:#059669;color:#fff}
+.btn.back{background:#fff;border-color:var(--violet);color:var(--violet)}
+.btn.back:hover{background:#f5f3ff}
+.btn.sm{padding:6px 9px;font-size:11px;border-radius:8px}
+
+.switcher{display:flex;gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;margin-top:14px}
+.switcher button{flex:1;padding:10px;border:none;border-radius:9px;background:transparent;font-family:inherit;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;line-height:1.3}
+.switcher button.on{background:var(--bmw);color:#fff}
+.switcher button small{display:block;font-size:9.5px;font-weight:600;opacity:.75;margin-top:2px}
+.pane{display:none}
+.pane.on{display:block}
+
+/* list view */
+.bulk{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.bulk .cnt{font-size:12px;font-weight:700;color:var(--muted);margin-right:auto}
+.bulk label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;cursor:pointer}
+.tw{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:70vh}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;min-width:940px}
+th{position:sticky;top:0;background:var(--surf2);text-align:left;font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:9px 10px;white-space:nowrap;border-bottom:1px solid var(--line);z-index:1}
+td{padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:12.5px;white-space:nowrap;vertical-align:middle}
+tr.sel td{background:var(--blue4)}
+tr.gone td{opacity:.35;transition:opacity .3s}
+td.ref{font-family:var(--mono);font-weight:800;color:var(--bmw)}
+td.mono,.mono{font-family:var(--mono);font-size:11.5px;letter-spacing:.3px}
+td.cu{white-space:normal;min-width:150px;max-width:240px}
+td.note{white-space:normal;min-width:160px;max-width:260px;font-size:12px;color:#334155}
+td.acts{text-align:right}
+td.acts .btn+.btn{margin-left:4px}
+td input[type=checkbox],th input[type=checkbox]{width:17px;height:17px;cursor:pointer}
+.muted{color:var(--faint);font-style:italic;font-size:11.5px}
+.wait{display:inline-block;min-width:44px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;text-align:center}
+.wait.g{background:rgba(16,185,129,.13);color:#047857}
+.wait.a{background:#fef9c3;color:#854d0e}
+.wait.b{background:rgba(225,29,72,.12);color:#9f1239}
+.empty{padding:34px 16px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;line-height:1.5}
+.empty .big{font-size:34px;display:block;margin-bottom:6px}
+
+/* case view */
+.cv-nav{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.cv-nav .pos{font-size:13px;font-weight:800;color:var(--muted);text-align:center;flex:1}
+.cv-nav .btn{font-size:18px;padding:8px 16px}
+.case{border:1.5px solid var(--line);border-radius:16px;padding:18px;margin-top:12px;background:#fff}
+.case .hd{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.case .gor{font-family:var(--mono);font-size:26px;font-weight:800;color:var(--bmw);letter-spacing:.3px;overflow-wrap:anywhere}
+.case .no{font-size:12px;color:var(--muted);font-weight:700;margin-top:2px}
+.case .hd .wait{margin-left:auto;font-size:13px;padding:5px 12px}
+.case .cust{font-size:18px;font-weight:800;margin-top:14px;overflow-wrap:anywhere}
+.case .vin{font-family:var(--mono);font-size:15px;letter-spacing:1px;color:#334155;margin-top:3px;overflow-wrap:anywhere}
+.dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
+.dl div{background:var(--surf2);border-radius:10px;padding:9px 11px;min-width:0}
+.dl dt{font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.dl dd{margin:3px 0 0;font-size:14px;font-weight:700;overflow-wrap:anywhere}
+.advnote{margin-top:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;font-size:13px;color:#78350f;white-space:pre-wrap;overflow-wrap:anywhere}
+.advnote b{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#92400e;margin-bottom:3px}
+.case textarea,.modal textarea{width:100%;min-height:74px;padding:11px 13px;border:1.5px solid var(--line);border-radius:11px;font-family:inherit;font-size:15px;resize:vertical;color:var(--txt)}
+.case textarea:focus,.modal textarea:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 4px rgba(124,58,237,.12)}
+.case .lbl{display:block;font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px}
+.cv-acts{display:grid;grid-template-columns:2fr 2fr 1fr;gap:10px;margin-top:12px}
+.cv-acts .btn{padding:15px 10px;font-size:15px;border-radius:12px;white-space:normal}
+
+/* note modal */
+.ov{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:800}
+.ov.on{display:flex}
+.modal{background:#fff;border-radius:16px;padding:18px;width:100%;max-width:440px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal h3{margin:0 0 4px;font-size:15px;font-weight:800}
+.modal p{margin:0 0 12px;font-size:12px;color:var(--muted);font-weight:600;overflow-wrap:anywhere}
+.modal .row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.err{color:var(--rose);font-size:11.5px;font-weight:700;margin-top:6px;min-height:14px}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(140px);background:#0f172a;color:#fff;padding:10px 12px 10px 16px;border-radius:12px;font-size:13px;font-weight:600;transition:transform .25s;z-index:900;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);box-shadow:0 12px 32px rgba(0,0,0,.2)}
+.toast.on{transform:translateX(-50%) translateY(0)}
+.toast.bad{background:#9f1239}
+.toast button{border:none;background:#fff;color:#0f172a;font-family:inherit;font-weight:800;font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer;flex-shrink:0}
+
+@media(max-width:720px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dl{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .top .me{margin-left:0;text-align:left}
+  .fg select{min-width:0}
+  .fg.adv{flex:1 1 100%}
+}
+@media(max-width:420px){
+  .cv-acts{grid-template-columns:1fr 1fr}
+  .cv-acts .skip{grid-column:1 / -1}
+  .case .gor{font-size:22px}
+  .switcher button small{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="backrow">
+    <a class="backlink" href="index.html">🏠 Dashboard</a>
+    <a class="backlink" href="warranty_bmw_quick.html">⚡ Quick Entry</a>
+    <a class="backlink" href="warranty_bmw_orders.html">📋 All orders (full details)</a>
+    <a class="backlink" href="warranty_bmw_report.html">📊 Advisor report</a>
+    <a class="backlink" href="warranty_bmw.html">🏁 Credits / Upload</a>
+  </div>
+
+  <div class="top">
+    <a class="logo" href="index.html">B</a>
+    <div>
+      <h1>📦 Pick-up</h1>
+      <p>BMW Warranty · receive the repair orders the service advisors registered, or send them back</p>
+    </div>
+    <div class="me"><span class="chip" id="meChip">👤 —</span></div>
+  </div>
+
+  <div class="notice" id="roNotice" style="display:none">🔒 Only the warranty admin can receive or send back orders.</div>
+
+  <div class="kpis">
+    <div class="kpi w"><div class="l">To receive</div><div class="v" id="kTodo">—</div><div class="s" id="kTodoS">&nbsp;</div></div>
+    <div class="kpi p"><div class="l">Oldest waiting</div><div class="v" id="kOld">—</div><div class="s" id="kOldS">&nbsp;</div></div>
+    <div class="kpi ok"><div class="l">Received today</div><div class="v" id="kRecv">—</div><div class="s">pick-up date today</div></div>
+    <div class="kpi r"><div class="l">Sent back today</div><div class="v" id="kBack">—</div><div class="s">return date today</div></div>
+  </div>
+
+  <div class="card">
+    <div class="filters">
+      <div class="fg grow"><label for="searchInput">Search</label><input type="search" id="searchInput" class="viewer-ok" placeholder="Order, VIN or customer" autocomplete="off"></div>
+      <div class="fg adv"><label for="advFilter">Service advisor</label><select id="advFilter" class="viewer-ok"><option value="">All advisors</option></select></div>
+      <button type="button" class="btn viewer-ok" id="clearFilters">Clear</button>
+      <button type="button" class="btn viewer-ok" id="refreshBtn">🔄 Refresh</button>
+    </div>
+    <div id="savedViewsMount" style="margin-top:8px"></div>
+  </div>
+
+  <div class="switcher" role="tablist">
+    <button type="button" class="viewer-ok on" id="tabList" role="tab" data-tab="list">☰ List view<small>Table · tick several and act at once</small></button>
+    <button type="button" class="viewer-ok" id="tabCase" role="tab" data-tab="case">🗂 Case view<small>One order at a time · phone friendly</small></button>
+  </div>
+
+  <!-- LIST VIEW -->
+  <div class="pane on" id="paneList">
+    <div class="card">
+      <div class="bulk" id="bulkBar">
+        <span class="cnt" id="listCnt">Loading…</span>
+        <label class="adm-only"><input type="checkbox" id="selAll"> Select all</label>
+        <button type="button" class="btn ok adm-only" id="bulkRecv" disabled>✓ Mark received</button>
+        <button type="button" class="btn back adm-only" id="bulkBack" disabled>↩ Send back</button>
+      </div>
+      <div id="listBox"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- CASE VIEW -->
+  <div class="pane" id="paneCase">
+    <div class="card">
+      <div class="cv-nav">
+        <button type="button" class="btn viewer-ok" id="cvPrev" aria-label="Previous order">←</button>
+        <div class="pos" id="cvPos">—</div>
+        <button type="button" class="btn viewer-ok" id="cvNext" aria-label="Next order">→</button>
+      </div>
+      <div id="caseBox"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- send-back note -->
+<div class="ov" id="noteOv">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="noteTitle">
+    <h3 id="noteTitle">↩ Send back to the advisor</h3>
+    <p id="noteSub"></p>
+    <textarea id="noteTxt" placeholder="Why is it sent back? (required)"></textarea>
+    <div class="err" id="noteErr"></div>
+    <div class="row">
+      <button type="button" class="btn viewer-ok" id="noteCancel">Cancel</button>
+      <button type="button" class="btn back" id="noteOk">↩ Send back</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg"></span><button type="button" class="viewer-ok" id="toastUndo" style="display:none">↶ Undo</button></div>
+
+<script type="module">
+import { SUPABASE_CONFIG } from './config.js'
+
+let createClient = null
+const cdns = [
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
+  'https://cdn.skypack.dev/@supabase/supabase-js@2',
+  'https://esm.sh/@supabase/supabase-js@2',
+  'https://unpkg.com/@supabase/supabase-js@2/dist/module/index.js'
+]
+for (const url of cdns){ try { const m = await import(url); if (m && m.createClient){ createClient = m.createClient; break } } catch(e){} }
+if (!createClient){ alert('Could not load Supabase library — please check your network.'); throw new Error('Supabase unreachable') }
+const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
+window._sb = sb
+
+const WARRANTY_ADMIN_ROLES = ['admin', 'manager', 'warranty admin', 'warranty manager']
+const TABLE = 'warranty_bmw_orders'
+const S = { me:null, name:'—', role:'employee', isAdmin:false, rows:[], view:[], sel:new Set(), caseId:null, busy:false, undo:null, counts:{ recv:null, back:null } }
+
+const $ = id => document.getElementById(id)
+const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
+const pad2 = n => String(n).padStart(2,'0')
+
+// Today on the Beirut calendar, as a plain YYYY-MM-DD (never toISOString(),
+// which is still yesterday before 03:00 in Beirut).
+function todayISO(){
+  try {
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Beirut', year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date())
+    const g = t => p.find(x => x.type === t)?.value
+    if (g('year') && g('month') && g('day')) return `${g('year')}-${g('month')}-${g('day')}`
+  } catch (e) {}
+  const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
+}
+// A timestamp → its Beirut calendar day
+function dayOf(ts){
+  if (!ts) return null
+  try {
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Beirut', year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date(ts))
+    const g = t => p.find(x => x.type === t)?.value
+    return `${g('year')}-${g('month')}-${g('day')}`
+  } catch (e) { return String(ts).slice(0,10) }
+}
+const dmy = iso => { if (!iso) return ''; const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso) }
+const dayNum = iso => { const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? Date.UTC(+m[1], +m[2]-1, +m[3]) / 864e5 : null }
+const refOf = r => r.order_ref || ('GOR0' + (r.order_number ?? ''))
+function waitDays(r){
+  const from = r.work_date || dayOf(r.created_at)
+  const a = dayNum(from), b = dayNum(todayISO())
+  return a == null || b == null ? null : Math.max(0, Math.round(b - a))
+}
+const waitChip = d => d == null ? '<span class="muted">—</span>'
+  : `<span class="wait ${d >= 7 ? 'b' : d >= 3 ? 'a' : 'g'}" title="Waiting since the service date">${d === 0 ? 'today' : d + ' d'}</span>`
+const orderDateHtml = r => r.order_date ? esc(dmy(r.order_date)) : '<span class="muted">— from Incadea</span>'
+
+// ── toast (with Undo) ──
+let toastT = null
+function toast(msg, { bad=false, undo=false, ms } = {}){
+  const t = $('toast')
+  $('toastMsg').textContent = msg
+  t.classList.toggle('bad', !!bad)
+  $('toastUndo').style.display = undo ? '' : 'none'
+  t.classList.add('on')
+  clearTimeout(toastT)
+  toastT = setTimeout(() => { t.classList.remove('on') }, ms || (undo ? 10000 : bad ? 6000 : 3500))
+}
+const errMsg = e => (e && (e.message || e.details || e.hint)) || String(e || 'Unknown error')
+
+// ── who is this ──
+async function whoami(){
+  let roleStr = (sessionStorage.getItem('cw_role') || localStorage.getItem('cw_role') || '').toLowerCase()
+  let email = ''
+  try{
+    const { data:{ user } } = await sb.auth.getUser()
+    email = user?.email || ''
+    if (user){
+      const { data } = await sb.from('employees').select('id,name,email,role,custom_role,auth_user_id').eq('auth_user_id', user.id).maybeSingle()
+      if (data){ S.me = data; roleStr = (data.custom_role || data.role || roleStr || '').toLowerCase() }
+    }
+  }catch(e){ console.warn('whoami', e) }
+  S.role = roleStr || 'employee'
+  S.isAdmin = WARRANTY_ADMIN_ROLES.some(r => S.role.includes(r))
+  S.name = (S.me && S.me.name) || window.CW_USER || sessionStorage.getItem('cw_name') || localStorage.getItem('cw_name') || email || '—'
+  $('meChip').textContent = '👤 ' + S.name + (S.isAdmin ? ' · warranty admin' : '')
+  $('meChip').classList.toggle('adm', S.isAdmin)
+  $('roNotice').style.display = S.isAdmin ? 'none' : ''
+  document.querySelectorAll('.adm-only').forEach(el => { el.style.display = S.isAdmin ? '' : 'none' })
+}
+
+// ── data ──
+async function loadRows(){
+  const out = [], CH = 1000
+  for (let from = 0; ; from += CH){
+    const { data, error } = await sb.from(TABLE)
+      .select('id,order_number,order_ref,order_date,work_date,pickup_date,return_date,service_advisor,service_advisor_id,warranty_claim_date,service_claim_date,note,warranty_note,vin,customer_name,created_at,created_by')
+      .is('pickup_date', null).is('return_date', null)
+      .order('work_date', { ascending:false, nullsFirst:false }).order('id', { ascending:false })
+      .range(from, from + CH - 1)
+    if (error) throw error
+    out.push(...(data || []))
+    if (!data || data.length < CH) break
+  }
+  S.rows = out
+  const live = new Set(out.map(r => r.id))
+  for (const id of [...S.sel]) if (!live.has(id)) S.sel.delete(id)
+}
+async function loadCounts(){
+  const t = todayISO()
+  const [a, b] = await Promise.all([
+    sb.from(TABLE).select('id', { count:'exact', head:true }).eq('pickup_date', t),
+    sb.from(TABLE).select('id', { count:'exact', head:true }).eq('return_date', t),
+  ])
+  if (a.error || b.error) console.warn('counts', a.error || b.error)
+  S.counts.recv = a.error ? null : (a.count ?? 0)
+  S.counts.back = b.error ? null : (b.count ?? 0)
+}
+async function reload(){
+  try { await Promise.all([loadRows(), loadCounts()]) }
+  catch (e) {
+    toast('❌ Could not load the orders: ' + errMsg(e), { bad:true })
+    $('listBox').innerHTML = `<div class="empty">❌ Could not load the orders.<br><span class="muted">${esc(errMsg(e))}</span></div>`
+    return false
+  }
+  buildAdvisors()
+  apply()
+  return true
+}
+
+// ── filters ──
+function buildAdvisors(){
+  const sel = $('advFilter'), cur = sel.value
+  const names = [...new Set(S.rows.map(r => (r.service_advisor || '').trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b))
+  const none = S.rows.some(r => !(r.service_advisor || '').trim())
+  sel.innerHTML = '<option value="">All advisors</option>'
+    + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')
+    + (none ? '<option value="__none__">(no advisor)</option>' : '')
+  // keep a chosen advisor even if none of their orders is left
+  if (cur && ![...sel.options].some(o => o.value === cur)) sel.insertAdjacentHTML('beforeend', `<option value="${esc(cur)}">${esc(cur)} (0)</option>`)
+  sel.value = cur
+}
+function matches(r){
+  const q = $('searchInput').value.trim().toLowerCase()
+  const adv = $('advFilter').value
+  if (adv === '__none__' && (r.service_advisor || '').trim()) return false
+  if (adv && adv !== '__none__' && (r.service_advisor || '').trim() !== adv) return false
+  if (q){
+    const hay = [refOf(r), r.order_number, r.vin, r.customer_name].map(x => String(x || '').toLowerCase()).join(' ')
+    if (!q.split(/\s+/).every(w => hay.includes(w))) return false
+  }
+  return true
+}
+function apply(){
+  S.view = S.rows.filter(matches)
+  renderKpis(); renderList(); renderCase()
+}
+
+// ── KPIs ──
+function renderKpis(){
+  $('kTodo').textContent = S.rows.length
+  $('kTodoS').textContent = S.view.length !== S.rows.length ? S.view.length + ' shown by the filters' : 'waiting for pick-up'
+  const ds = S.rows.map(waitDays).filter(d => d != null)
+  const max = ds.length ? Math.max(...ds) : null
+  $('kOld').textContent = max == null ? '—' : max + ' d'
+  const oldest = max == null ? null : S.rows.find(r => waitDays(r) === max)
+  $('kOldS').textContent = oldest ? refOf(oldest) + (oldest.service_advisor ? ' · ' + oldest.service_advisor : '') : 'nothing waiting'
+  $('kRecv').textContent = S.counts.recv == null ? '—' : S.counts.recv
+  $('kBack').textContent = S.counts.back == null ? '—' : S.counts.back
+}
+
+// ── list view ──
+const EMPTY_ALL = '<div class="empty"><span class="big">✅</span>Nothing to receive — every order has been picked up or sent back.</div>'
+const EMPTY_FILTER = '<div class="empty"><span class="big">🔎</span>No order to receive matches these filters.</div>'
+function renderList(){
+  const V = S.view
+  $('listCnt').textContent = `${V.length} order${V.length === 1 ? '' : 's'} to receive` + (S.sel.size ? ` · ${S.sel.size} ticked` : '')
+  updateBulk()
+  if (!V.length){ $('listBox').innerHTML = S.rows.length ? EMPTY_FILTER : EMPTY_ALL; return }
+  const adm = S.isAdmin
+  const head = '<tr>' + (adm ? '<th style="width:34px"></th>' : '')
+    + '<th>Order ref</th><th>Order #</th><th>VIN</th><th>Customer</th><th>Service advisor</th><th>Order date</th><th>Date</th><th>Waiting</th><th>Advisor note</th>'
+    + (adm ? '<th style="text-align:right">Action</th>' : '') + '</tr>'
+  const body = V.map(r => {
+    const on = S.sel.has(r.id)
+    return `<tr data-id="${r.id}" class="${on ? 'sel' : ''}">`
+      + (adm ? `<td><input type="checkbox" data-pick="${r.id}" ${on ? 'checked' : ''} aria-label="Tick ${esc(refOf(r))}"></td>` : '')
+      + `<td class="ref">${esc(refOf(r))}</td>`
+      + `<td class="mono">${esc(r.order_number ?? '')}</td>`
+      + `<td class="mono">${r.vin ? esc(r.vin) : '<span class="muted">—</span>'}</td>`
+      + `<td class="cu">${r.customer_name ? esc(r.customer_name) : '<span class="muted">—</span>'}</td>`
+      + `<td>${r.service_advisor ? esc(r.service_advisor) : '<span class="muted">—</span>'}</td>`
+      + `<td>${orderDateHtml(r)}</td>`
+      + `<td>${r.work_date ? esc(dmy(r.work_date)) : '<span class="muted">—</span>'}</td>`
+      + `<td>${waitChip(waitDays(r))}</td>`
+      + `<td class="note">${r.note ? esc(r.note) : '<span class="muted">—</span>'}</td>`
+      + (adm ? `<td class="acts"><button type="button" class="btn ok sm" data-recv="${r.id}" title="Received today">✓</button><button type="button" class="btn back sm" data-back="${r.id}" title="Send back to the advisor">↩</button></td>` : '')
+      + '</tr>'
+  }).join('')
+  $('listBox').innerHTML = `<div class="tw"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>`
+}
+function updateBulk(){
+  const vis = S.view.map(r => r.id)
+  const n = vis.filter(id => S.sel.has(id)).length
+  const all = $('selAll')
+  all.checked = vis.length > 0 && n === vis.length
+  all.indeterminate = n > 0 && n < vis.length
+  $('bulkRecv').disabled = !n || S.busy
+  $('bulkBack').disabled = !n || S.busy
+  $('bulkRecv').textContent = n ? `✓ Mark received (${n})` : '✓ Mark received'
+  $('bulkBack').textContent = n ? `↩ Send back (${n})` : '↩ Send back'
+}
+const ticked = () => S.view.filter(r => S.sel.has(r.id))
+
+$('listBox').addEventListener('change', e => {
+  const cb = e.target.closest('[data-pick]'); if (!cb) return
+  const id = Number(cb.dataset.pick)
+  if (cb.checked) S.sel.add(id); else S.sel.delete(id)
+  cb.closest('tr').classList.toggle('sel', cb.checked)
+  $('listCnt').textContent = `${S.view.length} order${S.view.length === 1 ? '' : 's'} to receive` + (S.sel.size ? ` · ${S.sel.size} ticked` : '')
+  updateBulk()
+})
+$('listBox').addEventListener('click', e => {
+  const rb = e.target.closest('[data-recv]'), bb = e.target.closest('[data-back]')
+  if (rb){ const r = S.rows.find(x => x.id === Number(rb.dataset.recv)); if (r) receive([r]) }
+  else if (bb){ const r = S.rows.find(x => x.id === Number(bb.dataset.back)); if (r) askNote([r]).then(note => note && sendBack([r], note)) }
+})
+$('selAll').addEventListener('change', e => {
+  S.view.forEach(r => e.target.checked ? S.sel.add(r.id) : S.sel.delete(r.id))
+  renderList()
+})
+$('bulkRecv').addEventListener('click', () => {
+  const rs = ticked(); if (!rs.length) return
+  if (rs.length > 1 && !confirm(`Mark ${rs.length} orders as received today (${dmy(todayISO())})?`)) return
+  receive(rs)
+})
+$('bulkBack').addEventListener('click', async () => {
+  const rs = ticked(); if (!rs.length) return
+  const note = await askNote(rs); if (note) sendBack(rs, note)
+})
+
+// ── note modal ──
+let noteResolve = null
+function askNote(rs){
+  $('noteSub').textContent = rs.length === 1
+    ? `${refOf(rs[0])}${rs[0].customer_name ? ' · ' + rs[0].customer_name : ''}${rs[0].service_advisor ? ' · ' + rs[0].service_advisor : ''} — the note is added to its warranty note.`
+    : `${rs.length} orders — the same note is added to each one's warranty note.`
+  $('noteTxt').value = ''; $('noteErr').textContent = ''
+  $('noteOv').classList.add('on')
+  setTimeout(() => $('noteTxt').focus(), 30)
+  return new Promise(res => { noteResolve = res })
+}
+function closeNote(v){ $('noteOv').classList.remove('on'); const r = noteResolve; noteResolve = null; if (r) r(v) }
+$('noteCancel').addEventListener('click', () => closeNote(null))
+$('noteOv').addEventListener('click', e => { if (e.target === $('noteOv')) closeNote(null) })
+$('noteOk').addEventListener('click', () => {
+  const v = $('noteTxt').value.trim()
+  if (!v){ $('noteErr').textContent = 'A note is required to send an order back.'; $('noteTxt').focus(); return }
+  closeNote(v)
+})
+$('noteTxt').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('noteOk').click() })
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('noteOv').classList.contains('on')) closeNote(null) })
+
+// ── actions ──
+const snap = r => ({ id:r.id, ref:refOf(r), pickup_date:r.pickup_date ?? null, return_date:r.return_date ?? null, warranty_note:r.warranty_note ?? null })
+function setBusy(b){
+  S.busy = b
+  updateBulk()
+  document.querySelectorAll('#caseBox .cv-acts button, #listBox .acts button').forEach(x => { x.disabled = b })
+}
+function guardAdmin(){
+  if (S.isAdmin) return true
+  toast('🔒 Only the warranty admin can receive or send back orders.', { bad:true }); return false
+}
+// Remove done rows from the list, keep the case view on the next order.
+function dropRows(ids){
+  const curIdx = S.view.findIndex(r => r.id === S.caseId)
+  const gone = new Set(ids)
+  if (gone.has(S.caseId)){
+    // the next order after the current one that is not being removed
+    const nxt = S.view.slice(curIdx + 1).find(r => !gone.has(r.id)) || S.view.slice(0, curIdx).reverse().find(r => !gone.has(r.id))
+    S.caseId = nxt ? nxt.id : null
+  }
+  S.rows = S.rows.filter(r => !gone.has(r.id))
+  ids.forEach(id => S.sel.delete(id))
+  buildAdvisors(); apply()
+}
+
+async function receive(rs){
+  if (!guardAdmin() || S.busy || !rs.length) return
+  const t = todayISO()
+  setBusy(true)
+  const prev = rs.map(snap)
+  const ids = rs.map(r => r.id)
+  let done = [], err = null
+  for (let i = 0; i < ids.length; i += 200){
+    const part = ids.slice(i, i + 200)
+    const { data, error } = await sb.from(TABLE).update({ pickup_date: t })
+      .in('id', part).is('pickup_date', null).is('return_date', null).select('id')
+    if (error){ err = error; break }
+    done.push(...(data || []).map(x => x.id))
+  }
+  setBusy(false)
+  finish({ kind:'recv', prev, done, err, asked: rs.length })
+}
+
+async function sendBack(rs, note){
+  if (!guardAdmin() || S.busy || !rs.length) return
+  const t = todayISO(), line = `Sent back ${dmy(t)}: ${note.trim()}`
+  setBusy(true)
+  const prev = rs.map(snap)
+  const done = []; let err = null
+  // each order keeps its own warranty note → one update per order
+  for (let i = 0; i < rs.length && !err; i += 8){
+    const part = rs.slice(i, i + 8)
+    const res = await Promise.all(part.map(r => {
+      const wn = [String(r.warranty_note || '').trim(), line].filter(Boolean).join(' · ')
+      return sb.from(TABLE).update({ return_date: t, warranty_note: wn })
+        .eq('id', r.id).is('pickup_date', null).is('return_date', null).select('id')
+    }))
+    for (const x of res){ if (x.error){ err = err || x.error } else done.push(...(x.data || []).map(d => d.id)) }
+  }
+  setBusy(false)
+  finish({ kind:'back', prev, done, err, asked: rs.length })
+}
+
+function finish({ kind, prev, done, err, asked }){
+  if (done.length){
+    S.undo = { kind, prev: prev.filter(p => done.includes(p.id)) }
+    if (kind === 'recv') S.counts.recv = (S.counts.recv || 0) + done.length
+    else S.counts.back = (S.counts.back || 0) + done.length
+    dropRows(done)
+  }
+  const what = kind === 'recv' ? 'received' : 'sent back'
+  const one = done.length === 1 ? S.undo.prev[0].ref : `${done.length} orders`
+  if (err){
+    toast(`❌ ${done.length ? one + ' ' + what + ', then: ' : ''}${errMsg(err)}`, { bad:true, undo: done.length > 0, ms: 9000 })
+  } else if (done.length < asked){
+    // nothing came back: the row changed meanwhile, or the database refused it silently
+    toast(`⚠️ ${done.length ? one + ' ' + what + '. ' : ''}${asked - done.length} not changed — already received / sent back by someone else, or not allowed. Refreshing…`, { bad:true, undo: done.length > 0, ms: 9000 })
+    reload()
+  } else {
+    toast(`${kind === 'recv' ? '✓' : '↩'} ${one} ${what}`, { undo:true })
+  }
+}
+
+async function undoLast(){
+  const u = S.undo; if (!u || S.busy) return
+  S.undo = null
+  $('toast').classList.remove('on')
+  setBusy(true)
+  let err = null, n = 0
+  for (const p of u.prev){
+    // put back exactly what the action changed
+    const back = u.kind === 'recv'
+      ? { pickup_date: p.pickup_date }
+      : { return_date: p.return_date, warranty_note: p.warranty_note }
+    const { data, error } = await sb.from(TABLE).update(back).eq('id', p.id).select('id')
+    if (error){ err = error; break }
+    n += (data || []).length
+  }
+  setBusy(false)
+  const first = u.prev[0]
+  await reload()
+  if (first && S.rows.some(r => r.id === first.id)) { S.caseId = first.id; renderCase() }
+  if (err) toast('❌ Undo failed: ' + errMsg(err), { bad:true })
+  else toast(`↶ Undone — ${n === 1 ? first.ref : n + ' orders'} back to receive`)
+}
+$('toastUndo').addEventListener('click', undoLast)
+
+// ── case view ──
+function renderCase(){
+  const V = S.view
+  if (!V.length){
+    S.caseId = null
+    $('cvPos').textContent = '0 of 0'
+    $('cvPrev').disabled = $('cvNext').disabled = true
+    $('caseBox').innerHTML = S.rows.length ? EMPTY_FILTER : EMPTY_ALL
+    return
+  }
+  let i = V.findIndex(r => r.id === S.caseId)
+  if (i < 0){ i = 0; S.caseId = V[0].id }
+  const r = V[i]
+  $('cvPos').textContent = `${i + 1} of ${V.length}`
+  $('cvPrev').disabled = V.length < 2
+  $('cvNext').disabled = V.length < 2
+  const keepNote = $('cvNote') && $('cvNote').dataset.id === String(r.id) ? $('cvNote').value : ''
+  const adm = S.isAdmin
+  $('caseBox').innerHTML = `<div class="case">
+    <div class="hd">
+      <div><div class="gor">${esc(refOf(r))}</div><div class="no">Order # ${esc(r.order_number ?? '—')}</div></div>
+      ${waitChip(waitDays(r))}
+    </div>
+    <div class="cust">${r.customer_name ? esc(r.customer_name) : '<span class="muted">No customer name</span>'}</div>
+    <div class="vin">${r.vin ? esc(r.vin) : '<span class="muted">No VIN</span>'}</div>
+    <dl class="dl">
+      <div><dt>Service advisor</dt><dd>${r.service_advisor ? esc(r.service_advisor) : '<span class="muted">—</span>'}</dd></div>
+      <div><dt>Order date</dt><dd>${orderDateHtml(r)}</dd></div>
+      <div><dt>Date</dt><dd>${r.work_date ? esc(dmy(r.work_date)) : '<span class="muted">—</span>'}</dd></div>
+      <div><dt>Waiting</dt><dd>${(() => { const d = waitDays(r); return d == null ? '—' : d === 0 ? 'since today' : d + ' day' + (d === 1 ? '' : 's') })()}</dd></div>
+      <div><dt>Registered</dt><dd>${r.created_at ? esc(dmy(dayOf(r.created_at))) : '<span class="muted">—</span>'}</dd></div>
+      ${r.warranty_claim_date || r.service_claim_date ? `<div><dt>Claims</dt><dd>${[r.warranty_claim_date ? 'Warranty ' + dmy(r.warranty_claim_date) : '', r.service_claim_date ? 'Service ' + dmy(r.service_claim_date) : ''].filter(Boolean).map(esc).join('<br>')}</dd></div>` : ''}
+    </dl>
+    ${r.note ? `<div class="advnote"><b>Advisor note</b>${esc(r.note)}</div>` : ''}
+    ${r.warranty_note ? `<div class="advnote" style="background:var(--surf2);border-color:var(--line);color:#334155"><b style="color:var(--muted)">Warranty note</b>${esc(r.warranty_note)}</div>` : ''}
+    ${adm ? `<label class="lbl" for="cvNote">Note for the advisor (needed to send back)</label>
+    <textarea id="cvNote" data-id="${r.id}" placeholder="Why is it sent back?">${esc(keepNote)}</textarea>
+    <div class="err" id="cvErr"></div>
+    <div class="cv-acts">
+      <button type="button" class="btn ok" id="cvRecv" ${S.busy ? 'disabled' : ''}>✓ Received</button>
+      <button type="button" class="btn back" id="cvBack" ${S.busy ? 'disabled' : ''}>↩ Send back</button>
+      <button type="button" class="btn skip viewer-ok" id="cvSkip">Skip</button>
+    </div>` : ''}
+  </div>`
+  if (adm){
+    $('cvRecv').addEventListener('click', () => receive([r]))
+    $('cvBack').addEventListener('click', () => {
+      const note = $('cvNote').value.trim()
+      if (!note){ $('cvErr').textContent = 'Write a note for the advisor first — it is required to send an order back.'; $('cvNote').focus(); return }
+      sendBack([r], note)
+    })
+    $('cvSkip').addEventListener('click', () => step(1))
+  }
+}
+function step(d){
+  const V = S.view; if (!V.length) return
+  let i = V.findIndex(r => r.id === S.caseId); if (i < 0) i = 0
+  S.caseId = V[(i + d + V.length) % V.length].id
+  renderCase()
+}
+$('cvPrev').addEventListener('click', () => step(-1))
+$('cvNext').addEventListener('click', () => step(1))
+document.addEventListener('keydown', e => {
+  if (!$('paneCase').classList.contains('on') || $('noteOv').classList.contains('on')) return
+  if (e.target.closest && e.target.closest('input, textarea, select')) return
+  if (e.key === 'ArrowLeft') step(-1)
+  else if (e.key === 'ArrowRight') step(1)
+})
+
+// ── tabs ──
+function showTab(which){
+  const isCase = which === 'case'
+  $('tabList').classList.toggle('on', !isCase); $('tabCase').classList.toggle('on', isCase)
+  $('tabList').setAttribute('aria-selected', String(!isCase)); $('tabCase').setAttribute('aria-selected', String(isCase))
+  $('paneList').classList.toggle('on', !isCase); $('paneCase').classList.toggle('on', isCase)
+  try { localStorage.setItem('cw_bmw_pickup_tab', which) } catch (e) {}
+}
+$('tabList').addEventListener('click', () => showTab('list'))
+$('tabCase').addEventListener('click', () => showTab('case'))
+
+// ── filters wiring ──
+let searchT = null
+$('searchInput').addEventListener('input', () => { clearTimeout(searchT); searchT = setTimeout(apply, 150) })
+$('advFilter').addEventListener('change', apply)
+$('clearFilters').addEventListener('click', () => { $('searchInput').value = ''; $('advFilter').value = ''; apply() })
+$('refreshBtn').addEventListener('click', async () => { if (await reload()) toast('🔄 Up to date') })
+
+// ── boot ──
+let startTab = null
+try { startTab = localStorage.getItem('cw_bmw_pickup_tab') } catch (e) {}
+showTab(startTab || (window.innerWidth < 640 ? 'case' : 'list'))
+await whoami()
+await reload()
+
+// Saved views: the picker keeps his own search / advisor combinations.
+try {
+  const { mountSavedViews } = await import('./user_views.js?v=20261103a')
+  mountSavedViews({
+    sb, page: 'warranty_bmw_pickup',
+    mountEl: $('savedViewsMount'),
+    filterIds: ['searchInput', 'advFilter'],
+    applyFilter: () => apply(),
+    ntf: m => toast(m),
+    currentUser: sessionStorage.getItem('cw_current_emp') || '',
+  })
+} catch (e) { console.warn('saved views', e) }
+</script>
+<script src="analytics.js?v=1" data-site="bassoul-heneine"></script>
+</body>
+</html>

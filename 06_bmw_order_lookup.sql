@@ -40,7 +40,7 @@ AS $$
     UNION ALL
     SELECT upper(trim(coalesce(nullif(b.service_vin, ''), b.reference_vin))), trim(b.sell_to_customer_name), b.model, coalesce(b.posting_date, b.order_date) FROM bmw_invoices b, q WHERE length(q.s) >= 5 AND upper(coalesce(nullif(b.service_vin, ''), b.reference_vin)) LIKE '%' || q.s
     UNION ALL
-    SELECT upper(trim(v.vin)), trim(v.customer_name), v.model, coalesce(v.updated_at, v.created_at)::date FROM si_vehicles v, q WHERE length(q.s) >= 5 AND upper(v.vin) LIKE '%' || q.s
+    SELECT upper(trim(v.vin)), trim(v.customer_name), v.model, v.updated_at::date FROM si_vehicles v, q WHERE length(q.s) >= 5 AND upper(v.vin) LIKE '%' || q.s
   ),
   g AS (
     SELECT v,
@@ -89,8 +89,7 @@ BEGIN
   RETURN NEW;
 END $$;
 
-DROP TRIGGER IF EXISTS trg_bmw_orders_fill ON public.warranty_bmw_orders;
-CREATE TRIGGER trg_bmw_orders_fill
+CREATE OR REPLACE TRIGGER trg_bmw_orders_fill
   BEFORE INSERT OR UPDATE ON public.warranty_bmw_orders
   FOR EACH ROW EXECUTE FUNCTION public.bmw_orders_fill_from_incadea();
 
@@ -109,11 +108,9 @@ BEGIN
   RETURN NULL;
 END $$;
 
-DROP TRIGGER IF EXISTS trg_bmw_rec_invoices_backfill ON public.bmw_rec_invoices;
-CREATE TRIGGER trg_bmw_rec_invoices_backfill
+CREATE OR REPLACE TRIGGER trg_bmw_rec_invoices_backfill
   AFTER INSERT OR UPDATE ON public.bmw_rec_invoices
   FOR EACH ROW EXECUTE FUNCTION public.bmw_orders_backfill_from_invoice();
-DROP TRIGGER IF EXISTS trg_bmw_invoices_backfill ON public.bmw_invoices;
-CREATE TRIGGER trg_bmw_invoices_backfill
+CREATE OR REPLACE TRIGGER trg_bmw_invoices_backfill
   AFTER INSERT OR UPDATE ON public.bmw_invoices
   FOR EACH ROW EXECUTE FUNCTION public.bmw_orders_backfill_from_invoice();
