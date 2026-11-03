@@ -37,7 +37,7 @@
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;font-size:13px;-webkit-font-smoothing:antialiased}
 .app{display:flex;min-height:100vh}
-.sidebar{width:240px;background:#fff;border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar{width:240px;flex-shrink:0;background:#fff;border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh;overflow-y:auto}
 .brand{display:flex;align-items:center;gap:10px;padding:6px 10px 14px;border-bottom:1px solid var(--line);margin-bottom:10px}
 .brand-logo{width:32px;height:32px;background:linear-gradient(135deg,#1C69D4,#0F4FA8);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px}
 .brand-name{font-size:12px;font-weight:800;color:#0f172a;letter-spacing:-.3px;line-height:1.1}
@@ -47,7 +47,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .si.active{background:var(--blue4);color:var(--blue)}
 .si-icon{font-size:14px}
 .si-badge{margin-left:auto;background:var(--blue);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:999px;min-width:18px;text-align:center}
-.main{flex:1;padding:20px 28px;max-width:1700px;margin:0 auto;width:100%}
+.main{flex:1;min-width:0;padding:20px 28px;max-width:1700px;margin:0 auto;width:100%}   /* min-width:0: the wide table scrolls in its box instead of squeezing the sidebar */
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:14px;flex-wrap:wrap}
 .topbar h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.3px;display:flex;align-items:center;gap:10px}
 .topbar p{margin:2px 0 0;font-size:12px;color:var(--muted);font-weight:500}
@@ -246,7 +246,7 @@ body.hide-sc .c-sc{display:none}
       </div>
     </div>
 
-    <div class="al al-i">📝 Fill in the order, VIN and customer, then press <strong>Save order</strong>. Your name is set from your login and the <strong>Order</strong> reference (GOR0…) builds itself. For the VIN type only the <strong>last 7</strong> — the full VIN and the customer fill in from the system. The <strong>Order date</strong> 🔒 comes from Incadea; <strong>Date</strong> defaults to today. Pick-up, return and the warranty fields are handled by the warranty admin.</div>
+    <div class="al al-i"><span>📝 Fill in the order, VIN and customer, then press <strong>Save order</strong>. Your name is set from your login and the <strong>Order</strong> reference (GOR0…) builds itself. For the VIN type only the <strong>last 7</strong> — the full VIN and the customer fill in from the system. The <strong>Order date</strong> 🔒 comes from Incadea; <strong>Date</strong> defaults to today. Pick-up, return and the warranty fields are handled by the warranty admin.</span></div>
 
     <!-- ── ENTRY FORM ── -->
     <div class="card editor-only">
