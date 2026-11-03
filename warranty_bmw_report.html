@@ -80,6 +80,22 @@ td.nm{font-weight:700}
 .wlink{color:var(--sun);font-weight:800;text-decoration:none}
 .wlink:hover{text-decoration:underline}
 .empty{padding:28px;text-align:center;color:var(--muted);font-weight:600}
+.kpi.go{cursor:pointer} .kpi.go:hover{border-color:var(--bmw)}
+.kpi.on{outline:2px solid var(--bmw);outline-offset:-1px}
+.stbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0 10px}
+.chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font:inherit;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer}
+.chip b{color:var(--txt);margin-left:3px}
+.chip.on{background:var(--bmw);border-color:var(--bmw);color:#fff} .chip.on b{color:#fff}
+.stbar input{margin-left:auto;padding:7px 10px;border:1.5px solid var(--line);border-radius:9px;font:inherit;font-size:12.5px;min-width:220px}
+#tOrd td{text-align:left} #tOrd th{text-align:left}
+#tOrd td.vin{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;letter-spacing:.02em}
+#tOrd a{color:var(--bmw);font-weight:800;text-decoration:none} #tOrd a:hover{text-decoration:underline}
+#tOrd td.note{white-space:normal;min-width:180px;max-width:320px;color:#334155;font-size:12px}
+.tag{display:inline-block;padding:2px 7px;border-radius:999px;font-size:10.5px;font-weight:800}
+.tag.ok{background:rgba(16,185,129,.13);color:#047857} .tag.bad{background:rgba(225,29,72,.12);color:#9f1239}
+.tag.cut{background:#fef9c3;color:#854d0e} .tag.wait{background:var(--surf2);color:var(--muted)}
+.tag.ret{background:rgba(124,58,237,.12);color:#6d28d9} .tag.pen{background:#ffedd5;color:#9a3412}
+.more{margin-top:10px;text-align:center}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:8px}
 .legend b{color:var(--txt)}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(120px);background:#0f172a;color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;transition:transform .25s;z-index:300}
@@ -165,6 +181,15 @@ td.nm{font-weight:700}
     <div class="tw"><table id="tPivot"></table></div>
   </div>
 
+  <div class="card" id="ordCard">
+    <h2>Orders — VIN list</h2>
+    <div class="sub" id="ordSub">Every order behind the figures above, with the same filters.</div>
+    <div class="stbar noprint" id="stbar"></div>
+    <input type="hidden" id="fSt">
+    <div class="tw"><table id="tOrd"></table></div>
+    <div class="more noprint" id="ordMore"></div>
+  </div>
+
   <div class="card">
     <div class="legend">
       <span><b>Orders</b> — repair orders by their order date.</span>
@@ -207,6 +232,7 @@ const pctOf = (a, b) => b ? a / b : null
 const pctTxt = p => p == null ? '—' : (p * 100).toFixed(p < 0.1 && p > 0 ? 1 : 0) + '%'
 
 let ALL = []           // every (month, advisor) row in the database
+let ORD = []           // every order (bmw_advisor_orders), for the VIN list
 let charts = {}
 
 // ── data ──
@@ -216,6 +242,14 @@ async function loadAll(){
     sb.rpc('bmw_advisor_pickup',  { p_from: null, p_to: null }),
   ])
   if (m.error) { toast('❌ ' + m.error.message, 6000); return }
+  // The orders one by one (the API answers 1,000 rows at a time).
+  ORD = []
+  for (let off = 0; off < 100000; off += 1000){
+    const { data, error } = await sb.rpc('bmw_advisor_orders', { p_from: null, p_to: null }).range(off, off + 999)
+    if (error) { console.warn('bmw_advisor_orders', error.message); break }
+    ORD.push(...(data || []))
+    if (!data || data.length < 1000) break
+  }
   // Pick-up figures (warranty admin) joined on month + advisor.
   const P = {}
   ;(pk.data || []).forEach(r => { P[r.month + '|' + r.advisor] = r })
@@ -308,16 +342,18 @@ function render(){
   const T = rows.reduce(add, blank())
 
   // KPIs
-  const k = (cls, l, v, s) => `<div class="kpi ${cls}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`
+  const k = (cls, l, v, s, key) => `<div class="kpi ${cls}${key ? ' go' : ''}"${key ? ` data-st="${key}" title="Show these orders in the VIN list"` : ''}><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`
   $('kpis').innerHTML =
-      k('', 'Orders', fmt(T.orders), `${new Set(rows.map(r => r.advisor)).size} advisor(s) · ${new Set(rows.map(r => r.month)).size} month(s)`)
-    + k('w', 'Warranty claims', fmt(T.warranty), pctTxt(pctOf(T.warranty, T.orders)) + ' of orders')
-    + k('sv', 'Service claims', fmt(T.service), pctTxt(pctOf(T.service, T.orders)) + ' of orders')
-    + k('p', 'Pending', fmt(T.pending), 'no claim yet, not returned')
-    + k(pctOf(T.rejected, T.answered) > 0.10 ? 'r' : 'ok', 'BMW return rate', pctTxt(pctOf(T.rejected, T.answered)), `${fmt(T.rejected)} sent back of ${fmt(T.answered)} answered`)
-    + k(pctOf(T.returned, T.orders) > 0.08 ? 'r' : 'ok', 'Returned to advisor', pctTxt(pctOf(T.returned, T.orders)), `${fmt(T.returned)} not warranty cases`)
-    + k(T.waiting ? 'p' : 'ok', 'Waiting pick-up', fmt(T.waiting), `${fmt(T.picked)} picked up · ${T.days_to_pickup_n ? (T.days_to_pickup_sum / T.days_to_pickup_n).toFixed(1) + ' days on average' : '—'}`)
+      k('', 'Orders', fmt(T.orders), `${new Set(rows.map(r => r.advisor)).size} advisor(s) · ${new Set(rows.map(r => r.month)).size} month(s)`, 'all')
+    + k('w', 'Warranty claims', fmt(T.warranty), pctTxt(pctOf(T.warranty, T.orders)) + ' of orders', 'warranty')
+    + k('sv', 'Service claims', fmt(T.service), pctTxt(pctOf(T.service, T.orders)) + ' of orders', 'service')
+    + k('p', 'Pending', fmt(T.pending), 'no claim yet, not returned', 'pending')
+    + k(pctOf(T.rejected, T.answered) > 0.10 ? 'r' : 'ok', 'BMW return rate', pctTxt(pctOf(T.rejected, T.answered)), `${fmt(T.rejected)} sent back of ${fmt(T.answered)} answered`, 'sentback')
+    + k(pctOf(T.returned, T.orders) > 0.08 ? 'r' : 'ok', 'Returned to advisor', pctTxt(pctOf(T.returned, T.orders)), `${fmt(T.returned)} not warranty cases`, 'returned')
+    + k(T.waiting ? 'p' : 'ok', 'Waiting pick-up', fmt(T.waiting), `${fmt(T.picked)} picked up · ${T.days_to_pickup_n ? (T.days_to_pickup_sum / T.days_to_pickup_n).toFixed(1) + ' days on average' : '—'}`, 'waiting')
     + k('', 'Days to claim', avgDays(T), 'average, order → first claim')
+
+  renderOrders()
 
   // By advisor
   const byAdv = {}
@@ -395,6 +431,78 @@ function drawCharts(months, byMonth, advs, byAdv){
   })
 }
 
+// ── the VIN list: the orders behind the figures ──
+const STATUSES = [
+  ['all',      'All',                 r => true],
+  ['warranty', 'Warranty claim',      r => !!r.warranty_date],
+  ['service',  'Service claim',       r => !!r.service_date],
+  ['both',     'Both',                r => !!r.warranty_date && !!r.service_date],
+  ['pending',  'Pending',             r => !r.warranty_date && !r.service_date && !r.return_date],
+  ['returned', 'Returned to advisor', r => !!r.return_date],
+  ['answered', 'Answered by BMW',     r => r.answered],
+  ['sentback', 'Sent back by BMW',    r => r.rejected],
+  ['cut',      'Cut',                 r => r.cut],
+  ['waiting',  'Waiting pick-up',     r => !r.pickup_date && !r.return_date],
+  ['novin',    'No VIN',              r => !(r.vin || '').trim()],
+]
+let ORD_LIMIT = 300
+const dmy = d => d ? String(d).slice(0, 10).split('-').reverse().join('/') : ''
+function ordScoped(){
+  const a = listOf('fAdv'), m = listOf('fMon')
+  return ORD.filter(r => inRange(r) && (!a || a.includes(r.advisor)) && (!m || m.includes(r.month)))
+}
+function ordShown(){
+  const st = STATUSES.find(s => s[0] === $('fSt').value) || STATUSES[0]
+  const q = ($('fOrdQ')?.value || '').trim().toUpperCase()
+  return ordScoped().filter(r => st[2](r) && (!q || [r.order_ref, r.order_number, r.vin, r.customer, r.advisor].some(v => (v || '').toUpperCase().includes(q))))
+}
+const answerTxt = r => r.rejected ? 'Sent back' : r.cut ? 'Cut' : r.answered ? 'Credited' : (r.warranty_date || r.service_date) ? 'Waiting BMW' : ''
+const statusTxt = r => r.return_date ? 'Returned' : (!r.warranty_date && !r.service_date) ? 'Pending' : 'Claimed'
+function answerTag(r){
+  const t = answerTxt(r); if (!t) return ''
+  return `<span class="tag ${{ 'Sent back':'bad', 'Cut':'cut', 'Credited':'ok', 'Waiting BMW':'wait' }[t]}">${t}</span>`
+}
+function statusTag(r){
+  const t = statusTxt(r)
+  return t === 'Returned' ? '<span class="tag ret">↩ Returned</span>' : t === 'Pending' ? '<span class="tag pen">⏳ Pending</span>' : '<span class="tag ok">✓ Claimed</span>'
+}
+function renderOrders(){
+  const base = ordScoped(), cur = $('fSt').value || 'all'
+  const q = $('fOrdQ') ? $('fOrdQ').value : ''
+  $('stbar').innerHTML = STATUSES.map(([key, label, f]) => `<button type="button" class="chip viewer-ok${key === cur ? ' on' : ''}" data-st="${key}">${label}<b>${fmt(base.filter(f).length)}</b></button>`).join('')
+    + `<input id="fOrdQ" class="viewer-ok" placeholder="🔎 Order, VIN, customer" value="${esc(q)}">`
+  const rows = ordShown()
+  $('tOrd').innerHTML = rows.length
+    ? `<thead><tr><th>Order</th><th>Order date</th><th>Service advisor</th><th>VIN</th><th>Customer</th><th>Status</th><th>Warranty claim</th><th>Service claim</th><th>BMW answer</th><th>Picked up</th><th>Returned</th><th>Warranty note</th></tr></thead><tbody>`
+      + rows.slice(0, ORD_LIMIT).map(r => `<tr>
+        <td><a href="warranty_bmw_orders.html?q=${encodeURIComponent(r.order_number)}" title="Open the case">${esc(r.order_ref)}</a></td>
+        <td>${dmy(r.order_date)}</td><td>${esc(r.advisor)}</td>
+        <td class="vin">${esc(r.vin) || '<span class="zero">—</span>'}</td><td>${esc(r.customer)}</td>
+        <td>${statusTag(r)}</td><td>${dmy(r.warranty_date)}</td><td>${dmy(r.service_date)}</td><td>${answerTag(r)}</td>
+        <td>${dmy(r.pickup_date)}</td><td>${dmy(r.return_date)}</td><td class="note">${esc(r.warranty_note)}</td></tr>`).join('') + '</tbody>'
+    : `<tbody><tr><td class="empty">No orders match.</td></tr></tbody>`
+  const label = (STATUSES.find(s => s[0] === cur) || STATUSES[0])[1]
+  $('ordSub').textContent = `${fmt(rows.length)} order(s)${cur !== 'all' ? ' · ' + label : ''} — same period and advisors as above. Click a figure above or a status to narrow it; click an order to open its case.`
+  $('ordMore').innerHTML = rows.length > ORD_LIMIT ? `<button type="button" class="btn viewer-ok" id="ordAll">Show all ${fmt(rows.length)}</button>` : ''
+  document.querySelectorAll('.kpi.go').forEach(el => el.classList.toggle('on', el.dataset.st === cur))
+}
+function setStatus(key, scroll){
+  $('fSt').value = key === 'all' ? '' : key
+  ORD_LIMIT = 300
+  $('fSt').dispatchEvent(new Event('change'))       // re-renders and updates the saved-view marker
+  if (scroll) $('ordCard').scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+$('kpis').addEventListener('click', e => { const el = e.target.closest('.kpi.go'); if (el) setStatus(el.dataset.st, true) })
+$('stbar').addEventListener('click', e => { const el = e.target.closest('.chip'); if (el) setStatus(el.dataset.st) })
+$('stbar').addEventListener('input', e => {
+  if (e.target.id !== 'fOrdQ') return
+  const pos = e.target.selectionStart
+  ORD_LIMIT = 300; renderOrders()
+  const i = $('fOrdQ'); i.focus(); i.setSelectionRange(pos, pos)
+})
+$('ordMore').addEventListener('click', e => { if (e.target.id === 'ordAll') { ORD_LIMIT = Infinity; renderOrders() } })
+window.addEventListener('beforeprint', () => { if (ORD_LIMIT !== Infinity) { ORD_LIMIT = Infinity; renderOrders() } })
+
 // ── period buttons ──
 function setRange(kind){
   const now = new Date()
@@ -404,7 +512,7 @@ function setRange(kind){
   $('fFrom').dispatchEvent(new Event('change'))   // re-renders (and updates the saved-view marker)
 }
 document.querySelectorAll('[data-range]').forEach(b => b.addEventListener('click', () => setRange(b.dataset.range)))
-;['fFrom','fTo','fAdv','fMon'].forEach(id => $(id).addEventListener('change', render))
+;['fFrom','fTo','fAdv','fMon','fSt'].forEach(id => $(id).addEventListener('change', render))
 
 // ── export ──
 let _xlsxP = null
@@ -434,6 +542,9 @@ $('xlsBtn').addEventListener('click', async () => {
     X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Service advisor', ...H], ...Object.entries(byAdv).map(([a, t]) => [a, ...vals(t)]), ['Total', ...vals(T)]]), 'By advisor')
     X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Month', ...H], ...Object.keys(byMonth).sort().map(m => [m, ...vals(byMonth[m])]), ['Total', ...vals(T)]]), 'By month')
     X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Month', 'Service advisor', ...H], ...rows.map(r => [r.month, r.advisor, ...vals(r)])]), 'Month x advisor')
+    const OH = ['Order','Order date','Month','Service advisor','VIN','Customer','Status','Warranty claim','Service claim','BMW answer','Picked up','Returned to advisor','Warranty note']
+    X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([OH, ...ordShown().map(r => [r.order_ref, r.order_date, r.month, r.advisor, r.vin || '', r.customer || '',
+      statusTxt(r), r.warranty_date || '', r.service_date || '', answerTxt(r), r.pickup_date || '', r.return_date || '', r.warranty_note || ''])]), 'Orders (VIN list)')
     X.writeFile(wb, `BMW_Advisor_Report_${$('fFrom').value || 'start'}_${$('fTo').value || 'today'}.xlsx`)
   } catch (e) { toast('❌ ' + e.message) }
 })
@@ -450,7 +561,7 @@ try {
   mountSavedViews({
     sb, page: 'warranty_bmw_report',
     mountEl: $('savedViewsMount'),
-    filterIds: ['fFrom', 'fTo', 'fAdv', 'fMon'],
+    filterIds: ['fFrom', 'fTo', 'fAdv', 'fMon', 'fSt'],
     applyFilter: () => render(),
     ntf: m => toast(m),
     currentUser: sessionStorage.getItem('cw_current_emp') || '',
