@@ -985,7 +985,17 @@ async function mountViews(){
     })
   } catch (e){ console.warn('[orders] saved views unavailable', e) }
 }
-mountViews()
+await mountViews()
+
+// Opened from the Advisor Report's order list: ?q=<order> shows that order and opens its case.
+{
+  const q = new URLSearchParams(location.search).get('q')
+  if (q){
+    $('f_q').value = q; render()
+    const hit = S.rows.filter(r => String(r.order_number) === q.replace(/\D/g,'') )
+    if (hit.length === 1) openModal(hit[0].id)
+  }
+}
 </script>
   <script src="analytics.js?v=1" data-site="bassoul-heneine"></script>
 </body>
