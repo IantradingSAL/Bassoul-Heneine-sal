@@ -77,6 +77,8 @@ td.nm{font-weight:700}
 .rate.n{background:var(--surf2);color:var(--faint)}
 .bar{display:inline-block;height:8px;border-radius:4px;background:var(--bmw);vertical-align:middle;margin-left:6px;opacity:.75}
 .zero{color:var(--faint)}
+.wlink{color:var(--sun);font-weight:800;text-decoration:none}
+.wlink:hover{text-decoration:underline}
 .empty{padding:28px;text-align:center;color:var(--muted);font-weight:600}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:8px}
 .legend b{color:var(--txt)}
@@ -173,6 +175,7 @@ td.nm{font-weight:700}
       <span><b>Sent back</b> — BMW rejected at least one line (SAP status <i>Error</i>); <b>BMW return rate</b> = sent back ÷ answered.</span>
       <span><b>Cut</b> — partly credited (status <i>Warning</i>).</span>
       <span><b>Returned to advisor</b> — not a warranty case (internal, customer pays…): no claim, a return date set; <b>return rate</b> = returned ÷ orders.</span>
+      <span><b>Picked up / Waiting pick-up</b> — received by the warranty admin on the 📥 Pick-up page, or still to receive (not returned); <b>days to pick-up</b> = average days from the order's date to its pick-up.</span>
       <span><b>Days to claim</b> — average days from the order date to its first claim.</span>
     </div>
   </div>
@@ -208,9 +211,19 @@ let charts = {}
 
 // ── data ──
 async function loadAll(){
-  const { data, error } = await sb.rpc('bmw_advisor_monthly', { p_from: null, p_to: null })
-  if (error) { toast('❌ ' + error.message, 6000); return }
-  ALL = data || []
+  const [m, pk] = await Promise.all([
+    sb.rpc('bmw_advisor_monthly', { p_from: null, p_to: null }),
+    sb.rpc('bmw_advisor_pickup',  { p_from: null, p_to: null }),
+  ])
+  if (m.error) { toast('❌ ' + m.error.message, 6000); return }
+  // Pick-up figures (warranty admin) joined on month + advisor.
+  const P = {}
+  ;(pk.data || []).forEach(r => { P[r.month + '|' + r.advisor] = r })
+  if (pk.error) console.warn('bmw_advisor_pickup', pk.error.message)
+  ALL = (m.data || []).map(r => {
+    const x = P[r.month + '|' + r.advisor] || {}
+    return { ...r, picked: x.picked || 0, waiting: x.waiting || 0, days_to_pickup_sum: x.days_to_pickup_sum || 0, days_to_pickup_n: x.days_to_pickup_n || 0 }
+  })
 }
 
 // Multi-select filters: the hidden inputs hold a JSON list (an older saved
@@ -248,7 +261,7 @@ $('fMonBtn').addEventListener('click', e => {
     chosen: listOf('fMon'), onApply: pick => setList('fMon', pick) })
 })
 
-function blank(){ return { orders:0, warranty:0, service:0, pending:0, answered:0, rejected:0, cut:0, returned:0, picked_up:0, days_to_claim_sum:0, days_to_claim_n:0, warranty_only:0, service_only:0, both_claims:0 } }
+function blank(){ return { orders:0, warranty:0, service:0, pending:0, answered:0, rejected:0, cut:0, returned:0, picked_up:0, days_to_claim_sum:0, days_to_claim_n:0, warranty_only:0, service_only:0, both_claims:0, picked:0, waiting:0, days_to_pickup_sum:0, days_to_pickup_n:0 } }
 function add(t, r){ for (const k in t) t[k] += Number(r[k]) || 0; return t }
 
 function scoped(){
@@ -276,6 +289,9 @@ const COLS = [
   ['Cut',             t => cell(t.cut)],
   ['Returned to advisor', t => cell(t.returned, t.orders)],
   ['Return rate',     t => rateChip(pctOf(t.returned, t.orders), 0.02, 0.08)],
+  ['Picked up',       t => cell(t.picked, t.orders)],
+  ['Waiting pick-up', t => t.waiting ? `<a class="wlink" href="warranty_bmw_pickup.html" title="Open the pick-up page">${fmt(t.waiting)}</a>` : '<span class="zero">0</span>'],
+  ['Days to pick-up', t => t.days_to_pickup_n ? (t.days_to_pickup_sum / t.days_to_pickup_n).toFixed(1) : '—'],
   ['Days to claim',   t => avgDays(t)],
 ]
 const head = first => `<thead><tr><th>${first}</th>${COLS.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead>`
@@ -300,6 +316,7 @@ function render(){
     + k('p', 'Pending', fmt(T.pending), 'no claim yet, not returned')
     + k(pctOf(T.rejected, T.answered) > 0.10 ? 'r' : 'ok', 'BMW return rate', pctTxt(pctOf(T.rejected, T.answered)), `${fmt(T.rejected)} sent back of ${fmt(T.answered)} answered`)
     + k(pctOf(T.returned, T.orders) > 0.08 ? 'r' : 'ok', 'Returned to advisor', pctTxt(pctOf(T.returned, T.orders)), `${fmt(T.returned)} not warranty cases`)
+    + k(T.waiting ? 'p' : 'ok', 'Waiting pick-up', fmt(T.waiting), `${fmt(T.picked)} picked up · ${T.days_to_pickup_n ? (T.days_to_pickup_sum / T.days_to_pickup_n).toFixed(1) + ' days on average' : '—'}`)
     + k('', 'Days to claim', avgDays(T), 'average, order → first claim')
 
   // By advisor
@@ -404,10 +421,11 @@ $('xlsBtn').addEventListener('click', async () => {
   try {
     const X = await loadXlsx()
     const rows = scoped()
-    const H = ['Orders','Warranty','Service','Warranty only','Service only','Both','Pending','Answered','Sent back','BMW return rate %','Cut','Returned to advisor','Return rate %','Avg days to claim']
+    const H = ['Orders','Warranty','Service','Warranty only','Service only','Both','Pending','Answered','Sent back','BMW return rate %','Cut','Returned to advisor','Return rate %','Picked up','Waiting pick-up','Avg days to pick-up','Avg days to claim']
     const vals = t => [t.orders, t.warranty, t.service, t.warranty_only, t.service_only, t.both_claims, t.pending, t.answered, t.rejected,
       t.answered ? +(t.rejected / t.answered * 100).toFixed(1) : null, t.cut, t.returned,
       t.orders ? +(t.returned / t.orders * 100).toFixed(1) : null,
+      t.picked, t.waiting, t.days_to_pickup_n ? +(t.days_to_pickup_sum / t.days_to_pickup_n).toFixed(1) : null,
       t.days_to_claim_n ? +(t.days_to_claim_sum / t.days_to_claim_n).toFixed(1) : null]
     const byAdv = {}, byMonth = {}
     rows.forEach(r => { add(byAdv[r.advisor] = byAdv[r.advisor] || blank(), r); add(byMonth[r.month] = byMonth[r.month] || blank(), r) })

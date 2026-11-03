@@ -114,3 +114,28 @@ CREATE OR REPLACE TRIGGER trg_bmw_rec_invoices_backfill
 CREATE OR REPLACE TRIGGER trg_bmw_invoices_backfill
   AFTER INSERT OR UPDATE ON public.bmw_invoices
   FOR EACH ROW EXECUTE FUNCTION public.bmw_orders_backfill_from_invoice();
+
+-- ── Pick-up per advisor and month, for the Advisor Report ────────────
+CREATE OR REPLACE FUNCTION public.bmw_advisor_pickup(p_from date DEFAULT NULL, p_to date DEFAULT NULL)
+RETURNS TABLE (month text, advisor text, picked int, waiting int, days_to_pickup_sum bigint, days_to_pickup_n int)
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+  WITH o AS (
+    SELECT COALESCE(o.order_date, o.work_date, o.created_at::date) AS d,
+           COALESCE(o.work_date, o.order_date, o.created_at::date) AS start_d,
+           COALESCE(NULLIF(trim(o.service_advisor), ''), '— not set —') AS advisor,
+           o.pickup_date, o.return_date
+      FROM warranty_bmw_orders o
+  )
+  SELECT to_char(d, 'YYYY-MM'), advisor,
+         count(*) FILTER (WHERE pickup_date IS NOT NULL)::int,
+         count(*) FILTER (WHERE pickup_date IS NULL AND return_date IS NULL)::int,
+         COALESCE(sum(GREATEST(pickup_date - start_d, 0)) FILTER (WHERE pickup_date IS NOT NULL AND start_d IS NOT NULL), 0)::bigint,
+         count(*) FILTER (WHERE pickup_date IS NOT NULL AND start_d IS NOT NULL)::int
+    FROM o
+   WHERE d IS NOT NULL
+     AND (p_from IS NULL OR d >= p_from) AND (p_to IS NULL OR d <= p_to)
+   GROUP BY 1, 2
+$$;
+GRANT EXECUTE ON FUNCTION public.bmw_advisor_pickup(date, date) TO authenticated;
