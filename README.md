@@ -156,3 +156,24 @@ The PROTOCOLS object inside `customer_feedback.html` (the smart guidance text pe
 | Right role but still "No access" | `auth_user_id` on the employee row doesn't match `auth.users.id`. Re-paste from Supabase → Authentication → Users. |
 | Yellow "View-only" banner appears for managers | `is_manager()` matches `employees.role = 'manager'` exactly — check for typos / whitespace. |
 | Permission change not picked up | `access.js` evaluates once on page load. Refresh the page (no full sign-out needed). |
+
+---
+
+## Per-person page access, landing page, saved views (2026-11-03)
+
+**Settings → Employees → Edit** now has, under the role:
+
+- **Landing page** — where this person opens after signing in (`employees.landing_page`). The dashboard stays one click away; a person with no access to their landing page lands on the dashboard.
+- **Page access** — one row per page: *No access / Viewer / Writer*. The role already grants the pages shown in blue ("from role"); ticking another level gives **this person alone** that access ("for them", ↺ puts it back to the role). Stored in `employees.page_permissions` (`{page: none|view|edit}`), read first by `effective_page_permission()`. Managers always write everywhere.
+
+**Saved views** (`user_views.js`) are on every list with filters — Customer Feedback, Renault Warranty (each tab), BMW Warranty (each tab), BMW v2, BMW Orders, Service Inclusive (each tab). Each person saves their own filter combinations; ⭐ makes one open by default (`user_views.is_default`), on every device.
+
+SQL: `04_per_user_access.sql` (already applied).
+
+## BMW Quick Entry → Import Excel
+
+Loads past orders from an .xlsx/.csv into `warranty_bmw_orders`. **The system is the main source**: for every order the system already knows from Incadea (`bmw_rec_invoices`, `bmw_rec_submissions`), its VIN, customer, order date and first warranty / service claim dates are used; the file only fills what the system does not know (service date, pick-up, advisor, notes, and claims older than the first upload). Orders already saved are never overwritten — only their empty fields are filled. Every disagreement, impossible date and repeated order number is listed and downloadable ("Download what to check").
+
+## BMW dates stored one day early — fixed
+
+`warranty_bmw.html` stored every Excel date one day early (local midnight read in UTC). The upload is fixed; `ops/2026-11-03_bmw_rec_dates_plus_one_day.sql` corrects the rows already uploaded — run it once, **before** this change goes live. The Quick Entry import waits for it.

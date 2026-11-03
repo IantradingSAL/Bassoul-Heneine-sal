@@ -112,6 +112,31 @@ tbody tr:hover{background:#f8fafc}
 .perm-pill.on[data-l="view"]{background:var(--amber);color:#fff;box-shadow:0 1px 3px rgba(217,119,6,.4)}
 .perm-pill.on[data-l="edit"]{background:var(--green);color:#fff;box-shadow:0 1px 3px rgba(22,163,74,.4)}
 
+/* PER-PERSON PAGE ACCESS (employee modal) */
+.pa-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;background:#f8fafc;border:1px solid var(--bdr);border-radius:10px;margin:8px 0 10px}
+.pa-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;background:var(--b50);color:var(--blue);border:1px solid var(--b100)}
+.pa-chip.w{background:var(--g50);color:var(--green);border-color:var(--g100)}
+.pa-chip .lv{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;opacity:.75}
+.pa-box{border:1px solid var(--bdr);border-radius:10px;max-height:340px;overflow:auto}
+.pa-tbl{width:100%;border-collapse:collapse}
+.pa-tbl th{position:sticky;top:0;background:var(--card);z-index:1;font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.4px;padding:9px 10px;border-bottom:1px solid var(--bdr);text-align:center}
+.pa-tbl th:first-child{text-align:left}
+.pa-tbl td{padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px;text-align:center;vertical-align:middle}
+.pa-tbl td:first-child{text-align:left;font-weight:600}
+.pa-tbl tr:last-child td{border-bottom:none}
+.pa-tbl tr.pa-all td{background:#f8fafc;font-size:11px;color:var(--mu);font-weight:700}
+.pa-tbl tr.pa-all a{color:var(--blue);cursor:pointer;font-weight:700;text-decoration:none}
+.pa-tbl tr.pa-all a:hover{text-decoration:underline}
+.pa-tbl input[type=radio]{width:16px;height:16px;accent-color:var(--blue);cursor:pointer}
+.pa-tbl input[type=radio]:disabled{cursor:not-allowed;opacity:.35}
+.pa-tag{font-size:9px;font-weight:700;padding:1px 6px;border-radius:5px;margin-left:6px;vertical-align:middle;letter-spacing:.2px}
+.pa-tag.role{background:var(--b50);color:var(--blue)}
+.pa-tag.own{background:#fef3c7;color:#92400e}
+.pa-reset{border:none;background:transparent;color:var(--mu);cursor:pointer;font-size:12px;padding:2px 4px;border-radius:5px}
+.pa-reset:hover{background:var(--b50);color:var(--blue)}
+.pa-note{font-size:11px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-top:8px;display:none}
+.emp-sub{font-size:10px;color:var(--mu);font-weight:600;margin-top:4px}
+
 /* MODAL */
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:200;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;backdrop-filter:blur(2px)}
 .modal-bg.on{display:flex}
@@ -406,7 +431,7 @@ tbody tr:hover{background:#f8fafc}
 
 <!-- ════ EMPLOYEE MODAL ════════════════════════════════════════ -->
 <div class="modal-bg" id="empModal">
-  <div class="modal">
+  <div class="modal" style="max-width:680px">
     <div class="m-h" id="empModalTitle">Add employee</div>
     <div class="m-s">Fill in the details — the system creates the Supabase login automatically and emails a confirmation link to the employee. They click the link, then they can sign in with the password you set below.</div>
     <input type="hidden" id="empId"/>
@@ -451,7 +476,24 @@ tbody tr:hover{background:#f8fafc}
       <div class="full">
         <label class="fl">Role *</label>
         <select class="fi" id="empRole"></select>
-        <div class="fl-help">Sets which pages this person can access. Manage the list and permissions in the <strong>Roles &amp; Access</strong> tab.</div>
+        <div class="fl-help">Sets which pages this person can access. Manage the list and permissions in the <strong>Roles &amp; Access</strong> tab. Give this person more or less on single pages below.</div>
+      </div>
+      <div class="full">
+        <label class="fl" for="empLanding">Landing page</label>
+        <select class="fi" id="empLanding"></select>
+        <div class="fl-help">The page this person opens on after signing in. The dashboard stays one click away in the sidebar.</div>
+      </div>
+      <div class="full">
+        <label class="fl">Page access</label>
+        <div class="fl-help" style="font-style:normal">The role already grants the pages shown in blue. Set a level on any page to give <strong>this person alone</strong> that access, without changing the role. <strong>Viewer</strong> can open the page; <strong>Writer</strong> can also add and change things on it. A <strong>Manager</strong> always writes everywhere.</div>
+        <div class="pa-chips" id="empRoleChips"></div>
+        <div class="pa-box">
+          <table class="pa-tbl">
+            <thead><tr><th>Page</th><th>No access</th><th>Viewer</th><th>Writer</th><th style="width:34px"></th></tr></thead>
+            <tbody id="empPageAccess"></tbody>
+          </table>
+        </div>
+        <div class="pa-note" id="empAccessNote"></div>
       </div>
       <div class="full">
         <label class="fl">Notification channels</label>
@@ -696,7 +738,7 @@ let unconfirmedUids = new Set()  // auth_user_ids whose email_confirmed_at IS NU
 async function loadEmployees(){
   const [empRes, unconfRes] = await Promise.all([
     sb.from('employees')
-      .select('id,name,username,email,phone,whatsapp_phone,role,custom_role,extra_roles,is_active,auth_user_id,notification_prefs')
+      .select('id,name,username,email,phone,whatsapp_phone,role,custom_role,extra_roles,is_active,auth_user_id,notification_prefs,page_permissions,landing_page')
       .order('name'),
     sb.rpc('list_unconfirmed_auth_uids')
   ])
@@ -733,7 +775,7 @@ function renderEmployees(){
       <td>${esc(e.username || '—')}</td>
       <td style="color:var(--mu)">${esc(e.email || '—')}</td>
       <td style="color:var(--mu)">${esc(e.phone || '—')}</td>
-      <td>${roleHtml}</td>
+      <td>${roleHtml}${empSubline(e)}</td>
       <td>${e.is_active ? '<span class="bdg b-g">Active</span>' : '<span class="bdg b-gray">Inactive</span>'}</td>
       <td class="editor-only" style="text-align:right">
         <button class="btn btn-ghost btn-sm" data-edit-emp="${e.id}">✏️ Edit</button>
@@ -768,6 +810,135 @@ function populateRoleDropdown(selected){
   else sel.value = 'employee'
 }
 
+// ════════════════════════════════════════════════════════════════
+//  PER-PERSON PAGE ACCESS + LANDING PAGE
+//  employees.page_permissions = { page_id: 'none'|'view'|'edit' } —
+//  a page listed there replaces what the roles give on that page
+//  (effective_page_permission() reads it first). Not listed = role.
+// ════════════════════════════════════════════════════════════════
+const LV_RANK = { none:0, view:1, edit:2 }
+let paOverrides = {}        // the person being edited
+let paEmp       = null
+function pageLabel(id){
+  if (!id) return 'Dashboard'
+  const p = PAGES.find(x => x.id === id)
+  return p ? `${p.icon || '📄'} ${p.label}` : id
+}
+function empSubline(e){
+  const n = Object.keys(e.page_permissions || {}).length
+  const bits = []
+  if (n) bits.push(`🎯 ${n} page${n === 1 ? '' : 's'} set for them`)
+  if (e.landing_page) bits.push(`🛬 opens on ${esc(pageLabel(e.landing_page))}`)
+  return bits.length ? `<div class="emp-sub">${bits.join(' · ')}</div>` : ''
+}
+// Roles the selected dropdown value puts on the person — the same set
+// effective_page_permission() walks: role + custom_role + extra_roles.
+function heldRoles(selectedRole, emp){
+  const names = (selectedRole === 'manager' || selectedRole === 'employee')
+    ? [selectedRole] : ['employee', selectedRole]
+  const extra = Array.isArray(emp?.extra_roles) ? emp.extra_roles : []
+  return [...new Set([...names, ...extra])]
+}
+function roleLevel(selectedRole, emp, pageId){
+  const held = heldRoles(selectedRole, emp)
+  if (held.includes('manager')) return 'edit'
+  let best = 0
+  for (const name of held) {
+    const r = roles.find(x => x.name === name)
+    const l = r?.permissions?.[pageId]
+    if (LV_RANK[l] > best) best = LV_RANK[l]
+  }
+  return ['none','view','edit'][best]
+}
+function isAlwaysOpen(p){ return p.always_view === true || p.id === 'dashboard' }
+function renderPageAccess(){
+  const sel = $('empRole').value
+  const isMgr = heldRoles(sel, paEmp).includes('manager')
+  // Chips: what the role(s) already grant
+  const granted = PAGES.filter(p => roleLevel(sel, paEmp, p.id) !== 'none')
+  $('empRoleChips').innerHTML = granted.length
+    ? granted.map(p => {
+        const l = roleLevel(sel, paEmp, p.id)
+        return `<span class="pa-chip ${l === 'edit' ? 'w' : ''}">${esc(p.icon || '📄')} ${esc(p.label)} <span class="lv">${l === 'edit' ? 'writer' : 'viewer'}</span></span>`
+      }).join('')
+    : `<span style="font-size:11px;color:var(--mu)">This role grants no pages yet.</span>`
+  const dis = isMgr ? 'disabled' : ''
+  let html = `<tr class="pa-all"><td>All pages</td>
+    <td><a data-pa-all="none">No access</a></td>
+    <td><a data-pa-all="view">Viewer</a></td>
+    <td><a data-pa-all="edit">Writer</a></td>
+    <td><button type="button" class="pa-reset" data-pa-all="reset" title="Every page back to what the role gives">↺</button></td></tr>`
+  html += PAGES.map(p => {
+    const fromRole = roleLevel(sel, paEmp, p.id)
+    const own = paOverrides[p.id]
+    const cur = isMgr ? 'edit' : (own || fromRole)
+    const tag = isMgr ? '' : own
+      ? `<span class="pa-tag own" title="Set for this person only (role gives: ${fromRole === 'edit' ? 'Writer' : fromRole === 'view' ? 'Viewer' : 'No access'})">for them</span>`
+      : (fromRole !== 'none' ? `<span class="pa-tag role">from role</span>` : '')
+    const radio = l => `<input type="radio" name="pa_${esc(p.id)}" value="${l}" data-pa="${esc(p.id)}" ${cur === l ? 'checked' : ''} ${dis || (l === 'none' && isAlwaysOpen(p) ? 'disabled' : '')} aria-label="${esc(p.label)}: ${l}">`
+    return `<tr>
+      <td>${esc(p.icon || '📄')} ${esc(p.label)}${tag}</td>
+      <td>${radio('none')}</td><td>${radio('view')}</td><td>${radio('edit')}</td>
+      <td>${own && !isMgr ? `<button type="button" class="pa-reset" data-pa-reset="${esc(p.id)}" title="Back to what the role gives">↺</button>` : ''}</td>
+    </tr>`
+  }).join('')
+  $('empPageAccess').innerHTML = html
+  checkLandingAccess()
+}
+function setOverride(pageId, level){
+  const p = PAGES.find(x => x.id === pageId); if (!p) return
+  if (level === 'none' && isAlwaysOpen(p)) level = 'view'
+  // Same as the role → no override needed; the role keeps deciding.
+  if (level === roleLevel($('empRole').value, paEmp, pageId)) delete paOverrides[pageId]
+  else paOverrides[pageId] = level
+}
+$('empPageAccess').addEventListener('change', e => {
+  const r = e.target.closest('[data-pa]'); if (!r) return
+  setOverride(r.dataset.pa, r.value)
+  renderPageAccess()
+})
+$('empPageAccess').addEventListener('click', e => {
+  const all = e.target.closest('[data-pa-all]')
+  if (all) {
+    e.preventDefault()
+    if (heldRoles($('empRole').value, paEmp).includes('manager')) return
+    const l = all.dataset.paAll
+    if (l === 'reset') paOverrides = {}
+    else PAGES.forEach(p => setOverride(p.id, l))
+    renderPageAccess(); return
+  }
+  const rs = e.target.closest('[data-pa-reset]')
+  if (rs) { delete paOverrides[rs.dataset.paReset]; renderPageAccess() }
+})
+$('empRole').addEventListener('change', () => {
+  // Drop overrides that now equal what the new role gives.
+  for (const id of Object.keys(paOverrides)) {
+    if (paOverrides[id] === roleLevel($('empRole').value, paEmp, id)) delete paOverrides[id]
+  }
+  renderPageAccess()
+})
+function effectiveFor(pageId){
+  const sel = $('empRole').value
+  if (heldRoles(sel, paEmp).includes('manager')) return 'edit'
+  return paOverrides[pageId] || roleLevel(sel, paEmp, pageId)
+}
+function populateLanding(selected){
+  const opts = [`<option value="">🏠 Dashboard (default)</option>`]
+    .concat(PAGES.filter(p => p.id !== 'dashboard')
+      .map(p => `<option value="${esc(p.id)}">${esc(p.icon || '📄')} ${esc(p.label)}</option>`))
+  $('empLanding').innerHTML = opts.join('')
+  $('empLanding').value = selected && PAGES.some(p => p.id === selected) ? selected : ''
+}
+function checkLandingAccess(){
+  const id = $('empLanding').value
+  const note = $('empAccessNote')
+  if (id && effectiveFor(id) === 'none') {
+    note.textContent = `⚠️ ${pageLabel(id)} is set as their landing page but they have no access to it — they will land on the dashboard instead.`
+    note.style.display = 'block'
+  } else note.style.display = 'none'
+}
+$('empLanding').addEventListener('change', checkLandingAccess)
+
 function fillEmpModal(e){
   $('empId').value         = e?.id || ''
   $('empAuthUid').value    = e?.auth_user_id || ''
@@ -791,6 +962,11 @@ function fillEmpModal(e){
   // Effective role: custom_role overrides role
   const effective = e?.custom_role || e?.role || 'employee'
   populateRoleDropdown(effective)
+  // Per-person page access + landing page
+  paEmp       = e || null
+  paOverrides = { ...(e?.page_permissions || {}) }
+  populateLanding(e?.landing_page || '')
+  renderPageAccess()
   // Password field appears only for not-yet-linked employees.
   // Resend-confirmation button appears for linked-but-unconfirmed.
   const isLinked  = !!e?.auth_user_id
@@ -913,6 +1089,8 @@ $('empSaveBtn').addEventListener('click', async () => {
     custom_role:     customRoleCol,
     auth_user_id:    authUid,
     is_active:       $('empActive').checked,
+    page_permissions: roleCol === 'manager' ? {} : { ...paOverrides },
+    landing_page:    $('empLanding').value || null,
     notification_prefs: {
       email:    $('empPrefEmail').checked,
       whatsapp: $('empPrefWa').checked,

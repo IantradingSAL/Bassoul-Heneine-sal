@@ -53,6 +53,47 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 .alllink .sub{display:block;font-size:10px;color:var(--muted);font-weight:500;margin-top:2px}
 .alllink .txt{text-align:center}
 
+/* ── Excel import ── */
+.imp-drop{display:flex;flex-direction:column;align-items:center;gap:6px;padding:26px 16px;border:2px dashed var(--line);border-radius:14px;background:var(--surf2);text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.imp-drop:hover,.imp-drop.over{border-color:var(--bmw);background:var(--blue4)}
+.imp-drop .big{font-size:30px}
+.imp-drop .t{font-size:14px;font-weight:800}
+.imp-drop .s{font-size:11px;color:var(--muted);font-weight:600}
+.imp-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.imp-btn{padding:9px 14px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font-family:inherit;font-size:12px;font-weight:700;color:var(--txt);cursor:pointer}
+.imp-btn:hover{border-color:var(--bmw);color:var(--bmw)}
+.imp-sec{margin-top:18px}
+.imp-sec h3{margin:0 0 4px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.imp-sec .hint{font-size:11px;color:var(--muted);margin-bottom:10px}
+.imp-map{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px 14px}
+.imp-map label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:700;color:var(--txt)}
+.imp-map label .req{color:var(--rose)}
+.imp-map label .lt{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.imp-map label .adm{font-size:9px;font-weight:800;color:var(--sun);text-transform:uppercase;letter-spacing:.04em}
+.imp-map select,.imp-row select{padding:8px 10px;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;font-size:12px;background:#fff;color:var(--txt)}
+.imp-map select.set{border-color:var(--bmw);background:var(--blue4)}
+.imp-stats{display:flex;gap:6px;flex-wrap:wrap}
+.imp-stat{font-size:11px;font-weight:700;padding:5px 10px;border-radius:999px;background:var(--surf2);color:var(--txt)}
+.imp-stat.ok{background:rgba(16,185,129,.13);color:#047857}
+.imp-stat.warn{background:#fef9c3;color:#854d0e}
+.imp-stat.bad{background:rgba(225,29,72,.13);color:#9f1239}
+.imp-opts{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;font-weight:600}
+.imp-opts label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.imp-prev{overflow:auto;max-height:360px;border:1px solid var(--line);border-radius:12px}
+.imp-prev table{width:100%;border-collapse:collapse;min-width:720px}
+.imp-prev th{position:sticky;top:0;background:var(--surf2);text-align:left;font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:8px 10px;white-space:nowrap;border-bottom:1px solid var(--line)}
+.imp-prev td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:12px;white-space:nowrap}
+.imp-prev td.mono{font-family:var(--mono);font-size:11px}
+.imp-go{margin-top:16px}
+.imp-log{margin-top:12px;font-size:12px;font-weight:600;white-space:pre-wrap}
+.imp-log.err{color:var(--rose)}
+.imp-stat.sys{background:var(--blue4);color:var(--bmw)}
+.sysb{font-size:9px;font-weight:800;color:var(--bmw);background:var(--blue4);padding:1px 6px;border-radius:5px;text-transform:uppercase;letter-spacing:.04em}
+.sysdot{color:var(--bmw);font-size:8px;vertical-align:middle}
+.imp-prev td .was{font-size:10px;color:var(--rose);font-weight:700;margin-top:2px}
+.imp-prev td.chk{white-space:normal;min-width:380px;font-size:11px;color:#9f1239;line-height:1.35}
+.imp-wait{margin-top:12px;padding:10px 12px;border-radius:10px;background:#fef9c3;color:#854d0e;font-size:12px;font-weight:600}
+
 /* ── simple form ── */
 .fld{margin-bottom:16px}
 .fld label{display:block;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px}
@@ -146,6 +187,7 @@ details.more textarea{font-size:14px;min-height:64px;resize:vertical}
 <div class="switcher">
   <button id="tabForm" class="on">📝 Simple form<small>One order at a time · phone friendly</small></button>
   <button id="tabGrid">⚡ Rapid grid<small>Several orders like Excel · auto-save · new line opens</small></button>
+  <button id="tabImport">📥 Import Excel<small>Load previous orders from a .xlsx / .csv file</small></button>
 </div>
 
 <!-- ═════════ SIMPLE FORM ═════════ -->
@@ -219,6 +261,54 @@ details.more textarea{font-size:14px;min-height:64px;resize:vertical}
       </table>
     </div>
     <div class="autosave-note"><span class="dot"></span> Auto-save is on — every completed line is saved instantly, nothing else to click.</div>
+  </div>
+</div>
+</div>
+
+<!-- ═════════ EXCEL IMPORT ═════════ -->
+<div class="pane" id="paneImport">
+<div class="wrapwide">
+  <div class="card">
+    <label class="imp-drop" id="impDrop" for="impFile">
+      <span class="big">📥</span>
+      <span class="t">Drop your Excel file here, or tap to choose it</span>
+      <span class="s">.xlsx, .xls or .csv · one row per order · the first row holds the column names</span>
+    </label>
+    <input type="file" id="impFile" accept=".xlsx,.xls,.csv" hidden>
+    <div class="imp-row">
+      <button type="button" class="imp-btn viewer-ok" id="impTemplate">⬇ Download an empty template</button>
+      <span id="impFileName" style="font-size:12px;font-weight:700;color:var(--muted)"></span>
+      <select id="impSheet" style="display:none" aria-label="Sheet"></select>
+    </div>
+
+    <div class="imp-wait" id="impWait" style="display:none">⏳ The BMW claim and invoice dates already in the system are being corrected (they were stored one day early). Importing opens as soon as that is done — the file is read and checked meanwhile.</div>
+    <div id="impBody" style="display:none">
+      <div class="imp-sec">
+        <h3>1 · Match the columns</h3>
+        <div class="hint">Guessed from your column names — change any that are wrong. Only <strong>Order number</strong> is required. Dates can be Excel dates or written as dd/mm/yyyy. Columns marked <span class="sysb">system first</span> are taken from what Incadea already gave the system (invoices and claim submissions) whenever it knows the order — the file only fills the gaps.</div>
+        <div class="imp-map" id="impMap"></div>
+      </div>
+
+      <div class="imp-sec">
+        <h3>2 · Orders already saved here</h3>
+        <div class="hint">What is saved is never overwritten. The file can only fill what is still empty.</div>
+        <div class="imp-opts">
+          <label><input type="radio" name="impExisting" value="fill" checked> Fill their empty fields from the file</label>
+          <label><input type="radio" name="impExisting" value="skip"> Leave them untouched</label>
+        </div>
+      </div>
+
+      <div class="imp-sec">
+        <h3>3 · Check</h3>
+        <div class="imp-stats" id="impStats"></div>
+        <div class="imp-row" style="margin-top:8px"><button type="button" class="imp-btn viewer-ok" id="impDiffDl" style="display:none">⬇ Download what to check (file vs system)</button></div>
+        <div class="imp-prev" style="margin-top:10px"><table><thead id="impHead"></thead><tbody id="impPrev"></tbody></table></div>
+        <div class="hint" id="impPrevNote" style="margin-top:6px"></div>
+      </div>
+
+      <button class="savebtn imp-go" id="impGo">📥 Import</button>
+      <div class="imp-log" id="impLog"></div>
+    </div>
   </div>
 </div>
 </div>
@@ -306,6 +396,11 @@ async function insertOrder(fields){
 const tabForm=$('tabForm'), tabGrid=$('tabGrid'), paneForm=$('paneForm'), paneGrid=$('paneGrid')
 tabForm.addEventListener('click', ()=>{ tabForm.classList.add('on'); tabGrid.classList.remove('on'); paneForm.classList.add('on'); paneGrid.classList.remove('on'); $('f_order').focus() })
 tabGrid.addEventListener('click', ()=>{ tabGrid.classList.add('on'); tabForm.classList.remove('on'); paneGrid.classList.add('on'); paneForm.classList.remove('on'); focusLastGridRow() })
+// third tab: Excel import — the two handlers above only know their own pair, so close it there too
+const tabImport=$('tabImport'), paneImport=$('paneImport')
+tabForm.addEventListener('click', ()=>{ tabImport.classList.remove('on'); paneImport.classList.remove('on') })
+tabGrid.addEventListener('click', ()=>{ tabImport.classList.remove('on'); paneImport.classList.remove('on') })
+tabImport.addEventListener('click', ()=>{ [tabForm,tabGrid].forEach(t=>t.classList.remove('on')); [paneForm,paneGrid].forEach(p=>p.classList.remove('on')); tabImport.classList.add('on'); paneImport.classList.add('on') })
 
 // ── simple form ──
 $('f_order').addEventListener('input', ()=>{ const v=val('f_order').replace(/\D/g,''); $('f_order').value=v; $('f_gor').textContent=v?'GOR0'+v:'GOR0—' })
@@ -409,6 +504,395 @@ async function loadToday(){
     $('todayList').innerHTML='<div class="entry-empty">Could not load today’s orders.</div>'
   }
 }
+
+// ── Excel import: previous orders → warranty_bmw_orders ──
+// The SYSTEM is the main source. For each order in the file, what Incadea
+// already gave the system (bmw_rec_invoices: order date, VIN, customer;
+// bmw_rec_submissions: first warranty claim, first BSI / service claim)
+// wins; the file only fills what the system does not know (service date,
+// pick-up, advisor, notes, and orders older than the uploads). Every place
+// where the file says something else is listed, and downloadable, so the
+// manual sheet's mistakes can be seen. Orders already saved here are never
+// overwritten — only their empty fields are filled.
+// Claim / pick-up / return columns go to warranty admins only (the
+// bmw_orders_guard trigger clears them for anyone else).
+const IMP_FIELDS = [
+  { k:'order_number',        l:'Order number', req:true, syn:['ordernumber','orderno','ordernum','order','numerocommande','ncommande','commande','ordre','numeroordre','ornumber','ro','repairorder','orderref','gor','ref'] },
+  { k:'vin',                 l:'VIN',            sys:'vin', syn:['vin','chassis','chassisnumber','numerochassis','vinnumber','nchassis'] },
+  { k:'customer_name',       l:'Customer name',  sys:'customer', syn:['customername','customer','client','nomclient','owner','proprietaire','name','nom'] },
+  { k:'order_date',          l:'Order date',     sys:'order_date', date:true, syn:['orderdate','datecommande','dateorder','dateordre','opened','date'] },
+  { k:'work_date',           l:'Date (service)', date:true, syn:['servicedate','dateservice','workdate','datetravaux','dateintervention','date'] },
+  { k:'service_advisor',     l:'Service advisor',syn:['serviceadvisor','advisor','conseiller','conseillerservice','sa'] },
+  { k:'note',                l:'Advisor note',   syn:['note','notes','advisornote','comment','comments','commentaire','remarque','remarks'] },
+  { k:'pickup_date',         l:'Pick-up date',   date:true, admin:true, syn:['pickupdate','pickup','daterecuperation'] },
+  { k:'return_date',         l:'Return date',    date:true, admin:true, syn:['returndate','return','dateretour'] },
+  { k:'warranty_claim_date', l:'Warranty claim date', sys:'warranty_claim', date:true, admin:true, syn:['warrantyclaimdate','warrantyclaim','dateclaimgarantie'] },
+  { k:'service_claim_date',  l:'Service claim date',  sys:'service_claim', date:true, admin:true, syn:['serviceclaimdate','serviceclaim'] },
+  { k:'warranty_note',       l:'Warranty note',  admin:true, syn:['warrantynote','notegarantie'] },
+]
+const SYS_FIELDS = IMP_FIELDS.filter(f => f.sys)
+const IMP = { wb:null, rows:[], headers:[], map:{}, orders:[], emps:[], sysReady:true }
+const normH = s => String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'')
+const impFields = () => IMP_FIELDS.filter(f => !f.admin || S.isAdmin)
+const pad2 = n => String(n).padStart(2,'0')
+
+let _xlsxP = null
+function loadXlsx(){
+  if (window.XLSX) return Promise.resolve(window.XLSX)
+  if (_xlsxP) return _xlsxP
+  _xlsxP = new Promise((res, rej) => {
+    const sc = document.createElement('script')
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+    sc.onload = () => window.XLSX ? res(window.XLSX) : rej(new Error('Excel reader did not load'))
+    sc.onerror = () => { _xlsxP = null; rej(new Error('Could not load the Excel reader — check your connection')) }
+    document.head.appendChild(sc)
+  })
+  return _xlsxP
+}
+
+function impOrderNo(v){
+  if (v == null) return ''
+  if (typeof v === 'number') return String(Math.trunc(v))
+  let t = String(v).trim().toUpperCase().replace(/\s+/g,'')
+  if (t.startsWith('GOR')) t = t.slice(3)
+  return t.replace(/\D/g,'').replace(/^0+(?=\d)/, '')
+}
+// → 'YYYY-MM-DD', null (empty) or { bad: text } (kept as a note, never a date)
+function impDate(v){
+  if (v == null || v === '') return null
+  let out = null
+  if (typeof v === 'number' && isFinite(v)) {
+    const d = XLSX.SSF.parse_date_code(v)
+    out = d ? `${d.y}-${pad2(d.m)}-${pad2(d.d)}` : null
+  } else {
+    const t = String(v).trim(); if (!t) return null
+    let m = t.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+    if (m) out = okDate(+m[1], +m[2], +m[3])
+    else if ((m = t.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/))) {
+      let a = +m[1], b = +m[2], y = +m[3]; if (y < 100) y += 2000
+      out = (a <= 12 && b > 12) ? okDate(y, a, b) : okDate(y, b, a)   // day first (dd/mm/yyyy)
+    } else if (/[a-z]{3,}/i.test(t) && /\d{4}/.test(t)) {
+      const d = new Date(t)                                            // "Monday, November 03, 2025"
+      if (!isNaN(d)) out = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`
+    }
+    if (!out) return { bad: t }
+  }
+  // A year typed wrong (2598, 2029…) is a typing slip, not a date.
+  const y = out ? +out.slice(0,4) : 0
+  if (!out || y < 2015 || y > new Date().getFullYear() + 1) return { bad: out || String(v), raw: v }
+  return out
+}
+function okDate(y, mo, d){
+  const dt = new Date(Date.UTC(y, mo-1, d))
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo-1 || dt.getUTCDate() !== d) return null
+  return `${y}-${pad2(mo)}-${pad2(d)}`
+}
+
+function guessMap(headers){
+  const map = {}, used = new Set(), H = headers.map(normH)
+  for (const pass of ['exact','contains']) {
+    for (const f of impFields()) {
+      if (map[f.k] != null) continue
+      for (const syn of f.syn) {
+        const i = H.findIndex((h, j) => !used.has(j) && h && (pass === 'exact' ? h === syn : (syn.length > 3 && h.includes(syn))))
+        if (i >= 0) { map[f.k] = i; used.add(i); break }
+      }
+    }
+  }
+  return map
+}
+function findHeaderRow(aoa){
+  let best = 0, bestScore = -1
+  for (let r = 0; r < Math.min(aoa.length, 15); r++) {
+    const set = new Set((aoa[r] || []).map(normH))
+    let score = 0
+    for (const f of IMP_FIELDS) if (f.syn.some(s => set.has(s))) score++
+    if (score > bestScore) { bestScore = score; best = r }
+  }
+  return best
+}
+
+async function impOpen(file){
+  impLog('')
+  try {
+    const X = await loadXlsx()
+    IMP.wb = X.read(await file.arrayBuffer(), { type:'array', cellDates:false })
+    $('impFileName').textContent = '📄 ' + file.name
+    const sel = $('impSheet')
+    sel.innerHTML = IMP.wb.SheetNames.map(n => `<option>${esc(n)}</option>`).join('')
+    sel.style.display = IMP.wb.SheetNames.length > 1 ? '' : 'none'
+    await impSheet(IMP.wb.SheetNames[0])
+  } catch (e) {
+    console.warn('import', e); impLog('❌ ' + (e.message || 'Could not read this file'), true)
+  }
+}
+function impLog(msg, err){ const l = $('impLog'); l.textContent = msg; l.classList.toggle('err', !!err) }
+async function impSheet(name){
+  const aoa = XLSX.utils.sheet_to_json(IMP.wb.Sheets[name], { header:1, raw:true, defval:'', blankrows:false })
+  const h = findHeaderRow(aoa)
+  IMP.headers = (aoa[h] || []).map((x, i) => String(x || '').trim() || ('Column ' + (i+1)))
+  IMP.rows = aoa.slice(h+1).map((r, i) => ({ r, line: h + i + 2 })).filter(x => x.r.some(c => String(c).trim() !== ''))
+  IMP.map = guessMap(IMP.headers)
+  renderMap()
+  $('impBody').style.display = ''
+  await impParse()
+}
+function renderMap(){
+  $('impMap').innerHTML = impFields().map(f => {
+    const cur = IMP.map[f.k]
+    const opts = ['<option value="">— not in the file —</option>']
+      .concat(IMP.headers.map((h, i) => `<option value="${i}" ${cur === i ? 'selected' : ''}>${esc(h)}</option>`))
+    return `<label><span class="lt">${esc(f.l)}${f.req ? ' <span class="req">*</span>' : ''}${f.sys ? ' <span class="sysb" title="Taken from the system when it knows it">system first</span>' : ''}${f.admin ? ' <span class="adm">admin</span>' : ''}</span>
+      <select data-imp="${f.k}" class="${cur != null ? 'set' : ''}">${opts.join('')}</select></label>`
+  }).join('')
+}
+$('impMap').addEventListener('change', e => {
+  const s = e.target.closest('[data-imp]'); if (!s) return
+  if (s.value === '') delete IMP.map[s.dataset.imp]; else IMP.map[s.dataset.imp] = +s.value
+  s.classList.toggle('set', s.value !== '')
+  impParse()
+})
+
+// What the system already knows, per order number.
+async function loadSystem(nums){
+  const sys = {}, saved = {}
+  // The claim uploads only go back so far: before that, the system cannot know a claim.
+  if (IMP.sysClaimsFrom === undefined) {
+    const { data } = await sb.from('bmw_rec_submissions').select('document_date').not('document_date', 'is', null).order('document_date', { ascending: true }).limit(1)
+    IMP.sysClaimsFrom = data?.[0]?.document_date || null
+  }
+  const get = n => (sys[n] = sys[n] || {})
+  const refs = nums.map(n => 'GOR0' + n)
+  for (let i = 0; i < nums.length; i += 150) {
+    const part = refs.slice(i, i + 150), pn = nums.slice(i, i + 150)
+    const [sub, inv, ord] = await Promise.all([
+      sb.from('bmw_rec_submissions').select('service_order_no,claim_kind,document_date,vin').in('service_order_no', part),
+      sb.from('bmw_rec_invoices').select('service_order_no,order_date,vin,sell_to_customer_name').in('service_order_no', part),
+      sb.from('warranty_bmw_orders').select('*').in('order_number', pn),
+    ])
+    for (const r of (sub.data || [])) {
+      const o = get(r.service_order_no.slice(4)), k = r.claim_kind === 'bsi' ? 'service_claim' : 'warranty_claim'
+      if (r.document_date && (!o[k] || r.document_date < o[k])) o[k] = r.document_date
+      if (r.vin && !o.vin) o.vin = r.vin.trim().toUpperCase()
+    }
+    for (const r of (inv.data || [])) {
+      const o = get(r.service_order_no.slice(4))
+      if (r.order_date && (!o.order_date || r.order_date < o.order_date)) o.order_date = r.order_date
+      if (r.vin) o.vin = r.vin.trim().toUpperCase()
+      if (r.sell_to_customer_name && !o.customer) o.customer = r.sell_to_customer_name.trim()
+    }
+    for (const r of (ord.data || [])) saved[String(r.order_number)] = r
+    if (sub.error || inv.error || ord.error) console.warn('system lookup', sub.error || inv.error || ord.error)
+  }
+  return { sys, saved }
+}
+
+async function impParse(){
+  const fields = impFields().filter(f => IMP.map[f.k] != null)
+  impLog('⏳ Comparing with the system…')
+  // 1. Read every line, then merge the lines of the same order.
+  const byNo = new Map(), noNumber = []
+  for (const { r, line } of IMP.rows) {
+    const rec = {}, notes = []
+    for (const f of fields) {
+      const raw = r[IMP.map[f.k]]
+      if (f.k === 'order_number') { rec.order_number = impOrderNo(raw); continue }
+      if (f.date) {
+        const d = impDate(raw)
+        if (d && d.bad) { rec[f.k] = null; notes.push({ f, text: d.bad, raw: d.raw }) }
+        else rec[f.k] = d
+      } else {
+        const t = String(raw == null ? '' : raw).trim()
+        rec[f.k] = t ? (f.k === 'vin' ? t.toUpperCase().replace(/\s+/g,'') : t) : null
+      }
+    }
+    if (!rec.order_number) { noNumber.push(line); continue }
+    let o = byNo.get(rec.order_number)
+    if (!o) { o = { no: rec.order_number, lines: [], file: {}, issues: [], textNotes: [] }; byNo.set(rec.order_number, o) }
+    o.lines.push(line)
+    for (const f of fields) {
+      if (f.k === 'order_number') continue
+      const v = rec[f.k]; if (v == null) continue
+      if (o.file[f.k] == null) o.file[f.k] = v
+      else if (o.file[f.k] !== v) {
+        if (f.k === 'note' || f.k === 'warranty_note') { if (!o.file[f.k].includes(v)) o.file[f.k] += ' · ' + v }
+        else o.issues.push(`${f.l}: line ${line} says ${v}, an earlier line ${o.file[f.k]}`)
+      }
+    }
+    for (const n of notes) {
+      // Text typed in a date column ("invoiced on internal") is kept as a note;
+      // a number that is no date (2598-07-13, often the order number typed
+      // in the wrong column) is reported and left empty.
+      if (/\d{4}/.test(n.text) && !/[a-z]{3,}/i.test(n.text))
+        o.issues.push(`${n.f.l}: ${n.text} is not a real date${String(n.raw) === rec.order_number ? ' (the order number typed in the date column)' : ''} — left empty`)
+      else o.textNotes.push(`${n.f.l}: ${n.text}`)
+    }
+  }
+  // 2. The system first.
+  const nums = [...byNo.keys()]
+  const { sys, saved } = await loadSystem(nums)
+  IMP.orders = nums.map(no => {
+    const o = byNo.get(no), s = sys[no] || {}, cur = saved[no] || null
+    const final = {}, diffs = []
+    for (const f of impFields()) {
+      if (f.k === 'order_number') continue
+      const fromFile = o.file[f.k] ?? null
+      const fromSys = f.sys ? (s[f.sys] ?? null) : null
+      let v = fromSys ?? fromFile
+      // A claim the file dates before the system's first claim upload cannot
+      // be in the system: the system's claim on that order is a later one.
+      const olderThanSystem = (f.k === 'warranty_claim_date' || f.k === 'service_claim_date')
+        && fromFile && fromSys && IMP.sysClaimsFrom && fromFile < IMP.sysClaimsFrom && fromFile < fromSys
+      if (olderThanSystem) v = fromFile
+      if (fromSys != null && fromFile != null && String(fromSys) !== String(fromFile))
+        diffs.push({ field: f.l, file: fromFile, system: fromSys, kept: olderThanSystem ? 'file' : 'system' })
+      final[f.k] = v
+    }
+    // Text found in date columns is kept, as a note.
+    if (o.textNotes.length) {
+      const k = S.isAdmin ? 'warranty_note' : 'note'
+      final[k] = [final[k], ...o.textNotes].filter(Boolean).join(' · ')
+    }
+    let status
+    if (cur) {
+      // Saved already: fill only what is empty there, never overwrite.
+      const fill = {}
+      for (const [k, v] of Object.entries(final)) if (v != null && v !== '' && (cur[k] == null || cur[k] === '')) fill[k] = v
+      status = Object.keys(fill).length ? 'fill' : 'same'
+      return { no, o, final: fill, diffs, status, cur, sys: s }
+    }
+    status = 'new'
+    return { no, o, final, diffs, status, cur: null, sys: s }
+  })
+  IMP.noNumber = noNumber
+  IMP.sysCount = nums.filter(n => sys[n] && Object.keys(sys[n]).length).length
+  impLog('')
+  renderPreview()
+}
+
+const PREVIEW_COLS = [['vin','VIN'],['customer_name','Customer'],['order_date','Order date'],['work_date','Date (service)'],['warranty_claim_date','Warranty claim'],['service_claim_date','Service claim']]
+function renderPreview(){
+  const O = IMP.orders
+  const fillOn = document.querySelector('input[name="impExisting"]:checked').value === 'fill'
+  const n = s => O.filter(x => x.status === s).length
+  const nDiff = O.filter(x => x.diffs.length).length, nIss = O.filter(x => x.o.issues.length).length
+  const nMerged = O.filter(x => x.o.lines.length > 1).length
+  $('impStats').innerHTML =
+      `<span class="imp-stat">${IMP.rows.length} lines → ${O.length} orders</span>`
+    + `<span class="imp-stat ok">✚ ${n('new')} new</span>`
+    + `<span class="imp-stat ${fillOn ? 'ok' : 'warn'}">${n('fill')} already saved — ${fillOn ? 'empty fields filled' : 'left untouched'}</span>`
+    + (n('same') ? `<span class="imp-stat">${n('same')} already saved, nothing to add</span>` : '')
+    + `<span class="imp-stat sys">🖥 ${IMP.sysCount} known to the system — its data is used</span>`
+    + (nDiff ? `<span class="imp-stat warn">⚠️ ${nDiff} where the file disagrees with the system</span>` : '')
+    + (nIss ? `<span class="imp-stat bad">${nIss} with a problem in the file</span>` : '')
+    + (nMerged ? `<span class="imp-stat warn">${nMerged} order numbers on several lines — merged</span>` : '')
+    + (IMP.noNumber.length ? `<span class="imp-stat bad">${IMP.noNumber.length} lines without an order number</span>` : '')
+  const show = [...O].sort((a, b) => (b.diffs.length + b.o.issues.length) - (a.diffs.length + a.o.issues.length)).slice(0, 200)
+  $('impHead').innerHTML = '<tr><th>Order</th><th>Status</th>' + PREVIEW_COLS.map(c => `<th>${c[1]}</th>`).join('') + '<th>Check</th></tr>'
+  const lab = { new:['ok','new'], fill:[fillOn ? 'ok' : 'pend', fillOn ? 'fill empty' : 'skip'], same:['pend','nothing new'] }
+  $('impPrev').innerHTML = show.map(x => {
+    const v = x.status === 'new' ? x.final : { ...(x.cur || {}), ...x.final }
+    const cells = PREVIEW_COLS.map(([k]) => {
+      const d = x.diffs.find(d => IMP_FIELDS.find(f => f.k === k)?.l === d.field)
+      const src = x.sys[IMP_FIELDS.find(f => f.k === k)?.sys] != null ? ' title="From the system"' : ''
+      const fromSys = src && !(d && d.kept === 'file')
+      return `<td class="${k === 'vin' ? 'mono' : ''}"${fromSys ? src : ''}>${esc(v[k] ?? '')}${fromSys ? ' <span class="sysdot">●</span>' : ''}${d ? `<div class="was">${d.kept === 'file' ? 'system: ' + esc(d.system) : 'file: ' + esc(d.file)}</div>` : ''}</td>`
+    }).join('')
+    const check = [...(x.o.lines.length > 1 ? [`on lines ${x.o.lines.join(', ')}`] : []), ...x.o.issues.slice(0, 2),
+      ...(x.o.issues.length > 2 ? [`+${x.o.issues.length - 2} more in the download`] : [])]
+    return `<tr><td class="mono">GOR0${esc(x.no)}</td><td><span class="st ${lab[x.status][0]}">${lab[x.status][1]}</span></td>${cells}<td class="chk">${esc(check.join(' · '))}</td></tr>`
+  }).join('')
+  $('impPrevNote').innerHTML = `<span class="sysdot">●</span> = taken from the system. ${O.length > show.length ? `Showing the ${show.length} orders that need a look first, of ${O.length}.` : ''}`
+  $('impDiffDl').style.display = (nDiff || nIss || IMP.noNumber.length) ? '' : 'none'
+  const total = n('new') + (fillOn ? n('fill') : 0)
+  const go = $('impGo')
+  go.disabled = IMP.map.order_number == null || total === 0 || !IMP.sysReady
+  go.textContent = !IMP.sysReady ? 'Waiting for the BMW date correction'
+    : IMP.map.order_number == null ? 'Choose the Order number column first'
+    : total ? `📥 Import ${n('new')} new${fillOn && n('fill') ? ` + fill ${n('fill')} saved` : ''}` : 'Nothing new to import'
+}
+document.querySelectorAll('input[name="impExisting"]').forEach(r => r.addEventListener('change', renderPreview))
+
+// The mismatches as an Excel file: what the file says, what the system says.
+$('impDiffDl').addEventListener('click', () => {
+  const rows = [['Order', 'Lines in the file', 'Field', 'In the Excel file', 'In the system', 'Kept', 'Problem']]
+  for (const x of IMP.orders) {
+    for (const d of x.diffs) rows.push(['GOR0' + x.no, x.o.lines.join(', '), d.field, d.file, d.system,
+      d.kept === 'file' ? 'Excel — claim older than the system\'s first claim upload' : 'System', ''])
+    for (const i of x.o.issues) rows.push(['GOR0' + x.no, x.o.lines.join(', '), '', '', '', '', i])
+  }
+  for (const l of IMP.noNumber) rows.push(['', String(l), '', '', '', '', 'No order number'])
+  const ws = XLSX.utils.aoa_to_sheet(rows), wb = XLSX.utils.book_new()
+  ws['!cols'] = [{wch:12},{wch:14},{wch:20},{wch:16},{wch:16},{wch:28},{wch:70}]
+  XLSX.utils.book_append_sheet(wb, ws, 'To check')
+  XLSX.writeFile(wb, 'BMW_orders_file_vs_system_' + todayISO() + '.xlsx')
+})
+
+function withAdvisorId(rec){
+  if (rec.service_advisor) {
+    const e = IMP.emps.find(x => (x.name || '').trim().toLowerCase() === rec.service_advisor.toLowerCase())
+    if (e) rec.service_advisor_id = e.id
+  }
+  return rec
+}
+
+$('impGo').addEventListener('click', async () => {
+  const fillOn = document.querySelector('input[name="impExisting"]:checked').value === 'fill'
+  if (!IMP.emps.length) { const { data } = await sb.from('employees').select('id,name'); IMP.emps = data || [] }
+  const ins = IMP.orders.filter(x => x.status === 'new').map(x => withAdvisorId({ order_number: x.no, ...x.final }))
+  const upd = fillOn ? IMP.orders.filter(x => x.status === 'fill') : []
+  if (!ins.length && !upd.length) return
+  if (!confirm(`Import ${ins.length} new order${ins.length === 1 ? '' : 's'}${upd.length ? ` and fill the empty fields of ${upd.length} already saved` : ''}?`)) return
+  const go = $('impGo'); go.disabled = true
+  let done = 0, upDone = 0
+  const fails = [], CH = 200
+  for (let i = 0; i < ins.length; i += CH) {
+    const chunk = ins.slice(i, i + CH)
+    impLog(`⏳ Saving ${Math.min(i + CH, ins.length)} / ${ins.length}…`)
+    const { error } = await sb.from('warranty_bmw_orders').insert(chunk)
+    if (!error) { done += chunk.length; continue }
+    // A chunk failed (e.g. an order saved meanwhile): retry its lines one by one.
+    for (const r of chunk) {
+      const { error: e1 } = await sb.from('warranty_bmw_orders').insert(r)
+      if (e1) fails.push(`GOR0${r.order_number}: ${e1.code === '23505' ? 'already saved' : e1.message}`); else done++
+    }
+  }
+  for (let i = 0; i < upd.length; i++) {
+    const x = upd[i]
+    if (i % 25 === 0) impLog(`⏳ Filling ${i + 1} / ${upd.length}…`)
+    const { error } = await sb.from('warranty_bmw_orders').update(withAdvisorId({ ...x.final })).eq('order_number', x.no)
+    if (error) fails.push(`GOR0${x.no}: ${error.message}`); else upDone++
+  }
+  await impParse()          // re-check against what is saved now
+  await loadToday()
+  impLog(`✅ ${done} order${done === 1 ? '' : 's'} imported` + (upd.length ? `, ${upDone} completed` : '')
+    + (fails.length ? `\n❌ ${fails.length} not saved:\n` + fails.slice(0, 30).join('\n') + (fails.length > 30 ? `\n… and ${fails.length - 30} more` : '') : ''), fails.length > 0)
+  showToast(`📥 ${done} imported${upd.length ? ', ' + upDone + ' completed' : ''}`)
+})
+
+// The system's BMW dates were stored a day early until the 2026-11-03
+// correction ran; importing from them before that would copy the error.
+async function checkSysReady(){
+  const { data } = await sb.from('system_settings').select('key').eq('key', 'fix_bmw_rec_dates_2026_11_03').maybeSingle()
+  IMP.sysReady = !!data
+  $('impWait').style.display = IMP.sysReady ? 'none' : ''
+}
+
+const impFile = $('impFile'), impDrop = $('impDrop')
+impFile.addEventListener('change', () => { if (impFile.files[0]) impOpen(impFile.files[0]); impFile.value = '' })
+$('impSheet').addEventListener('change', e => impSheet(e.target.value))
+;['dragenter','dragover'].forEach(ev => impDrop.addEventListener(ev, e => { e.preventDefault(); impDrop.classList.add('over') }))
+;['dragleave','drop'].forEach(ev => impDrop.addEventListener(ev, e => { e.preventDefault(); impDrop.classList.remove('over') }))
+impDrop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) impOpen(f) })
+$('impTemplate').addEventListener('click', async () => {
+  try {
+    const X = await loadXlsx()
+    const ws = X.utils.aoa_to_sheet([impFields().map(f => f.l), ['267779', 'WBA00000000000000', 'Customer name', '03/11/2026', '03/11/2026']])
+    const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Orders')
+    X.writeFile(wb, 'BMW_orders_import_template.xlsx')
+  } catch (e) { showToast('❌ ' + e.message) }
+})
+tabImport.addEventListener('click', checkSysReady)
 
 // init
 $('f_orderdate').value = todayISO(); $('f_date').value = todayISO()

@@ -353,7 +353,10 @@
         if (v == null) return null;
         if (v instanceof Date) {
             if (isNaN(v.getTime())) return null;
-            return v.toISOString().slice(0, 10);
+            // A Date from SheetJS is local midnight; toISOString() would read
+            // it as the previous day east of UTC. Take the local calendar day.
+            const t = new Date(v.getTime() + 2 * 60 * 1000);  // absorbs SheetJS's seconds-before-midnight rounding
+            return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
         }
         // Excel serial (number, or numeric-looking string)
         if (typeof v === 'number' && isFinite(v) && v > 20000 && v < 80000) {

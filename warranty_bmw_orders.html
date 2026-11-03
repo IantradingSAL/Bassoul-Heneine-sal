@@ -192,6 +192,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .filterbar .fld{min-width:130px;flex:1}
 .filterbar .fld.grow{flex:2;min-width:200px}
 .filterbar .btns{display:flex;gap:8px;align-items:center}
+.sv-mount{margin:-8px 0 10px}
+.sv-mount:empty{display:none}
 .result-count{font-size:11px;color:var(--muted);font-weight:600;margin-left:auto}
 .section-head{display:flex;align-items:center;gap:10px;margin:4px 0 14px}
 .section-head .ct{margin:0}
@@ -349,6 +351,7 @@ body.hide-sc .c-sc{display:none}
           <button class="btn btn-sm" id="refreshBtn">↻ Refresh</button>
         </div>
       </div>
+      <div class="sv-mount" id="ordersViews"></div>
 
       <div class="tw">
         <table class="t">
@@ -687,13 +690,32 @@ $('printBtn').addEventListener('click', printReport)
 $('m_save').addEventListener('click', saveModal)
 $('modalBg').addEventListener('click', e=>{ if(e.target===$('modalBg')) window._closeModal() })
 ;['f_q','f_adv','f_from','f_to'].forEach(id=> $(id).addEventListener('input', render))
-$('clearFilters').addEventListener('click', ()=>{ ['f_q','f_adv','f_from','f_to'].forEach(id=>{ if($(id)) $(id).value='' }); render() })
+$('clearFilters').addEventListener('click', ()=>{ ['f_q','f_adv','f_from','f_to'].forEach(id=>{ if($(id)) $(id).value='' }); $('f_q').dispatchEvent(new Event('input')) })
 
 // init
 $('f_orderdate').value = todayISO(); $('f_date').value = todayISO()
 await whoami()
 await loadRules()
 await load()
+
+// saved views — mounted once, after the first load filled the advisor dropdown
+let _viewsMounted = false
+async function mountViews(){
+  if (_viewsMounted) return
+  _viewsMounted = true
+  try {
+    const { mountSavedViews } = await import('./user_views.js?v=20261103a')
+    mountSavedViews({
+      sb, page: 'warranty_bmw_orders',
+      mountEl:     $('ordersViews'),
+      filterIds:   ['f_q','f_adv','f_from','f_to'],
+      applyFilter: () => render(),
+      ntf:         m => showToast(m),
+      currentUser: sessionStorage.getItem('cw_current_emp') || '',
+    })
+  } catch (e){ console.warn('[orders] saved views unavailable', e) }
+}
+mountViews()
 </script>
   <script src="analytics.js?v=1" data-site="bassoul-heneine"></script>
 </body>

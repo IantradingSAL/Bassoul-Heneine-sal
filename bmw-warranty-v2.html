@@ -142,6 +142,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
 .filters select, .filters input{padding:7px 11px;border:1px solid var(--line);border-radius:8px;font-size:11px;background:#fff;font-family:inherit}
 .filters input[type="text"], .filters input[type="search"]{flex:1;min-width:200px}
+.sv-mount{margin-top:-6px;padding-top:2px;border-top:1px dashed var(--line)}
+.sv-mount:empty{display:none}
 .fl-l{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-right:3px}
 
 /* ── Modal ── */
@@ -330,6 +332,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
           </select>
           <input type="text" id="fl_search" placeholder="Search VIN, claim, doc, customer, model…">
         </div>
+        <div class="sv-mount" id="claims_views"></div>
       </div>
       <div id="T_claims"></div>
     </div>
@@ -343,6 +346,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
           <select id="bsi_brand"><option value="">All</option></select>
           <input type="text" id="bsi_search" placeholder="Search VIN, dealer claim, credit note, model…">
         </div>
+        <div class="sv-mount" id="bsi_views"></div>
       </div>
       <div id="T_bsi"></div>
     </div>
@@ -728,8 +732,9 @@ function updateBadges(){
   // BSI brand filter
   const bsel = document.getElementById('bsi_brand')
   if (bsel){
-    const brands = [...S.brands].sort()
+    const brands = [...S.brands].sort(), cur = bsel.value
     bsel.innerHTML = '<option value="">All</option>' + brands.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('')
+    bsel.value = cur
   }
 }
 
@@ -1364,12 +1369,40 @@ document.getElementById('veh_search').addEventListener('input', () => {
 })
 
 // ════════════════════════════════════════════════════════════════════
+// SAVED VIEWS — one chip row per list, mounted after the first load
+// has filled the BSI brand dropdown. Vehicles' VIN finder is a lookup.
+// ════════════════════════════════════════════════════════════════════
+let _viewsMounted = false
+async function mountViews(){
+  if (_viewsMounted) return
+  _viewsMounted = true
+  let mountSavedViews
+  try { ({ mountSavedViews } = await import('./user_views.js?v=20261103a')) }
+  catch (e){ console.warn('[bmw-v2] saved views unavailable', e); return }
+  const currentUser = sessionStorage.getItem('cw_current_emp') || ''
+  const ntf = m => showToast(m)
+  mountSavedViews({
+    sb, page: 'bmw-warranty-v2:claims', ntf, currentUser,
+    mountEl:     document.getElementById('claims_views'),
+    filterIds:   ['fl_make','fl_status','fl_only','fl_search'],
+    applyFilter: () => { if (S.page === 'claims') rClaims() },
+  })
+  mountSavedViews({
+    sb, page: 'bmw-warranty-v2:bsi', ntf, currentUser,
+    mountEl:     document.getElementById('bsi_views'),
+    filterIds:   ['bsi_brand','bsi_search'],
+    applyFilter: () => { if (S.page === 'bsi') rBsi() },
+  })
+}
+
+// ════════════════════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════════════════════
 ;(async () => {
   await whoami()
   setupDropzone()
   await refreshAll()
+  mountViews()
   rImportHistory()
   if (S.chains.length || S.bsi.length){
     showToast(`☁️ Synced · ${f0(S.chains.length)} chains · ${f0(S.bsi.length)} BSI`, 2400)

@@ -719,6 +719,30 @@ function avatarColor(name){
   return palette[h % palette.length]
 }
 
+// ─── landing page: where each person opens after signing in ─────
+// Set per employee in Settings → Employees → Landing page
+// (employees.landing_page). Taken once per browser tab: after that the
+// dashboard link in the sidebar opens the dashboard as usual.
+const LANDED_KEY = 'cw_landed'
+async function goLanding(){
+  try {
+    if (sessionStorage.getItem(LANDED_KEY)) return false
+    sessionStorage.setItem(LANDED_KEY, '1')
+    if (new URLSearchParams(location.search).has('stay')) return false
+    const { data: pageId, error } = await sb.rpc('my_landing_page')
+    if (error || !pageId || pageId === 'dashboard') return false
+    const { data: { user } } = await sb.auth.getUser()
+    if (!user) return false
+    const { data: lvl } = await sb.rpc('effective_page_permission', { p_uid: user.id, p_page: pageId })
+    if (lvl === 'none') return false
+    const file = pageId + '.html'
+    const head = await fetch(file, { method: 'HEAD', cache: 'no-store' }).catch(() => null)
+    if (!head || !head.ok) return false
+    location.replace(file)
+    return true
+  } catch (e) { console.warn('landing page skipped', e); return false }
+}
+
 // ─── routing: login screen vs app ──────────────────────────────
 const loginScreen = $('loginScreen')
 const appShell    = $('appShell')
@@ -771,6 +795,7 @@ function showLogin(){
 
   const { data, error } = await sb.auth.getUser()
   if (!error && data?.user) {
+    if (await goLanding()) return
     showApp(data.user)
   } else {
     showLogin()
@@ -808,6 +833,8 @@ async function hydrateEmpAndEnter(user){
     sessionStorage.setItem('cw_current_emp', email.split('@')[0])
     sessionStorage.setItem('cw_role', 'employee')
   }
+  sessionStorage.removeItem(LANDED_KEY)      // a fresh sign-in lands again
+  if (await goLanding()) return
   showApp(user)
 }
 

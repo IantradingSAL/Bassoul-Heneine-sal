@@ -124,6 +124,9 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
 .al{padding:12px 15px;border-radius:12px;font-size:11.5px;font-weight:500;margin-bottom:14px;display:flex;align-items:center;gap:10px}
 .al-i{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}
 .filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sv-mount{margin-top:8px;padding-top:2px;border-top:1px dashed var(--line2)}
+.sv-mount:empty{display:none}
+@media print{.sv-mount{display:none}}
 .filters select,.filters input{padding:8px 12px;border:1px solid var(--line);border-radius:10px;font-size:11.5px;background:#fff;font-family:inherit;color:var(--txt)}
 .filters select:focus,.filters input:focus{outline:none;border-color:var(--bmw);box-shadow:0 0 0 3px rgba(28,105,212,.1)}
 .fl-l{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
@@ -367,7 +370,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         <span class="fl-l">Month</span><select id="pp_month"><option value="">All</option></select>
         <input type="text" id="pp_search" placeholder="Search VIN, invoice GAR…, submission #, claim…" style="flex:1;min-width:220px">
         <button class="btn btn-sm btn-bmw" id="pp_export">⬇ Excel</button>
-      </div></div>
+      </div>
+        <div class="sv-mount" id="pp_views"></div></div>
       <div id="T_pipe"></div>
     </div>
 
@@ -385,7 +389,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         <button class="btn btn-sm btn-bmw" id="cr_xlsx">⬇ Excel</button>
         <button class="btn btn-sm btn-sun" id="cr_share" style="margin-left:6px">📤 Share Report</button>
         <button class="btn btn-sm" id="cr_ivp" style="background:var(--bmw);color:#fff;margin-left:6px" title="Invoiced vs Paid — difference split into Rejected / In Correction / Price Difference">📄 Invoiced vs Paid</button>
-      </div></div>
+      </div>
+        <div class="sv-mount" id="cr_views"></div></div>
       <div id="T_cr"></div>
     </div>
 
@@ -398,7 +403,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         <span class="fl-l">Make</span><select id="rj_make"><option value="">All</option></select>
         <input type="text" id="rj_search" placeholder="Search VIN, claim, invoice…" style="flex:1;min-width:200px">
         <button class="btn btn-sm btn-bmw" id="rj_xlsx">⬇ Excel</button>
-      </div></div>
+      </div>
+        <div class="sv-mount" id="rj_views"></div></div>
       <div id="T_rej"></div>
     </div>
 
@@ -412,7 +418,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         <input type="text" id="pr_search" placeholder="Search VIN, claim, invoice…" style="flex:1;min-width:200px">
         <button class="btn btn-sm btn-mint" id="pr_approveall">✅ Approve all shown</button>
         <button class="btn btn-sm btn-bmw" id="pr_xlsx">⬇ Excel</button>
-      </div></div>
+      </div>
+        <div class="sv-mount" id="pr_views"></div></div>
       <div id="T_price"></div>
     </div>
 
@@ -444,7 +451,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         <button class="btn btn-sm btn-bmw" id="st_csv">⬇ Excel</button>
         <button class="btn btn-sm btn-bmw" id="st_print">🖨️ Print</button>
         <button class="btn btn-sm" style="background:var(--bmw);color:#fff" id="st_summary">📊 Summary Report</button>
-      </div></div>
+      </div>
+        <div class="sv-mount" id="st_views"></div></div>
       <div id="T_statement"></div>
     </div>
 
@@ -458,7 +466,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer"><input type="checkbox" id="ns_noown" style="width:15px;height:15px"> Hide own-sale</label>
         <input type="text" id="ns_search" placeholder="Search invoice GAR…, VIN, model…" style="flex:1;min-width:200px">
         <button class="btn btn-sm btn-bmw" id="ns_export">⬇ Excel</button>
-      </div></div>
+      </div>
+        <div class="sv-mount" id="ns_views"></div></div>
       <div id="T_notsub"></div>
     </div>
 
@@ -471,7 +480,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         <select id="fu_filter"><option value="open">⏳ Open (not done)</option><option value="overdue">🔴 Overdue</option><option value="today">📅 Due today</option><option value="all">All</option><option value="done">✅ Done</option></select>
         <span style="flex:1"></span>
         <button class="btn btn-sm btn-bmw" id="fu_export">⬇ Excel</button>
-      </div></div>
+      </div>
+        <div class="sv-mount" id="fu_views"></div></div>
       <div id="T_follow"></div>
     </div>
 
@@ -485,7 +495,8 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans
         <span style="flex:1"></span>
         <button class="btn btn-sm" id="wo_share" style="background:var(--bmw);color:#fff">📤 Share Report</button>
         <button class="btn btn-sm btn-bmw" id="wo_export">⬇ Excel</button>
-      </div></div>
+      </div>
+        <div class="sv-mount" id="wo_views"></div></div>
       <div id="T_writtenoff"></div>
     </div>
 
@@ -752,7 +763,13 @@ const subkey=v=>String(v==null?'':v).replace(/\D/g,'').replace(/^0+/,'')
 const fmM=m=>{if(!m)return'';const[y,mo]=m.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)-1]+' '+y}
 const fmMs=m=>{if(!m)return'';const[y,mo]=m.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)-1]+" '"+y.substr(2)}
 const days=(a,b)=>{if(!a||!b)return null;const d1=new Date(a),d2=new Date(b);if(isNaN(d1)||isNaN(d2))return null;return Math.round((d2-d1)/86400000)}
-const toIso=v=>{if(v==null)return null;if(v instanceof Date)return isNaN(v)?null:v.toISOString().slice(0,10);const s=String(v).trim();if(!s||s==='0')return null;if(typeof v==='number'&&v>20000&&v<80000)return new Date(Date.UTC(1899,11,30)+Math.floor(v)*864e5).toISOString().slice(0,10);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];const m2=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);if(m2){let[_,d,mo,y]=m2;if(y.length===2)y='20'+y;return y+'-'+mo.padStart(2,'0')+'-'+d.padStart(2,'0')}const t=Date.parse(s);return isNaN(t)?null:new Date(t).toISOString().slice(0,10)}
+// Excel dates arrive (cellDates:true) as LOCAL midnight. toISOString() reads them in UTC, which in
+// Beirut (UTC+2/+3) is the previous day — every date uploaded before 2026-11-03 was stored one day early
+// (fixed in the data by supabase ops 2026-11-03_bmw_rec_dates_plus_one_day.sql). Read the local calendar
+// day instead (+2 min absorbs SheetJS's few-seconds-before-midnight rounding; a cell that
+// carries a time of day, e.g. noon, keeps its own day).
+const _localDay=d=>{const t=new Date(d.getTime()+12e4);return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')}
+const toIso=v=>{if(v==null)return null;if(v instanceof Date)return isNaN(v)?null:_localDay(v);const s=String(v).trim();if(!s||s==='0')return null;if(typeof v==='number'&&v>20000&&v<80000)return new Date(Date.UTC(1899,11,30)+Math.floor(v)*864e5).toISOString().slice(0,10);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];const m2=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);if(m2){let[_,d,mo,y]=m2;if(y.length===2)y='20'+y;return y+'-'+mo.padStart(2,'0')+'-'+d.padStart(2,'0')}const t=Date.parse(s);return isNaN(t)?null:new Date(t).toISOString().slice(0,10)}
 const showToast=(msg,ms=3800)=>{const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),ms)}
 const showLoad=msg=>{document.getElementById('loadingMsg').textContent=msg||'Loading…';document.getElementById('loadingOverlay').classList.add('on')}
 const hideLoad=()=>document.getElementById('loadingOverlay').classList.remove('on')
@@ -1948,8 +1965,8 @@ function updateBadges(){
   const months=[...new Set(reconcile().claims.map(c=>c.month).filter(Boolean))].sort().reverse()
   const brands=[...new Set(S.cred.map(c=>c.brand).filter(Boolean))].sort()
   ;[['pp_make',makes],['rj_make',makes],['st_make',makes]].forEach(([id,arr])=>{const el=document.getElementById(id);if(el){const cur=el.value;el.innerHTML='<option value="">All</option>'+arr.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');el.value=cur}})
-  const cb=document.getElementById('cr_brand');if(cb)cb.innerHTML='<option value="">All</option>'+brands.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')
-  const mo=document.getElementById('pp_month');if(mo)mo.innerHTML='<option value="">All</option>'+months.map(m=>`<option value="${esc(m)}">${esc(fmM(m))}</option>`).join('')
+  const cb=document.getElementById('cr_brand');if(cb){const cur=cb.value;cb.innerHTML='<option value="">All</option>'+brands.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');cb.value=cur}
+  const mo=document.getElementById('pp_month');if(mo){const cur=mo.value;mo.innerHTML='<option value="">All</option>'+months.map(m=>`<option value="${esc(m)}">${esc(fmM(m))}</option>`).join('');mo.value=cur}
   const crMonths=[...new Set(S.cred.map(c=>c.month).filter(Boolean))].sort().reverse()
   const cm=document.getElementById('cr_month');if(cm){const cur=cm.value;cm.innerHTML='<option value="">All</option>'+crMonths.map(m=>`<option value="${esc(m)}">${esc(fmM(m))}</option>`).join('');cm.value=cur}
   const cns=[...new Set(S.cred.map(c=>c.credit_note_number).filter(Boolean))].sort()
@@ -2192,7 +2209,7 @@ async function approveAllPrice(){const rows=(window._prRows||[]).filter(c=>!pric
 window.approveAllPrice=approveAllPrice
 function rPricing(){
   const all=pricingRows()
-  const mSel=document.getElementById('pr_month');if(mSel&&mSel.options.length<=1){const ms=[...new Set(all.map(c=>c.month).filter(Boolean))].sort().reverse();mSel.insertAdjacentHTML('beforeend',ms.map(m=>`<option value="${m}">${fmM(m)}</option>`).join(''))}
+  const mSel=document.getElementById('pr_month');if(mSel&&mSel.dataset.filled!=='1'&&all.length){const cur=mSel.value,ms=[...new Set(all.map(c=>c.month).filter(Boolean))].sort().reverse();mSel.innerHTML='<option value="">All</option>'+ms.map(m=>`<option value="${m}">${fmM(m)}</option>`).join('');mSel.value=cur;mSel.dataset.filled='1'}
   const sf=document.getElementById('pr_status').value,mo=document.getElementById('pr_month').value,q=document.getElementById('pr_search').value.toLowerCase().trim()
   let rows=all.filter(c=>{const ap=priceApproved(c)
     if(sf==='pending'&&ap)return false;if(sf==='approved'&&!ap)return false
@@ -3064,12 +3081,38 @@ document.getElementById('ov_add').addEventListener('click',addOverride)
 ;(()=>{const e=document.getElementById('ic_add');if(e)e.addEventListener('click',addCancel)})()
 ;['ov_old','ov_new','ov_note'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')addOverride()}))
 
+// ── saved views: one chip row per list, mounted once the first load has filled the dropdowns
+let _bmwViewsMounted=false
+async function mountBmwViews(){
+  if(_bmwViewsMounted)return;_bmwViewsMounted=true
+  let mountSavedViews
+  try{({mountSavedViews}=await import('./user_views.js?v=20261103a'))}catch(e){console.warn('[BMW] saved views unavailable',e);return}
+  const currentUser=sessionStorage.getItem('cw_current_emp')||''
+  // a list whose select has no blank option falls back to its own default when a view leaves it empty
+  const dflt=(id,v)=>{const el=document.getElementById(id);if(el&&el.selectedIndex<0)el.value=v}
+  const only=(page,fn)=>()=>{if(currentPage()===page)fn()}
+  const lists=[
+    ['pp',['pp_status','pp_make','pp_month','pp_search'],only('pipeline',rPipe)],
+    ['cr',['cr_status','cr_brand','cr_month','cr_cn','cr_link','cr_search'],only('credits',rCredits)],
+    ['rj',['rj_status','rj_make','rj_search'],only('rejections',rRej)],
+    ['pr',['pr_status','pr_month','pr_search'],only('pricing',rPricing)],
+    ['st',['st_make','st_out_mode'],()=>{dflt('st_out_mode','tochase');if(currentPage()==='statement')rStatement()}],
+    ['ns',['ns_pay','ns_make','ns_noown','ns_search'],only('notsub',rNotSub)],
+    ['fu',['fu_filter'],()=>{dflt('fu_filter','open');if(currentPage()==='followups')rFollowups()}],
+    ['wo',['wo_q'],only('writtenoff',rWrittenOff)],
+  ]
+  for(const [k,filterIds,applyFilter] of lists){
+    const mountEl=document.getElementById(k+'_views');if(!mountEl)continue
+    mountSavedViews({sb,page:'warranty_bmw:'+k,mountEl,filterIds,applyFilter,ntf:m=>showToast(m),currentUser})
+  }
+}
+
 // ══ INIT ════════════════════════════════════════════════════════
 ;(async()=>{
   await whoami();setupDropzone();showLoad('Loading from cloud…')
   try{await refreshData();console.log('[BMW] inv',S.inv.length,'sub',S.subs.length,'cred',S.cred.length)}
   catch(e){console.error(e);showToast('⚠️ Cloud load failed: '+e.message)}
-  hideLoad();updateBadges();rDash();rUploadHist()
+  hideLoad();updateBadges();rDash();rUploadHist();mountBmwViews()
   const tot=S.inv.length+S.subs.length+S.cred.length
   if(tot>0){showToast('☁️ Synced '+f0(S.inv.length)+' invoices · '+f0(S.subs.length)+' submissions · '+f0(S.cred.length)+' credit lines',3500);setTimeout(freshnessNudge,4200)}
   else showToast('👋 No data yet — open Upload Center and drop your 3 files',4500)
