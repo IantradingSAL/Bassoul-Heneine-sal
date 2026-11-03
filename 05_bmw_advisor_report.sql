@@ -1,5 +1,6 @@
 -- 05_bmw_advisor_report.sql — monthly report per BMW service advisor.
--- 2026-11-03 (later): + warranty_only / service_only / both_claims columns.
+-- 2026-11-03 (later): + warranty_only / service_only / both_claims columns;
+--   pending leaves out orders returned to the advisor (return_date set).
 -- Already applied to the Bassoul, Heneine Sal project (2026-11-03).
 -- One row per (month of the order date, advisor). Claims come from the order
 -- itself or from the Incadea claim submissions on the same GOR0 order; BMW's
@@ -55,7 +56,7 @@ AS $$
          count(*)::int,
          count(*) FILTER (WHERE w IS NOT NULL)::int,
          count(*) FILTER (WHERE b IS NOT NULL)::int,
-         count(*) FILTER (WHERE w IS NULL AND b IS NULL)::int,
+         count(*) FILTER (WHERE w IS NULL AND b IS NULL AND return_date IS NULL)::int,   -- pending: no claim, not returned to the advisor
          count(*) FILTER (WHERE answered)::int,
          count(*) FILTER (WHERE rejected)::int,
          count(*) FILTER (WHERE cut AND NOT rejected)::int,

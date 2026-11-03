@@ -182,7 +182,7 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .pending-tag,.lock-tag{background:#fef9c3;color:#854d0e}
 .order-ref-box{font-family:var(--mono);font-size:14px;font-weight:800;color:var(--bmw);padding:9px 11px;background:rgba(28,105,212,.06);border:1px dashed var(--bmw);border-radius:9px}
 .form-actions{display:flex;gap:9px;align-items:center;margin-top:16px;flex-wrap:wrap}
-.b-pend{background:#fef9c3;color:#854d0e} .b-ok{background:rgba(16,185,129,.12);color:#047857}
+.b-pend{background:#fef9c3;color:#854d0e} .b-ret{background:#ede9fe;color:#5b21b6} .b-ok{background:rgba(16,185,129,.12);color:#047857}
 .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:200;padding:16px}
 .modal-bg.on{display:flex}
 .modal{background:#fff;border-radius:16px;max-width:460px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.22);overflow:hidden;max-height:92vh;display:flex;flex-direction:column}
@@ -288,7 +288,7 @@ body.hide-sc .c-sc{display:none}
           <span class="hint" id="hint_pickup">Set by warranty admin</span>
         </div>
         <div class="fld">
-          <label>Return date <span class="auto-tag lock-tag" id="tag_return">🔒 WARRANTY ADMIN</span></label>
+          <label>Returned to advisor <span class="auto-tag lock-tag" id="tag_return">🔒 WARRANTY ADMIN</span></label>
           <input id="f_return" type="date" disabled>
           <span class="hint" id="hint_return">Set by warranty admin</span>
         </div>
@@ -321,7 +321,8 @@ body.hide-sc .c-sc{display:none}
     <!-- ── KPIs ── -->
     <div class="kpis">
       <div class="kpi"><div class="kpi-accent" style="background:var(--bmw)"></div><div class="ks">Total orders</div><div class="kv bmw" id="k_total">—</div><div class="ks" id="k_total_sub">All registered</div></div>
-      <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="ks">Waiting for a claim</div><div class="kv sun" id="k_pending">—</div><div class="ks">No warranty or service claim yet</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:var(--sun)"></div><div class="ks">Waiting for a claim</div><div class="kv sun" id="k_pending">—</div><div class="ks">No claim yet, not returned</div></div>
+      <div class="kpi"><div class="kpi-accent" style="background:#7c3aed"></div><div class="ks">Returned to advisor</div><div class="kv" style="color:#7c3aed" id="k_returned">—</div><div class="ks">Not a warranty case — no claim to wait for</div></div>
       <div class="kpi"><div class="kpi-accent" style="background:var(--mint)"></div><div class="ks">Claimed</div><div class="kv mint" id="k_matched">—</div><div class="ks">Warranty and/or service claim</div></div>
     </div>
 
@@ -372,7 +373,7 @@ body.hide-sc .c-sc{display:none}
               <th>Order date</th>
               <th>Date</th>
               <th>Pick-up</th>
-              <th>Return</th>
+              <th title="Returned to the advisor: not a warranty case (internal, customer pays…)">Returned</th>
               <th class="c-wc">Warranty claim</th>
               <th class="c-sc">Service claim</th>
               <th>Advisor note</th>
@@ -406,7 +407,7 @@ body.hide-sc .c-sc{display:none}
 
       <div class="sec-lab">🔒 Warranty admin fields</div>
       <div class="fld"><label>Pick-up date</label><input id="m_pickup" type="date"></div>
-      <div class="fld"><label>Return date</label><input id="m_return" type="date"></div>
+      <div class="fld"><label>Returned to advisor</label><input id="m_return" type="date"></div>
       <div class="fld" id="wrap_m_wc"><label>Warranty claim date &amp; time</label><input id="m_warranty" type="datetime-local"><span class="hint">Defaults to now · advisors see date only</span></div>
       <div class="fld" id="wrap_m_sc"><label>Service claim date &amp; time</label><input id="m_service" type="datetime-local"><span class="hint">Defaults to now · advisors see date only</span></div>
       <div class="fld"><label>Warranty note</label><textarea id="m_wnote" rows="2"></textarea></div>
@@ -614,10 +615,12 @@ function render(){
   paintAdvBtn()
   const scoped = scopeRows()
   S.view = applyFilters(scoped)
-  // An order is claimed by a warranty claim, a service claim, or both —
-  // only an order with neither is still waiting.
+  // An order is claimed by a warranty claim, a service claim, or both. One
+  // with neither is either returned to the advisor (return date: not a
+  // warranty case — internal, customer pays…) or still waiting.
   const total = scoped.length, matched = scoped.filter(r=>r.warranty_claim_date || r.service_claim_date).length
-  $('k_total').textContent=total; $('k_matched').textContent=matched; $('k_pending').textContent=total-matched
+  const returned = scoped.filter(r=>!r.warranty_claim_date && !r.service_claim_date && r.return_date).length
+  $('k_total').textContent=total; $('k_matched').textContent=matched; $('k_returned').textContent=returned; $('k_pending').textContent=total-matched-returned
   const shown = Math.min(S.view.length, S.limit || 300)
   $('resultCount').textContent = shown < S.view.length ? `Showing ${shown} of ${S.view.length} (of ${total})` : `Showing ${S.view.length} of ${total}`
   $('moreRow').style.display = shown < S.view.length ? '' : 'none'
@@ -627,7 +630,10 @@ function render(){
   if (!S.view.length){ $('tbody').innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--faint);padding:26px">'+(scoped.length?'No orders match the filters.':'No orders yet — add one above.')+'</td></tr>'; return }
   $('tbody').innerHTML = S.view.slice(0, shown).map(r=>{
     const none = !r.warranty_claim_date && !r.service_claim_date
-    const wc = r.warranty_claim_date ? '<span class="badge b-ok">'+claim(r.warranty_claim_date)+'</span>' : none ? '<span class="badge b-pend">⏳ pending</span>' : dash
+    const wc = r.warranty_claim_date ? '<span class="badge b-ok">'+claim(r.warranty_claim_date)+'</span>'
+      : !none ? dash
+      : r.return_date ? '<span class="badge b-ret" title="Returned to the advisor — not a warranty case">↩ returned</span>'
+      : '<span class="badge b-pend">⏳ pending</span>'
     const sc = r.service_claim_date ? '<span class="badge b-ok">'+claim(r.service_claim_date)+'</span>' : dash
     return '<tr class="tr-clickable" data-id="'+r.id+'">'
       + '<td class="mono" style="font-weight:700">'+esc(r.order_number)+'</td>'
@@ -759,8 +765,8 @@ let CF = null
       { key:'wd',   get: r => r.work_date,   kind:'month' },
       { key:'pu',   get: r => r.pickup_date, kind:'month' },
       { key:'ret',  get: r => r.return_date, kind:'month' },
-      { key:'wc',   get: r => r.warranty_claim_date || (r.service_claim_date ? 'Service claim only' : null), kind:'month', empty:'⏳ Pending (no claim)' },
-      { key:'sc',   get: r => r.service_claim_date || (r.warranty_claim_date ? 'Warranty claim only' : null), kind:'month', empty:'⏳ Pending (no claim)' },
+      { key:'wc',   get: r => r.warranty_claim_date || (r.service_claim_date ? 'Service claim only' : r.return_date ? '↩ Returned to advisor' : null), kind:'month', empty:'⏳ Pending (no claim)' },
+      { key:'sc',   get: r => r.service_claim_date || (r.warranty_claim_date ? 'Warranty claim only' : r.return_date ? '↩ Returned to advisor' : null), kind:'month', empty:'⏳ Pending (no claim)' },
       { key:'note', get: r => r.note },
       { key:'wnote',get: r => r.warranty_note },
     ],
