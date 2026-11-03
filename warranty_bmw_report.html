@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="cw-page" content="warranty_bmw_report">
+<title>BMW Warranty · Advisor Report — Bassoul, Heneine SAL</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='10' fill='%231C69D4'/><text x='12' y='17' font-size='12' text-anchor='middle' fill='white' font-weight='800' font-family='Arial'>B</text></svg>">
+
+<script type="module" src="./auth_guard.js"></script>
+<script src="./access.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<style>
+:root{
+  --bg:#fafbff; --surf:#ffffff; --surf2:#f1f5f9; --line:#e2e8f0;
+  --txt:#0f172a; --muted:#64748b; --faint:#94a3b8;
+  --bmw:#1C69D4; --bmw-dark:#0F4FA8; --blue4:#eef2ff;
+  --mint:#10b981; --sun:#f59e0b; --rose:#e11d48; --violet:#7c3aed;
+  --mono:'SF Mono','Roboto Mono','Menlo',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;padding:0 16px 48px;font-size:13px}
+.wrap{max-width:1240px;margin:0 auto}
+.backrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.backlink{font-size:11px;font-weight:700;color:var(--muted);text-decoration:none;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.backlink:hover{color:var(--bmw);border-color:var(--bmw)}
+.top{display:flex;align-items:center;gap:12px;padding:16px 0 4px;flex-wrap:wrap}
+.logo{width:40px;height:40px;background:linear-gradient(135deg,#1C69D4,#0F4FA8);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:19px;flex-shrink:0}
+.top h1{margin:0;font-size:19px;font-weight:800;letter-spacing:-.3px}
+.top p{margin:2px 0 0;font-size:11px;color:var(--muted);font-weight:600}
+
+.card{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px;box-shadow:0 1px 3px rgba(15,23,42,.04)}
+.card h2{margin:0 0 2px;font-size:14px;font-weight:800}
+.card .sub{font-size:11px;color:var(--muted);margin-bottom:12px}
+
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.fg input,.fg select{padding:8px 10px;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;font-size:13px;background:#fff;color:var(--txt);min-width:150px}
+.btn{padding:8px 12px;border:1.5px solid var(--line);border-radius:9px;background:#fff;font-family:inherit;font-size:12px;font-weight:700;color:var(--txt);cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--bmw);color:var(--bmw)}
+.btn.pri{background:var(--bmw);border-color:var(--bmw);color:#fff}
+.btn.pri:hover{background:var(--bmw-dark)}
+.quick{display:flex;gap:6px;flex-wrap:wrap}
+.spacer{flex:1}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:10px;margin-top:14px}
+.kpi{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:13px 14px;box-shadow:0 1px 3px rgba(15,23,42,.04)}
+.kpi .l{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kpi .v{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:11px;color:var(--muted);font-weight:600;margin-top:2px}
+.kpi.w .v{color:var(--bmw)} .kpi.sv .v{color:var(--violet)} .kpi.p .v{color:var(--sun)} .kpi.r .v{color:var(--rose)} .kpi.ok .v{color:var(--mint)}
+
+.charts{display:grid;grid-template-columns:3fr 2fr;gap:14px}
+.charts>.card{min-width:0}
+.chartbox{position:relative;height:300px}
+
+.tw{overflow:auto;border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{position:sticky;top:0;background:var(--surf2);text-align:right;font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:9px 10px;white-space:nowrap;border-bottom:1px solid var(--line);z-index:1}
+th:first-child,td:first-child{text-align:left}
+td{padding:8px 10px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;font-size:12.5px}
+tr.tot td{font-weight:800;background:#f8fafc;border-top:2px solid var(--line)}
+tr.sub td{background:#fbfcfe;font-size:12px;color:#334155}
+tr.sub td:first-child{padding-left:30px}
+td.nm{font-weight:700}
+.tog{border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:11px;width:18px;padding:0}
+.pct{font-size:11px;color:var(--muted);margin-left:4px}
+.rate{display:inline-block;min-width:46px;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:800;text-align:center}
+.rate.g{background:rgba(16,185,129,.13);color:#047857}
+.rate.a{background:#fef9c3;color:#854d0e}
+.rate.b{background:rgba(225,29,72,.12);color:#9f1239}
+.rate.n{background:var(--surf2);color:var(--faint)}
+.bar{display:inline-block;height:8px;border-radius:4px;background:var(--bmw);vertical-align:middle;margin-left:6px;opacity:.75}
+.zero{color:var(--faint)}
+.empty{padding:28px;text-align:center;color:var(--muted);font-weight:600}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:8px}
+.legend b{color:var(--txt)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(120px);background:#0f172a;color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;transition:transform .25s;z-index:300}
+.toast.on{transform:translateX(-50%) translateY(0)}
+
+@media(max-width:900px){.charts{grid-template-columns:1fr}}
+@media print{
+  body{background:#fff;padding:0}
+  .backrow,.noprint,#savedViewsMount{display:none !important}
+  .card,.kpi{box-shadow:none;break-inside:avoid}
+  .tw{overflow:visible;border:none}
+  th{position:static}
+  @page{size:landscape;margin:10mm}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="backrow">
+    <a class="backlink" href="index.html">🏠 Dashboard</a>
+    <a class="backlink" href="warranty_bmw_quick.html">⚡ Quick Entry</a>
+    <a class="backlink" href="warranty_bmw_orders.html">📋 All orders (full details)</a>
+    <a class="backlink" href="warranty_bmw.html">🏁 Credits / Upload</a>
+  </div>
+
+  <div class="top">
+    <div class="logo">B</div>
+    <div>
+      <h1>📊 Advisor Report</h1>
+      <p>BMW Warranty · orders, warranty &amp; service claims, BMW answers and returns — month by month, per service advisor</p>
+    </div>
+  </div>
+
+  <div class="card noprint">
+    <div class="filters">
+      <div class="fg"><label for="fFrom">From month</label><input type="month" id="fFrom"></div>
+      <div class="fg"><label for="fTo">To month</label><input type="month" id="fTo"></div>
+      <div class="fg"><label for="fAdv">Service advisor</label><select id="fAdv"><option value="">All advisors</option></select></div>
+      <div class="quick">
+        <button class="btn viewer-ok" data-range="year" type="button">This year</button>
+        <button class="btn viewer-ok" data-range="12" type="button">Last 12 months</button>
+        <button class="btn viewer-ok" data-range="all" type="button">All</button>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn viewer-ok" id="xlsBtn" type="button">⬇ Excel</button>
+      <button class="btn pri viewer-ok" id="printBtn" type="button">🖨 Print / PDF</button>
+    </div>
+    <div id="savedViewsMount" style="margin-top:8px"></div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="charts">
+    <div class="card">
+      <h2>Month by month</h2>
+      <div class="sub">Orders, warranty and service claims per month · line: share of answered claims BMW sent back</div>
+      <div class="chartbox"><canvas id="chMonth"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Per service advisor</h2>
+      <div class="sub">Orders in the period, split by what was claimed</div>
+      <div class="chartbox"><canvas id="chAdv"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>By service advisor</h2>
+    <div class="sub" id="periodLbl"></div>
+    <div class="tw"><table id="tAdv"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>Month by month</h2>
+    <div class="sub">▶ opens each month's advisors</div>
+    <div class="tw"><table id="tMonth"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>Orders per advisor per month</h2>
+    <div class="sub">Number of repair orders opened (by order date)</div>
+    <div class="tw"><table id="tPivot"></table></div>
+  </div>
+
+  <div class="card">
+    <div class="legend">
+      <span><b>Orders</b> — repair orders by their order date.</span>
+      <span><b>Warranty / Service</b> — orders with a warranty claim / a service (BSI) claim, from the order or from the Incadea claim upload.</span>
+      <span><b>Pending</b> — no claim yet.</span>
+      <span><b>Answered</b> — BMW's credit note received.</span>
+      <span><b>Sent back</b> — BMW rejected at least one line (SAP status <i>Error</i>); <b>BMW return rate</b> = sent back ÷ answered.</span>
+      <span><b>Cut</b> — partly credited (status <i>Warning</i>).</span>
+      <span><b>Car returns</b> — orders with a return date; <b>car return rate</b> = returns ÷ orders.</span>
+      <span><b>Days to claim</b> — average days from the order date to its first claim.</span>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { SUPABASE_CONFIG } from './config.js'
+
+let createClient = null
+for (const url of ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm', 'https://esm.sh/@supabase/supabase-js@2']) {
+  try { const m = await import(url); if (m && m.createClient) { createClient = m.createClient; break } } catch (e) {}
+}
+if (!createClient) { alert('Could not load Supabase library — please check your network.'); throw new Error('Supabase unreachable') }
+const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
+
+const $ = id => document.getElementById(id)
+const esc = s => (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]))
+const toast = (m, ms = 3500) => { const t = $('toast'); t.textContent = m; t.classList.add('on'); setTimeout(() => t.classList.remove('on'), ms) }
+const pad2 = n => String(n).padStart(2, '0')
+const ym = d => d.getFullYear() + '-' + pad2(d.getMonth() + 1)
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const monthLbl = m => MONTHS[+m.slice(5, 7) - 1] + ' ' + m.slice(0, 4)
+const lastDay = m => { const [y, mo] = m.split('-').map(Number); return m + '-' + pad2(new Date(y, mo, 0).getDate()) }
+const fmt = n => (n || 0).toLocaleString('en-US')
+const pctOf = (a, b) => b ? a / b : null
+const pctTxt = p => p == null ? '—' : (p * 100).toFixed(p < 0.1 && p > 0 ? 1 : 0) + '%'
+
+let ALL = []           // every (month, advisor) row in the database
+let charts = {}
+
+// ── data ──
+async function loadAll(){
+  const { data, error } = await sb.rpc('bmw_advisor_monthly', { p_from: null, p_to: null })
+  if (error) { toast('❌ ' + error.message, 6000); return }
+  ALL = data || []
+  const advs = [...new Set(ALL.map(r => r.advisor))].sort((a, b) => a.localeCompare(b))
+  const sel = $('fAdv'), cur = sel.value
+  sel.innerHTML = '<option value="">All advisors</option>' + advs.map(a => `<option>${esc(a)}</option>`).join('')
+  if (cur) sel.value = cur
+}
+
+function blank(){ return { orders:0, warranty:0, service:0, pending:0, answered:0, rejected:0, cut:0, returned:0, picked_up:0, days_to_claim_sum:0, days_to_claim_n:0 } }
+function add(t, r){ for (const k in t) t[k] += Number(r[k]) || 0; return t }
+
+function scoped(){
+  const from = $('fFrom').value, to = $('fTo').value, adv = $('fAdv').value
+  return ALL.filter(r => (!from || r.month >= from) && (!to || r.month <= to) && (!adv || r.advisor === adv))
+}
+
+// ── render ──
+function rateCls(p, good, bad){ if (p == null) return 'n'; return p <= good ? 'g' : p >= bad ? 'b' : 'a' }
+function rateChip(p, good, bad){ return `<span class="rate ${rateCls(p, good, bad)}">${pctTxt(p)}</span>` }
+function cell(n, of){ return n ? `${fmt(n)}${of ? `<span class="pct">${pctTxt(n / of)}</span>` : ''}` : '<span class="zero">0</span>' }
+function avgDays(t){ return t.days_to_claim_n ? (t.days_to_claim_sum / t.days_to_claim_n).toFixed(1) : '—' }
+
+const COLS = [
+  ['Orders',          t => `<b>${fmt(t.orders)}</b>`],
+  ['Warranty',        t => cell(t.warranty, t.orders)],
+  ['Service',         t => cell(t.service, t.orders)],
+  ['Pending',         t => cell(t.pending, t.orders)],
+  ['Answered',        t => cell(t.answered)],
+  ['Sent back',       t => cell(t.rejected)],
+  ['BMW return rate', t => rateChip(pctOf(t.rejected, t.answered), 0.03, 0.10)],
+  ['Cut',             t => cell(t.cut)],
+  ['Car returns',     t => cell(t.returned)],
+  ['Car return rate', t => rateChip(pctOf(t.returned, t.orders), 0.02, 0.08)],
+  ['Days to claim',   t => avgDays(t)],
+]
+const head = first => `<thead><tr><th>${first}</th>${COLS.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead>`
+const row = (label, t, cls = '', pre = '') => `<tr class="${cls}"><td class="nm">${pre}${label}</td>${COLS.map(c => `<td>${c[1](t)}</td>`).join('')}</tr>`
+
+const OPEN = new Set()
+function render(){
+  const rows = scoped()
+  const from = $('fFrom').value, to = $('fTo').value
+  $('periodLbl').textContent = (from || to)
+    ? `${from ? monthLbl(from) : 'Start'} → ${to ? monthLbl(to) : 'today'}${$('fAdv').value ? ' · ' + $('fAdv').value : ''}`
+    : 'All months'
+  const T = rows.reduce(add, blank())
+
+  // KPIs
+  const k = (cls, l, v, s) => `<div class="kpi ${cls}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`
+  $('kpis').innerHTML =
+      k('', 'Orders', fmt(T.orders), `${new Set(rows.map(r => r.advisor)).size} advisor(s) · ${new Set(rows.map(r => r.month)).size} month(s)`)
+    + k('w', 'Warranty claims', fmt(T.warranty), pctTxt(pctOf(T.warranty, T.orders)) + ' of orders')
+    + k('sv', 'Service claims', fmt(T.service), pctTxt(pctOf(T.service, T.orders)) + ' of orders')
+    + k('p', 'Pending', fmt(T.pending), 'no claim yet')
+    + k(pctOf(T.rejected, T.answered) > 0.10 ? 'r' : 'ok', 'BMW return rate', pctTxt(pctOf(T.rejected, T.answered)), `${fmt(T.rejected)} sent back of ${fmt(T.answered)} answered`)
+    + k(pctOf(T.returned, T.orders) > 0.08 ? 'r' : 'ok', 'Car return rate', pctTxt(pctOf(T.returned, T.orders)), `${fmt(T.returned)} returns`)
+    + k('', 'Days to claim', avgDays(T), 'average, order → first claim')
+
+  // By advisor
+  const byAdv = {}
+  rows.forEach(r => add(byAdv[r.advisor] = byAdv[r.advisor] || blank(), r))
+  const advs = Object.keys(byAdv).sort((a, b) => byAdv[b].orders - byAdv[a].orders)
+  $('tAdv').innerHTML = rows.length
+    ? head('Service advisor') + '<tbody>' + advs.map(a => row(esc(a), byAdv[a])).join('') + row('Total', T, 'tot') + '</tbody>'
+    : `<tbody><tr><td class="empty">No orders in this period.</td></tr></tbody>`
+
+  // Month by month, advisors inside
+  const byMonth = {}
+  rows.forEach(r => { const m = byMonth[r.month] = byMonth[r.month] || { t: blank(), a: {} }; add(m.t, r); m.a[r.advisor] = add(m.a[r.advisor] || blank(), r) })
+  const months = Object.keys(byMonth).sort().reverse()
+  $('tMonth').innerHTML = rows.length
+    ? head('Month') + '<tbody>' + months.map(m => {
+        const open = OPEN.has(m)
+        const subs = open ? Object.entries(byMonth[m].a).sort((x, y) => y[1].orders - x[1].orders).map(([a, t]) => row(esc(a), t, 'sub')).join('') : ''
+        return row(monthLbl(m), byMonth[m].t, '', `<button class="tog viewer-ok" data-m="${m}" type="button" aria-label="Show advisors">${open ? '▼' : '▶'}</button> `) + subs
+      }).join('') + row('Total', T, 'tot') + '</tbody>'
+    : `<tbody><tr><td class="empty">No orders in this period.</td></tr></tbody>`
+
+  // Pivot
+  const advCols = advs
+  const maxCell = Math.max(1, ...rows.map(r => r.orders))
+  $('tPivot').innerHTML = rows.length
+    ? `<thead><tr><th>Month</th>${advCols.map(a => `<th>${esc(a)}</th>`).join('')}<th>Total</th></tr></thead><tbody>`
+      + months.map(m => `<tr><td class="nm">${monthLbl(m)}</td>${advCols.map(a => { const n = byMonth[m].a[a]?.orders || 0; return `<td>${n ? fmt(n) + `<span class="bar" style="width:${Math.round(n / maxCell * 40)}px"></span>` : '<span class="zero">·</span>'}</td>` }).join('')}<td><b>${fmt(byMonth[m].t.orders)}</b></td></tr>`).join('')
+      + `<tr class="tot"><td>Total</td>${advCols.map(a => `<td>${fmt(byAdv[a].orders)}</td>`).join('')}<td>${fmt(T.orders)}</td></tr></tbody>`
+    : `<tbody><tr><td class="empty">No orders in this period.</td></tr></tbody>`
+
+  drawCharts(months.slice().reverse(), byMonth, advs, byAdv)
+}
+
+$('tMonth').addEventListener('click', e => {
+  const b = e.target.closest('[data-m]'); if (!b) return
+  OPEN.has(b.dataset.m) ? OPEN.delete(b.dataset.m) : OPEN.add(b.dataset.m)
+  render()
+})
+
+function drawCharts(months, byMonth, advs, byAdv){
+  if (!window.Chart) return
+  Object.values(charts).forEach(c => c.destroy())
+  const C = { orders:'#cbd5e1', w:'#1C69D4', s:'#7c3aed', p:'#f59e0b', r:'#e11d48' }
+  charts.m = new Chart($('chMonth'), {
+    data: {
+      labels: months.map(monthLbl),
+      datasets: [
+        { type:'bar', label:'Orders', data: months.map(m => byMonth[m].t.orders), backgroundColor: C.orders, borderRadius: 4, order: 3 },
+        { type:'bar', label:'Warranty', data: months.map(m => byMonth[m].t.warranty), backgroundColor: C.w, borderRadius: 4, order: 2 },
+        { type:'bar', label:'Service', data: months.map(m => byMonth[m].t.service), backgroundColor: C.s, borderRadius: 4, order: 2 },
+        { type:'line', label:'BMW return rate %', yAxisID:'y2', data: months.map(m => { const t = byMonth[m].t; return t.answered ? +(t.rejected / t.answered * 100).toFixed(1) : null }), borderColor: C.r, backgroundColor: C.r, tension: .3, spanGaps: true, order: 1 },
+      ],
+    },
+    options: {
+      animation: false, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, y2: { position: 'right', beginAtZero: true, suggestedMax: 15, grid: { display: false }, ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } },
+    },
+  })
+  charts.a = new Chart($('chAdv'), {
+    type: 'bar',
+    data: {
+      labels: advs,
+      datasets: [
+        { label:'Warranty', data: advs.map(a => byAdv[a].warranty), backgroundColor: C.w, borderRadius: 4 },
+        { label:'Service', data: advs.map(a => byAdv[a].service), backgroundColor: C.s, borderRadius: 4 },
+        { label:'Pending', data: advs.map(a => byAdv[a].pending), backgroundColor: C.p, borderRadius: 4 },
+      ],
+    },
+    options: {
+      animation: false, indexAxis: 'y', maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { grid: { display: false } } },
+    },
+  })
+}
+
+// ── period buttons ──
+function setRange(kind){
+  const now = new Date()
+  if (kind === 'year') { $('fFrom').value = now.getFullYear() + '-01'; $('fTo').value = ym(now) }
+  else if (kind === '12') { const d = new Date(now.getFullYear(), now.getMonth() - 11, 1); $('fFrom').value = ym(d); $('fTo').value = ym(now) }
+  else { $('fFrom').value = ''; $('fTo').value = '' }
+  $('fFrom').dispatchEvent(new Event('change'))   // re-renders (and updates the saved-view marker)
+}
+document.querySelectorAll('[data-range]').forEach(b => b.addEventListener('click', () => setRange(b.dataset.range)))
+;['fFrom','fTo','fAdv'].forEach(id => $(id).addEventListener('change', render))
+
+// ── export ──
+let _xlsxP = null
+function loadXlsx(){
+  if (window.XLSX) return Promise.resolve(window.XLSX)
+  return _xlsxP = _xlsxP || new Promise((res, rej) => {
+    const sc = document.createElement('script')
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+    sc.onload = () => res(window.XLSX); sc.onerror = () => { _xlsxP = null; rej(new Error('Could not load the Excel writer')) }
+    document.head.appendChild(sc)
+  })
+}
+$('xlsBtn').addEventListener('click', async () => {
+  try {
+    const X = await loadXlsx()
+    const rows = scoped()
+    const H = ['Orders','Warranty','Service','Pending','Answered','Sent back','BMW return rate %','Cut','Car returns','Car return rate %','Avg days to claim']
+    const vals = t => [t.orders, t.warranty, t.service, t.pending, t.answered, t.rejected,
+      t.answered ? +(t.rejected / t.answered * 100).toFixed(1) : null, t.cut, t.returned,
+      t.orders ? +(t.returned / t.orders * 100).toFixed(1) : null,
+      t.days_to_claim_n ? +(t.days_to_claim_sum / t.days_to_claim_n).toFixed(1) : null]
+    const byAdv = {}, byMonth = {}
+    rows.forEach(r => { add(byAdv[r.advisor] = byAdv[r.advisor] || blank(), r); add(byMonth[r.month] = byMonth[r.month] || blank(), r) })
+    const T = rows.reduce(add, blank())
+    const wb = X.utils.book_new()
+    X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Service advisor', ...H], ...Object.entries(byAdv).map(([a, t]) => [a, ...vals(t)]), ['Total', ...vals(T)]]), 'By advisor')
+    X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Month', ...H], ...Object.keys(byMonth).sort().map(m => [m, ...vals(byMonth[m])]), ['Total', ...vals(T)]]), 'By month')
+    X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Month', 'Service advisor', ...H], ...rows.map(r => [r.month, r.advisor, ...vals(r)])]), 'Month x advisor')
+    X.writeFile(wb, `BMW_Advisor_Report_${$('fFrom').value || 'start'}_${$('fTo').value || 'today'}.xlsx`)
+  } catch (e) { toast('❌ ' + e.message) }
+})
+$('printBtn').addEventListener('click', () => window.print())
+
+// ── boot ──
+setRange('12')
+await loadAll()
+render()
+
+// Saved views: each person keeps their own period / advisor combinations.
+try {
+  const { mountSavedViews } = await import('./user_views.js?v=20261103a')
+  mountSavedViews({
+    sb, page: 'warranty_bmw_report',
+    mountEl: $('savedViewsMount'),
+    filterIds: ['fFrom', 'fTo', 'fAdv'],
+    applyFilter: () => render(),
+    ntf: m => toast(m),
+    currentUser: sessionStorage.getItem('cw_current_emp') || '',
+  })
+} catch (e) { console.warn('saved views', e) }
+</script>
+<script src="analytics.js?v=1" data-site="bassoul-heneine"></script>
+</body>
+</html>
