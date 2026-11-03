@@ -166,7 +166,8 @@ td.nm{font-weight:700}
     <div class="legend">
       <span><b>Orders</b> — repair orders by their order date.</span>
       <span><b>Warranty / Service</b> — orders with a warranty claim / a service (BSI) claim, from the order or from the Incadea claim upload.</span>
-      <span><b>Pending</b> — no claim yet.</span>
+      <span><b>Warranty only / Service only / Both</b> — which claims the order has (an order needs one or the other, or both).</span>
+      <span><b>Pending</b> — no claim of either kind yet.</span>
       <span><b>Answered</b> — BMW's credit note received.</span>
       <span><b>Sent back</b> — BMW rejected at least one line (SAP status <i>Error</i>); <b>BMW return rate</b> = sent back ÷ answered.</span>
       <span><b>Cut</b> — partly credited (status <i>Warning</i>).</span>
@@ -180,7 +181,7 @@ td.nm{font-weight:700}
 
 <script type="module">
 import { SUPABASE_CONFIG } from './config.js'
-import { openPicker } from './col_filters.js?v=20261103c'
+import { openPicker } from './col_filters.js?v=20261103d'
 
 let createClient = null
 for (const url of ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm', 'https://esm.sh/@supabase/supabase-js@2']) {
@@ -246,7 +247,7 @@ $('fMonBtn').addEventListener('click', e => {
     chosen: listOf('fMon'), onApply: pick => setList('fMon', pick) })
 })
 
-function blank(){ return { orders:0, warranty:0, service:0, pending:0, answered:0, rejected:0, cut:0, returned:0, picked_up:0, days_to_claim_sum:0, days_to_claim_n:0 } }
+function blank(){ return { orders:0, warranty:0, service:0, pending:0, answered:0, rejected:0, cut:0, returned:0, picked_up:0, days_to_claim_sum:0, days_to_claim_n:0, warranty_only:0, service_only:0, both_claims:0 } }
 function add(t, r){ for (const k in t) t[k] += Number(r[k]) || 0; return t }
 
 function scoped(){
@@ -264,6 +265,9 @@ const COLS = [
   ['Orders',          t => `<b>${fmt(t.orders)}</b>`],
   ['Warranty',        t => cell(t.warranty, t.orders)],
   ['Service',         t => cell(t.service, t.orders)],
+  ['Warranty only',   t => cell(t.warranty_only, t.orders)],
+  ['Service only',    t => cell(t.service_only, t.orders)],
+  ['Both',            t => cell(t.both_claims, t.orders)],
   ['Pending',         t => cell(t.pending, t.orders)],
   ['Answered',        t => cell(t.answered)],
   ['Sent back',       t => cell(t.rejected)],
@@ -399,8 +403,8 @@ $('xlsBtn').addEventListener('click', async () => {
   try {
     const X = await loadXlsx()
     const rows = scoped()
-    const H = ['Orders','Warranty','Service','Pending','Answered','Sent back','BMW return rate %','Cut','Car returns','Car return rate %','Avg days to claim']
-    const vals = t => [t.orders, t.warranty, t.service, t.pending, t.answered, t.rejected,
+    const H = ['Orders','Warranty','Service','Warranty only','Service only','Both','Pending','Answered','Sent back','BMW return rate %','Cut','Car returns','Car return rate %','Avg days to claim']
+    const vals = t => [t.orders, t.warranty, t.service, t.warranty_only, t.service_only, t.both_claims, t.pending, t.answered, t.rejected,
       t.answered ? +(t.rejected / t.answered * 100).toFixed(1) : null, t.cut, t.returned,
       t.orders ? +(t.returned / t.orders * 100).toFixed(1) : null,
       t.days_to_claim_n ? +(t.days_to_claim_sum / t.days_to_claim_n).toFixed(1) : null]
