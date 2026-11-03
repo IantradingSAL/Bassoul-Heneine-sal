@@ -139,3 +139,5 @@ AS $$
    GROUP BY 1, 2
 $$;
 GRANT EXECUTE ON FUNCTION public.bmw_advisor_pickup(date, date) TO authenticated;
+
+-- Claim dates from the claim submissions and BMW's answer per claim: see 07_bmw_claims_from_submissions.sql
