@@ -742,7 +742,7 @@ $('clearFilters').addEventListener('click', ()=>{ ['f_q','f_adv','f_from','f_to'
 // Filters on every column: tick any number of values (dates by month).
 let CF = null
 {
-  const { attachColumnFilters } = await import('./col_filters.js?v=20261103a')
+  const { attachColumnFilters } = await import('./col_filters.js?v=20261103b')
   CF = attachColumnFilters({
     table: document.querySelector('table.t'),
     stateInput: $('f_cols'),
