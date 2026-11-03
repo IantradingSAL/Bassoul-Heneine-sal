@@ -194,6 +194,15 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .modal-h .ct{margin:0}
 .modal-b{padding:18px 20px;display:flex;flex-direction:column;gap:13px;overflow-y:auto}
 .modal-x{background:none;border:1px solid var(--line);border-radius:9px;width:30px;height:30px;cursor:pointer;font-size:15px;color:var(--muted);font-family:inherit}
+.case-sum{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;background:var(--surf2);border-radius:10px;padding:10px 12px;font-size:12px}
+.case-sum div{min-width:0} .case-sum b{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:800}
+.case-sum span{font-weight:600;overflow-wrap:anywhere}
+.case-act{border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.case-state{font-size:12px;font-weight:700}
+.case-btns{display:flex;gap:8px;flex-wrap:wrap}
+.case-ok{background:#10b981;color:#fff;border:none} .case-ret{background:#7c3aed;color:#fff;border:none}
+.case-lab{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px}
+#m_retBox textarea{width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:9px;font:inherit;font-size:13px}
 .sec-lab{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-top:1px solid var(--line);padding-top:11px;margin-top:2px}
 /* filters */
 .filterbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
@@ -419,6 +428,23 @@ body.hide-sc .c-sc{display:none}
       <button class="modal-x" onclick="window._closeModal()">✕</button>
     </div>
     <div class="modal-b">
+      <div class="case-sum" id="m_sum"></div>
+      <div class="case-act" id="m_actions">
+        <div class="case-state" id="m_state"></div>
+        <div class="case-btns">
+          <button type="button" class="btn btn-sm case-ok" id="m_receive">✓ Received today</button>
+          <button type="button" class="btn btn-sm case-ret" id="m_retOpen">↩ Return to advisor</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="m_unret">Undo return</button>
+        </div>
+        <div id="m_retBox" hidden>
+          <label class="case-lab">Reason (sent to the advisor) *</label>
+          <textarea id="m_retReason" rows="2" placeholder="e.g. not a warranty case — internal / customer pays / missing documents"></textarea>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button type="button" class="btn btn-sm case-ret" id="m_retGo">↩ Return now</button>
+            <button type="button" class="btn btn-sm btn-ghost" id="m_retCancel">Cancel</button>
+          </div>
+        </div>
+      </div>
       <div class="al al-i" style="margin:0" id="m_modeNote">—</div>
       <div class="fld"><label>VIN</label><input id="m_vin" type="text" style="text-transform:uppercase"></div>
       <div class="fld"><label>Customer name</label><input id="m_customer" type="text"></div>
@@ -427,8 +453,8 @@ body.hide-sc .c-sc{display:none}
       <div class="sec-lab">🔒 Warranty admin fields</div>
       <div class="fld"><label>Pick-up date</label><input id="m_pickup" type="date"></div>
       <div class="fld"><label>Returned to advisor</label><input id="m_return" type="date"></div>
-      <div class="fld" id="wrap_m_wc"><label>Warranty claim date &amp; time</label><input id="m_warranty" type="datetime-local"><span class="hint">Defaults to now · advisors see date only</span></div>
-      <div class="fld" id="wrap_m_sc"><label>Service claim date &amp; time</label><input id="m_service" type="datetime-local"><span class="hint">Defaults to now · advisors see date only</span></div>
+      <div class="fld" id="wrap_m_wc"><label>Warranty claim date &amp; time</label><input id="m_warranty" type="datetime-local"><span class="hint">Filled from the claim submissions upload — change only to correct it</span></div>
+      <div class="fld" id="wrap_m_sc"><label>Service claim date &amp; time</label><input id="m_service" type="datetime-local"><span class="hint">Filled from the claim submissions upload — change only to correct it</span></div>
       <div class="fld"><label>Warranty note</label><textarea id="m_wnote" rows="2"></textarea></div>
 
       <div class="form-actions" style="margin-top:4px">
@@ -467,6 +493,7 @@ const val = id => ($(id)?.value || '').trim()
 const todayISO = () => { const d=new Date(); const o=d.getTimezoneOffset(); return new Date(d.getTime()-o*60000).toISOString().slice(0,10) }
 const nowLocal = () => { const d=new Date(); const o=d.getTimezoneOffset(); return new Date(d.getTime()-o*60000).toISOString().slice(0,16) }
 const setDate = (id,d) => { const el=$(id); if(el) el.value = d ? String(d).slice(0,10) : '' }
+const dtLocal = d => { if(!d) return ''; const dt=new Date(d); return new Date(dt.getTime()-dt.getTimezoneOffset()*60000).toISOString().slice(0,16) }
 const setDT   = (id,d) => { const el=$(id); if(!el) return; if(!d){ el.value=''; return } const dt=new Date(d); const o=dt.getTimezoneOffset(); el.value=new Date(dt.getTime()-o*60000).toISOString().slice(0,16) }
 const showToast = (msg, ms=3500) => { const t=$('toast'); t.textContent=msg; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),ms) }
 const showLoad = msg => { $('loadingMsg').textContent = msg||'Loading…'; $('loadingOverlay').classList.add('on') }
@@ -802,12 +829,14 @@ function printReport(){
 function openModal(id){
   const r = S.rows.find(x=>x.id===id); if(!r) return
   S.editId = id
-  $('m_title').textContent = 'Edit ' + (r.order_ref||('GOR0'+r.order_number))
+  $('m_title').textContent = 'Order ' + (r.order_ref||('GOR0'+r.order_number))
   $('m_vin').value = r.vin || ''; $('m_customer').value = r.customer_name || ''
   $('m_note').value = r.note || ''; $('m_wnote').value = r.warranty_note || ''
   setDate('m_pickup', r.pickup_date); setDate('m_return', r.return_date)
-  if (S.isAdmin){ setDT('m_warranty', r.warranty_claim_date || nowLocal()); setDT('m_service', r.service_claim_date || nowLocal()) }
-  else { setDT('m_warranty', r.warranty_claim_date); setDT('m_service', r.service_claim_date) }
+  // Claim dates come from the claim submissions upload — never pre-fill "now"
+  // (saving that would stamp a claim that was never made).
+  setDT('m_warranty', r.warranty_claim_date); setDT('m_service', r.service_claim_date)
+  paintCase(r)
   // advisor edits VIN / customer / their own note; admin edits warranty fields
   $('m_vin').disabled = S.isAdmin; $('m_customer').disabled = S.isAdmin; $('m_note').disabled = S.isAdmin
   ;['m_pickup','m_return','m_warranty','m_service','m_wnote'].forEach(i=>{ $(i).disabled = !S.isAdmin })
@@ -819,13 +848,66 @@ function openModal(id){
 }
 window._closeModal = () => { $('modalBg').classList.remove('on'); S.editId=null }
 
+// ── the case: who / what / where it stands, and the warranty admin's actions ──
+function paintCase(r){
+  const d = v => v ? fmtD(v) : '—'
+  $('m_sum').innerHTML = [
+    ['Order', r.order_ref || ('GOR0'+r.order_number)], ['Service advisor', r.service_advisor || '—'],
+    ['VIN', r.vin || '—'], ['Customer', r.customer_name || '—'],
+    ['Order date', r.order_date ? d(r.order_date) : 'from Incadea'], ['Date', d(r.work_date)],
+    ['Warranty claim', d(r.warranty_claim_date)], ['Service claim', d(r.service_claim_date)],
+    ['Advisor note', r.note || '—'], ['Warranty note', r.warranty_note || '—'],
+  ].map(([k,v]) => `<div><b>${esc(k)}</b><span>${esc(v)}</span></div>`).join('')
+  const claimed = r.warranty_claim_date || r.service_claim_date
+  $('m_state').innerHTML = r.return_date ? `↩ Returned to the advisor on ${d(r.return_date)}`
+    : claimed ? `✓ Claimed${r.pickup_date ? ' · picked up ' + d(r.pickup_date) : ''}`
+    : r.pickup_date ? `📥 Picked up ${d(r.pickup_date)} — no claim yet`
+    : '⏳ Waiting for pick-up'
+  $('m_actions').style.display = S.isAdmin ? '' : 'none'
+  $('m_receive').style.display = !r.pickup_date && !r.return_date ? '' : 'none'
+  $('m_retOpen').style.display = !r.return_date ? '' : 'none'
+  $('m_unret').style.display = r.return_date ? '' : 'none'
+  $('m_retBox').hidden = true; $('m_retReason').value = ''
+}
+async function caseUpdate(upd, msg){
+  const r = S.rows.find(x => x.id === S.editId); if (!r) return
+  showLoad('Saving…')
+  const { error } = await sb.from('warranty_bmw_orders').update(upd).eq('id', r.id)
+  hideLoad()
+  if (error){ showToast('❌ '+(error.message||'').slice(0,90)); return }
+  Object.assign(r, upd); paintCase(r); render()
+  setDate('m_pickup', r.pickup_date); setDate('m_return', r.return_date); $('m_wnote').value = r.warranty_note || ''
+  showToast(msg)
+}
+$('m_receive').addEventListener('click', () => caseUpdate({ pickup_date: todayISO() }, '✓ Received today'))
+$('m_retOpen').addEventListener('click', () => { $('m_retBox').hidden = false; $('m_retReason').focus() })
+$('m_retCancel').addEventListener('click', () => { $('m_retBox').hidden = true })
+$('m_retGo').addEventListener('click', () => {
+  const reason = $('m_retReason').value.trim()
+  if (!reason){ showToast('⚠️ Write the reason for the advisor'); $('m_retReason').focus(); return }
+  const r = S.rows.find(x => x.id === S.editId); if (!r) return
+  const line = 'Returned ' + todayISO().split('-').reverse().join('/') + ': ' + reason
+  caseUpdate({ return_date: todayISO(), warranty_note: [r.warranty_note, line].filter(Boolean).join(' · ') }, '↩ Returned to the advisor')
+})
+$('m_unret').addEventListener('click', () => {
+  if (!confirm('Undo the return? The order will wait for a claim again.')) return
+  caseUpdate({ return_date: null }, 'Return undone')
+})
+
 async function saveModal(){
   if (!S.editId) return
   const dtISO = id => { const v=val(id); return v ? new Date(v).toISOString() : null }
   const upd = S.isAdmin
     ? { pickup_date: val('m_pickup')||null, return_date: val('m_return')||null,
-        warranty_claim_date: dtISO('m_warranty'), service_claim_date: dtISO('m_service'), warranty_note: val('m_wnote')||null }
+        warranty_note: val('m_wnote')||null }
     : { vin: val('m_vin')||null, customer_name: val('m_customer')||null, note: val('m_note')||null }
+  if (S.isAdmin){
+    // claim dates only when the admin actually changed them
+    const r = S.rows.find(x=>x.id===S.editId) || {}
+    const same = (v, id) => dtLocal(v) === val(id)
+    if (!same(r.warranty_claim_date, 'm_warranty')) upd.warranty_claim_date = dtISO('m_warranty')
+    if (!same(r.service_claim_date,  'm_service'))  upd.service_claim_date  = dtISO('m_service')
+  }
   showLoad('Saving…')
   const { error } = await sb.from('warranty_bmw_orders').update(upd).eq('id', S.editId)
   hideLoad()
