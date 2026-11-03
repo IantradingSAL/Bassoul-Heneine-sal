@@ -21,7 +21,7 @@
 // empty: the label for an empty cell (default "(Empty)").
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-const EMPTY = '\u0000'
+const EMPTY = '__empty__'   // a plain key: an invisible character would not survive an HTML attribute
 let cssDone = false
 
 function css(){
