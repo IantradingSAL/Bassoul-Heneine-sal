@@ -611,6 +611,12 @@
   .status-dot.scheduled { background: var(--info); }
   .status-dot.resolved { background: var(--success); }
   @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); } 50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); } }
+  /* Saved views (user_views.js) — one chip row under each list's filter bar.
+     Maps the module's colour tokens onto this page's palette. */
+  .si-sv-mount { margin: -0.75rem 0 0.75rem;
+    --mu: var(--text-2); --bdr: var(--border); --card: var(--surface);
+    --blue: var(--accent); --b50: var(--accent-soft); --red: var(--danger); }
+  .si-sv-mount:empty { display: none; }
 </style>
 </head>
 <body>
@@ -791,6 +797,7 @@
         </div>
         <button class="btn btn-primary" onclick="openVehicleModal()"><i data-lucide="plus" class="w-4 h-4"></i>Add Vehicle</button>
       </div>
+      <div id="sv-mount-vehicles" class="si-sv-mount"></div>
       <div class="card overflow-hidden">
         <div class="overflow-x-auto scroll-area">
           <table>
@@ -827,6 +834,7 @@
           <button class="btn btn-primary" onclick="openPackageModal()"><i data-lucide="plus" class="w-4 h-4"></i>New Package</button>
         </div>
       </div>
+      <div id="sv-mount-packages" class="si-sv-mount"></div>
       <div id="packages-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
       <div id="packages-list" class="card overflow-hidden hidden">
         <div class="overflow-x-auto scroll-area">
@@ -861,6 +869,7 @@
         </div>
         <button class="btn btn-primary" onclick="openServiceModal()"><i data-lucide="plus" class="w-4 h-4"></i>Log Service</button>
       </div>
+      <div id="sv-mount-services" class="si-sv-mount"></div>
       <div class="card overflow-hidden">
         <div class="overflow-x-auto scroll-area">
           <table>
@@ -962,6 +971,7 @@
             <option value="pinned">Manually added</option>
           </select>
         </div>
+        <div id="sv-mount-followups" class="si-sv-mount" style="margin-top:-0.5rem;"></div>
         <div class="card overflow-hidden">
           <div class="overflow-x-auto scroll-area">
             <table>
@@ -1051,6 +1061,7 @@
             <option value="1d">1 day</option>
           </select>
         </div>
+        <div id="sv-mount-fu-emails" class="si-sv-mount" style="margin-top:-0.5rem;"></div>
         <div class="card overflow-hidden">
           <div class="overflow-x-auto scroll-area">
             <table>
@@ -1088,6 +1099,7 @@
             <option value="declined">Declined</option>
           </select>
         </div>
+        <div id="sv-mount-fu-history" class="si-sv-mount" style="margin-top:-0.75rem;"></div>
         <div class="card overflow-hidden">
           <div class="overflow-x-auto scroll-area">
             <table>
@@ -5878,6 +5890,64 @@ function init() {
 init();
 </script>
 <script src="si-cloud.js" defer></script>
+<script type="module">
+// Saved views (user_views.js): one chip row per independent list, so each
+// user keeps named filter combinations per list, stars a default, and finds
+// them on any device (public.user_views, owner-only RLS). Only list filters
+// are saved — never the entry-modal fields or the import file input.
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+import { SUPABASE_CONFIG } from './config.js'
+import { mountSavedViews } from './user_views.js?v=20261103a'
+
+if (!window.__siSavedViewsMounted) {
+  window.__siSavedViewsMounted = true
+  const sb = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
+  const currentUser = sessionStorage.getItem('cw_current_emp') || ''
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  const ntf = (m, t) => { if (typeof toast === 'function') toast(esc(m), t === 'err' ? 'danger' : 'success') }
+
+  const LISTS = [
+    { page: 'service_inclusive:vehicles',   mount: 'sv-mount-vehicles',
+      filterIds: ['vehicles-search', 'vehicles-make-filter'],
+      applyFilter: () => renderVehicles() },
+    { page: 'service_inclusive:packages',   mount: 'sv-mount-packages',
+      filterIds: ['packages-search', 'packages-status-filter', 'packages-type-filter'],
+      applyFilter: () => renderPackages() },
+    { page: 'service_inclusive:services',   mount: 'sv-mount-services',
+      filterIds: ['services-search', 'services-type-filter'],
+      applyFilter: () => renderServices() },
+    { page: 'service_inclusive:followups',  mount: 'sv-mount-followups',
+      filterIds: ['fu-action-search', 'fu-action-sort', 'fu-action-state'],
+      applyFilter: () => renderFollowups() },
+    { page: 'service_inclusive:fu_emails',  mount: 'sv-mount-fu-emails',
+      filterIds: ['fu-emails-sent-filter'],
+      applyFilter: () => renderEmailReminders() },
+    { page: 'service_inclusive:fu_history', mount: 'sv-mount-fu-history',
+      filterIds: ['fu-history-search', 'fu-history-status-filter'],
+      applyFilter: () => renderFollowupsHistory() },
+  ]
+
+  // The make / package-type / service-type dropdowns are rebuilt from the
+  // data on every render, so wait for the first data load (localStorage
+  // cache, else si-cloud's first pull) before restoring a view.
+  const hasData = () => {
+    try { return !!(state && ((state.vehicles && state.vehicles.length) || (state.packages && state.packages.length) || (state.services && state.services.length))) }
+    catch { return false }
+  }
+  const t0 = Date.now()
+  while (!hasData() && Date.now() - t0 < 30000) await new Promise(r => setTimeout(r, 250))
+
+  await Promise.all(LISTS.map(l => {
+    const mountEl = document.getElementById(l.mount)
+    if (!mountEl || mountEl.dataset.svMounted) return null
+    mountEl.dataset.svMounted = '1'
+    return mountSavedViews({
+      sb, page: l.page, mountEl, filterIds: l.filterIds,
+      applyFilter: l.applyFilter, ntf, currentUser,
+    }).catch(e => console.warn('[saved views]', l.page, e))
+  }))
+}
+</script>
   <script src="analytics.js?v=1" data-site="bassoul-heneine"></script>
 </body>
 </html>

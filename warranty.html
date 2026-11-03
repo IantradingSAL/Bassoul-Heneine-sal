@@ -694,6 +694,9 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .finput{border:1.5px solid var(--border);background:var(--surf2);border-radius:8px;padding:5px 10px;font-size:11px;color:var(--ink);outline:none;font-family:inherit;min-width:160px;font-weight:500;transition:border-color .15s}
 .finput:focus{border-color:var(--sun)}
 .page-area{flex:1;overflow:hidden;display:flex;flex-direction:column}
+/* Saved-views chip row (user_views.js), one under each list's filter bar */
+.sv-mount{background:var(--surf);border-bottom:1.5px solid var(--border);padding:0 20px;flex-shrink:0;overflow-x:auto;--bdr:var(--border);--mu:var(--muted);--card:var(--surf)}
+.sv-mount:empty{display:none}
 .scroll{flex:1;overflow-y:auto;padding:20px 22px;background:var(--bg)}
 .page{max-width:1600px}
 
@@ -1457,6 +1460,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
     <div class="fg"><span class="fl">Status</span><select class="fsel" id="F_GS" onchange="rGCM()"><option value="">All</option><option value="0">✅ Paid</option><option value="4">❌ Rejected</option><option value="other">Other</option></select></div>
     <div class="fg nobr"><span class="fl">Search</span><input class="finput" id="F_GQ" placeholder="VIN, invoice, RO, NITG…" oninput="rGCM()"/></div>
   </div>
+  <div id="sv_gcm" class="sv-mount"></div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--sun3)">📋</div><div><div class="ph-title">GCM Claims</div><div class="ph-sub">All warranty claims from the GCM portal</div></div></div>
     <div id="GCM_E" class="al al-i" style="display:none">⬆️ Upload a GCM file to view claims.</div>
@@ -1482,6 +1486,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
     <div class="fg"><span class="fl">Month</span><select class="fsel" id="F_EM" onchange="rExp()"><option value="">All</option></select></div>
     <div class="fg nobr"><span class="fl">Search</span><input class="finput" id="F_EQ" placeholder="Code or description…" oninput="rExp()"/></div>
   </div>
+  <div id="sv_exp" class="sv-mount"></div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--lemon3)">🏷️</div><div><div class="ph-title">By Expense Code</div><div class="ph-sub">Claims grouped and ranked by expense type</div></div></div>
     <div id="EXP_E" class="al al-i" style="display:none">⬆️ Upload GCM to view expense breakdown.</div>
@@ -1499,6 +1504,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
     <div class="fg"><span class="fl">Show</span><select class="fsel" id="F_CD" onchange="rComp()"><option value="">All VINs</option><option value="diff">⚠️ Differences Only</option><option value="match">✅ Matches Only</option></select></div>
     <div class="fg nobr"><span class="fl">Search VIN</span><input class="finput" id="F_CQ" placeholder="Search VIN or model…" oninput="rComp()"/></div>
   </div>
+  <div id="sv_comp" class="sv-mount"></div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--pur3)">⚖️</div><div><div class="ph-title">Incadea vs GCM</div><div class="ph-sub">Reconciliation per VIN — spot every difference</div></div></div>
     <div id="CMP_E" class="al al-i" style="display:none">⬆️ Upload both GCM and Incadea files to reconcile.</div>
@@ -1520,6 +1526,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
     </select></div>
     <div class="fg nobr"><span class="fl">Search</span><input class="finput" id="F_CCQ" placeholder="VIN, invoice, RO…" oninput="rCompClaim()"/></div>
   </div>
+  <div id="sv_compclaim" class="sv-mount"></div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--pur3)">⚖️</div><div><div class="ph-title">Incadea vs GCM — by Claim</div><div class="ph-sub">Reconciliation per GCM claim — one row per claim, matched to its Incadea invoice</div></div></div>
     <div id="CMC_E" class="al al-i" style="display:none">⬆️ Upload both GCM and Incadea files to reconcile.</div>
@@ -1534,6 +1541,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
     <div class="fg"><span class="fl">Month</span><select class="fsel" id="F_AM" onchange="rAP()"><option value="">All</option></select></div>
     <div class="fg nobr"><span class="fl">Expense Code</span><select class="fsel" id="F_AE" onchange="rAP()"><option value="">All</option></select></div>
   </div>
+  <div id="sv_ap" class="sv-mount"></div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--mint3)">📈</div><div><div class="ph-title">Asked vs Paid</div><div class="ph-sub">Gap analysis — what you asked vs what Renault paid</div></div></div>
     <div id="AP_E" class="al al-i" style="display:none">⬆️ Upload GCM to view this analysis.</div>
@@ -1556,6 +1564,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
       <option value="resolved">✅ Resolved</option>
     </select></div>
   </div>
+  <div id="sv_rej" class="sv-mount"></div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--rose3)">❌</div><div><div class="ph-title">Rejections</div><div class="ph-sub">Track, annotate and resubmit rejected claims</div></div></div>
     <div style="padding:8px 22px 0;display:flex;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="exportRejections()" style="font-size:10px">📥 Export to CSV</button></div>
@@ -1572,6 +1581,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
     <div class="fg"><span class="fl">Location</span><select class="fsel" id="F_ILOC" onchange="rInc()"><option value="">All Locations</option></select></div>
     <div class="fg nobr"><span class="fl">Search</span><input class="finput" id="F_IQ" placeholder="VIN, invoice, order, customer…" oninput="rInc()"/></div>
   </div>
+  <div id="sv_inc" class="sv-mount"></div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--sky3)">🔧</div><div><div class="ph-title">Incadea Data</div><div class="ph-sub">All records from your INCADEA DMS export</div></div></div>
     <div id="INC_E" class="al al-i" style="display:none">⬆️ Upload INCADEA file to view data.</div>
@@ -1601,6 +1611,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
       <option value="resolved">✅ Resolved only</option>
     </select></div>
   </div>
+  <div id="sv_age" class="sv-mount"></div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--rose3)">⏰</div><div><div class="ph-title">Rejection Ageing</div><div class="ph-sub">Days outstanding per rejection — your follow-up priority list</div></div></div>
     <div id="AGE_E" class="al al-i" style="display:none">⬆️ Upload GCM data and track at least one rejection to see ageing.</div>
@@ -1731,6 +1742,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
       <option value="overpaid">💙 Overpaid by Renault</option>
     </select></div>
   </div>
+  <div id="sv_shf" class="sv-mount"></div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--rose3)">📋</div><div><div class="ph-title">Shortfall Report</div><div class="ph-sub">Credited claims where Renault paid less than the rejected amount — money still owed</div></div></div>
     <div id="SHF_E" class="al al-i" style="display:none">No credited claims yet. Mark rejected claims as "💚 Credited" in the Rejection Protocol to populate this report.</div>
@@ -1751,6 +1763,7 @@ input[type="file"]#FI_GCM, input[type="file"]#FI_INC{
     <div class="fg nobr"><span class="fl">Search</span><input class="finput" id="F_CORRQ" placeholder="VIN, invoice, reason…" oninput="rCorr()"/></div>
     <button class="btn btn-ghost btn-sm" onclick="exportCorrCSV()" style="margin-left:auto">📥 Export to CSV</button>
   </div>
+  <div id="sv_corr" class="sv-mount"></div>
   <div class="scroll"><div class="page">
     <div class="ph"><div class="ph-icon" style="background:var(--sky3,#E0F2FE)">💧</div><div><div class="ph-title">Collection &amp; Corrections</div><div class="ph-sub">Every claim with a collection difference or a corrected invoice amount — detailed report</div></div></div>
     <div id="CORR_E" class="al al-i" style="display:none">No collection differences or corrections tracked yet. On the GCM page, use "+ Track Δ" on a paid claim with a gap, or enter a corrected amount in the protocol.</div>
@@ -2552,8 +2565,58 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. Hide the upload buttons / dropzones for non-managers
     _cwApplyUploadGate();
+
+    // 4. Saved views — only now, once fillGF/fillIF have filled the
+    //    month / expense-code / make / location options a view restores.
+    cwMountSavedViews();
   }, 600);
 });
+
+// ══ SAVED VIEWS (user_views.js) ═════════════════════════════════
+// One chip row per list, each under its own filter bar with its own
+// `page` key: the tabs are independent lists, so a GCM view never
+// touches the Incadea filters. Mounted once, after the first data load.
+// Only the list filters (F_*) go in; never the protocol modal (M_*),
+// the report builder (RPT_*) or the header jump-to search (GSEARCH).
+const CW_SV_LISTS = [
+  { key:'gcm',       ids:['F_GM','F_GE','F_GS','F_GQ'],          render:()=>rGCM() },
+  { key:'exp',       ids:['F_EM','F_EQ'],                        render:()=>rExp() },
+  { key:'comp',      ids:['F_CV','F_CD','F_CQ'],                 render:()=>{ const v=document.getElementById('F_CV'); if(v&&!v.value) v.value='vin'; rComp(); } },
+  { key:'compclaim', ids:['F_CCM','F_CCE','F_CCV','F_CCQ'],      render:()=>rCompClaim() },
+  { key:'ap',        ids:['F_AM','F_AE'],                        render:()=>rAP() },
+  { key:'rej',       ids:['F_RM','F_RF'],                        render:()=>rRej() },
+  { key:'inc',       ids:['F_IMK','F_ILOC','F_IQ'],              render:()=>rInc() },
+  { key:'age',       ids:['F_AGF'],                              render:()=>rAge() },
+  { key:'shf',       ids:['F_SHFF'],                             render:()=>rShf() },
+  { key:'corr',      ids:['F_CORRF','F_CORRQ'],                  render:()=>rCorr() },
+];
+let _cwSvMounted = false;
+async function cwMountSavedViews(){
+  if (_cwSvMounted) return;
+  _cwSvMounted = true;
+  try {
+    const ctx = await cwResubGetSb();
+    if (!ctx || !ctx.sb) { _cwSvMounted = false; return; }
+    const { mountSavedViews } = await import('./user_views.js?v=20261103a');
+    const currentUser = sessionStorage.getItem('cw_current_emp') || '';
+    for (const l of CW_SV_LISTS) {
+      const mountEl = document.getElementById('sv_' + l.key);
+      if (!mountEl) continue;
+      mountSavedViews({
+        sb: ctx.sb,
+        page: 'warranty:' + l.key,
+        mountEl,
+        filterIds: l.ids,
+        applyFilter: l.render,
+        ntf: (m) => showToast(m),
+        currentUser,
+      }).catch(e => console.warn('[BH] saved views failed for', l.key, e));
+    }
+  } catch (e) {
+    _cwSvMounted = false;
+    console.warn('[BH] saved views unavailable:', e);
+  }
+}
 
 // Hide upload UI for users who can't upload, and surface a small
 // read-only banner so they understand why

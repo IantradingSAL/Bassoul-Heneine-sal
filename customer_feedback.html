@@ -1021,7 +1021,7 @@ document.getElementById('btnPrev').addEventListener('click',()=>{if(pg>0){pg--;r
 document.getElementById('btnNext').addEventListener('click',()=>{pg++;render()})
 
 // Saved views — delegated to the shared module (user_views.js).
-import { mountSavedViews } from './user_views.js?v=20260423d'
+import { mountSavedViews } from './user_views.js?v=20261103a'
 mountSavedViews({
   sb,
   page:        'customer_feedback',
@@ -1030,6 +1030,8 @@ mountSavedViews({
   applyFilter: () => applyFilter(),
   ntf:         (m, t) => ntf(m, t),
   currentUser,
+  // A deep link (?filter=mine from the 🔔 modal) sets the filters itself.
+  restore:     !new URLSearchParams(location.search).get('filter'),
 })
 
 // ─── NOTIFICATION ON ASSIGNMENT (email + WhatsApp) ────────────
