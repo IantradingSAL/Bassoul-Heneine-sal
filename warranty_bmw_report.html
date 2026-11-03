@@ -43,6 +43,9 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 .btn.pri{background:var(--bmw);border-color:var(--bmw);color:#fff}
 .btn.pri:hover{background:var(--bmw-dark)}
 .quick{display:flex;gap:6px;flex-wrap:wrap}
+.pick{padding:8px 10px;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;font-size:13px;background:#fff;color:var(--txt);min-width:170px;max-width:260px;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick:hover{border-color:var(--bmw)}
+.pick.on{border-color:var(--bmw);background:var(--blue4);color:var(--bmw);font-weight:700}
 .spacer{flex:1}
 
 .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:10px;margin-top:14px}
@@ -112,7 +115,8 @@ td.nm{font-weight:700}
     <div class="filters">
       <div class="fg"><label for="fFrom">From month</label><input type="month" id="fFrom"></div>
       <div class="fg"><label for="fTo">To month</label><input type="month" id="fTo"></div>
-      <div class="fg"><label for="fAdv">Service advisor</label><select id="fAdv"><option value="">All advisors</option></select></div>
+      <div class="fg"><label for="fAdvBtn">Service advisor</label><button type="button" class="pick viewer-ok" id="fAdvBtn">All advisors ▾</button><input type="hidden" id="fAdv"></div>
+      <div class="fg"><label for="fMonBtn">Months</label><button type="button" class="pick viewer-ok" id="fMonBtn">All months ▾</button><input type="hidden" id="fMon"></div>
       <div class="quick">
         <button class="btn viewer-ok" data-range="year" type="button">This year</button>
         <button class="btn viewer-ok" data-range="12" type="button">Last 12 months</button>
@@ -176,6 +180,7 @@ td.nm{font-weight:700}
 
 <script type="module">
 import { SUPABASE_CONFIG } from './config.js'
+import { openPicker } from './col_filters.js?v=20261103b'
 
 let createClient = null
 for (const url of ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm', 'https://esm.sh/@supabase/supabase-js@2']) {
@@ -204,18 +209,49 @@ async function loadAll(){
   const { data, error } = await sb.rpc('bmw_advisor_monthly', { p_from: null, p_to: null })
   if (error) { toast('❌ ' + error.message, 6000); return }
   ALL = data || []
-  const advs = [...new Set(ALL.map(r => r.advisor))].sort((a, b) => a.localeCompare(b))
-  const sel = $('fAdv'), cur = sel.value
-  sel.innerHTML = '<option value="">All advisors</option>' + advs.map(a => `<option>${esc(a)}</option>`).join('')
-  if (cur) sel.value = cur
 }
+
+// Multi-select filters: the hidden inputs hold a JSON list (an older saved
+// view may hold one advisor name as plain text), '' = everything.
+function listOf(id){
+  const v = $(id).value
+  if (!v) return null
+  try { const a = JSON.parse(v); return Array.isArray(a) && a.length ? a : null } catch { return [v] }
+}
+function setList(id, arr){
+  $(id).value = arr && arr.length ? JSON.stringify(arr) : ''
+  $(id).dispatchEvent(new Event('change'))      // re-renders and updates the saved-view marker
+}
+function paintPickers(){
+  const a = listOf('fAdv'), m = listOf('fMon')
+  const at = a ? a.join(', ') : 'All advisors', mt = m ? m.slice().sort().map(monthLbl).join(', ') : 'All months'
+  $('fAdvBtn').textContent = at + ' ▾'; $('fAdvBtn').title = at; $('fAdvBtn').classList.toggle('on', !!a)
+  $('fMonBtn').textContent = mt + ' ▾'; $('fMonBtn').title = mt; $('fMonBtn').classList.toggle('on', !!m)
+}
+function inRange(r){ const from = $('fFrom').value, to = $('fTo').value; return (!from || r.month >= from) && (!to || r.month <= to) }
+$('fAdvBtn').addEventListener('click', e => {
+  e.stopPropagation()
+  const m = listOf('fMon'), cnt = {}
+  ALL.filter(r => inRange(r) && (!m || m.includes(r.month))).forEach(r => { cnt[r.advisor] = (cnt[r.advisor] || 0) + r.orders })
+  openPicker({ anchor: $('fAdvBtn'), title: 'Service advisor',
+    items: Object.keys(cnt).sort((x, y) => cnt[y] - cnt[x]).map(k => ({ key:k, label:k, count:cnt[k] })),
+    chosen: listOf('fAdv'), onApply: pick => setList('fAdv', pick) })
+})
+$('fMonBtn').addEventListener('click', e => {
+  e.stopPropagation()
+  const a = listOf('fAdv'), cnt = {}
+  ALL.filter(r => inRange(r) && (!a || a.includes(r.advisor))).forEach(r => { cnt[r.month] = (cnt[r.month] || 0) + r.orders })
+  openPicker({ anchor: $('fMonBtn'), title: 'Months',
+    items: Object.keys(cnt).sort().reverse().map(k => ({ key:k, label:monthLbl(k), count:cnt[k] })),
+    chosen: listOf('fMon'), onApply: pick => setList('fMon', pick) })
+})
 
 function blank(){ return { orders:0, warranty:0, service:0, pending:0, answered:0, rejected:0, cut:0, returned:0, picked_up:0, days_to_claim_sum:0, days_to_claim_n:0 } }
 function add(t, r){ for (const k in t) t[k] += Number(r[k]) || 0; return t }
 
 function scoped(){
-  const from = $('fFrom').value, to = $('fTo').value, adv = $('fAdv').value
-  return ALL.filter(r => (!from || r.month >= from) && (!to || r.month <= to) && (!adv || r.advisor === adv))
+  const a = listOf('fAdv'), m = listOf('fMon')
+  return ALL.filter(r => inRange(r) && (!a || a.includes(r.advisor)) && (!m || m.includes(r.month)))
 }
 
 // ── render ──
@@ -242,11 +278,12 @@ const row = (label, t, cls = '', pre = '') => `<tr class="${cls}"><td class="nm"
 
 const OPEN = new Set()
 function render(){
+  paintPickers()
   const rows = scoped()
-  const from = $('fFrom').value, to = $('fTo').value
-  $('periodLbl').textContent = (from || to)
-    ? `${from ? monthLbl(from) : 'Start'} → ${to ? monthLbl(to) : 'today'}${$('fAdv').value ? ' · ' + $('fAdv').value : ''}`
-    : 'All months'
+  const from = $('fFrom').value, to = $('fTo').value, a = listOf('fAdv'), m = listOf('fMon')
+  $('periodLbl').textContent = ((from || to) ? `${from ? monthLbl(from) : 'Start'} → ${to ? monthLbl(to) : 'today'}` : 'All months')
+    + (m ? ' · ' + m.slice().sort().map(monthLbl).join(', ') : '')
+    + (a ? ' · ' + a.join(', ') : '')
   const T = rows.reduce(add, blank())
 
   // KPIs
@@ -345,7 +382,7 @@ function setRange(kind){
   $('fFrom').dispatchEvent(new Event('change'))   // re-renders (and updates the saved-view marker)
 }
 document.querySelectorAll('[data-range]').forEach(b => b.addEventListener('click', () => setRange(b.dataset.range)))
-;['fFrom','fTo','fAdv'].forEach(id => $(id).addEventListener('change', render))
+;['fFrom','fTo','fAdv','fMon'].forEach(id => $(id).addEventListener('change', render))
 
 // ── export ──
 let _xlsxP = null
@@ -390,7 +427,7 @@ try {
   mountSavedViews({
     sb, page: 'warranty_bmw_report',
     mountEl: $('savedViewsMount'),
-    filterIds: ['fFrom', 'fTo', 'fAdv'],
+    filterIds: ['fFrom', 'fTo', 'fAdv', 'fMon'],
     applyFilter: () => render(),
     ntf: m => toast(m),
     currentUser: sessionStorage.getItem('cw_current_emp') || '',

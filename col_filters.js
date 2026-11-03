@@ -50,13 +50,73 @@ function css(){
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]))
 
+// ── The multi-select list itself, usable on its own ──
+// items: [{ key, label, count? }]; chosen: array of keys, or null (= all).
+// onApply(keys | null): null means "everything" (no filter).
+let pop = null
+function closePicker(){ if (pop) { pop.remove(); pop = null } }
+let _wired = false
+function wireGlobal(){
+  if (_wired) return; _wired = true
+  document.addEventListener('click', e => { if (pop && !pop.contains(e.target)) closePicker() })
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePicker() })
+  window.addEventListener('resize', closePicker)
+}
+export function openPicker({ anchor, title, items, chosen, onApply }){
+  css(); wireGlobal(); closePicker()
+  const keys = items.map(i => i.key)
+  const byKey = new Map(items.map(i => [i.key, i]))
+  const sel = new Set(chosen || keys)
+  pop = document.createElement('div')
+  pop.className = 'cf-pop'
+  pop.innerHTML = `<div class="cf-h"><span>${esc(title)}</span><span style="color:var(--faint,#94a3b8);font-weight:600">${keys.length} value${keys.length === 1 ? '' : 's'}</span></div>
+    <input type="search" placeholder="Search…" aria-label="Search values">
+    <div class="cf-list"></div>
+    <div class="cf-f"><button type="button" class="clr">Clear</button><button type="button" class="ok">OK</button></div>`
+  document.body.appendChild(pop)
+  const list = pop.querySelector('.cf-list'), q = pop.querySelector('input[type=search]')
+  const LIMIT = 400
+  const lab = k => String(byKey.get(k).label)
+  function draw(){
+    const term = q.value.trim().toLowerCase()
+    const vis = term ? keys.filter(k => lab(k).toLowerCase().includes(term)) : keys
+    const allOn = vis.length && vis.every(k => sel.has(k))
+    list.innerHTML = `<label class="all"><input type="checkbox" data-all ${allOn ? 'checked' : ''}> ${term ? 'Select all shown' : 'Select all'}</label>`
+      + vis.slice(0, LIMIT).map(k => `<label><input type="checkbox" data-k="${esc(k)}" ${sel.has(k) ? 'checked' : ''}><span>${esc(lab(k))}</span>${byKey.get(k).count != null ? `<span class="n">${byKey.get(k).count}</span>` : ''}</label>`).join('')
+      + (vis.length > LIMIT ? `<div class="cf-more">+${vis.length - LIMIT} more — type to narrow</div>` : '')
+      + (!vis.length ? `<div class="cf-more">No match</div>` : '')
+    list._vis = vis
+  }
+  draw()
+  q.addEventListener('input', draw)
+  list.addEventListener('change', e => {
+    const cb = e.target
+    if (cb.dataset.all !== undefined) { list._vis.forEach(k => cb.checked ? sel.add(k) : sel.delete(k)); draw(); return }
+    cb.checked ? sel.add(cb.dataset.k) : sel.delete(cb.dataset.k)
+    const all = list.querySelector('[data-all]'); if (all) all.checked = list._vis.every(k => sel.has(k))
+  })
+  pop.querySelector('.clr').addEventListener('click', () => { closePicker(); onApply(null) })
+  pop.querySelector('.ok').addEventListener('click', () => {
+    const term = q.value.trim().toLowerCase()
+    let pick = keys.filter(k => sel.has(k))
+    if (term) pick = pick.filter(k => lab(k).toLowerCase().includes(term))   // a search narrows to what was found
+    closePicker()
+    onApply(!pick.length || pick.length === keys.length ? null : pick)
+  })
+  q.addEventListener('keydown', e => { if (e.key === 'Enter') pop.querySelector('.ok').click() })
+  const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight
+  let left = Math.min(r.left, window.innerWidth - w - 8); left = Math.max(8, left)
+  let top = r.bottom + 4; if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4)
+  pop.style.left = left + 'px'; pop.style.top = top + 'px'
+  q.focus()
+}
+
 export function attachColumnFilters(opts){
   const { table, stateInput, columns, rows, onChange } = opts
   css()
   const ths = [...table.tHead.rows[0].cells]
   const cols = columns.map((c, i) => c && { kind:'text', empty:'(Empty)', ...c, th: ths[i] }).filter(Boolean)
   let state = {}           // key → array of chosen keys (EMPTY for empty)
-  let pop = null
 
   function readState(){
     try { state = JSON.parse(stateInput.value || '{}') || {} } catch { state = {} }
@@ -99,71 +159,27 @@ export function attachColumnFilters(opts){
     c.th.appendChild(b)
   }
 
-  function close(){ if (pop) { pop.remove(); pop = null } }
-  document.addEventListener('click', e => { if (pop && !pop.contains(e.target)) close() })
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') close() })
-  window.addEventListener('resize', close)
-
   // Values are counted among the rows the OTHER column filters keep (as in Excel).
   function open(c, anchor){
-    close()
     readState()
     const others = rows().filter(r => matchExcept(r, c.key))
     const counts = new Map()
     for (const r of others) { const k = keyOf(c, r); counts.set(k, (counts.get(k) || 0) + 1) }
-    let keys = [...counts.keys()].sort((a, b) => {
+    const keys = [...counts.keys()].sort((a, b) => {
       if (a === EMPTY) return 1; if (b === EMPTY) return -1
       if (c.kind === 'month') return b.localeCompare(a)        // newest month first
       return a.localeCompare(b, undefined, { numeric:true })
     })
-    const chosen = new Set(state[c.key] || keys)              // nothing chosen = everything
-    const title = c.th.childNodes[0]?.textContent?.trim() || c.key
-
-    pop = document.createElement('div')
-    pop.className = 'cf-pop'
-    pop.innerHTML = `<div class="cf-h"><span>${esc(title)}</span><span style="color:var(--faint,#94a3b8);font-weight:600">${keys.length} value${keys.length === 1 ? '' : 's'}</span></div>
-      <input type="search" placeholder="Search…" aria-label="Search values">
-      <div class="cf-list"></div>
-      <div class="cf-f"><button type="button" class="clr">Clear</button><button type="button" class="ok">OK</button></div>`
-    document.body.appendChild(pop)
-    const list = pop.querySelector('.cf-list'), q = pop.querySelector('input[type=search]')
-    const LIMIT = 400
-    function draw(){
-      const term = q.value.trim().toLowerCase()
-      const vis = term ? keys.filter(k => labelOf(c, k).toLowerCase().includes(term)) : keys
-      const allOn = vis.length && vis.every(k => chosen.has(k))
-      list.innerHTML = `<label class="all"><input type="checkbox" data-all ${allOn ? 'checked' : ''}> ${term ? 'Select all shown' : 'Select all'}</label>`
-        + vis.slice(0, LIMIT).map(k => `<label><input type="checkbox" data-k="${esc(k)}" ${chosen.has(k) ? 'checked' : ''}><span>${esc(labelOf(c, k))}</span><span class="n">${counts.get(k)}</span></label>`).join('')
-        + (vis.length > LIMIT ? `<div class="cf-more">+${vis.length - LIMIT} more — type to narrow</div>` : '')
-        + (!vis.length ? `<div class="cf-more">No match</div>` : '')
-      list._vis = vis
-    }
-    draw()
-    q.addEventListener('input', draw)
-    list.addEventListener('change', e => {
-      const cb = e.target
-      if (cb.dataset.all !== undefined) { list._vis.forEach(k => cb.checked ? chosen.add(k) : chosen.delete(k)); draw(); return }
-      cb.checked ? chosen.add(cb.dataset.k) : chosen.delete(cb.dataset.k)
-      const all = list.querySelector('[data-all]'); if (all) all.checked = list._vis.every(k => chosen.has(k))
+    openPicker({
+      anchor,
+      title: c.th.childNodes[0]?.textContent?.trim() || c.key,
+      items: keys.map(k => ({ key:k, label:labelOf(c, k), count:counts.get(k) })),
+      chosen: state[c.key] || null,
+      onApply: pick => {
+        if (pick) state[c.key] = pick; else delete state[c.key]
+        writeState(); paintButtons(); onChange()
+      },
     })
-    pop.querySelector('.clr').addEventListener('click', () => { delete state[c.key]; writeState(); paintButtons(); close(); onChange() })
-    pop.querySelector('.ok').addEventListener('click', () => {
-      const sel = keys.filter(k => chosen.has(k))
-      // A search narrows the choice to what was found and ticked.
-      const term = q.value.trim().toLowerCase()
-      const pick = term ? sel.filter(k => labelOf(c, k).toLowerCase().includes(term)) : sel
-      if (!pick.length || pick.length === keys.length) delete state[c.key]
-      else state[c.key] = pick
-      writeState(); paintButtons(); close(); onChange()
-    })
-    q.addEventListener('keydown', e => { if (e.key === 'Enter') pop.querySelector('.ok').click() })
-
-    // Place it under the button, inside the window.
-    const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight
-    let left = Math.min(r.left, window.innerWidth - w - 8); left = Math.max(8, left)
-    let top = r.bottom + 4; if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4)
-    pop.style.left = left + 'px'; pop.style.top = top + 'px'
-    q.focus()
   }
 
   function matchExcept(r, skip){
