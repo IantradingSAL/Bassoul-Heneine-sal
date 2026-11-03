@@ -82,6 +82,10 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .t tbody tr.tr-clickable:hover .vin-cell{color:var(--blue);text-decoration:underline}
 .vin-cell{cursor:pointer;transition:color .12s}
 .vin-cell:hover{color:var(--blue) !important;text-decoration:underline}
+.adv-pick{width:100%;min-width:190px;text-align:left;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font:inherit;font-size:13px;color:var(--txt);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.adv-pick:hover{border-color:var(--bmw)}
+.adv-pick.on{border-color:var(--bmw);background:var(--blue4,#eef2ff);color:var(--bmw);font-weight:700}
+.t thead th{white-space:nowrap}
 .t thead th.sortable{cursor:pointer;user-select:none;position:relative;padding-right:18px}
 .t thead th.sortable:hover{background:#e2e8f0}
 .t thead th.sortable::after{content:"↕";position:absolute;right:5px;top:50%;transform:translateY(-50%);opacity:.3;font-size:10px}
@@ -336,7 +340,8 @@ body.hide-sc .c-sc{display:none}
         </div>
         <div class="fld" id="wrap_advfilter">
           <label>Service advisor</label>
-          <select id="f_adv"><option value="">All advisors</option></select>
+          <select id="f_adv" style="display:none" aria-hidden="true"><option value="">All advisors</option></select>
+          <button type="button" class="adv-pick viewer-ok" id="f_adv_btn">All advisors ▾</button>
         </div>
         <div class="fld">
           <label>Order date from</label>
@@ -352,6 +357,7 @@ body.hide-sc .c-sc{display:none}
           <button class="btn btn-sm" id="refreshBtn">↻ Refresh</button>
         </div>
       </div>
+      <input type="hidden" id="f_cols">
       <div class="sv-mount" id="ordersViews"></div>
 
       <div class="tw">
@@ -564,7 +570,8 @@ function scopeRows(){
     (r.created_by && S.authUserId && r.created_by === S.authUserId)
   )
 }
-function applyFilters(rows){
+// Search box + date range (+ the old single advisor of saved views).
+function topFilters(rows){
   const q = val('f_q').toLowerCase()
   const adv = val('f_adv')
   const from = val('f_from'), to = val('f_to')
@@ -578,6 +585,19 @@ function applyFilters(rows){
     return true
   })
 }
+// …then every column filter (multi-select, col_filters.js).
+function applyFilters(rows){
+  const top = topFilters(rows)
+  return CF ? top.filter(CF.match) : top
+}
+function paintAdvBtn(){
+  const b = $('f_adv_btn'); if (!b) return
+  const picked = CF && CF.label('adv')
+  const single = val('f_adv')
+  const txt = picked ? picked.join(', ') : single ? (single === '__none__' ? '— no advisor —' : single) : 'All advisors'
+  b.textContent = txt + ' ▾'; b.title = txt
+  b.classList.toggle('on', !!(picked || single))
+}
 function populateAdvisorFilter(){
   if (!S.isAdmin) return
   const cur = val('f_adv')
@@ -590,6 +610,8 @@ function populateAdvisorFilter(){
 }
 
 function render(){
+  if (CF) CF.refresh()
+  paintAdvBtn()
   const scoped = scopeRows()
   S.view = applyFilters(scoped)
   const total = scoped.length, matched = scoped.filter(r=>r.warranty_claim_date).length
@@ -642,6 +664,7 @@ function printReport(){
   const f=[]
   if (val('f_q')) f.push('search: "'+val('f_q')+'"')
   if (val('f_adv')) f.push('advisor: '+val('f_adv'))
+  if (CF) CF.describe().forEach(d => f.push(d))
   if (val('f_from')) f.push('from '+val('f_from'))
   if (val('f_to')) f.push('to '+val('f_to'))
   if (!S.isAdmin) f.push('advisor: '+S.advisorName)
@@ -714,7 +737,39 @@ $('moreBtn').addEventListener('click', () => { S.limit = (S.limit || 300) + 300;
 $('m_save').addEventListener('click', saveModal)
 $('modalBg').addEventListener('click', e=>{ if(e.target===$('modalBg')) window._closeModal() })
 ;['f_q','f_adv','f_from','f_to'].forEach(id=> $(id).addEventListener('input', render))
-$('clearFilters').addEventListener('click', ()=>{ ['f_q','f_adv','f_from','f_to'].forEach(id=>{ if($(id)) $(id).value='' }); $('f_q').dispatchEvent(new Event('input')) })
+$('clearFilters').addEventListener('click', ()=>{ ['f_q','f_adv','f_from','f_to','f_cols'].forEach(id=>{ if($(id)) $(id).value='' }); $('f_q').dispatchEvent(new Event('input')) })
+
+// Filters on every column: tick any number of values (dates by month).
+let CF = null
+{
+  const { attachColumnFilters } = await import('./col_filters.js?v=20261103a')
+  CF = attachColumnFilters({
+    table: document.querySelector('table.t'),
+    stateInput: $('f_cols'),
+    columns: [
+      { key:'no',   get: r => r.order_number },
+      { key:'ref',  get: r => r.order_ref || ('GOR0' + r.order_number) },
+      { key:'vin',  get: r => r.vin },
+      { key:'cust', get: r => r.customer_name },
+      { key:'adv',  get: r => r.service_advisor, empty:'— no advisor —' },
+      { key:'od',   get: r => r.order_date,  kind:'month' },
+      { key:'wd',   get: r => r.work_date,   kind:'month' },
+      { key:'pu',   get: r => r.pickup_date, kind:'month' },
+      { key:'ret',  get: r => r.return_date, kind:'month' },
+      { key:'wc',   get: r => r.warranty_claim_date, kind:'month', empty:'⏳ Pending' },
+      { key:'sc',   get: r => r.service_claim_date,  kind:'month', empty:'(None)' },
+      { key:'note', get: r => r.note },
+      { key:'wnote',get: r => r.warranty_note },
+    ],
+    rows: () => topFilters(scopeRows()),
+    onChange: () => { S.limit = 300; render() },
+  })
+  $('f_adv_btn').addEventListener('click', e => {
+    e.stopPropagation()
+    if (val('f_adv')) { $('f_adv').value = '' }      // an old single-advisor view gives way to the list
+    CF.open('adv', $('f_adv_btn'))
+  })
+}
 
 // init
 $('f_orderdate').value = todayISO(); $('f_date').value = todayISO()
@@ -732,7 +787,7 @@ async function mountViews(){
     mountSavedViews({
       sb, page: 'warranty_bmw_orders',
       mountEl:     $('ordersViews'),
-      filterIds:   ['f_q','f_adv','f_from','f_to'],
+      filterIds:   ['f_q','f_adv','f_from','f_to','f_cols'],
       applyFilter: () => render(),
       ntf:         m => showToast(m),
       currentUser: sessionStorage.getItem('cw_current_emp') || '',
