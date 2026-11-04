@@ -370,7 +370,7 @@ body.hide-sc .c-sc{display:none}
         <div class="btns">
           <button class="btn btn-sm btn-ghost" id="clearFilters">Clear</button>
           <button class="btn btn-sm btn-ghost" id="printBtn">🖨 Print report</button>
-          <button class="btn btn-sm btn-ghost viewer-ok" id="sheetBtn" title="The day's orders for the warranty admin to receive and sign">📝 Daily sheet</button>
+          <button class="btn btn-sm btn-ghost viewer-ok" id="sheetBtn" title="Every order still in the tray — printed for the warranty clerk to sign when he picks them up">📝 Pick-up sheet</button>
           <button class="btn btn-sm" id="refreshBtn">↻ Refresh</button>
         </div>
       </div>
@@ -403,10 +403,9 @@ body.hide-sc .c-sc{display:none}
       </div>
       <div id="sheetDlg" class="sheet-dlg" hidden>
         <div class="sheet-box">
-          <div style="font-weight:800;font-size:14px;margin-bottom:4px">📝 Daily sheet</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">The orders an advisor registered on one day — printed for the warranty admin to receive, note and sign.</div>
-          <div class="fld"><label>Day</label><input type="date" id="sheetDay"></div>
-          <div class="fld" id="sheetAdvWrap" style="margin-top:10px"><label>Service advisor</label><select id="sheetAdv"></select></div>
+          <div style="font-weight:800;font-size:14px;margin-bottom:4px">📝 Pick-up sheet</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Every order still in the tray (not yet received or returned by the warranty clerk), whatever day it was entered — printed for the clerk to sign when he takes them. Claims come later, so there is no claim column.</div>
+          <div class="fld" id="sheetAdvWrap"><label>Service advisor</label><select id="sheetAdv"></select></div>
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
             <button type="button" class="btn btn-sm btn-ghost viewer-ok" id="sheetCancel">Cancel</button>
             <button type="button" class="btn btn-sm viewer-ok" id="sheetGo">🖨 Print</button>
@@ -521,7 +520,10 @@ async function whoami(){
   const chip = $('modeChip'); chip.textContent = S.isAdmin ? '🔓 Warranty admin' : '🔒 Advisor'; chip.className = 'badge ' + (S.isAdmin ? 'b-ok' : 'b-pend')
   // advisors are scoped to their own cases → hide the advisor filter for them
   $('wrap_advfilter').style.display = S.isAdmin ? '' : 'none'
-  $('k_total_sub').textContent = S.isAdmin ? 'All registered' : 'Your cases'
+  $('k_total_sub').textContent = S.isAdmin ? 'All registered' : 'In the tray — not yet picked up'
+  // An advisor sees only what is still in the tray: once the warranty clerk
+  // receives or returns an order it leaves this list (it is in the report).
+  if (!S.isAdmin) ['k_pending','k_returned','k_matched'].forEach(id => { const k = $(id)?.closest('.kpi'); if (k) k.style.display = 'none' })
   applyRoleLocks()
 }
 
@@ -618,14 +620,16 @@ async function load(){
   render()
 }
 
-// advisor sees only their own cases
+// still in the tray: not yet received nor returned by the warranty clerk
+const inTray = r => !r.pickup_date && !r.return_date
+// advisor sees only their own cases, and only those still in the tray
 function scopeRows(){
   if (S.isAdmin) return S.rows
-  return S.rows.filter(r =>
+  return S.rows.filter(r => inTray(r) && (
     (S.me && r.service_advisor_id && r.service_advisor_id === S.me.id) ||
     (r.service_advisor && S.advisorName !== '—' && (r.service_advisor||'').toLowerCase() === S.advisorName.toLowerCase()) ||
     (r.created_by && S.authUserId && r.created_by === S.authUserId)
-  )
+  ))
 }
 // Search box + date range (+ the old single advisor of saved views).
 function topFilters(rows){
@@ -683,7 +687,7 @@ function render(){
   $('moreBtn').textContent = `Show ${Math.min(300, S.view.length - shown)} more`
   const dash='<span style="color:var(--faint)">—</span>'
   const claim = v => v ? (S.isAdmin ? fmtDT(v) : fmtD(v)) : null
-  if (!S.view.length){ $('tbody').innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--faint);padding:26px">'+(scoped.length?'No orders match the filters.':'No orders yet — add one above.')+'</td></tr>'; return }
+  if (!S.view.length){ $('tbody').innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--faint);padding:26px">'+(scoped.length?'No orders match the filters.':S.isAdmin?'No orders yet — add one above.':'Nothing in the tray — every order has been picked up by the warranty clerk. Picked-up and returned orders are in the 📊 Advisor Report.')+'</td></tr>'; return }
   $('tbody').innerHTML = S.view.slice(0, shown).map(r=>{
     const none = !r.warranty_claim_date && !r.service_claim_date
     const wc = r.warranty_claim_date ? '<span class="badge b-ok">'+claim(r.warranty_claim_date)+'</span>'
@@ -710,12 +714,11 @@ function render(){
   $('tbody').querySelectorAll('tr.tr-clickable').forEach(tr=>tr.addEventListener('click',()=>openModal(+tr.dataset.id)))
 }
 
-// ── daily sheet: one advisor's orders of one day, for the warranty admin ──
-// Printed and handed over with the job cards: the admin ticks what he
-// received, notes why a claim was not picked up, and both sign.
+// ── pick-up sheet: every order still in the tray, per advisor ──
+// Printed when the warranty clerk takes the job cards: he ticks what he
+// received, notes what he did not take, and both sign. Claims come later.
 function openSheet(){
-  $('sheetDay').value = todayISO()
-  const names = [...new Set(S.rows.map(r => (r.service_advisor||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b))
+  const names = [...new Set(S.rows.filter(inTray).map(r => (r.service_advisor||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b))
   if (S.isAdmin) {
     $('sheetAdvWrap').style.display = ''
     $('sheetAdv').innerHTML = '<option value="">All advisors (one sheet each)</option>' + names.map(n => `<option>${esc(n)}</option>`).join('')
@@ -723,13 +726,12 @@ function openSheet(){
   $('sheetDlg').hidden = false
 }
 function printDailySheet(){
-  const day = $('sheetDay').value || todayISO()
   const dayOf = r => (r.work_date || '').slice(0,10) || localDay(r.created_at)
-  let rows = scopeRows().filter(r => dayOf(r) === day)
+  let rows = scopeRows().filter(inTray)
   const pick = S.isAdmin ? $('sheetAdv').value : ''
   if (pick) rows = rows.filter(r => (r.service_advisor||'').trim() === pick)
   $('sheetDlg').hidden = true
-  if (!rows.length) { showToast('No orders on ' + fmtD(day) + (pick ? ' for ' + pick : '')); return }
+  if (!rows.length) { showToast('Nothing in the tray' + (pick ? ' for ' + pick : '')); return }
   const groups = {}
   rows.forEach(r => { const a = (r.service_advisor||'').trim() || '— no advisor —'; (groups[a] = groups[a] || []).push(r) })
   const pages = Object.keys(groups).sort().map(a => {
@@ -740,26 +742,26 @@ function printDailySheet(){
       <td class="m">${esc(r.vin || '')}</td>
       <td>${esc(r.customer_name || '')}</td>
       <td>${r.order_date ? fmtD(r.order_date) : '<span class="mu">Incadea</span>'}</td>
+      <td>${fmtD(dayOf(r))}</td>
       <td>${esc(r.note || '')}</td>
-      <td class="box">${r.pickup_date ? '✓ ' + fmtD(r.pickup_date) : ''}</td>
-      <td class="box"></td><td class="box"></td>
-      <td class="nt">${esc(r.warranty_note || '')}</td>
+      <td class="box"></td>
+      <td class="nt"></td>
     </tr>`).join('')
     return `<section class="pg">
-      <div class="meta"><div><h1>🇩🇪 BMW Warranty — Daily sheet</h1>
-        <div class="sub">Bassoul, Heneine SAL · Service advisor: <b>${esc(a)}</b> · Day: <b>${fmtD(day)}</b> · ${list.length} order(s)</div></div>
+      <div class="meta"><div><h1>🇩🇪 BMW Warranty — Pick-up sheet</h1>
+        <div class="sub">Bassoul, Heneine SAL · Service advisor: <b>${esc(a)}</b> · Orders in the tray: <b>${list.length}</b></div></div>
         <div class="sub">Printed ${new Date().toLocaleString('en-GB')}</div></div>
-      <table><thead><tr><th>#</th><th>Order</th><th>VIN</th><th>Customer</th><th>Order date</th><th>Advisor note</th>
-        <th>Received ✓</th><th>Warranty claim</th><th>Service claim</th><th style="width:22%">Warranty admin note (if not picked up)</th></tr></thead>
+      <table><thead><tr><th>#</th><th>Order</th><th>VIN</th><th>Customer</th><th>Order date</th><th>Entered</th><th>Advisor note</th>
+        <th>Received ✓</th><th style="width:26%">Warranty clerk note (if not taken)</th></tr></thead>
         <tbody>${body}</tbody></table>
       <div class="sign">
         <div><div class="ln"></div>Service advisor — ${esc(a)}<br><span class="mu">Signature &amp; date</span></div>
-        <div><div class="ln"></div>Warranty admin — received by<br><span class="mu">Signature &amp; date</span></div>
+        <div><div class="ln"></div>Warranty clerk — received by<br><span class="mu">Signature &amp; date</span></div>
       </div></section>`
   }).join('')
   const w = window.open('', '_blank')
   if (!w){ showToast('⚠️ Allow pop-ups to print'); return }
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>BMW Daily sheet ${fmtD(day)}</title>
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>BMW Pick-up sheet ${fmtD(todayISO())}</title>
     <style>
       *{font-family:Arial,Helvetica,sans-serif;box-sizing:border-box}
       body{margin:24px;color:#0f172a}
