@@ -126,7 +126,7 @@ td.nm{font-weight:700}
     <div class="logo">B</div>
     <div>
       <h1>📊 Advisor Report</h1>
-      <p>BMW Warranty · orders, warranty &amp; service claims, BMW answers and returns — month by month, per service advisor</p>
+      <p>BMW Warranty · orders, warranty &amp; service claims, pick-ups and returns — month by month, per service advisor</p>
     </div>
   </div>
 
@@ -153,7 +153,7 @@ td.nm{font-weight:700}
   <div class="charts">
     <div class="card">
       <h2>Month by month</h2>
-      <div class="sub">Orders, warranty and service claims per month · line: share of answered claims BMW sent back</div>
+      <div class="sub">Orders, warranty and service claims per month</div>
       <div class="chartbox"><canvas id="chMonth"></canvas></div>
     </div>
     <div class="card">
@@ -196,9 +196,6 @@ td.nm{font-weight:700}
       <span><b>Warranty / Service</b> — orders with a warranty claim / a service (BSI) claim, from the order or from the Incadea claim upload.</span>
       <span><b>Warranty only / Service only / Both</b> — which claims the order has (an order needs one or the other, or both).</span>
       <span><b>Pending</b> — no claim of either kind yet and not returned to the advisor.</span>
-      <span><b>Answered</b> — BMW's credit note received.</span>
-      <span><b>Sent back</b> — BMW rejected at least one line (SAP status <i>Error</i>); <b>BMW return rate</b> = sent back ÷ answered.</span>
-      <span><b>Cut</b> — partly credited (status <i>Warning</i>).</span>
       <span><b>Returned to advisor</b> — not a warranty case (internal, customer pays…): no claim, a return date set; <b>return rate</b> = returned ÷ orders.</span>
       <span><b>Picked up / Waiting pick-up</b> — received by the warranty admin on the 📥 Pick-up page, or still to receive (not returned); <b>days to pick-up</b> = average days from the order's date to its pick-up.</span>
       <span><b>Days to claim</b> — average days from the order date to its first claim.</span>
@@ -317,10 +314,6 @@ const COLS = [
   ['Service only',    t => cell(t.service_only, t.orders)],
   ['Both',            t => cell(t.both_claims, t.orders)],
   ['Pending',         t => cell(t.pending, t.orders)],
-  ['Answered',        t => cell(t.answered)],
-  ['Sent back',       t => cell(t.rejected)],
-  ['BMW return rate', t => rateChip(pctOf(t.rejected, t.answered), 0.03, 0.10)],
-  ['Cut',             t => cell(t.cut)],
   ['Returned to advisor', t => cell(t.returned, t.orders)],
   ['Return rate',     t => rateChip(pctOf(t.returned, t.orders), 0.02, 0.08)],
   ['Picked up',       t => cell(t.picked, t.orders)],
@@ -348,7 +341,6 @@ function render(){
     + k('w', 'Warranty claims', fmt(T.warranty), pctTxt(pctOf(T.warranty, T.orders)) + ' of orders', 'warranty')
     + k('sv', 'Service claims', fmt(T.service), pctTxt(pctOf(T.service, T.orders)) + ' of orders', 'service')
     + k('p', 'Pending', fmt(T.pending), 'no claim yet, not returned', 'pending')
-    + k(pctOf(T.rejected, T.answered) > 0.10 ? 'r' : 'ok', 'BMW return rate', pctTxt(pctOf(T.rejected, T.answered)), `${fmt(T.rejected)} sent back of ${fmt(T.answered)} answered`, 'sentback')
     + k(pctOf(T.returned, T.orders) > 0.08 ? 'r' : 'ok', 'Returned to advisor', pctTxt(pctOf(T.returned, T.orders)), `${fmt(T.returned)} not warranty cases`, 'returned')
     + k(T.waiting ? 'p' : 'ok', 'Waiting pick-up', fmt(T.waiting), `${fmt(T.picked)} picked up · ${T.days_to_pickup_n ? (T.days_to_pickup_sum / T.days_to_pickup_n).toFixed(1) + ' days on average' : '—'}`, 'waiting')
     + k('', 'Days to claim', avgDays(T), 'average, order → first claim')
@@ -404,13 +396,12 @@ function drawCharts(months, byMonth, advs, byAdv){
         { type:'bar', label:'Orders', data: months.map(m => byMonth[m].t.orders), backgroundColor: C.orders, borderRadius: 4, order: 3 },
         { type:'bar', label:'Warranty', data: months.map(m => byMonth[m].t.warranty), backgroundColor: C.w, borderRadius: 4, order: 2 },
         { type:'bar', label:'Service', data: months.map(m => byMonth[m].t.service), backgroundColor: C.s, borderRadius: 4, order: 2 },
-        { type:'line', label:'BMW return rate %', yAxisID:'y2', data: months.map(m => { const t = byMonth[m].t; return t.answered ? +(t.rejected / t.answered * 100).toFixed(1) : null }), borderColor: C.r, backgroundColor: C.r, tension: .3, spanGaps: true, order: 1 },
       ],
     },
     options: {
       animation: false, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, y2: { position: 'right', beginAtZero: true, suggestedMax: 15, grid: { display: false }, ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } },
     },
   })
   charts.a = new Chart($('chAdv'), {
@@ -439,9 +430,6 @@ const STATUSES = [
   ['both',     'Both',                r => !!r.warranty_date && !!r.service_date],
   ['pending',  'Pending',             r => !r.warranty_date && !r.service_date && !r.return_date],
   ['returned', 'Returned to advisor', r => !!r.return_date],
-  ['answered', 'Answered by BMW',     r => r.answered],
-  ['sentback', 'Sent back by BMW',    r => r.rejected],
-  ['cut',      'Cut',                 r => r.cut],
   ['waiting',  'Waiting pick-up',     r => !r.pickup_date && !r.return_date],
   ['novin',    'No VIN',              r => !(r.vin || '').trim()],
 ]
@@ -524,9 +512,8 @@ $('xlsBtn').addEventListener('click', async () => {
   try {
     const X = await loadXlsx()
     const rows = scoped()
-    const H = ['Orders','Warranty','Service','Warranty only','Service only','Both','Pending','Answered','Sent back','BMW return rate %','Cut','Returned to advisor','Return rate %','Picked up','Waiting pick-up','Avg days to pick-up','Avg days to claim']
-    const vals = t => [t.orders, t.warranty, t.service, t.warranty_only, t.service_only, t.both_claims, t.pending, t.answered, t.rejected,
-      t.answered ? +(t.rejected / t.answered * 100).toFixed(1) : null, t.cut, t.returned,
+    const H = ['Orders','Warranty','Service','Warranty only','Service only','Both','Pending','Returned to advisor','Return rate %','Picked up','Waiting pick-up','Avg days to pick-up','Avg days to claim']
+    const vals = t => [t.orders, t.warranty, t.service, t.warranty_only, t.service_only, t.both_claims, t.pending, t.returned,
       t.orders ? +(t.returned / t.orders * 100).toFixed(1) : null,
       t.picked, t.waiting, t.days_to_pickup_n ? +(t.days_to_pickup_sum / t.days_to_pickup_n).toFixed(1) : null,
       t.days_to_claim_n ? +(t.days_to_claim_sum / t.days_to_claim_n).toFixed(1) : null]
