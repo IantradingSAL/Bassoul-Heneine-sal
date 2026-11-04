@@ -456,12 +456,7 @@ function ordShown(){
   const q = ($('fOrdQ')?.value || '').trim().toUpperCase()
   return ordScoped().filter(r => st[2](r) && (!q || [r.order_ref, r.order_number, r.vin, r.customer, r.advisor].some(v => (v || '').toUpperCase().includes(q))))
 }
-const answerTxt = r => r.rejected ? 'Sent back' : r.cut ? 'Cut' : r.answered ? 'Credited' : (r.warranty_date || r.service_date) ? 'Waiting BMW' : ''
 const statusTxt = r => r.return_date ? 'Returned' : (!r.warranty_date && !r.service_date) ? 'Pending' : 'Claimed'
-function answerTag(r){
-  const t = answerTxt(r); if (!t) return ''
-  return `<span class="tag ${{ 'Sent back':'bad', 'Cut':'cut', 'Credited':'ok', 'Waiting BMW':'wait' }[t]}">${t}</span>`
-}
 function statusTag(r){
   const t = statusTxt(r)
   return t === 'Returned' ? '<span class="tag ret">↩ Returned</span>' : t === 'Pending' ? '<span class="tag pen">⏳ Pending</span>' : '<span class="tag ok">✓ Claimed</span>'
@@ -473,12 +468,12 @@ function renderOrders(){
     + `<input id="fOrdQ" class="viewer-ok" placeholder="🔎 Order, VIN, customer" value="${esc(q)}">`
   const rows = ordShown()
   $('tOrd').innerHTML = rows.length
-    ? `<thead><tr><th>Order</th><th>Order date</th><th>Service advisor</th><th>VIN</th><th>Customer</th><th>Status</th><th>Warranty claim</th><th>Service claim</th><th>BMW answer</th><th>Picked up</th><th>Returned</th><th>Warranty note</th></tr></thead><tbody>`
+    ? `<thead><tr><th>Order</th><th>Order date</th><th>Service advisor</th><th>VIN</th><th>Customer</th><th>Status</th><th>Warranty claim</th><th>Service claim</th><th>Picked up</th><th>Returned</th><th>Warranty note</th></tr></thead><tbody>`
       + rows.slice(0, ORD_LIMIT).map(r => `<tr>
         <td><a href="warranty_bmw_orders.html?q=${encodeURIComponent(r.order_number)}" title="Open the case">${esc(r.order_ref)}</a></td>
         <td>${dmy(r.order_date)}</td><td>${esc(r.advisor)}</td>
         <td class="vin">${esc(r.vin) || '<span class="zero">—</span>'}</td><td>${esc(r.customer)}</td>
-        <td>${statusTag(r)}</td><td>${dmy(r.warranty_date)}</td><td>${dmy(r.service_date)}</td><td>${answerTag(r)}</td>
+        <td>${statusTag(r)}</td><td>${dmy(r.warranty_date)}</td><td>${dmy(r.service_date)}</td>
         <td>${dmy(r.pickup_date)}</td><td>${dmy(r.return_date)}</td><td class="note">${esc(r.warranty_note)}</td></tr>`).join('') + '</tbody>'
     : `<tbody><tr><td class="empty">No orders match.</td></tr></tbody>`
   const label = (STATUSES.find(s => s[0] === cur) || STATUSES[0])[1]
@@ -542,9 +537,9 @@ $('xlsBtn').addEventListener('click', async () => {
     X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Service advisor', ...H], ...Object.entries(byAdv).map(([a, t]) => [a, ...vals(t)]), ['Total', ...vals(T)]]), 'By advisor')
     X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Month', ...H], ...Object.keys(byMonth).sort().map(m => [m, ...vals(byMonth[m])]), ['Total', ...vals(T)]]), 'By month')
     X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Month', 'Service advisor', ...H], ...rows.map(r => [r.month, r.advisor, ...vals(r)])]), 'Month x advisor')
-    const OH = ['Order','Order date','Month','Service advisor','VIN','Customer','Status','Warranty claim','Service claim','BMW answer','Picked up','Returned to advisor','Warranty note']
+    const OH = ['Order','Order date','Month','Service advisor','VIN','Customer','Status','Warranty claim','Service claim','Picked up','Returned to advisor','Warranty note']
     X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([OH, ...ordShown().map(r => [r.order_ref, r.order_date, r.month, r.advisor, r.vin || '', r.customer || '',
-      statusTxt(r), r.warranty_date || '', r.service_date || '', answerTxt(r), r.pickup_date || '', r.return_date || '', r.warranty_note || ''])]), 'Orders (VIN list)')
+      statusTxt(r), r.warranty_date || '', r.service_date || '', r.pickup_date || '', r.return_date || '', r.warranty_note || ''])]), 'Orders (VIN list)')
     X.writeFile(wb, `BMW_Advisor_Report_${$('fFrom').value || 'start'}_${$('fTo').value || 'today'}.xlsx`)
   } catch (e) { toast('❌ ' + e.message) }
 })

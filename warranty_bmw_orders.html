@@ -370,7 +370,7 @@ body.hide-sc .c-sc{display:none}
         <div class="btns">
           <button class="btn btn-sm btn-ghost" id="clearFilters">Clear</button>
           <button class="btn btn-sm btn-ghost" id="printBtn">🖨 Print report</button>
-          <button class="btn btn-sm btn-ghost viewer-ok" id="sheetBtn" title="The day's orders for the warranty admin to receive and sign">📝 Daily sheet</button>
+          <button class="btn btn-sm btn-ghost viewer-ok" id="sheetBtn" title="Every order still in the tray — printed for the warranty clerk to sign when he picks them up">📝 Pick-up sheet</button>
           <button class="btn btn-sm" id="refreshBtn">↻ Refresh</button>
         </div>
       </div>
@@ -403,10 +403,9 @@ body.hide-sc .c-sc{display:none}
       </div>
       <div id="sheetDlg" class="sheet-dlg" hidden>
         <div class="sheet-box">
-          <div style="font-weight:800;font-size:14px;margin-bottom:4px">📝 Daily sheet</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">The orders an advisor registered on one day — printed for the warranty admin to receive, note and sign.</div>
-          <div class="fld"><label>Day</label><input type="date" id="sheetDay"></div>
-          <div class="fld" id="sheetAdvWrap" style="margin-top:10px"><label>Service advisor</label><select id="sheetAdv"></select></div>
+          <div style="font-weight:800;font-size:14px;margin-bottom:4px">📝 Pick-up sheet</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Every order still in the tray (not yet received or returned by the warranty clerk), whatever day it was entered — printed for the clerk to sign when he takes them. Claims come later, so there is no claim column.</div>
+          <div class="fld" id="sheetAdvWrap"><label>Service advisor</label><select id="sheetAdv"></select></div>
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
             <button type="button" class="btn btn-sm btn-ghost viewer-ok" id="sheetCancel">Cancel</button>
             <button type="button" class="btn btn-sm viewer-ok" id="sheetGo">🖨 Print</button>
@@ -446,6 +445,7 @@ body.hide-sc .c-sc{display:none}
         </div>
       </div>
       <div class="al al-i" style="margin:0" id="m_modeNote">—</div>
+      <div class="fld" id="wrap_m_adv"><label>Service advisor</label><select id="m_adv"></select><span class="hint">Admin only — move the order to another advisor</span></div>
       <div class="fld"><label>VIN</label><input id="m_vin" type="text" style="text-transform:uppercase"></div>
       <div class="fld"><label>Customer name</label><input id="m_customer" type="text"></div>
       <div class="fld"><label>Service advisor note</label><textarea id="m_note" rows="2"></textarea></div>
@@ -520,7 +520,10 @@ async function whoami(){
   const chip = $('modeChip'); chip.textContent = S.isAdmin ? '🔓 Warranty admin' : '🔒 Advisor'; chip.className = 'badge ' + (S.isAdmin ? 'b-ok' : 'b-pend')
   // advisors are scoped to their own cases → hide the advisor filter for them
   $('wrap_advfilter').style.display = S.isAdmin ? '' : 'none'
-  $('k_total_sub').textContent = S.isAdmin ? 'All registered' : 'Your cases'
+  $('k_total_sub').textContent = S.isAdmin ? 'All registered' : 'In the tray — not yet picked up'
+  // An advisor sees only what is still in the tray: once the warranty clerk
+  // receives or returns an order it leaves this list (it is in the report).
+  if (!S.isAdmin) ['k_pending','k_returned','k_matched'].forEach(id => { const k = $(id)?.closest('.kpi'); if (k) k.style.display = 'none' })
   applyRoleLocks()
 }
 
@@ -617,14 +620,16 @@ async function load(){
   render()
 }
 
-// advisor sees only their own cases
+// still in the tray: not yet received nor returned by the warranty clerk
+const inTray = r => !r.pickup_date && !r.return_date
+// advisor sees only their own cases, and only those still in the tray
 function scopeRows(){
   if (S.isAdmin) return S.rows
-  return S.rows.filter(r =>
+  return S.rows.filter(r => inTray(r) && (
     (S.me && r.service_advisor_id && r.service_advisor_id === S.me.id) ||
     (r.service_advisor && S.advisorName !== '—' && (r.service_advisor||'').toLowerCase() === S.advisorName.toLowerCase()) ||
     (r.created_by && S.authUserId && r.created_by === S.authUserId)
-  )
+  ))
 }
 // Search box + date range (+ the old single advisor of saved views).
 function topFilters(rows){
@@ -682,7 +687,7 @@ function render(){
   $('moreBtn').textContent = `Show ${Math.min(300, S.view.length - shown)} more`
   const dash='<span style="color:var(--faint)">—</span>'
   const claim = v => v ? (S.isAdmin ? fmtDT(v) : fmtD(v)) : null
-  if (!S.view.length){ $('tbody').innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--faint);padding:26px">'+(scoped.length?'No orders match the filters.':'No orders yet — add one above.')+'</td></tr>'; return }
+  if (!S.view.length){ $('tbody').innerHTML='<tr><td colspan="13" style="text-align:center;color:var(--faint);padding:26px">'+(scoped.length?'No orders match the filters.':S.isAdmin?'No orders yet — add one above.':'Nothing in the tray — every order has been picked up by the warranty clerk. Picked-up and returned orders are in the 📊 Advisor Report.')+'</td></tr>'; return }
   $('tbody').innerHTML = S.view.slice(0, shown).map(r=>{
     const none = !r.warranty_claim_date && !r.service_claim_date
     const wc = r.warranty_claim_date ? '<span class="badge b-ok">'+claim(r.warranty_claim_date)+'</span>'
@@ -709,12 +714,11 @@ function render(){
   $('tbody').querySelectorAll('tr.tr-clickable').forEach(tr=>tr.addEventListener('click',()=>openModal(+tr.dataset.id)))
 }
 
-// ── daily sheet: one advisor's orders of one day, for the warranty admin ──
-// Printed and handed over with the job cards: the admin ticks what he
-// received, notes why a claim was not picked up, and both sign.
+// ── pick-up sheet: every order still in the tray, per advisor ──
+// Printed when the warranty clerk takes the job cards: he ticks what he
+// received, notes what he did not take, and both sign. Claims come later.
 function openSheet(){
-  $('sheetDay').value = todayISO()
-  const names = [...new Set(S.rows.map(r => (r.service_advisor||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b))
+  const names = [...new Set(S.rows.filter(inTray).map(r => (r.service_advisor||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b))
   if (S.isAdmin) {
     $('sheetAdvWrap').style.display = ''
     $('sheetAdv').innerHTML = '<option value="">All advisors (one sheet each)</option>' + names.map(n => `<option>${esc(n)}</option>`).join('')
@@ -722,13 +726,12 @@ function openSheet(){
   $('sheetDlg').hidden = false
 }
 function printDailySheet(){
-  const day = $('sheetDay').value || todayISO()
   const dayOf = r => (r.work_date || '').slice(0,10) || localDay(r.created_at)
-  let rows = scopeRows().filter(r => dayOf(r) === day)
+  let rows = scopeRows().filter(inTray)
   const pick = S.isAdmin ? $('sheetAdv').value : ''
   if (pick) rows = rows.filter(r => (r.service_advisor||'').trim() === pick)
   $('sheetDlg').hidden = true
-  if (!rows.length) { showToast('No orders on ' + fmtD(day) + (pick ? ' for ' + pick : '')); return }
+  if (!rows.length) { showToast('Nothing in the tray' + (pick ? ' for ' + pick : '')); return }
   const groups = {}
   rows.forEach(r => { const a = (r.service_advisor||'').trim() || '— no advisor —'; (groups[a] = groups[a] || []).push(r) })
   const pages = Object.keys(groups).sort().map(a => {
@@ -739,26 +742,26 @@ function printDailySheet(){
       <td class="m">${esc(r.vin || '')}</td>
       <td>${esc(r.customer_name || '')}</td>
       <td>${r.order_date ? fmtD(r.order_date) : '<span class="mu">Incadea</span>'}</td>
+      <td>${fmtD(dayOf(r))}</td>
       <td>${esc(r.note || '')}</td>
-      <td class="box">${r.pickup_date ? '✓ ' + fmtD(r.pickup_date) : ''}</td>
-      <td class="box"></td><td class="box"></td>
-      <td class="nt">${esc(r.warranty_note || '')}</td>
+      <td class="box"></td>
+      <td class="nt"></td>
     </tr>`).join('')
     return `<section class="pg">
-      <div class="meta"><div><h1>🇩🇪 BMW Warranty — Daily sheet</h1>
-        <div class="sub">Bassoul, Heneine SAL · Service advisor: <b>${esc(a)}</b> · Day: <b>${fmtD(day)}</b> · ${list.length} order(s)</div></div>
+      <div class="meta"><div><h1>🇩🇪 BMW Warranty — Pick-up sheet</h1>
+        <div class="sub">Bassoul, Heneine SAL · Service advisor: <b>${esc(a)}</b> · Orders in the tray: <b>${list.length}</b></div></div>
         <div class="sub">Printed ${new Date().toLocaleString('en-GB')}</div></div>
-      <table><thead><tr><th>#</th><th>Order</th><th>VIN</th><th>Customer</th><th>Order date</th><th>Advisor note</th>
-        <th>Received ✓</th><th>Warranty claim</th><th>Service claim</th><th style="width:22%">Warranty admin note (if not picked up)</th></tr></thead>
+      <table><thead><tr><th>#</th><th>Order</th><th>VIN</th><th>Customer</th><th>Order date</th><th>Entered</th><th>Advisor note</th>
+        <th>Received ✓</th><th style="width:26%">Warranty clerk note (if not taken)</th></tr></thead>
         <tbody>${body}</tbody></table>
       <div class="sign">
         <div><div class="ln"></div>Service advisor — ${esc(a)}<br><span class="mu">Signature &amp; date</span></div>
-        <div><div class="ln"></div>Warranty admin — received by<br><span class="mu">Signature &amp; date</span></div>
+        <div><div class="ln"></div>Warranty clerk — received by<br><span class="mu">Signature &amp; date</span></div>
       </div></section>`
   }).join('')
   const w = window.open('', '_blank')
   if (!w){ showToast('⚠️ Allow pop-ups to print'); return }
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>BMW Daily sheet ${fmtD(day)}</title>
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>BMW Pick-up sheet ${fmtD(todayISO())}</title>
     <style>
       *{font-family:Arial,Helvetica,sans-serif;box-sizing:border-box}
       body{margin:24px;color:#0f172a}
@@ -837,14 +840,46 @@ function openModal(id){
   // (saving that would stamp a claim that was never made).
   setDT('m_warranty', r.warranty_claim_date); setDT('m_service', r.service_claim_date)
   paintCase(r)
-  // advisor edits VIN / customer / their own note; admin edits warranty fields
-  $('m_vin').disabled = S.isAdmin; $('m_customer').disabled = S.isAdmin; $('m_note').disabled = S.isAdmin
+  // advisor edits VIN / customer / their own note; admin can correct everything,
+  // including which advisor the order belongs to
+  $('m_vin').disabled = false; $('m_customer').disabled = false; $('m_note').disabled = false
   ;['m_pickup','m_return','m_warranty','m_service','m_wnote'].forEach(i=>{ $(i).disabled = !S.isAdmin })
+  $('wrap_m_adv').style.display = S.isAdmin ? '' : 'none'
+  if (S.isAdmin) fillAdvisorPick(r)
   $('m_modeNote').textContent = S.isAdmin
-    ? '🔓 Warranty admin — set pick-up, return, claim date/time and the warranty note.'
+    ? '🔓 Warranty admin — correct the advisor, VIN, customer and note; set pick-up, return, claim date/time and the warranty note.'
     : '🔒 Advisor — edit VIN, customer and your own note. Warranty fields are admin-managed.'
   resolveVisibility()
   $('modalBg').classList.add('on')
+}
+// advisor list for the admin: employees (service advisors first) + any name already on an order
+async function loadAdvisors(){
+  if (S.advisors) return S.advisors
+  let emps = []
+  try{
+    const { data } = await sb.from('employees').select('id,name,custom_role,role').order('name')
+    emps = (data||[]).filter(e => (e.name||'').trim())
+  }catch(e){ console.warn('advisors', e) }
+  const isSA = e => (e.custom_role||'').toLowerCase().includes('advisor')
+  S.advisors = [...emps.filter(isSA), ...emps.filter(e => !isSA(e))]
+  return S.advisors
+}
+function fillAdvisorPick(r){
+  const sel = $('m_adv'), cur = (r.service_advisor||'').trim()
+  const paint = list => {
+    const opts = ['<option value="">— no advisor —</option>']
+    let found = !cur
+    list.forEach(e => {
+      const on = (r.service_advisor_id && e.id === r.service_advisor_id) || (!r.service_advisor_id && e.name === cur)
+      if (on) found = true
+      opts.push(`<option value="${esc(e.id)}"${on?' selected':''}>${esc(e.name)}${(e.custom_role||'').toLowerCase().includes('advisor')?'':' · '+esc(e.custom_role||e.role||'')}</option>`)
+    })
+    if (!found) opts.splice(1, 0, `<option value="name:${esc(cur)}" selected>${esc(cur)} (not in the employee list)</option>`)
+    sel.innerHTML = opts.join('')
+    sel.dataset.orig = sel.value
+  }
+  paint(S.advisors || [])
+  if (!S.advisors) loadAdvisors().then(list => { if (S.editId === r.id) paint(list) })
 }
 window._closeModal = () => { $('modalBg').classList.remove('on'); S.editId=null }
 
@@ -897,11 +932,18 @@ $('m_unret').addEventListener('click', () => {
 async function saveModal(){
   if (!S.editId) return
   const dtISO = id => { const v=val(id); return v ? new Date(v).toISOString() : null }
-  const upd = S.isAdmin
-    ? { pickup_date: val('m_pickup')||null, return_date: val('m_return')||null,
-        warranty_note: val('m_wnote')||null }
-    : { vin: val('m_vin')||null, customer_name: val('m_customer')||null, note: val('m_note')||null }
+  const upd = { vin: val('m_vin').toUpperCase()||null, customer_name: val('m_customer')||null, note: val('m_note')||null }
   if (S.isAdmin){
+    Object.assign(upd, { pickup_date: val('m_pickup')||null, return_date: val('m_return')||null,
+                         warranty_note: val('m_wnote')||null })
+    const sel = $('m_adv')
+    if (sel.value !== sel.dataset.orig){
+      if (!sel.value){ upd.service_advisor = null; upd.service_advisor_id = null }
+      else if (!sel.value.startsWith('name:')){
+        const e = (S.advisors||[]).find(x => x.id === sel.value)
+        if (e){ upd.service_advisor = e.name; upd.service_advisor_id = e.id }
+      }
+    }
     // claim dates only when the admin actually changed them
     const r = S.rows.find(x=>x.id===S.editId) || {}
     const same = (v, id) => dtLocal(v) === val(id)
