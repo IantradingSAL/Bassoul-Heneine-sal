@@ -79,6 +79,8 @@ td.nm{font-weight:700}
 .zero{color:var(--faint)}
 .wlink{color:var(--sun);font-weight:800;text-decoration:none}
 .wlink:hover{text-decoration:underline}
+a.dl{color:inherit;text-decoration:none;cursor:pointer;border-bottom:1px dotted var(--bmw)} a.dl:hover{color:var(--bmw);border-bottom-style:solid}
+.chip.drill{background:#eef4fd;border-color:var(--bmw);color:var(--bmw)} .chip.drill b{color:var(--bmw)}
 .empty{padding:28px;text-align:center;color:var(--muted);font-weight:600}
 .kpi.go{cursor:pointer} .kpi.go:hover{border-color:var(--bmw)}
 .kpi.on{outline:2px solid var(--bmw);outline-offset:-1px}
@@ -306,23 +308,27 @@ function rateChip(p, good, bad){ return `<span class="rate ${rateCls(p, good, ba
 function cell(n, of){ return n ? `${fmt(n)}${of ? `<span class="pct">${pctTxt(n / of)}</span>` : ''}` : '<span class="zero">0</span>' }
 function avgDays(t){ return t.days_to_claim_n ? (t.days_to_claim_sum / t.days_to_claim_n).toFixed(1) : '—' }
 
+// Every figure is a link: it opens the orders behind it in the VIN list
+// [label, cell, status in the VIN list, count that decides if there is anything to open]
 const COLS = [
-  ['Orders',          t => `<b>${fmt(t.orders)}</b>`],
-  ['Warranty',        t => cell(t.warranty, t.orders)],
-  ['Service',         t => cell(t.service, t.orders)],
-  ['Warranty only',   t => cell(t.warranty_only, t.orders)],
-  ['Service only',    t => cell(t.service_only, t.orders)],
-  ['Both',            t => cell(t.both_claims, t.orders)],
-  ['Pending',         t => cell(t.pending, t.orders)],
-  ['Returned to advisor', t => cell(t.returned, t.orders)],
-  ['Return rate',     t => rateChip(pctOf(t.returned, t.orders), 0.02, 0.08)],
-  ['Picked up',       t => cell(t.picked, t.orders)],
-  ['Waiting pick-up', t => t.waiting ? `<a class="wlink" href="warranty_bmw_pickup.html" title="Open the pick-up page">${fmt(t.waiting)}</a>` : '<span class="zero">0</span>'],
-  ['Days to pick-up', t => t.days_to_pickup_n ? (t.days_to_pickup_sum / t.days_to_pickup_n).toFixed(1) : '—'],
-  ['Days to claim',   t => avgDays(t)],
+  ['Orders',          t => `<b>${fmt(t.orders)}</b>`,                    'all',      t => t.orders],
+  ['Warranty',        t => cell(t.warranty, t.orders),                   'warranty', t => t.warranty],
+  ['Service',         t => cell(t.service, t.orders),                    'service',  t => t.service],
+  ['Warranty only',   t => cell(t.warranty_only, t.orders),              'wonly',    t => t.warranty_only],
+  ['Service only',    t => cell(t.service_only, t.orders),               'sonly',    t => t.service_only],
+  ['Both',            t => cell(t.both_claims, t.orders),                'both',     t => t.both_claims],
+  ['Pending',         t => cell(t.pending, t.orders),                    'pending',  t => t.pending],
+  ['Returned to advisor', t => cell(t.returned, t.orders),               'returned', t => t.returned],
+  ['Return rate',     t => rateChip(pctOf(t.returned, t.orders), 0.02, 0.08), 'returned', t => t.returned],
+  ['Picked up',       t => cell(t.picked, t.orders),                     'picked',   t => t.picked],
+  ['Waiting pick-up', t => t.waiting ? `<span class="wlink">${fmt(t.waiting)}</span>` : '<span class="zero">0</span>', 'waiting', t => t.waiting],
+  ['Days to pick-up', t => t.days_to_pickup_n ? (t.days_to_pickup_sum / t.days_to_pickup_n).toFixed(1) : '—', 'picked', t => t.days_to_pickup_n],
+  ['Days to claim',   t => avgDays(t),                                   'claimed',  t => t.days_to_claim_n],
 ]
+// a link to the orders behind a figure: status + advisor and/or month (none = the whole scope)
+const dl = (html, st, ctx = {}) => `<a class="dl" data-st="${st}"${ctx.a != null ? ` data-a="${esc(ctx.a)}"` : ''}${ctx.m ? ` data-m="${ctx.m}"` : ''} title="Show these orders">${html}</a>`
 const head = first => `<thead><tr><th>${first}</th>${COLS.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead>`
-const row = (label, t, cls = '', pre = '') => `<tr class="${cls}"><td class="nm">${pre}${label}</td>${COLS.map(c => `<td>${c[1](t)}</td>`).join('')}</tr>`
+const row = (label, t, cls = '', pre = '', ctx = {}) => `<tr class="${cls}"><td class="nm">${pre}${label}</td>${COLS.map(c => `<td>${c[3](t) ? dl(c[1](t), c[2], ctx) : c[1](t)}</td>`).join('')}</tr>`
 
 const OPEN = new Set()
 function render(){
@@ -352,7 +358,7 @@ function render(){
   rows.forEach(r => add(byAdv[r.advisor] = byAdv[r.advisor] || blank(), r))
   const advs = Object.keys(byAdv).sort((a, b) => byAdv[b].orders - byAdv[a].orders)
   $('tAdv').innerHTML = rows.length
-    ? head('Service advisor') + '<tbody>' + advs.map(a => row(esc(a), byAdv[a])).join('') + row('Total', T, 'tot') + '</tbody>'
+    ? head('Service advisor') + '<tbody>' + advs.map(a => row(esc(a), byAdv[a], '', '', { a })).join('') + row('Total', T, 'tot') + '</tbody>'
     : `<tbody><tr><td class="empty">No orders in this period.</td></tr></tbody>`
 
   // Month by month, advisors inside
@@ -362,8 +368,8 @@ function render(){
   $('tMonth').innerHTML = rows.length
     ? head('Month') + '<tbody>' + months.map(m => {
         const open = OPEN.has(m)
-        const subs = open ? Object.entries(byMonth[m].a).sort((x, y) => y[1].orders - x[1].orders).map(([a, t]) => row(esc(a), t, 'sub')).join('') : ''
-        return row(monthLbl(m), byMonth[m].t, '', `<button class="tog viewer-ok" data-m="${m}" type="button" aria-label="Show advisors">${open ? '▼' : '▶'}</button> `) + subs
+        const subs = open ? Object.entries(byMonth[m].a).sort((x, y) => y[1].orders - x[1].orders).map(([a, t]) => row(esc(a), t, 'sub', '', { a, m })).join('') : ''
+        return row(monthLbl(m), byMonth[m].t, '', `<button class="tog viewer-ok" data-m="${m}" type="button" aria-label="Show advisors">${open ? '▼' : '▶'}</button> `, { m }) + subs
       }).join('') + row('Total', T, 'tot') + '</tbody>'
     : `<tbody><tr><td class="empty">No orders in this period.</td></tr></tbody>`
 
@@ -372,15 +378,15 @@ function render(){
   const maxCell = Math.max(1, ...rows.map(r => r.orders))
   $('tPivot').innerHTML = rows.length
     ? `<thead><tr><th>Month</th>${advCols.map(a => `<th>${esc(a)}</th>`).join('')}<th>Total</th></tr></thead><tbody>`
-      + months.map(m => `<tr><td class="nm">${monthLbl(m)}</td>${advCols.map(a => { const n = byMonth[m].a[a]?.orders || 0; return `<td>${n ? fmt(n) + `<span class="bar" style="width:${Math.round(n / maxCell * 40)}px"></span>` : '<span class="zero">·</span>'}</td>` }).join('')}<td><b>${fmt(byMonth[m].t.orders)}</b></td></tr>`).join('')
-      + `<tr class="tot"><td>Total</td>${advCols.map(a => `<td>${fmt(byAdv[a].orders)}</td>`).join('')}<td>${fmt(T.orders)}</td></tr></tbody>`
+      + months.map(m => `<tr><td class="nm">${monthLbl(m)}</td>${advCols.map(a => { const n = byMonth[m].a[a]?.orders || 0; return `<td>${n ? dl(fmt(n), 'all', { a, m }) + `<span class="bar" style="width:${Math.round(n / maxCell * 40)}px"></span>` : '<span class="zero">·</span>'}</td>` }).join('')}<td><b>${dl(fmt(byMonth[m].t.orders), 'all', { m })}</b></td></tr>`).join('')
+      + `<tr class="tot"><td>Total</td>${advCols.map(a => `<td>${dl(fmt(byAdv[a].orders), 'all', { a })}</td>`).join('')}<td>${dl(fmt(T.orders), 'all')}</td></tr></tbody>`
     : `<tbody><tr><td class="empty">No orders in this period.</td></tr></tbody>`
 
   drawCharts(months.slice().reverse(), byMonth, advs, byAdv)
 }
 
 $('tMonth').addEventListener('click', e => {
-  const b = e.target.closest('[data-m]'); if (!b) return
+  const b = e.target.closest('button.tog[data-m]'); if (!b) return
   OPEN.has(b.dataset.m) ? OPEN.delete(b.dataset.m) : OPEN.add(b.dataset.m)
   render()
 })
@@ -399,6 +405,8 @@ function drawCharts(months, byMonth, advs, byAdv){
       ],
     },
     options: {
+      onClick: (e, els) => { const el = els[0]; if (el) drill(['all', 'warranty', 'service'][el.datasetIndex], { m: months[el.index] }) },
+      onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : '' },
       animation: false, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } },
@@ -415,6 +423,8 @@ function drawCharts(months, byMonth, advs, byAdv){
       ],
     },
     options: {
+      onClick: (e, els) => { const el = els[0]; if (el) drill(['warranty', 'service', 'pending'][el.datasetIndex], { a: advs[el.index] }) },
+      onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : '' },
       animation: false, indexAxis: 'y', maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
       scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { grid: { display: false } } },
@@ -427,17 +437,24 @@ const STATUSES = [
   ['all',      'All',                 r => true],
   ['warranty', 'Warranty claim',      r => !!r.warranty_date],
   ['service',  'Service claim',       r => !!r.service_date],
+  ['wonly',    'Warranty only',       r => !!r.warranty_date && !r.service_date],
+  ['sonly',    'Service only',        r => !r.warranty_date && !!r.service_date],
   ['both',     'Both',                r => !!r.warranty_date && !!r.service_date],
+  ['claimed',  'Claimed',             r => !!r.warranty_date || !!r.service_date],
   ['pending',  'Pending',             r => !r.warranty_date && !r.service_date && !r.return_date],
   ['returned', 'Returned to advisor', r => !!r.return_date],
+  ['picked',   'Picked up',           r => !!r.pickup_date],
   ['waiting',  'Waiting pick-up',     r => !r.pickup_date && !r.return_date],
   ['novin',    'No VIN',              r => !(r.vin || '').trim()],
 ]
 let ORD_LIMIT = 300
 const dmy = d => d ? String(d).slice(0, 10).split('-').reverse().join('/') : ''
+// DRILL: the advisor and/or month of the figure that was clicked (null = whole scope)
+let DRILL = null
 function ordScoped(){
   const a = listOf('fAdv'), m = listOf('fMon')
-  return ORD.filter(r => inRange(r) && (!a || a.includes(r.advisor)) && (!m || m.includes(r.month)))
+  return ORD.filter(r => inRange(r) && (!a || a.includes(r.advisor)) && (!m || m.includes(r.month))
+    && (!DRILL || ((DRILL.a == null || r.advisor === DRILL.a) && (!DRILL.m || r.month === DRILL.m))))
 }
 function ordShown(){
   const st = STATUSES.find(s => s[0] === $('fSt').value) || STATUSES[0]
@@ -452,7 +469,9 @@ function statusTag(r){
 function renderOrders(){
   const base = ordScoped(), cur = $('fSt').value || 'all'
   const q = $('fOrdQ') ? $('fOrdQ').value : ''
-  $('stbar').innerHTML = STATUSES.map(([key, label, f]) => `<button type="button" class="chip viewer-ok${key === cur ? ' on' : ''}" data-st="${key}">${label}<b>${fmt(base.filter(f).length)}</b></button>`).join('')
+  const drillLbl = DRILL ? [DRILL.a, DRILL.m && monthLbl(DRILL.m)].filter(Boolean).join(' · ') : ''
+  $('stbar').innerHTML = (drillLbl ? `<button type="button" class="chip drill viewer-ok" id="drillX" title="Show the whole period again">📍 ${esc(drillLbl)}<b>✕</b></button>` : '')
+    + STATUSES.map(([key, label, f]) => `<button type="button" class="chip viewer-ok${key === cur ? ' on' : ''}" data-st="${key}">${label}<b>${fmt(base.filter(f).length)}</b></button>`).join('')
     + `<input id="fOrdQ" class="viewer-ok" placeholder="🔎 Order, VIN, customer" value="${esc(q)}">`
   const rows = ordShown()
   $('tOrd').innerHTML = rows.length
@@ -465,7 +484,7 @@ function renderOrders(){
         <td>${dmy(r.pickup_date)}</td><td>${dmy(r.return_date)}</td><td class="note">${esc(r.warranty_note)}</td></tr>`).join('') + '</tbody>'
     : `<tbody><tr><td class="empty">No orders match.</td></tr></tbody>`
   const label = (STATUSES.find(s => s[0] === cur) || STATUSES[0])[1]
-  $('ordSub').textContent = `${fmt(rows.length)} order(s)${cur !== 'all' ? ' · ' + label : ''} — same period and advisors as above. Click a figure above or a status to narrow it; click an order to open its case.`
+  $('ordSub').textContent = `${fmt(rows.length)} order(s)${drillLbl ? ' · ' + drillLbl : ''}${cur !== 'all' ? ' · ' + label : ''} — same period and advisors as above. Click a figure above or a status to narrow it; click an order to open its case.`
   $('ordMore').innerHTML = rows.length > ORD_LIMIT ? `<button type="button" class="btn viewer-ok" id="ordAll">Show all ${fmt(rows.length)}</button>` : ''
   document.querySelectorAll('.kpi.go').forEach(el => el.classList.toggle('on', el.dataset.st === cur))
 }
@@ -475,8 +494,21 @@ function setStatus(key, scroll){
   $('fSt').dispatchEvent(new Event('change'))       // re-renders and updates the saved-view marker
   if (scroll) $('ordCard').scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
-$('kpis').addEventListener('click', e => { const el = e.target.closest('.kpi.go'); if (el) setStatus(el.dataset.st, true) })
-$('stbar').addEventListener('click', e => { const el = e.target.closest('.chip'); if (el) setStatus(el.dataset.st) })
+// a figure in a table or chart: its status, narrowed to its advisor and/or month
+function drill(st, ctx = {}){
+  DRILL = (ctx.a != null || ctx.m) ? { a: ctx.a ?? null, m: ctx.m || null } : null
+  setStatus(st, true)
+}
+$('kpis').addEventListener('click', e => { const el = e.target.closest('.kpi.go'); if (el) { DRILL = null; setStatus(el.dataset.st, true) } })
+document.addEventListener('click', e => {
+  const el = e.target.closest('a.dl'); if (!el) return
+  e.preventDefault()
+  drill(el.dataset.st, { a: el.dataset.a, m: el.dataset.m })
+})
+$('stbar').addEventListener('click', e => {
+  if (e.target.closest('#drillX')) { DRILL = null; ORD_LIMIT = 300; renderOrders(); return }
+  const el = e.target.closest('.chip'); if (el) setStatus(el.dataset.st)
+})
 $('stbar').addEventListener('input', e => {
   if (e.target.id !== 'fOrdQ') return
   const pos = e.target.selectionStart
@@ -495,7 +527,8 @@ function setRange(kind){
   $('fFrom').dispatchEvent(new Event('change'))   // re-renders (and updates the saved-view marker)
 }
 document.querySelectorAll('[data-range]').forEach(b => b.addEventListener('click', () => setRange(b.dataset.range)))
-;['fFrom','fTo','fAdv','fMon','fSt'].forEach(id => $(id).addEventListener('change', render))
+;['fFrom','fTo','fAdv','fMon'].forEach(id => $(id).addEventListener('change', () => { DRILL = null; render() }))
+$('fSt').addEventListener('change', render)
 
 // ── export ──
 let _xlsxP = null
