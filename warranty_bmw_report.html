@@ -32,6 +32,8 @@ body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,Bl
 
 .card{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px;box-shadow:0 1px 3px rgba(15,23,42,.04)}
 .card h2{margin:0 0 2px;font-size:14px;font-weight:800}
+.colbtn{float:right;border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 10px;font:inherit;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer} .colbtn:hover{border-color:var(--bmw);color:var(--bmw)}
+.bmwleg{display:none} body.show-bmw .bmwleg{display:inline}
 .card .sub{font-size:11px;color:var(--muted);margin-bottom:12px}
 
 .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
@@ -166,6 +168,7 @@ a.dl{color:inherit;text-decoration:none;cursor:pointer;border-bottom:1px dotted 
   </div>
 
   <div class="card">
+    <button type="button" class="colbtn noprint viewer-ok" id="colBtn" title="Show or hide columns (both tables and the Excel export)">⚙ Columns</button>
     <h2>By service advisor</h2>
     <div class="sub" id="periodLbl"></div>
     <div class="tw"><table id="tAdv"></table></div>
@@ -184,6 +187,7 @@ a.dl{color:inherit;text-decoration:none;cursor:pointer;border-bottom:1px dotted 
   </div>
 
   <div class="card" id="ordCard">
+    <button type="button" class="colbtn noprint viewer-ok" id="ocolBtn" title="Show or hide columns of the VIN list (and its Excel sheet)">⚙ Columns</button>
     <h2>Orders — VIN list</h2>
     <div class="sub" id="ordSub">Every order behind the figures above, with the same filters.</div>
     <div class="stbar noprint" id="stbar"></div>
@@ -198,6 +202,7 @@ a.dl{color:inherit;text-decoration:none;cursor:pointer;border-bottom:1px dotted 
       <span><b>Warranty / Service</b> — orders with a warranty claim / a service (BSI) claim, from the order or from the Incadea claim upload.</span>
       <span><b>Warranty only / Service only / Both</b> — which claims the order has (an order needs one or the other, or both).</span>
       <span><b>Pending</b> — no claim of either kind yet and not returned to the advisor.</span>
+      <span class="bmwleg"><b>Answered</b> — BMW's credit note received. <b>Sent back</b> — BMW rejected at least one line (SAP status <i>Error</i>); <b>BMW return rate</b> = sent back ÷ answered. <b>Cut</b> — BMW paid only part (status <i>Warning</i>). Hidden by default — ⚙ Columns.</span>
       <span><b>Returned to advisor</b> — not a warranty case (internal, customer pays…): no claim, a return date set; <b>return rate</b> = returned ÷ orders.</span>
       <span><b>Picked up / Waiting pick-up</b> — received by the warranty admin on the 📥 Pick-up page, or still to receive (not returned); <b>days to pick-up</b> = average days from the order's date to its pick-up.</span>
       <span><b>Days to claim</b> — average days from the order date to its first claim.</span>
@@ -310,7 +315,7 @@ function avgDays(t){ return t.days_to_claim_n ? (t.days_to_claim_sum / t.days_to
 
 // Every figure is a link: it opens the orders behind it in the VIN list
 // [label, cell, status in the VIN list, count that decides if there is anything to open]
-const COLS = [
+const COLS_ALL = [
   ['Orders',          t => `<b>${fmt(t.orders)}</b>`,                    'all',      t => t.orders],
   ['Warranty',        t => cell(t.warranty, t.orders),                   'warranty', t => t.warranty],
   ['Service',         t => cell(t.service, t.orders),                    'service',  t => t.service],
@@ -318,6 +323,10 @@ const COLS = [
   ['Service only',    t => cell(t.service_only, t.orders),               'sonly',    t => t.service_only],
   ['Both',            t => cell(t.both_claims, t.orders),                'both',     t => t.both_claims],
   ['Pending',         t => cell(t.pending, t.orders),                    'pending',  t => t.pending],
+  ['Answered',        t => cell(t.answered, t.orders),                   'answered', t => t.answered, 'bmw'],
+  ['Sent back',       t => cell(t.rejected),                             'sentback', t => t.rejected, 'bmw'],
+  ['BMW return rate', t => rateChip(pctOf(t.rejected, t.answered), 0.03, 0.10), 'sentback', t => t.rejected, 'bmw'],
+  ['Cut',             t => cell(t.cut),                                  'cut',      t => t.cut, 'bmw'],
   ['Returned to advisor', t => cell(t.returned, t.orders),               'returned', t => t.returned],
   ['Return rate',     t => rateChip(pctOf(t.returned, t.orders), 0.02, 0.08), 'returned', t => t.returned],
   ['Picked up',       t => cell(t.picked, t.orders),                     'picked',   t => t.picked],
@@ -325,6 +334,21 @@ const COLS = [
   ['Days to pick-up', t => t.days_to_pickup_n ? (t.days_to_pickup_sum / t.days_to_pickup_n).toFixed(1) : '—', 'picked', t => t.days_to_pickup_n],
   ['Days to claim',   t => avgDays(t),                                   'claimed',  t => t.days_to_claim_n],
 ]
+// Which columns are shown — each viewer's own choice, kept in this browser.
+// The BMW answer columns are off until someone turns them on.
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k)) } catch (e) { return null } },
+  set(k, v){ try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)) } catch (e) {} },
+}
+const COL_KEY = 'bmw_report_cols_v1', OCOL_KEY = 'bmw_report_ocols_v1'
+const isBmw = c => c.includes('bmw')
+const defaultOn = list => list.filter(c => !isBmw(c)).map(c => c[0])
+let COLS = []
+function applyCols(){
+  const on = store.get(COL_KEY) || defaultOn(COLS_ALL)
+  COLS = COLS_ALL.filter(c => on.includes(c[0]))
+  document.body.classList.toggle('show-bmw', bmwShown())
+}
 // a link to the orders behind a figure: status + advisor and/or month (none = the whole scope)
 const dl = (html, st, ctx = {}) => `<a class="dl" data-st="${st}"${ctx.a != null ? ` data-a="${esc(ctx.a)}"` : ''}${ctx.m ? ` data-m="${ctx.m}"` : ''} title="Show these orders">${html}</a>`
 const head = first => `<thead><tr><th>${first}</th>${COLS.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead>`
@@ -443,6 +467,9 @@ const STATUSES = [
   ['claimed',  'Claimed',             r => !!r.warranty_date || !!r.service_date],
   ['pending',  'Pending',             r => !r.warranty_date && !r.service_date && !r.return_date],
   ['returned', 'Returned to advisor', r => !!r.return_date],
+  ['answered', 'Answered by BMW',     r => r.answered, 'bmw'],
+  ['sentback', 'Sent back by BMW',    r => r.rejected, 'bmw'],
+  ['cut',      'Cut by BMW',          r => r.cut && !r.rejected, 'bmw'],
   ['picked',   'Picked up',           r => !!r.pickup_date],
   ['waiting',  'Waiting pick-up',     r => !r.pickup_date && !r.return_date],
   ['novin',    'No VIN',              r => !(r.vin || '').trim()],
@@ -461,6 +488,33 @@ function ordShown(){
   const q = ($('fOrdQ')?.value || '').trim().toUpperCase()
   return ordScoped().filter(r => st[2](r) && (!q || [r.order_ref, r.order_number, r.vin, r.customer, r.advisor].some(v => (v || '').toUpperCase().includes(q))))
 }
+const answerTxt = r => r.rejected ? 'Sent back' : r.cut ? 'Cut' : r.answered ? 'Credited' : (r.warranty_date || r.service_date) ? 'Waiting BMW' : ''
+function answerTag(r){
+  const t = answerTxt(r); if (!t) return ''
+  return `<span class="tag ${{ 'Sent back':'bad', 'Cut':'cut', 'Credited':'ok', 'Waiting BMW':'wait' }[t]}">${t}</span>`
+}
+// VIN list columns: [label, cell html, Excel value, 'bmw' = hidden by default]
+const OCOLS_ALL = [
+  ['Order',           r => `<a href="warranty_bmw_orders.html?q=${encodeURIComponent(r.order_number)}" title="Open the case">${esc(r.order_ref)}</a>`, r => r.order_ref],
+  ['Order date',      r => dmy(r.order_date),         r => r.order_date || ''],
+  ['Service advisor', r => esc(r.advisor),            r => r.advisor],
+  ['VIN',             r => esc(r.vin) || '<span class="zero">—</span>', r => r.vin || ''],
+  ['Customer',        r => esc(r.customer),           r => r.customer || ''],
+  ['Status',          r => statusTag(r),              r => statusTxt(r)],
+  ['Warranty claim',  r => dmy(r.warranty_date),      r => r.warranty_date || ''],
+  ['Service claim',   r => dmy(r.service_date),       r => r.service_date || ''],
+  ['BMW answer',      r => answerTag(r),              r => answerTxt(r), 'bmw'],
+  ['Picked up',       r => dmy(r.pickup_date),        r => r.pickup_date || ''],
+  ['Returned',        r => dmy(r.return_date),        r => r.return_date || ''],
+  ['Warranty note',   r => esc(r.warranty_note),      r => r.warranty_note || ''],
+]
+let OCOLS = []
+function applyOcols(){
+  const on = store.get(OCOL_KEY) || defaultOn(OCOLS_ALL)
+  OCOLS = OCOLS_ALL.filter(c => on.includes(c[0]))
+  document.body.classList.toggle('show-bmw', bmwShown())
+}
+const bmwShown = () => COLS.some(isBmw) || OCOLS.some(isBmw)
 const statusTxt = r => r.return_date ? 'Returned' : (!r.warranty_date && !r.service_date) ? 'Pending' : 'Claimed'
 function statusTag(r){
   const t = statusTxt(r)
@@ -471,17 +525,12 @@ function renderOrders(){
   const q = $('fOrdQ') ? $('fOrdQ').value : ''
   const drillLbl = DRILL ? [DRILL.a, DRILL.m && monthLbl(DRILL.m)].filter(Boolean).join(' · ') : ''
   $('stbar').innerHTML = (drillLbl ? `<button type="button" class="chip drill viewer-ok" id="drillX" title="Show the whole period again">📍 ${esc(drillLbl)}<b>✕</b></button>` : '')
-    + STATUSES.map(([key, label, f]) => `<button type="button" class="chip viewer-ok${key === cur ? ' on' : ''}" data-st="${key}">${label}<b>${fmt(base.filter(f).length)}</b></button>`).join('')
+    + STATUSES.filter(s => !isBmw(s) || bmwShown() || s[0] === cur).map(([key, label, f]) => `<button type="button" class="chip viewer-ok${key === cur ? ' on' : ''}" data-st="${key}">${label}<b>${fmt(base.filter(f).length)}</b></button>`).join('')
     + `<input id="fOrdQ" class="viewer-ok" placeholder="🔎 Order, VIN, customer" value="${esc(q)}">`
   const rows = ordShown()
   $('tOrd').innerHTML = rows.length
-    ? `<thead><tr><th>Order</th><th>Order date</th><th>Service advisor</th><th>VIN</th><th>Customer</th><th>Status</th><th>Warranty claim</th><th>Service claim</th><th>Picked up</th><th>Returned</th><th>Warranty note</th></tr></thead><tbody>`
-      + rows.slice(0, ORD_LIMIT).map(r => `<tr>
-        <td><a href="warranty_bmw_orders.html?q=${encodeURIComponent(r.order_number)}" title="Open the case">${esc(r.order_ref)}</a></td>
-        <td>${dmy(r.order_date)}</td><td>${esc(r.advisor)}</td>
-        <td class="vin">${esc(r.vin) || '<span class="zero">—</span>'}</td><td>${esc(r.customer)}</td>
-        <td>${statusTag(r)}</td><td>${dmy(r.warranty_date)}</td><td>${dmy(r.service_date)}</td>
-        <td>${dmy(r.pickup_date)}</td><td>${dmy(r.return_date)}</td><td class="note">${esc(r.warranty_note)}</td></tr>`).join('') + '</tbody>'
+    ? `<thead><tr>${OCOLS.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody>`
+      + rows.slice(0, ORD_LIMIT).map(r => '<tr>' + OCOLS.map(c => `<td${c[0] === 'VIN' ? ' class="vin"' : c[0] === 'Warranty note' ? ' class="note"' : ''}>${c[1](r)}</td>`).join('') + '</tr>').join('') + '</tbody>'
     : `<tbody><tr><td class="empty">No orders match.</td></tr></tbody>`
   const label = (STATUSES.find(s => s[0] === cur) || STATUSES[0])[1]
   $('ordSub').textContent = `${fmt(rows.length)} order(s)${drillLbl ? ' · ' + drillLbl : ''}${cur !== 'all' ? ' · ' + label : ''} — same period and advisors as above. Click a figure above or a status to narrow it; click an order to open its case.`
@@ -545,11 +594,18 @@ $('xlsBtn').addEventListener('click', async () => {
   try {
     const X = await loadXlsx()
     const rows = scoped()
-    const H = ['Orders','Warranty','Service','Warranty only','Service only','Both','Pending','Returned to advisor','Return rate %','Picked up','Waiting pick-up','Avg days to pick-up','Avg days to claim']
-    const vals = t => [t.orders, t.warranty, t.service, t.warranty_only, t.service_only, t.both_claims, t.pending, t.returned,
-      t.orders ? +(t.returned / t.orders * 100).toFixed(1) : null,
-      t.picked, t.waiting, t.days_to_pickup_n ? +(t.days_to_pickup_sum / t.days_to_pickup_n).toFixed(1) : null,
-      t.days_to_claim_n ? +(t.days_to_claim_sum / t.days_to_claim_n).toFixed(1) : null]
+    // the columns shown on screen, as numbers
+    const XV = {
+      'Orders': t => t.orders, 'Warranty': t => t.warranty, 'Service': t => t.service, 'Warranty only': t => t.warranty_only,
+      'Service only': t => t.service_only, 'Both': t => t.both_claims, 'Pending': t => t.pending,
+      'Answered': t => t.answered, 'Sent back': t => t.rejected, 'BMW return rate': t => t.answered ? +(t.rejected / t.answered * 100).toFixed(1) : null, 'Cut': t => t.cut,
+      'Returned to advisor': t => t.returned, 'Return rate': t => t.orders ? +(t.returned / t.orders * 100).toFixed(1) : null,
+      'Picked up': t => t.picked, 'Waiting pick-up': t => t.waiting,
+      'Days to pick-up': t => t.days_to_pickup_n ? +(t.days_to_pickup_sum / t.days_to_pickup_n).toFixed(1) : null,
+      'Days to claim': t => t.days_to_claim_n ? +(t.days_to_claim_sum / t.days_to_claim_n).toFixed(1) : null,
+    }
+    const H = COLS.map(c => c[0] + (/rate/i.test(c[0]) ? ' %' : ''))
+    const vals = t => COLS.map(c => XV[c[0]](t))
     const byAdv = {}, byMonth = {}
     rows.forEach(r => { add(byAdv[r.advisor] = byAdv[r.advisor] || blank(), r); add(byMonth[r.month] = byMonth[r.month] || blank(), r) })
     const T = rows.reduce(add, blank())
@@ -557,13 +613,23 @@ $('xlsBtn').addEventListener('click', async () => {
     X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Service advisor', ...H], ...Object.entries(byAdv).map(([a, t]) => [a, ...vals(t)]), ['Total', ...vals(T)]]), 'By advisor')
     X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Month', ...H], ...Object.keys(byMonth).sort().map(m => [m, ...vals(byMonth[m])]), ['Total', ...vals(T)]]), 'By month')
     X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Month', 'Service advisor', ...H], ...rows.map(r => [r.month, r.advisor, ...vals(r)])]), 'Month x advisor')
-    const OH = ['Order','Order date','Month','Service advisor','VIN','Customer','Status','Warranty claim','Service claim','Picked up','Returned to advisor','Warranty note']
-    X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([OH, ...ordShown().map(r => [r.order_ref, r.order_date, r.month, r.advisor, r.vin || '', r.customer || '',
-      statusTxt(r), r.warranty_date || '', r.service_date || '', r.pickup_date || '', r.return_date || '', r.warranty_note || ''])]), 'Orders (VIN list)')
+    X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([['Month', ...OCOLS.map(c => c[0])], ...ordShown().map(r => [r.month, ...OCOLS.map(c => c[2](r))])]), 'Orders (VIN list)')
     X.writeFile(wb, `BMW_Advisor_Report_${$('fFrom').value || 'start'}_${$('fTo').value || 'today'}.xlsx`)
   } catch (e) { toast('❌ ' + e.message) }
 })
 $('printBtn').addEventListener('click', () => window.print())
+
+// ── ⚙ Columns: tick the columns to show; BMW answer ones are off by default ──
+function colPicker(anchor, all, key, title, after){
+  const on = store.get(key) || defaultOn(all)
+  openPicker({ anchor, title,
+    items: all.map(c => ({ key: c[0], label: c[0] + (isBmw(c) ? '  (BMW answer)' : '') })),
+    chosen: all.map(c => c[0]).filter(k => on.includes(k)),
+    onApply: pick => { store.set(key, pick || all.map(c => c[0])); after() } })
+}
+$('colBtn').addEventListener('click', e => { e.stopPropagation(); colPicker($('colBtn'), COLS_ALL, COL_KEY, 'Columns — both tables', () => { applyCols(); render() }) })
+$('ocolBtn').addEventListener('click', e => { e.stopPropagation(); colPicker($('ocolBtn'), OCOLS_ALL, OCOL_KEY, 'Columns — VIN list', () => { applyOcols(); renderOrders() }) })
+applyCols(); applyOcols()
 
 // ── boot ──
 setRange('12')
