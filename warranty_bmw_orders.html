@@ -446,6 +446,7 @@ body.hide-sc .c-sc{display:none}
         </div>
       </div>
       <div class="al al-i" style="margin:0" id="m_modeNote">—</div>
+      <div class="fld" id="wrap_m_adv"><label>Service advisor</label><select id="m_adv"></select><span class="hint">Admin only — move the order to another advisor</span></div>
       <div class="fld"><label>VIN</label><input id="m_vin" type="text" style="text-transform:uppercase"></div>
       <div class="fld"><label>Customer name</label><input id="m_customer" type="text"></div>
       <div class="fld"><label>Service advisor note</label><textarea id="m_note" rows="2"></textarea></div>
@@ -837,14 +838,46 @@ function openModal(id){
   // (saving that would stamp a claim that was never made).
   setDT('m_warranty', r.warranty_claim_date); setDT('m_service', r.service_claim_date)
   paintCase(r)
-  // advisor edits VIN / customer / their own note; admin edits warranty fields
-  $('m_vin').disabled = S.isAdmin; $('m_customer').disabled = S.isAdmin; $('m_note').disabled = S.isAdmin
+  // advisor edits VIN / customer / their own note; admin can correct everything,
+  // including which advisor the order belongs to
+  $('m_vin').disabled = false; $('m_customer').disabled = false; $('m_note').disabled = false
   ;['m_pickup','m_return','m_warranty','m_service','m_wnote'].forEach(i=>{ $(i).disabled = !S.isAdmin })
+  $('wrap_m_adv').style.display = S.isAdmin ? '' : 'none'
+  if (S.isAdmin) fillAdvisorPick(r)
   $('m_modeNote').textContent = S.isAdmin
-    ? '🔓 Warranty admin — set pick-up, return, claim date/time and the warranty note.'
+    ? '🔓 Warranty admin — correct the advisor, VIN, customer and note; set pick-up, return, claim date/time and the warranty note.'
     : '🔒 Advisor — edit VIN, customer and your own note. Warranty fields are admin-managed.'
   resolveVisibility()
   $('modalBg').classList.add('on')
+}
+// advisor list for the admin: employees (service advisors first) + any name already on an order
+async function loadAdvisors(){
+  if (S.advisors) return S.advisors
+  let emps = []
+  try{
+    const { data } = await sb.from('employees').select('id,name,custom_role,role').order('name')
+    emps = (data||[]).filter(e => (e.name||'').trim())
+  }catch(e){ console.warn('advisors', e) }
+  const isSA = e => (e.custom_role||'').toLowerCase().includes('advisor')
+  S.advisors = [...emps.filter(isSA), ...emps.filter(e => !isSA(e))]
+  return S.advisors
+}
+function fillAdvisorPick(r){
+  const sel = $('m_adv'), cur = (r.service_advisor||'').trim()
+  const paint = list => {
+    const opts = ['<option value="">— no advisor —</option>']
+    let found = !cur
+    list.forEach(e => {
+      const on = (r.service_advisor_id && e.id === r.service_advisor_id) || (!r.service_advisor_id && e.name === cur)
+      if (on) found = true
+      opts.push(`<option value="${esc(e.id)}"${on?' selected':''}>${esc(e.name)}${(e.custom_role||'').toLowerCase().includes('advisor')?'':' · '+esc(e.custom_role||e.role||'')}</option>`)
+    })
+    if (!found) opts.splice(1, 0, `<option value="name:${esc(cur)}" selected>${esc(cur)} (not in the employee list)</option>`)
+    sel.innerHTML = opts.join('')
+    sel.dataset.orig = sel.value
+  }
+  paint(S.advisors || [])
+  if (!S.advisors) loadAdvisors().then(list => { if (S.editId === r.id) paint(list) })
 }
 window._closeModal = () => { $('modalBg').classList.remove('on'); S.editId=null }
 
@@ -897,11 +930,18 @@ $('m_unret').addEventListener('click', () => {
 async function saveModal(){
   if (!S.editId) return
   const dtISO = id => { const v=val(id); return v ? new Date(v).toISOString() : null }
-  const upd = S.isAdmin
-    ? { pickup_date: val('m_pickup')||null, return_date: val('m_return')||null,
-        warranty_note: val('m_wnote')||null }
-    : { vin: val('m_vin')||null, customer_name: val('m_customer')||null, note: val('m_note')||null }
+  const upd = { vin: val('m_vin').toUpperCase()||null, customer_name: val('m_customer')||null, note: val('m_note')||null }
   if (S.isAdmin){
+    Object.assign(upd, { pickup_date: val('m_pickup')||null, return_date: val('m_return')||null,
+                         warranty_note: val('m_wnote')||null })
+    const sel = $('m_adv')
+    if (sel.value !== sel.dataset.orig){
+      if (!sel.value){ upd.service_advisor = null; upd.service_advisor_id = null }
+      else if (!sel.value.startsWith('name:')){
+        const e = (S.advisors||[]).find(x => x.id === sel.value)
+        if (e){ upd.service_advisor = e.name; upd.service_advisor_id = e.id }
+      }
+    }
     // claim dates only when the admin actually changed them
     const r = S.rows.find(x=>x.id===S.editId) || {}
     const same = (v, id) => dtLocal(v) === val(id)
